@@ -1,0 +1,9 @@
+# SPDX-License-Identifier: MIT OR Apache-2.0
+# See CONTRIBUTING.md §4.
+
+[alias]
+ci         = "check --workspace --all-targets"
+fix-all    = ["fmt", "--", "&&", "clippy", "--workspace", "--all-targets", "--fix", "--allow-staged", "--", "-D", "warnings"]
+t          = "test --workspace"
+snap       = ["insta", "test", "--workspace", "--review"]
+deny-check = ["deny", "check"]

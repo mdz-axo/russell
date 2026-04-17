@@ -1,0 +1,28 @@
+# SPDX-License-Identifier: MIT OR Apache-2.0
+[package]
+name = "russell-cli"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[[bin]]
+name = "russell"
+path = "src/main.rs"
+
+[dependencies]
+russell-core.workspace = true
+russell-sentinel.workspace = true
+russell-skills.workspace = true
+russell-doctor.workspace = true
+russell-proprio.workspace = true
+russell-mcp.workspace = true
+anyhow.workspace = true
+clap.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+serde_json.workspace = true
+time.workspace = true

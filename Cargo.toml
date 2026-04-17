@@ -1,0 +1,57 @@
+# SPDX-License-Identifier: MIT OR Apache-2.0
+# See docs/adr/0013-rust-workspace-layout.md
+
+[workspace]
+resolver = "3"
+members = [
+    "crates/russell-core",
+    "crates/russell-sentinel",
+    "crates/russell-skills",
+    "crates/russell-doctor",
+    "crates/russell-proprio",
+    "crates/russell-mcp",
+    "crates/russell-cli",
+]
+
+[workspace.package]
+version = "0.1.0-phase0"
+edition = "2024"
+rust-version = "1.94"
+license = "MIT OR Apache-2.0"
+repository = "https://example.invalid/russell"
+authors = ["Russell contributors"]
+
+[workspace.dependencies]
+# Internal
+russell-core     = { path = "crates/russell-core" }
+russell-sentinel = { path = "crates/russell-sentinel" }
+russell-skills   = { path = "crates/russell-skills" }
+russell-doctor   = { path = "crates/russell-doctor" }
+russell-proprio  = { path = "crates/russell-proprio" }
+russell-mcp      = { path = "crates/russell-mcp" }
+
+# Third-party (see ADRs 0004, 0009, 0010, 0012)
+thiserror = "2"
+anyhow = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+rusqlite = { version = "0.32", features = ["bundled"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "process", "signal", "sync", "time", "fs", "io-util"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
+ulid = { version = "1", features = ["serde"] }
+time = { version = "0.3", features = ["serde", "serde-human-readable", "macros"] }
+clap = { version = "4", features = ["derive"] }
+toml = "0.8"
+insta = { version = "1", features = ["yaml", "json"] }
+tempfile = "3"
+
+[profile.dev]
+opt-level = 0
+debug = true
+
+[profile.release]
+opt-level = 3
+debug = 1
+lto = "thin"
+strip = "debuginfo"

@@ -1,0 +1,4 @@
+# SPDX-License-Identifier: MIT OR Apache-2.0
+# Per docs/standards/coding-rust.md §7.
+edition = "2024"
+newline_style = "Unix"
