@@ -1,0 +1,70 @@
+# docs/templates/skill-manifest.yaml
+# Copy to skills/<id>/manifest.yaml and fill every field.
+# See AGENTS.md §6 ("How to add a new skill") and
+# docs/standards/safety.md (IDRS contract) before editing.
+
+# --- identity ---------------------------------------------------------------
+id: <kebab-case-id>                 # e.g. gpu-doctor, battery-doctor
+version: 0.1.0                      # semver; bump on any manifest change
+authored: YYYY-MM-DD
+min_harness_version: 0.1.0          # minimum Russell version this manifest needs
+
+# --- scope ------------------------------------------------------------------
+# Which symptom classes this skill claims to address. Doctor looks skills
+# up by symptom; an unknown symptom name is a poka-yoke error.
+symptoms:
+  - <symptom_class>                 # e.g. amdgpu_ring_hang, vram_oom
+
+# Preconditions on the profile. If any clause fails, the skill is not
+# offered for this machine. All clauses are ANDed. Values may be scalars
+# or `*_any: [list]`.
+applies_when:
+  - os_family: linux                # one of: linux, (future: darwin, windows)
+  # - pci_vendor: 0x1002            # example: AMD-only skills
+  # - gfx_target_any: [gfx1102, gfx1103]
+
+# --- probes (risk: none by definition) -------------------------------------
+# Probes are read-only. Anything that mutates MUST live under
+# `interventions`. The dispatcher enforces this at load time.
+probes:
+  - id: <probe_id>
+    cmd: ["argv", "as", "list"]     # no shell interpolation; use bash -c for pipes
+    risk: none
+    capture: stdout                 # one of: stdout, stderr, both, file:<path>
+    timeout: 30s                    # coarse upper bound; dispatcher kills on expiry
+
+# --- interventions ---------------------------------------------------------
+# Every mutating step satisfies IDRS. See docs/standards/safety.md.
+interventions:
+  - id: <intervention_id>
+    cmd: ["argv", "as", "list"]
+    risk: low                       # none | low | medium | high | critical
+    idempotent: true                # must be true; verifiable with --verify-idempotent
+    # Exactly one of: rollback_id, rollback: none_needed, rollback: reboot
+    rollback: none_needed           # justify in a comment if none_needed / reboot
+    # rollback_id: <reverse intervention id>
+    # requires_confirmation: false  # defaults: true for risk >= medium
+    # preconditions:
+    #   - on_ac_power
+    #   - no_active_graphical_session
+
+# --- safety -----------------------------------------------------------------
+safety:
+  max_auto_risk: low                # cap: Doctor will never auto-run above this
+  require_human_for:                # explicit deny-list of IDs that always confirm
+    - <intervention_id>
+
+# --- evaluation -------------------------------------------------------------
+# Run after any intervention to verify the symptom cleared. Exit codes
+# and/or stdout matchers. Fail here = revert via rollback.
+evaluation:
+  after_intervention:
+    - id: <check_id>
+      cmd: ["argv", "as", "list"]
+      timeout: 30s
+      expect_exit: 0
+
+# --- references ------------------------------------------------------------
+references:
+  - <upstream doc url>
+  - <related ADR path>              # e.g. docs/adr/0007-yaml-manifest-subprocess-skill-model.md
