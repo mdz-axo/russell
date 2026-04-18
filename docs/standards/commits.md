@@ -1,3 +1,17 @@
+---
+title: "Commit Standard (Conventional Commits)"
+audience: [contributors, developers]
+last_updated: 2026-04-18
+togaf_phase: "Preliminary"
+version: "1.0.0"
+status: "Active"
+---
+
+<!-- TOGAF_DOMAIN: Preliminary -->
+<!-- VERSION: 1.0.0 -->
+<!-- STATUS: Active -->
+<!-- LAST_UPDATED: 2026-04-18 -->
+
 <!--
 audience: Russell contributors authoring commits and PRs
 last-reviewed: 2026-04-17

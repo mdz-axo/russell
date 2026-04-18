@@ -1,3 +1,17 @@
+---
+title: "ADR-0002: Licensing — Dual MIT/Apache-2.0"
+audience: [developers, contributors]
+last_updated: 2026-04-18
+togaf_phase: "H — Change Management"
+version: "1.0.0"
+status: "Active"
+---
+
+<!-- TOGAF_DOMAIN: Change Management -->
+<!-- VERSION: 1.0.0 -->
+<!-- STATUS: Active -->
+<!-- LAST_UPDATED: 2026-04-18 -->
+
 <!--
 audience: anyone contributing code, docs, or skills to Russell
 last-reviewed: 2026-04-17

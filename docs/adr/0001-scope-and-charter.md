@@ -1,3 +1,17 @@
+---
+title: "ADR-0001: Scope and Charter"
+audience: [architects, developers, contributors]
+last_updated: 2026-04-18
+togaf_phase: "H — Change Management"
+version: "1.0.0"
+status: "Active"
+---
+
+<!-- TOGAF_DOMAIN: Change Management -->
+<!-- VERSION: 1.0.0 -->
+<!-- STATUS: Active -->
+<!-- LAST_UPDATED: 2026-04-18 -->
+
 <!--
 audience: anyone asking "what is Russell for?"
 last-reviewed: 2026-04-17

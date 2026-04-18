@@ -1,3 +1,17 @@
+---
+title: "ADR-0013: Rust Workspace Layout"
+audience: [developers, architects]
+last_updated: 2026-04-18
+togaf_phase: "H — Change Management"
+version: "1.0.0"
+status: "Active"
+---
+
+<!-- TOGAF_DOMAIN: Change Management -->
+<!-- VERSION: 1.0.0 -->
+<!-- STATUS: Active -->
+<!-- LAST_UPDATED: 2026-04-18 -->
+
 <!--
 audience: anyone adding crates / moving code between crates
 last-reviewed: 2026-04-17

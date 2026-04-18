@@ -1,3 +1,17 @@
+---
+title: "SOAP Bundle Template"
+audience: [developers]
+last_updated: 2026-04-18
+togaf_phase: "C — Information Systems"
+version: "1.0.0"
+status: "Active"
+---
+
+<!-- TOGAF_DOMAIN: Information Systems -->
+<!-- VERSION: 1.0.0 -->
+<!-- STATUS: Active -->
+<!-- LAST_UPDATED: 2026-04-18 -->
+
 <!--
 audience: Doctor (machine-generated) and downstream readers
 format: harness.soap.v1

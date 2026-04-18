@@ -1,3 +1,17 @@
+---
+title: "Architecture Overview"
+audience: [architects, developers, contributors]
+last_updated: 2026-04-18
+togaf_phase: "A — Architecture Vision"
+version: "1.1.0"
+status: "Active"
+---
+
+<!-- TOGAF_DOMAIN: Architecture Vision -->
+<!-- VERSION: 1.1.0 -->
+<!-- STATUS: Active -->
+<!-- LAST_UPDATED: 2026-04-18 -->
+
 <!--
 audience: contributors orienting themselves before editing code
 last-reviewed: 2026-04-17

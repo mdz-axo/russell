@@ -1,3 +1,17 @@
+---
+title: "ADR Template"
+audience: [contributors]
+last_updated: 2026-04-18
+togaf_phase: "Preliminary"
+version: "1.0.0"
+status: "Active"
+---
+
+<!-- TOGAF_DOMAIN: Preliminary -->
+<!-- VERSION: 1.0.0 -->
+<!-- STATUS: Active -->
+<!-- LAST_UPDATED: 2026-04-18 -->
+
 <!--
 audience: Russell contributors proposing a locked decision
 last-reviewed: 2026-04-17
