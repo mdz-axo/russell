@@ -30,7 +30,7 @@ Russell is open-source software intended to be embedded in a
 single user's workstation but also suitable for sharing skill
 manifests through a public registry (design document §13).
 Skills are separately-licensable artifacts
-([ADR-0014](0014-skill-manifest-licensing.md)).
+([ADR-0014](deferred/0014-skill-manifest-licensing.md)).
 
 The Rust ecosystem's de-facto standard is dual-licensed under
 MIT and Apache-2.0, which:
@@ -132,5 +132,5 @@ Rust ecosystem norms for new projects.
 - Rust API Guidelines: https://rust-lang.github.io/api-guidelines/
 - SPDX license list: https://spdx.org/licenses/
 - `deny.toml` template: https://embarkstudios.github.io/cargo-deny/
-- [ADR-0014](0014-skill-manifest-licensing.md) — licensing of
+- [ADR-0014](deferred/0014-skill-manifest-licensing.md) — licensing of
   third-party skill manifests.

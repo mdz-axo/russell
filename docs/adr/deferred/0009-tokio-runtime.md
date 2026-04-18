@@ -130,8 +130,8 @@ async; we would end up rebuilding a small runtime.
 ## References
 
 - Tokio docs: https://tokio.rs
-- [`../standards/coding-rust.md`](../standards/coding-rust.md) §5
-- [ADR-0004](0004-sqlite-journal.md) — writer uses
+- [`../../standards/coding-rust.md`](../../standards/coding-rust.md) §5
+- [ADR-0004](../0004-sqlite-journal.md) — writer uses
   `spawn_blocking`.
-- [ADR-0015](0015-proprioception-self-health.md) — blocking
+- [ADR-0015](../0015-proprioception-self-health.md) — blocking
   pool observation.

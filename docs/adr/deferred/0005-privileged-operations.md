@@ -147,5 +147,5 @@ without solving the authentication problem.
 
 - PolKit docs: https://www.freedesktop.org/software/polkit/docs/latest/
 - `systemd.exec(5)` — `NoNewPrivileges`, `CapabilityBoundingSet`.
-- [`../standards/safety.md`](../standards/safety.md)
+- [`../../standards/safety.md`](../../standards/safety.md)
 - [ADR-0003](0003-mcp-transport.md) — no network listener.

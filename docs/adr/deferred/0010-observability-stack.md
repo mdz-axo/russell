@@ -135,7 +135,7 @@ similar.
   `intervention_id`, `risk`.
 - The `russell-proprio` crate subscribes to the metrics
   recorder; documented in
-  [`../architecture/proprioception.md`](../architecture/proprioception.md).
+  [`../../archive/proprioception.md`](../../archive/proprioception.md).
 
 ## References
 

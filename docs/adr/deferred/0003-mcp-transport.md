@@ -42,7 +42,7 @@ model. That model also:
 - delegates lifecycle (kill, restart) to the frontend,
 - logs naturally to stdout/stderr + journald.
 
-See [ADR-0001](0001-scope-and-charter.md): Russell is a
+See [ADR-0001](../0001-scope-and-charter.md): Russell is a
 single-host, single-operator tool.
 
 ## Decision
@@ -109,7 +109,7 @@ Rejected: Windows is out of charter per ADR-0001.
   well-maintained compatible crate); the exact choice is a
   library selection note, not an ADR-level decision.
 - The server's tool surface is documented in
-  [`../architecture/mcp-surface.md`](../architecture/mcp-surface.md).
+  [`../../archive/mcp-surface.md`](../../archive/mcp-surface.md).
 - Any future transport must arrive via a new ADR that
   addresses:
   1. Threat model (who can connect?).
@@ -120,6 +120,6 @@ Rejected: Windows is out of charter per ADR-0001.
 ## References
 
 - MCP specification: https://modelcontextprotocol.io
-- [`CONTRIBUTING.md` §8](../../CONTRIBUTING.md) — how to wire
+- [`CONTRIBUTING.md` §8](../../../CONTRIBUTING.md) — how to wire
   frontends to the stdio binary.
-- [ADR-0001](0001-scope-and-charter.md) — single-host scope.
+- [ADR-0001](../0001-scope-and-charter.md) — single-host scope.

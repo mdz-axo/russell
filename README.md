@@ -1,48 +1,76 @@
 # Russell — Cybernetic Health Harness
 
-> Named for the disposition, not the philosopher: a steady, watchful companion
-> that tells you when something feels off and knows who to call when it does.
+> *Though she be but little, she is fierce.* — Shakespeare, *A Midsummer Night's Dream* III.ii.
+>
+> Named for the disposition of the Jack Russell terrier and for
+> *Will & Grace*'s "Just Jack" — small but mighty, quick but
+> loyal, alert but never cruel.
 
-This folder is a **design project**, not yet an implementation. It re-casts the
-loose collection of periodic shell scripts under `~/Clones/scripts/` as a
-closed-loop, self-adaptive maintenance harness for a Framework 16 / AMD RDNA3 /
-Ubuntu AI-dev workstation.
+Russell is a **single-host** cybernetic health harness for a
+Linux AI/ML workstation. He observes one machine, remembers what
+he saw, reports it honestly, watches himself, and — when asked —
+consults a frontier LLM with zero data retention to help the
+operator think about what he is seeing.
 
-## Reading order
+He does not fix things he does not understand.
 
-1. [`MACHINE_PROFILE.md`](MACHINE_PROFILE.md:1) — the patient's chart: what was
-   actually observed on this machine, today.
-2. [`cybernetic-health-harness.md`](cybernetic-health-harness.md:1) — **the
-   design document.** Executive summary, metaphor, research findings, legacy
-   recon + migration table, knowledge graphs (v1 and v2), architecture,
-   scheduler, telemetry, four tier specifications, specialist Doctor,
-   self-profiling bootstrap, logging/observability, safety contract, code
-   blueprints, reflection against exemplars, philosophical grounding, and the
-   implementation roadmap.
+## What Russell is today
 
-## One-line summary
+Phase 0 (read-only skeleton) is complete. Phase 1 (the MVP
+Doctor — `russell help`) is the current target.
 
-> A `systemd`-driven core clock runs cadenced hygiene tasks; a continuous
-> Sentinel watches for symptoms; a Doctor supervisor escalates with
-> manifest-driven skill modules; a self-profiling bootstrap personalizes the
-> regimen to *this* hardware; a SQLite journal turns every check into
-> time-series evidence — all observable, idempotent, reversible, and refusing
-> to "fix" things it doesn't understand.
+**Six verbs.** All read-only. See
+[`docs/specifications/MVP_SPEC.md`](docs/specifications/MVP_SPEC.md) §2.
+
+```sh
+russell status                         # summary
+russell list --limit 20                # recent events
+russell profile --init                 # one-shot stub
+russell digest --since-hours 168       # Markdown report
+russell sentinel-once                  # one observation cycle
+russell help --note "ollama hangs"     # ask Jack    [Phase 1]
+```
+
+## Reading order (do not skip)
+
+1. [`AGENTS.md`](AGENTS.md) — the binding rules.
+2. [`docs/README.md`](docs/README.md) — portal + critical set.
+3. [`docs/architecture/PRINCIPLES_CATALOG.md`](docs/architecture/PRINCIPLES_CATALOG.md)
+   — JR-1 through JR-7.
+4. [`docs/specifications/MVP_SPEC.md`](docs/specifications/MVP_SPEC.md)
+   — the pinned boundary.
+5. [`docs/architecture/THE_JACK.md`](docs/architecture/THE_JACK.md)
+   — who Jack is.
+6. [`MACHINE_PROFILE.md`](MACHINE_PROFILE.md) — the patient.
+7. [`cybernetic-health-harness.md`](cybernetic-health-harness.md)
+   — the full design, the aspirational target.
 
 ## Status
 
-- [x] Observed machine & legacy scripts recon
-- [x] Knowledge graph v1 + v2
-- [x] Plan drafted and revised against exemplars
-- [ ] Implementation (Phases 0 → 6 — see §20 of the design document)
+See [`docs/status/CONSOLIDATED-STATUS.md`](docs/status/CONSOLIDATED-STATUS.md).
 
-## Conventions
+- [x] Phase 0 — Skeleton. Read-only CLI verbs. Journal. Profile.
+- [ ] **Phase 1 — Doctor (`russell help`).** Kimi K2 via
+      OpenRouter with `zdr: true`. Offline fallback. This is
+      current.
+- [ ] Phase 1b — systemd unit files.
+- [ ] Phase 1c — 30-day unattended soak.
+- [ ] Phase 2 — Rules engine, EWMA baselines, Tier I modules.
+- [ ] Phase 3+ — Skills, dispatch, MCP surface, full proprio.
+      See `cybernetic-health-harness.md` §20.
 
-- Nothing here is executable yet. Code in the design document is illustrative
-  blueprint, not production.
-- Machine facts live in `MACHINE_PROFILE.md`. The design document references a
-  *target class* of hardware; the bootstrap reconciles the real observed
-  silicon at install time.
-- Every proposed automation must answer: what does it sense, what does it
-  change, how is it reversed, what does it log? If any of those four is
-  missing, it is not ready.
+## The four-question contract
+
+Every proposed automation answers:
+
+- What does it **sense**?
+- What does it **change**?
+- How is it **reversed**?
+- What does it **log**?
+
+If any of those is missing, it is not ready.
+
+## Licence
+
+Dual — MIT OR Apache-2.0. See `LICENSE-MIT`, `LICENSE-APACHE`,
+and [`docs/adr/0002-licensing.md`](docs/adr/0002-licensing.md).

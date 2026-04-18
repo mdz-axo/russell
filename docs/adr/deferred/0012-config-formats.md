@@ -136,7 +136,7 @@ for the longer argument.
 ## References
 
 - `toml`, `serde_yaml`, `serde_json` docs.
-- [ADR-0006](0006-profile-abstraction.md) — JSON for
+- [ADR-0006](../0006-profile-abstraction.md) — JSON for
   profile.
 - [ADR-0007](0007-yaml-manifest-subprocess-skill-model.md)
   — YAML for manifests.

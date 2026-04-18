@@ -174,7 +174,7 @@ Manifests may declare preconditions:
   24 hours.
 - `journal_healthy` — refuse if the meta-Sentinel reports the
   journal is degraded (see
-  [`../architecture/proprioception.md`](../architecture/proprioception.md)).
+  [`../archive/proprioception.md`](../archive/proprioception.md)).
 
 A precondition failure is not an error; it is a normal
 `deferred` outcome, journaled as such.
@@ -219,7 +219,7 @@ author. See [ADR-0008](../adr/0008-llm-triage-never-emits-shell.md).
 ## 9. Relationship to proprioception
 
 Self-triage (see
-[`../architecture/proprioception.md`](../architecture/proprioception.md))
+[`../archive/proprioception.md`](../archive/proprioception.md))
 uses the same IDRS contract. A reflex arc may fire without
 waiting for the next cadence, but it still emits
 `harness.event.v1`, still respects the kill switches, and

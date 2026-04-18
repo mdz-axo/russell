@@ -50,7 +50,7 @@ components:
 1. **Meta-Sentinel.** A telemetry collector that samples
    Russell's own vitals on the same 5-minute cadence as
    the host Sentinel. Vitals listed in
-   [`../architecture/proprioception.md`](../architecture/proprioception.md)
+   [`../archive/proprioception.md`](../archive/proprioception.md)
    §3. Writes to a `proprio_samples` table that mirrors
    `samples` column-for-column with an added `scope`
    field.
@@ -158,9 +158,9 @@ misbehaves will be catastrophic.
 
 ## References
 
-- [`../architecture/proprioception.md`](../architecture/proprioception.md)
+- [`../archive/proprioception.md`](../archive/proprioception.md)
 - [`../standards/safety.md`](../standards/safety.md) §9
-- [ADR-0007](0007-yaml-manifest-subprocess-skill-model.md)
+- [ADR-0007](deferred/0007-yaml-manifest-subprocess-skill-model.md)
 - [ADR-0008](0008-llm-triage-never-emits-shell.md)
 - Stafford Beer, *Brain of the Firm* — self-
   observation is System 3\*.

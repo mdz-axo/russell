@@ -93,7 +93,7 @@ checkpoint.
 
 - A single-writer contract adds latency under bursty load.
   The `journal_writer_lag_ms` vital
-  (see [proprioception.md](../architecture/proprioception.md))
+  (see [proprioception.md](../archive/proprioception.md))
   exists precisely to detect that latency rising.
 - WAL files (`-wal`, `-shm`) live alongside the DB. The
   proprioception reflex arc `self/journal-compactor` handles

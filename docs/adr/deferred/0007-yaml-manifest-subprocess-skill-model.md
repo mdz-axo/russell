@@ -31,7 +31,7 @@ last-reviewed: 2026-04-17
 
 ## Context
 
-[`cybernetic-health-harness.md` §12.1](../../cybernetic-health-harness.md)
+[`cybernetic-health-harness.md` §12.1](../../../cybernetic-health-harness.md)
 sketches skills as YAML manifests that describe probes and
 interventions, with referenced scripts under
 `~/.local/share/harness/skills/<id>/scripts/`. The design
@@ -62,7 +62,7 @@ skills/<id>/
 ```
 
 The manifest schema is defined by
-[`../templates/skill-manifest.yaml`](../templates/skill-manifest.yaml);
+[`../../templates/skill-manifest.yaml`](../../templates/skill-manifest.yaml);
 canonical parsing lives in `russell-skills::manifest`.
 
 Execution model:
@@ -89,7 +89,7 @@ Execution model:
      the parent systemd unit.
 4. The dispatcher translates LLM-selected **IDs** to manifest
    entries; the LLM never supplies commands
-   ([ADR-0008](0008-llm-triage-never-emits-shell.md)).
+   ([ADR-0008](../0008-llm-triage-never-emits-shell.md)).
 
 Manifest invariants (all enforced at load time):
 
@@ -178,12 +178,12 @@ shell poorly.
 - A `skills/self/` subdirectory hosts proprioception
   skills (`scope: self`); same schema, same dispatcher,
   but journaled into `proprio_events`
-  ([ADR-0015](0015-proprioception-self-health.md)).
+  ([ADR-0015](../0015-proprioception-self-health.md)).
 
 ## References
 
-- [`cybernetic-health-harness.md` §12](../../cybernetic-health-harness.md)
-- [`../templates/skill-manifest.yaml`](../templates/skill-manifest.yaml)
-- [`../standards/safety.md`](../standards/safety.md)
-- [ADR-0008](0008-llm-triage-never-emits-shell.md)
+- [`cybernetic-health-harness.md` §12](../../../cybernetic-health-harness.md)
+- [`../../templates/skill-manifest.yaml`](../../templates/skill-manifest.yaml)
+- [`../../standards/safety.md`](../../standards/safety.md)
+- [ADR-0008](../0008-llm-triage-never-emits-shell.md)
 - [ADR-0014](0014-skill-manifest-licensing.md)

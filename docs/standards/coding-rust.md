@@ -87,7 +87,7 @@ are separate crates. Cross-crate dependencies are a DAG rooted at
   runtime.
 - Blocking work (subprocess spawn, SQLite writes) goes through
   `tokio::task::spawn_blocking` or a dedicated blocking
-  threadpool. See [ADR-0009](../adr/0009-tokio-runtime.md).
+  threadpool. See [ADR-0009](../adr/deferred/0009-tokio-runtime.md).
 
 ## 6. Logging
 
@@ -185,8 +185,8 @@ are separate crates. Cross-crate dependencies are a DAG rooted at
 - Every tool declares a `risk_band` at registration time;
   tools with `risk_band >= Medium` MUST route through the
   proposal / `confirm_proposal` pattern rather than acting
-  directly. See [ADR-0003](../adr/0003-mcp-transport.md) and
-  [`../architecture/mcp-surface.md`](../architecture/mcp-surface.md).
+  directly. See [ADR-0003](../adr/deferred/0003-mcp-transport.md) and
+  [`../archive/mcp-surface.md`](../archive/mcp-surface.md).
 
 ## 15. What not to do
 

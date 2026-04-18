@@ -165,5 +165,5 @@ cardinality symptom spaces.
 
 - [`cybernetic-health-harness.md` §12.2](../../cybernetic-health-harness.md)
 - [`../standards/safety.md`](../standards/safety.md) §8
-- [ADR-0007](0007-yaml-manifest-subprocess-skill-model.md)
+- [ADR-0007](deferred/0007-yaml-manifest-subprocess-skill-model.md)
 - [ADR-0015](0015-proprioception-self-health.md)

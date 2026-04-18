@@ -93,10 +93,10 @@ a corresponding ADR and a corresponding area of the code:
 
 | VSM layer | Locked decision | Code home |
 |---|---|---|
-| Policy | [ADR-0005](../adr/0005-privileged-operations.md), [safety.md](../standards/safety.md) | `russell-cli` confirm flow, kill switches |
+| Policy | [ADR-0005](../adr/deferred/0005-privileged-operations.md), [safety.md](../standards/safety.md) | `russell-cli` confirm flow, kill switches |
 | Intelligence | [ADR-0008](../adr/0008-llm-triage-never-emits-shell.md) | `russell-doctor::llm`, `russell-doctor::bootstrap` |
-| Control | [ADR-0007](../adr/0007-yaml-manifest-subprocess-skill-model.md), [ADR-0015](../adr/0015-proprioception-self-health.md) | `russell-doctor`, `russell-proprio` |
-| Coordination | [ADR-0009](../adr/0009-tokio-runtime.md) + systemd timers | Unit files under `units/`; timers are OS-level |
+| Control | [ADR-0007](../adr/deferred/0007-yaml-manifest-subprocess-skill-model.md), [ADR-0015](../adr/0015-proprioception-self-health.md) | `russell-doctor`, `russell-proprio` |
+| Coordination | [ADR-0009](../adr/deferred/0009-tokio-runtime.md) + systemd timers | Unit files under `units/`; timers are OS-level |
 | Operations | [ADR-0004](../adr/0004-sqlite-journal.md), [ADR-0006](../adr/0006-profile-abstraction.md) | `russell-sentinel`, `russell-skills` |
 
 ## 2. Crate topology
@@ -168,7 +168,7 @@ derived.
 
 Russell runs under user-scoped systemd with one exception:
 `weekly/apt-upgrade` escalates through a narrow PolKit action
-([ADR-0005](../adr/0005-privileged-operations.md)). All timers
+([ADR-0005](../adr/deferred/0005-privileged-operations.md)). All timers
 declare `Persistent=true` + `RandomizedDelaySec=` so a sleeping
 laptop catches up without thundering herd.
 
@@ -178,7 +178,7 @@ Every CLI subcommand has a matching MCP tool unless an ADR
 explicitly justifies the asymmetry. This is a hard rule so
 agents and humans never diverge in capability. The MCP surface
 is catalogued in
-[`mcp-surface.md`](mcp-surface.md).
+[`../archive/mcp-surface.md`](../archive/mcp-surface.md).
 
 ### 4.3 The Doctor
 
@@ -208,7 +208,7 @@ probe's value against the EWMA baseline. Samples and any
 generated events land in the journal.
 
 The Meta-Sentinel is the same thing pointed at Russell itself
-(see [`proprioception.md`](proprioception.md)). Timer drift,
+(see [`../archive/proprioception.md`](../archive/proprioception.md)). Timer drift,
 dispatcher latency, journal-writer lag, subprocess zombies,
 LLM round-trip times, MCP error rate.
 
@@ -227,9 +227,9 @@ aggressive intervention.
 |---|---|---|
 | New probe | `russell-sentinel::probes` | `overview.md` §3.2 if schema changes; ADR if new hardware class |
 | New skill | `skills/<id>/` | `AGENTS.md` §6; new symptom-class ADR if introducing one |
-| New MCP tool | `russell-mcp::tools` | [`mcp-surface.md`](mcp-surface.md); ADR |
+| New MCP tool | `russell-mcp::tools` | [`../archive/mcp-surface.md`](../archive/mcp-surface.md); ADR |
 | New CLI subcommand | `russell-cli::commands` | `CONTRIBUTING.md` §9; mirror in MCP if user-facing |
-| New self-health vital | `russell-proprio::probes` | [`proprioception.md`](proprioception.md); ADR if new failure class |
+| New self-health vital | `russell-proprio::probes` | [`../archive/proprioception.md`](../archive/proprioception.md); ADR if new failure class |
 
 ## 8. What this document is not
 

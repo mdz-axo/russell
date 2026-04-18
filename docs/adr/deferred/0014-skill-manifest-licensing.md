@@ -32,10 +32,10 @@ last-reviewed: 2026-04-17
 ## Context
 
 Russell core is dual-licensed
-[ADR-0002](0002-licensing.md). Skills are **data plus
+[ADR-0002](../0002-licensing.md). Skills are **data plus
 scripts** (ADR-0007) that may be authored separately and
 eventually fetched from a remote registry
-([`cybernetic-health-harness.md` §13](../../cybernetic-health-harness.md)).
+([`cybernetic-health-harness.md` §13](../../../cybernetic-health-harness.md)).
 Third-party skills may reasonably carry licenses the core
 does not.
 
@@ -153,6 +153,6 @@ license. Inconsistency is a load-time error.
 ## References
 
 - SPDX license list: https://spdx.org/licenses/
-- [ADR-0002](0002-licensing.md)
+- [ADR-0002](../0002-licensing.md)
 - [ADR-0007](0007-yaml-manifest-subprocess-skill-model.md)
-- [`cybernetic-health-harness.md` §13](../../cybernetic-health-harness.md)
+- [`cybernetic-health-harness.md` §13](../../../cybernetic-health-harness.md)

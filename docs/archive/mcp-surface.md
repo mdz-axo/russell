@@ -22,7 +22,7 @@ last-reviewed: 2026-04-17
 # MCP surface
 
 Russell is an MCP server over stdio
-([ADR-0003](../adr/0003-mcp-transport.md)). Agent frontends —
+([ADR-0003](../adr/deferred/0003-mcp-transport.md)). Agent frontends —
 Claude Desktop, Roo/Cline in VSCodium, Zed — call its tools to
 inspect the machine, propose interventions, and confirm
 them.
