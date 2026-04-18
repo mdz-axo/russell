@@ -1,3 +1,22 @@
+---
+title: "ADR-0010: Observability Stack (Deferred)"
+audience: [developers, architects]
+last_updated: 2026-04-18
+togaf_phase: "H — Change Management"
+version: "1.0.0"
+status: "Accepted — Deferred"
+---
+
+<!-- TOGAF_DOMAIN: Change Management -->
+<!-- VERSION: 1.0.0 -->
+<!-- STATUS: Accepted — Deferred -->
+<!-- LAST_UPDATED: 2026-04-18 -->
+
+> **Deferred.** This ADR's subject is outside the MVP boundary per
+> [`../../specifications/MVP_SPEC.md`](../../specifications/MVP_SPEC.md) §5.
+> It remains **Accepted** — when its phase opens, it ships this way.
+> See [`README.md`](README.md) for the deferral register.
+
 <!--
 audience: logging / tracing / metrics contributors
 last-reviewed: 2026-04-17

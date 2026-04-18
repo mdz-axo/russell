@@ -1,246 +1,200 @@
-<!--
-audience: every contributor to Russell, human and AI
-last-reviewed: 2026-04-17
--->
+---
+title: "Russell — Agent Orientation"
+audience: [agents, operators, developers, contributors, architects]
+last_updated: 2026-04-18
+togaf_phase: "Preliminary / Governance"
+version: "1.0.0"
+status: "Active"
+---
+
+<!-- TOGAF_DOMAIN: Governance -->
+<!-- VERSION: 1.0.0 -->
+<!-- STATUS: Active -->
+<!-- LAST_UPDATED: 2026-04-18 -->
 
 # AGENTS.md — contributing to Russell
 
-> Russell is a cybernetic health harness for a single Linux AI/ML workstation,
-> exposed to local agent harnesses as a Model Context Protocol (MCP) server.
-> This file is the primary orientation document for anyone — human, LLM, or
-> subagent — who intends to change the code, the docs, or the skill catalog.
+> Russell is a cybernetic health harness for a single Linux AI/ML
+> workstation. He is small but mighty — a Jack Russell terrier who
+> watches the machine and cries for help when needed.
+>
+> This file is the **binding orientation document** for any human,
+> AI, or subagent touching the code, docs, or skill catalogue.
+> Read it before you edit anything.
 
 ## 1. What Russell is (one paragraph)
 
-Russell observes a Framework 16 / Ryzen AI / Radeon / Ubuntu workstation the
-way a primary-care physician watches a patient: cadenced hygiene, continuous
-vitals, a disciplined escalation to a specialist when something looks wrong,
-and an evidence bundle that anyone can read after the fact. The whole
-apparatus is packaged as a single Rust binary that speaks MCP over stdio so
-that agent frontends — Claude Desktop, Roo/Cline in VSCodium, Zed — can call
-the Sentinel, the Doctor, the journal, and the skill dispatcher as tools.
-The LLM is a consultant that ranks a differential over known probe IDs; it
-never emits shell.
+Russell is a single-host, single-operator harness that:
 
-## 2. Reading order
+- **observes** the host on a 5-minute cadence (Sentinel),
+- **remembers** what he saw in a SQLite journal,
+- **reports** through a read-only CLI,
+- **watches himself** (proprioception — "did I run on time?"),
+- and when asked, **cries for help** via a frontier LLM with
+  zero-data-retention (Kimi K2 through OpenRouter).
 
-Do not skip. Every section below references vocabulary defined here.
+He does *not* mutate host state, dispatch skills, or act on LLM
+output. Those lanes are deferred behind the MVP boundary.
 
-1. [`README.md`](README.md) — what this folder is.
-2. [`MACHINE_PROFILE.md`](MACHINE_PROFILE.md) — the patient's chart.
-3. [`cybernetic-health-harness.md`](cybernetic-health-harness.md) — the
-   canonical design document. **Treat its vocabulary as binding.**
-4. [`docs/architecture/overview.md`](docs/architecture/overview.md) — how
-   the locked decisions fit together.
-5. [`docs/architecture/mcp-surface.md`](docs/architecture/mcp-surface.md) —
-   the MCP tool surface you are extending.
-6. [`docs/architecture/proprioception.md`](docs/architecture/proprioception.md)
-   — Russell's reflexive nervous system.
-7. [`docs/adr/`](docs/adr/) — every locked decision, numbered.
-8. The standards (§5 below).
+## 2. Authority Hierarchy
 
-## 3. The medical metaphor is load-bearing
+When claims conflict, precedence is:
 
-The metaphor is not decoration; it shapes module boundaries, escalation,
-log schema, and the default refusal posture. Preserve this vocabulary
-verbatim across code, docs, commit messages, and agent prompts:
+1. **This file** (`AGENTS.md`) — binding vocabulary and posture.
+2. [`docs/README.md`](docs/README.md) — portal and critical-set
+   declaration.
+3. [`docs/status/CONSOLIDATED-STATUS.md`](docs/status/CONSOLIDATED-STATUS.md)
+   — where we actually are.
+4. [`docs/specifications/MVP_SPEC.md`](docs/specifications/MVP_SPEC.md)
+   — the pinned MVP boundary.
+5. [`docs/architecture/PRINCIPLES_CATALOG.md`](docs/architecture/PRINCIPLES_CATALOG.md)
+   — the JR principles.
+6. Active ADRs under [`docs/adr/`](docs/adr/).
+7. [`cybernetic-health-harness.md`](cybernetic-health-harness.md)
+   — the full design (aspirational).
 
-| Term | Meaning in Russell |
+## 3. Reading Order (do not skip)
+
+1. This file — the rules.
+2. [`docs/README.md`](docs/README.md) — what's where.
+3. [`docs/architecture/PRINCIPLES_CATALOG.md`](docs/architecture/PRINCIPLES_CATALOG.md)
+   — **read JR-1 through JR-7 or do not touch this code.**
+4. [`docs/specifications/MVP_SPEC.md`](docs/specifications/MVP_SPEC.md)
+   — the pinned boundary.
+5. [`docs/architecture/THE_JACK.md`](docs/architecture/THE_JACK.md)
+   — who Jack is.
+6. [`docs/standards/agent-operating-rules.md`](docs/standards/agent-operating-rules.md)
+   — inherited rules about workspace hygiene, verification,
+   honesty.
+7. [`docs/standards/safety.md`](docs/standards/safety.md) — the
+   IDRS contract.
+8. [`MACHINE_PROFILE.md`](MACHINE_PROFILE.md) — the patient.
+
+## 4. The Seven Principles (shorthand)
+
+These live in full at
+[`docs/architecture/PRINCIPLES_CATALOG.md`](docs/architecture/PRINCIPLES_CATALOG.md).
+
+| # | Clause |
 |---|---|
-| **Sentinel** | Continuous low-cost telemetry collector; writes `samples` rows. |
-| **Doctor** | Supervisor that triages symptoms, assembles a SOAP bundle, consults the LLM, and dispatches skill interventions. |
-| **Skill module** | YAML manifest + referenced scripts encoding one diagnostic playbook. Data, not code. |
-| **IDRS** | Idempotent / Dry-run / Rollback / Structured-log — the four-property contract every mutating action must satisfy. |
-| **SOAP bundle** | Evidence folder laid out as Subjective / Objective / Assessment / Plan. |
-| **Risk band** | `none` / `low` / `medium` / `high` / `critical`. `max_auto_risk` caps what the Doctor may run unattended. |
-| **Tiered cadences** | Tier I daily, Tier II weekly/monthly, Tier III quarterly, Tier IV urgent / on-symptom. |
-| **Honeymoon window** | First 30 days after bootstrap; any `risk>=high` defaults to *propose*, not *apply*. |
-| **EWMA baseline** | Per-probe exponentially-weighted mean + variance plus rolling p50/p95/p99. |
-| **Chaos-probe** | A scheduled, bounded, deliberate failure used to verify recovery. |
-| **Poka-yoke** | Manifest schema validation; dispatcher refuses IDs not in the loaded manifest. |
-| **Andon cord** | `russell confirm` / the `confirm_proposal` MCP tool — a human stops the line for any `risk>=medium` auto-disabled action. |
-| **VSM layers** | Operations (Sentinel, Tiers), Coordination (timers), Control (Doctor), Intelligence (Bootstrap + LLM), Policy (the human operator). |
-| **"First, do no harm"** | Default posture: **observe > recommend > act**. |
+| **JR-1** | *Though she be but little, she is fierce.* Austere by default. When in doubt, cut. |
+| **JR-2** | Observe > Recommend > Act. Mutations obey IDRS. |
+| **JR-3** | The LLM never emits shell. It ranks IDs; it does not compose commands. |
+| **JR-4** | Small but present: the Doctor. `russell help` exists from day one. |
+| **JR-5** | Proprioception: Jack watches Jack. One self-vital is non-optional. |
+| **JR-6** | Reuse, don't depend. Copy-with-provenance via `REUSE_MANIFEST.md`. |
+| **JR-7** | Persistence is auditable. Registered in `PERSISTENCE_CATALOG.md`. |
 
-These terms are new as of ADR-0015 and belong to Russell's **reflexive
-nervous system**:
+When two principles conflict, the lower number wins.
+
+## 5. The Vocabulary (binding)
+
+Use these terms exactly. New terminology requires a same-PR
+addition to this table.
 
 | Term | Meaning |
 |---|---|
-| **Proprioception** | Russell's awareness of its own internal state — timer drift, dispatch latency, journal health, MCP error rate, subprocess zombies, LLM call latency, unit states of its own services. |
-| **Meta-sentinel** | The internal Sentinel that samples Russell's own vitals on the same cadenced basis as the host Sentinel. |
-| **Self-triage** | A Doctor run whose subject is Russell itself — a stuck skill, a wedged journal, a flapping timer. Journaled with `scope=self`. |
-| **Reflex arc** | The fast path for self-faults that cannot wait for the next cadence (e.g., a watchdog on a hung skill subprocess). |
-| **Autoimmune check** | The recursion guard that prevents self-triage from invoking itself in a loop. |
+| **Sentinel** | The continuous low-cost telemetry collector; writes `samples` rows. |
+| **Doctor** | Supervisor that consults the LLM when the operator runs `russell help`. In MVP, he does **not** dispatch; he just consults. |
+| **Jack** | The Doctor's persona — terrier + *Will & Grace* Jack McFarland + Rust/Linux/cybernetics fluency. See [`docs/architecture/THE_JACK.md`](docs/architecture/THE_JACK.md). |
+| **Skill module** | YAML manifest + scripts encoding one playbook. **Deferred in MVP.** |
+| **IDRS** | Idempotent / Dry-run / Rollback / Structured-log contract for every mutation. |
+| **SOAP bundle** | Evidence folder laid out Subjective / Objective / Assessment / Plan. |
+| **Honeymoon window** | First 30 days after bootstrap; elevated caution. Deferred mechanism in MVP. |
+| **Risk band** | `none` / `low` / `medium` / `high` / `critical`. MVP interventions are all `none`. |
+| **EWMA baseline** | Per-probe mean + variance, 30-day rolling p50/p95/p99. Deferred to Phase 2. |
+| **Chaos probe** | Deliberate bounded failure to verify recovery. Deferred. |
+| **Poka-yoke** | The dispatcher refusing any ID not in the loaded manifest. Relevant post-MVP. |
+| **Andon cord** | Operator's stop-the-line signal. Deferred. |
+| **Proprioception** | Russell's self-observation. Active in MVP (one self-vital). |
+| **Meta-Sentinel** | The self-facing Sentinel. Full form deferred; the one-vital MVP form is active. |
+| **Self-triage** | A Doctor run whose subject is Russell himself. Deferred. |
+| **Reflex arc** | Fast-path fault handler inside Russell. Deferred. |
+| **Autoimmune check** | Recursion guard on self-triage. Deferred. |
+| **VSM layers** | Ops (Sentinel), Coordination (timers), Control (Doctor), Intelligence (Bootstrap + LLM), Policy (the human). |
+| **"First, do no harm"** | The refusal posture: observe > recommend > act. |
 
-## 4. The IDRS contract (restated crisply)
+## 6. The IDRS Contract (restated)
 
-Every mutating action — whether invoked via CLI, timer, or the `skill_run`
-MCP tool — MUST satisfy all four:
+Every mutation — whenever mutations land — MUST satisfy all four:
 
-- **I — Idempotent.** Running the action twice converges to the same end
-  state. Verifiable with `russell run --module X --verify-idempotent`.
-- **D — Dry-Run.** A `--dry-run` flag (or `RUSSELL_DRY_RUN=1`, or
-  `dry_run: true` in the MCP call) emits the would-do log but performs
-  zero mutations. The dispatcher enforces this at the boundary.
-- **R — Rollback.** Every mutating step captures pre-state before it
-  runs. Manifest fields: `rollback_id` (points at the reverse
-  intervention) or `rollback: reboot` / `none_needed` with written
-  justification. Config edits keep `.bak` copies; systemd drop-ins get a
-  templated revert unit.
-- **S — Structured log.** Every action emits a JSON event that conforms
-  to `harness.event.v1` and is appended to the journal; human-readable
-  renders derive from that record.
+- **I — Idempotent.** Second run = first run's end state.
+- **D — Dry-run.** `--dry-run` flag, `RUSSELL_DRY_RUN=1`, or
+  MCP `dry_run: true` all produce the would-do record with zero
+  side effects.
+- **R — Rollback.** Pre-state captured; `rollback_id` or
+  documented `none_needed` / `reboot` justification.
+- **S — Structured log.** `harness.event.v1` record appended to
+  the journal.
 
-Anything that cannot satisfy all four is not a skill — it is a probe, and
-must declare `risk: none`.
+Anything that cannot satisfy all four is a **probe** (`risk:
+none`), not a skill. **MVP Russell has no skills.**
 
-## 5. Standards
+## 7. How to add features
 
-| Document | Covers |
-|---|---|
-| [`docs/standards/coding-rust.md`](docs/standards/coding-rust.md) | Rust coding conventions, lint posture, error handling, `unsafe` discipline, module layout. |
-| [`docs/standards/documentation.md`](docs/standards/documentation.md) | Doc tiers, voice, Markdown headers, Mermaid discipline, cross-linking. |
-| [`docs/standards/adr.md`](docs/standards/adr.md) | How to author and file an ADR. |
-| [`docs/standards/commits.md`](docs/standards/commits.md) | Conventional Commits, Russell-specific types and scopes. |
-| [`docs/standards/safety.md`](docs/standards/safety.md) | IDRS, risk bands, honeymoon, andon cord, kill switches, confirm flow. **Read this before proposing any mutating action.** |
+Before touching code, answer:
 
-Mechanics (toolchains, `cargo` aliases, snapshot review, local MCP wiring)
-live in [`CONTRIBUTING.md`](CONTRIBUTING.md).
+1. Which **JR principle** is this feature serving or violating?
+2. Is this feature **inside the MVP boundary** per
+   [`docs/specifications/MVP_SPEC.md`](docs/specifications/MVP_SPEC.md) §2,
+   or does it require lifting a deferred ADR?
+3. If inside MVP: is the spec change documented first?
+4. If outside MVP: which ADR's deferral is being lifted, and
+   what evidence justifies lifting it?
+5. What **persistence** does this add? Is it in
+   [`PERSISTENCE_CATALOG.md`](docs/specifications/PERSISTENCE_CATALOG.md)?
+6. What's the **test** that proves it works? What's the test
+   that proves it doesn't break JR-2 / JR-3?
 
-## 6. How to add a new skill
+If you cannot answer all six, stop and ask.
 
-1. Pick an ID. Skill IDs are `kebab-case`: `gpu-doctor`, `battery-doctor`,
-   `toolchain-gardener`. Single-token IDs are reserved for core.
-2. Copy [`docs/templates/skill-manifest.yaml`](docs/templates/skill-manifest.yaml)
-   into `skills/<id>/manifest.yaml`. Fill every field. Probes are
-   `risk: none` by definition. Interventions must name a `rollback_id`
-   (or declare `rollback: none_needed` / `rollback: reboot` with a
-   code-comment justification).
-3. Put referenced scripts under `skills/<id>/scripts/`. Bash is fine;
-   Python is fine; a binary is fine. The Rust dispatcher invokes them as
-   subprocesses and enforces the IDRS contract at the boundary.
-4. Register the symptom class if new: add an entry to the symptom catalog
-   (see [`docs/adr/0007-yaml-manifest-subprocess-skill-model.md`](docs/adr/0007-yaml-manifest-subprocess-skill-model.md)).
-5. Write at least one integration test that exercises `dry_run: true`
-   through the `skill_dry_run` MCP tool and snapshots the SOAP bundle
-   with `insta`.
-6. File an ADR if the skill introduces a new risk-band convention or a
-   new probe category.
+## 8. Inherited Rules
 
-Do **not** add a skill whose only intervention is `risk >= high` without
-an accompanying ADR that justifies why a safer step does not exist.
+The Peripheral / Disclosure Stack operating rules apply to
+Russell unchanged where they speak to:
 
-## 7. How to add a new MCP tool
+- workspace integrity (never modify another agent's uncommitted
+  work),
+- verify-before-claiming-completion,
+- no dishonest code,
+- no historical records in active documentation,
+- diagram maintenance,
+- simplicity, surgical changes, goal-driven execution.
 
-1. Propose the tool in an ADR (short one — scope, name, input/output
-   schema, risk band, confirmation requirement).
-2. Add the wire schema to the `russell-mcp` crate. Every tool has a
-   `risk_band` field in its descriptor — even read-only tools; they
-   declare `none`.
-3. Any tool whose risk band is `medium` or above MUST require the caller
-   to first obtain a proposal ID via a plan-style tool and then pass it
-   to `confirm_proposal` to enact. There is no "one-shot mutating tool"
-   in Russell.
-4. Register the tool in [`docs/architecture/mcp-surface.md`](docs/architecture/mcp-surface.md).
-5. Snapshot-test the tool's output with `insta`.
+See [`docs/standards/agent-operating-rules.md`](docs/standards/agent-operating-rules.md)
+for the full text.
 
-## 8. How to add an ADR
+## 9. Persona
 
-Follow [`docs/standards/adr.md`](docs/standards/adr.md). Use
-[`docs/templates/adr-template.md`](docs/templates/adr-template.md). Number
-monotonically and zero-pad to four digits. Never renumber a merged ADR;
-supersede it instead.
+When an agent is operating Russell (as opposed to authoring
+Russell), and the operator's interface is "Jack" (the Doctor),
+the agent inherits Jack's voice and refusals. See
+[`docs/architecture/THE_JACK.md`](docs/architecture/THE_JACK.md).
 
-## 9. Proprioception is a first-class requirement
+Specifically:
+- The LLM (Kimi K2 or whatever frontier model is configured)
+  receives the persona in [`crates/russell-doctor/prompts/jack.md`](crates/russell-doctor/prompts/jack.md).
+- Jack never emits shell. If asked, he declines in-voice.
+- Jack is short, sassy, loyal, and never pretends to certainty
+  he does not have.
 
-Russell watches itself the same way it watches the host. When you add a
-new loop — a timer, a worker task, a subprocess pool, a retry wrapper,
-an LLM call — ask:
+## 10. When you are blocked
 
-- What vital tells me this loop is healthy?
-- What EWMA baseline does it feed?
-- What reflex arc fires if it wedges before the next cadence?
-- Under what condition would a self-triage try to invoke itself and how
-  is that prevented?
+- **If another agent's uncommitted work blocks you** — stop,
+  tell the operator which files are blocked, work on something
+  else.
+- **If the code contradicts the spec** — the spec wins. File a
+  ticket; don't silently "fix" the code to match undocumented
+  behaviour.
+- **If the spec contradicts itself** — the authority hierarchy
+  in §2 resolves it.
+- **If you do not know** — say "I do not know", name what you
+  do not know, and ask.
 
-See [`docs/adr/0015-proprioception-self-health.md`](docs/adr/0015-proprioception-self-health.md)
-and [`docs/architecture/proprioception.md`](docs/architecture/proprioception.md).
+## 11. What this file is not
 
-## 10. The "LLM never emits shell" rule
-
-The LLM is called by the Doctor (and by the meta-Doctor for self-triage)
-to rank a differential over the probe and intervention IDs present in
-the loaded manifests. It returns IDs and justifications; the dispatcher
-translates IDs to commands. If the LLM hallucinates an ID, the
-dispatcher rejects the plan. Network egress for LLM calls is opt-in; the
-default backend is local Ollama. Every LLM request and response is
-logged verbatim into the evidence bundle. See
-[`docs/adr/0008-llm-triage-never-emits-shell.md`](docs/adr/0008-llm-triage-never-emits-shell.md).
-
-This rule is not negotiable. An AI contributor who rewrites the prompt
-pipeline to let the LLM output shell is introducing a safety regression.
-
-## 11. Safety posture
-
-**observe > recommend > act.** For the first 30 days after bootstrap
-(the honeymoon window), any `risk >= high` intervention defaults to
-*propose* rather than *apply*. `max_auto_risk` is `low` by default and
-per-skill. Two kill switches exist:
-
-- `~/.config/harness/disable` — an empty file makes every timer a no-op
-  on next trigger.
-- `russell pause <module> --until <rfc3339>` — per-module cooldown.
-
-The `confirm_proposal` MCP tool is the programmatic andon cord; the
-`russell confirm <evidence_id>` CLI is the human-facing one. See
-[`docs/standards/safety.md`](docs/standards/safety.md).
-
-## 12. Testing expectations
-
-- `cargo test` green on every PR. CI runs `cargo clippy -- -D warnings`
-  and `cargo fmt --check`.
-- Unit tests live alongside the code.
-- Integration tests live under each crate's `tests/`.
-- MCP tool outputs and SOAP bundle rendering are covered with
-  [`insta`](https://insta.rs/) snapshot tests. Review new snapshots with
-  `cargo insta review`; do not blind-accept them.
-- Schema and parser invariants (manifest, rules, MCP wire format) are
-  covered with [`proptest`](https://proptest-rs.github.io/proptest/).
-- VM-based end-to-end runs are Phase-3-plus territory; do not gate PRs
-  on them.
-
-## 13. Commit conventions
-
-Conventional Commits, with the Russell-specific types and scopes defined
-in [`docs/standards/commits.md`](docs/standards/commits.md). Short form:
-
-```
-<type>(<scope>): <imperative subject, no period>
-
-<optional body>
-
-<optional footer; BREAKING CHANGE: ... ; Refs: ADR-0003>
-```
-
-Types: `feat`, `fix`, `docs`, `refactor`, `test`, `chore`, `adr`,
-`skill`, `proprio`.
-Scopes: `core`, `mcp`, `skills`, `doctor`, `sentinel`, `proprio`,
-`journal`, `profile`, `cli`.
-
-## 14. Branch naming
-
-- `feat/<scope>-<slug>` for features.
-- `fix/<scope>-<slug>` for bug fixes.
-- `adr/NNNN-<slug>` for ADR-only branches.
-- `skill/<skill-id>` for skill additions.
-- `proprio/<slug>` for self-health work.
-
-No long-lived feature branches; rebase on `main`.
-
-## 15. When in doubt
-
-Read the section of [`cybernetic-health-harness.md`](cybernetic-health-harness.md)
-that touches your change. Cite it in the commit body or PR description.
-The design document is the arbiter of taste disputes that the ADRs do
-not settle.
+- Not a tutorial. New contributors read [`docs/README.md`](docs/README.md) §3.
+- Not a reference. Every link above is the reference for its
+  topic.
+- Not a moving target. Changing this file is a reviewed PR that
+  cites an ADR or a principle change.

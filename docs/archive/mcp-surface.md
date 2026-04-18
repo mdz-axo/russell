@@ -1,3 +1,19 @@
+---
+title: "MCP Surface (Archived)"
+audience: [architects, developers]
+last_updated: 2026-04-18
+togaf_phase: "Repository"
+version: "1.0.0"
+status: "Archived"
+---
+
+<!-- STATUS: Archived -->
+<!-- LAST_UPDATED: 2026-04-18 -->
+
+> **Archived.** See [`README.md`](README.md) for provenance. The
+> subject of this document is outside the MVP boundary; this
+> full design returns to active status when its phase opens.
+
 <!--
 audience: contributors extending Russell's MCP surface
 last-reviewed: 2026-04-17
