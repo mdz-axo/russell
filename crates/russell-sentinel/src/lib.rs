@@ -27,7 +27,14 @@ pub fn run_once(writer: &JournalWriter) -> Result<usize> {
     let ts = russell_core::time::now_unix();
     let samples = probes::collect();
     for s in &samples {
-        writer.append_sample(ts, Scope::Host, &s.name, s.value_num, s.value_text.as_deref(), s.unit)?;
+        writer.append_sample(
+            ts,
+            Scope::Host,
+            &s.name,
+            s.value_num,
+            s.value_text.as_deref(),
+            s.unit,
+        )?;
     }
     Ok(samples.len())
 }

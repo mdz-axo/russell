@@ -65,20 +65,15 @@ pub enum Severity {
 /// Event scope. Host-observation rows land with `Host`;
 /// proprioception rows land with `Self_`
 /// (see [ADR-0015](../../../docs/adr/0015-proprioception-self-health.md)).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Scope {
     /// Event is about the host machine.
+    #[default]
     Host,
     /// Event is about Russell itself.
     #[serde(rename = "self")]
     Self_,
-}
-
-impl Default for Scope {
-    fn default() -> Self {
-        Self::Host
-    }
 }
 
 fn default_schema() -> String {

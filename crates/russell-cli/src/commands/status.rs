@@ -21,7 +21,11 @@ pub fn run(paths: &Paths) -> Result<()> {
     if profile_path.exists() {
         match russell_core::Profile::load(&profile_path) {
             Ok(p) => println!("  profile:      {} (id={})", p.schema, p.profile_id),
-            Err(e) => println!("  profile:      {} (load error: {})", profile_path.display(), e),
+            Err(e) => println!(
+                "  profile:      {} (load error: {})",
+                profile_path.display(),
+                e
+            ),
         }
     } else {
         println!("  profile:      <absent — run `russell profile --init`>");
@@ -30,9 +34,7 @@ pub fn run(paths: &Paths) -> Result<()> {
     let journal_path = paths.journal();
     if journal_path.exists() {
         // Best-effort read of counts.
-        let reader = russell_core::journal::JournalReader {
-            path: journal_path.clone(),
-        };
+        let reader = russell_core::journal::JournalReader::new(&journal_path);
         let counts = reader.severity_counts(0, i64::MAX).unwrap_or_default();
         println!(
             "  journal:      {} (info={} warn={} alert={} crit={})",

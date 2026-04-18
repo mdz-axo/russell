@@ -86,7 +86,10 @@ impl JournalWriter {
 
         info!(db = %path.display(), "journal opened");
 
-        Ok(Self { conn, path: path.to_path_buf() })
+        Ok(Self {
+            conn,
+            path: path.to_path_buf(),
+        })
     }
 
     /// Append a single `Event` to the journal.
@@ -167,7 +170,9 @@ impl JournalWriter {
     /// file.
     #[must_use]
     pub fn reader(&self) -> JournalReader {
-        JournalReader { path: self.path.clone() }
+        JournalReader {
+            path: self.path.clone(),
+        }
     }
 
     /// Path the journal was opened against.
@@ -178,13 +183,25 @@ impl JournalWriter {
 }
 
 impl JournalReader {
+    /// Construct a reader anchored at `path`. The file need not
+    /// exist yet; read methods error if the journal is missing.
+    #[must_use]
+    pub fn new(path: impl Into<std::path::PathBuf>) -> Self {
+        Self { path: path.into() }
+    }
+
     /// Count events in a given time range (inclusive lower,
     /// exclusive upper), optionally filtered by scope.
     ///
     /// # Errors
     ///
     /// Returns [`CoreError::Sqlite`] on DB errors.
-    pub fn count_events(&self, since_unix: i64, until_unix: i64, scope: Option<Scope>) -> Result<i64> {
+    pub fn count_events(
+        &self,
+        since_unix: i64,
+        until_unix: i64,
+        scope: Option<Scope>,
+    ) -> Result<i64> {
         let conn = self.open_ro()?;
         let count: i64 = match scope {
             Some(s) => {
@@ -236,7 +253,11 @@ impl JournalReader {
                         "crit" => Severity::Crit,
                         _ => Severity::Info,
                     },
-                    scope: if scope == "self" { Scope::Self_ } else { Scope::Host },
+                    scope: if scope == "self" {
+                        Scope::Self_
+                    } else {
+                        Scope::Host
+                    },
                     tier: r.get(4)?,
                     module: r.get(5)?,
                     action: r.get(6)?,
@@ -379,22 +400,39 @@ mod tests {
     fn severity_counts_buckets_correctly() {
         let (_g, p) = tmp_path();
         let w = JournalWriter::open(&p).unwrap();
-        for sev in [Severity::Info, Severity::Info, Severity::Warn, Severity::Crit] {
+        for sev in [
+            Severity::Info,
+            Severity::Info,
+            Severity::Warn,
+            Severity::Crit,
+        ] {
             w.append(&Event::new("x", sev)).unwrap();
         }
         let c = w.reader().severity_counts(0, i64::MAX).unwrap();
-        assert_eq!(c, SeverityCounts { info: 2, warn: 1, alert: 0, crit: 1 });
+        assert_eq!(
+            c,
+            SeverityCounts {
+                info: 2,
+                warn: 1,
+                alert: 0,
+                crit: 1
+            }
+        );
     }
 
     #[test]
     fn samples_insert_or_replace_is_idempotent() {
         let (_g, p) = tmp_path();
         let w = JournalWriter::open(&p).unwrap();
-        w.append_sample(100, Scope::Host, "cpu_temp_c", Some(42.0), None, Some("C")).unwrap();
-        w.append_sample(100, Scope::Host, "cpu_temp_c", Some(43.0), None, Some("C")).unwrap();
+        w.append_sample(100, Scope::Host, "cpu_temp_c", Some(42.0), None, Some("C"))
+            .unwrap();
+        w.append_sample(100, Scope::Host, "cpu_temp_c", Some(43.0), None, Some("C"))
+            .unwrap();
         let conn = w.reader().open_ro().unwrap();
         let n: i64 = conn
-            .query_row("SELECT COUNT(*) FROM samples WHERE ts=100", [], |r| r.get(0))
+            .query_row("SELECT COUNT(*) FROM samples WHERE ts=100", [], |r| {
+                r.get(0)
+            })
             .unwrap();
         assert_eq!(n, 1);
     }
