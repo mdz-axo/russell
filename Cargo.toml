@@ -45,6 +45,7 @@ clap = { version = "4", features = ["derive"] }
 toml = "0.8"
 insta = { version = "1", features = ["yaml", "json"] }
 tempfile = "3"
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "gzip"] }
 
 [profile.dev]
 opt-level = 0

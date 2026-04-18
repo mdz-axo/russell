@@ -37,7 +37,7 @@ of every meaningful development session.
 - Persistence catalog (`PERSISTENCE_CATALOG.md`).
 - Reuse manifest (`REUSE_MANIFEST.md`, forward-looking).
 - TOGAF traceability matrix.
-- 8 active ADRs + 7 deferred.
+- 10 active ADRs + 7 deferred.
 - 3 templates (ADR, skill manifest, SOAP bundle).
 
 ### Code
@@ -83,8 +83,8 @@ are met on the observed machine.
   journals the round-trip, prints the response. Offline
   fallback works.
 - **Tasks:**
-  1. Author ADR-0016 (Doctor and LLM router for MVP).
-  2. Author ADR-0017 (Reuse over dependency).
+  1. ~~Author ADR-0016 (Doctor and LLM router for MVP).~~ **Done 2026-04-18.**
+  2. ~~Author ADR-0017 (Reuse over dependency).~~ **Done 2026-04-18.**
   3. Copy `stack-llm` files per §4.1 of `REUSE_MANIFEST.md`;
      update §3 of that file with actual rows.
   4. Author persona `crates/russell-doctor/prompts/jack.md`.

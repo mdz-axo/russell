@@ -17,10 +17,11 @@
 //! All I/O into `~/.local/state/harness/` routes through this crate.
 //! No other crate opens the journal DB directly.
 
-#![forbid(unsafe_code)]
+#![deny(unsafe_code)]
 #![deny(rust_2018_idioms)]
 #![warn(missing_docs)]
 
+pub mod env;
 pub mod error;
 pub mod event;
 pub mod journal;

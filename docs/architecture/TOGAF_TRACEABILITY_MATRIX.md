@@ -65,7 +65,7 @@ is not a business concern.
 | **Phase D** — Technology | [`../adr/0009-tokio-runtime.md`](../adr/deferred/0009-tokio-runtime.md) *(deferred)*, [`../adr/0010-observability-stack.md`](../adr/deferred/0010-observability-stack.md) *(deferred)*, [`../operations/REUSE_MANIFEST.md`](../operations/REUSE_MANIFEST.md) | Tech choices + copy register |
 | **Phase E/F** — Migration | [`../../cybernetic-health-harness.md` §20](../../cybernetic-health-harness.md), [`../status/CONSOLIDATED-STATUS.md`](../status/CONSOLIDATED-STATUS.md) | Roadmap and where we are |
 | **Phase G** — Governance | [`../status/CONSOLIDATED-STATUS.md`](../status/CONSOLIDATED-STATUS.md), [`../standards/safety.md`](../standards/safety.md), [`../../AGENTS.md`](../../AGENTS.md) | The "don't break the patient" discipline |
-| **Phase H** — Change Management | [`../adr/`](../adr/) (ADRs 0001, 0002, 0004, 0006, 0008, 0011, 0013, 0015 active; 7 others deferred) | Locked decisions |
+| **Phase H** — Change Management | [`../adr/`](../adr/) (ADRs 0001, 0002, 0004, 0006, 0008, 0011, 0013, 0015, 0016, 0017 active; 7 others deferred) | Locked decisions |
 | **Requirements Mgmt** | [`../specifications/MVP_SPEC.md`](../specifications/MVP_SPEC.md), [`../specifications/PERSISTENCE_CATALOG.md`](../specifications/PERSISTENCE_CATALOG.md) | The pinned boundary |
 
 ## 3. Principle → Phase Anchoring

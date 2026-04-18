@@ -24,7 +24,7 @@ not belong in the corpus (yet).
 | Section | Contents | TOGAF Phase | Audience |
 |---|---|---|---|
 | [`architecture/`](architecture/) | System architecture & principles | A / Preliminary | All |
-| [`architecture/adr/`](adr/) | Architecture Decision Records (8 active, 7 deferred) | H | Developers |
+| [`architecture/adr/`](adr/) | Architecture Decision Records (10 active, 7 deferred) | H | Developers |
 | [`specifications/`](specifications/) | MVP boundary, persistence catalog | Requirements | All |
 | [`standards/`](standards/) | Documentation, coding, commits, safety, ADR process | Preliminary | Contributors |
 | [`operations/`](operations/) | Reuse manifest, operator runbooks | D / G | Developers, Operators |
@@ -98,6 +98,8 @@ may exist but must not contradict these.
 - [`adr/0011-testing-strategy.md`](adr/0011-testing-strategy.md)
 - [`adr/0013-rust-workspace-layout.md`](adr/0013-rust-workspace-layout.md)
 - [`adr/0015-proprioception-self-health.md`](adr/0015-proprioception-self-health.md)
+- [`adr/0016-doctor-and-llm-router.md`](adr/0016-doctor-and-llm-router.md)
+- [`adr/0017-reuse-over-dependency.md`](adr/0017-reuse-over-dependency.md)
 
 ### 2.8 ADRs (deferred — not MVP-load-bearing but retained)
 
@@ -160,8 +162,8 @@ They live under [`adr/deferred/`](adr/deferred/):
 
 | Bucket | Count |
 |---|---|
-| Active authoritative docs | 18 |
-| Active ADRs | 8 |
+| Active authoritative docs | 36 |
+| Active ADRs | 10 |
 | Deferred ADRs | 7 |
 | Archived docs | 2 |
 | Templates | 3 |

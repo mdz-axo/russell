@@ -166,6 +166,51 @@ impl JournalWriter {
         Ok(())
     }
 
+    /// Append a `help_sessions` row produced by the Doctor.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`CoreError::Sqlite`] on DB errors.
+    #[allow(clippy::too_many_arguments)]
+    pub fn append_help_session_row(
+        &self,
+        id: &str,
+        ts_unix: i64,
+        ts: &str,
+        backend: &str,
+        model: Option<&str>,
+        note: Option<&str>,
+        prompt_chars: i64,
+        response_chars: i64,
+        latency_ms: Option<i64>,
+        status: &str,
+        error_kind: Option<&str>,
+        evidence_ref: &str,
+    ) -> Result<()> {
+        self.conn.execute(
+            r"INSERT INTO help_sessions (
+                id, ts_unix, ts, backend, model, note,
+                prompt_chars, response_chars, latency_ms,
+                status, error_kind, evidence_ref
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
+            params![
+                id,
+                ts_unix,
+                ts,
+                backend,
+                model,
+                note,
+                prompt_chars,
+                response_chars,
+                latency_ms,
+                status,
+                error_kind,
+                evidence_ref
+            ],
+        )?;
+        Ok(())
+    }
+
     /// Return a cloneable read-only handle anchored at the same
     /// file.
     #[must_use]
@@ -297,6 +342,22 @@ impl JournalReader {
             }
         }
         Ok(counts)
+    }
+
+    /// Timestamp (unix seconds) of the most-recent sample across any
+    /// probe, or `None` if the `samples` table is empty.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`CoreError::Sqlite`] on DB errors.
+    pub fn last_sample_ts(&self) -> Result<Option<i64>> {
+        let conn = self.open_ro()?;
+        let row: Option<Option<i64>> = conn
+            .query_row("SELECT MAX(ts) FROM samples", [], |r| {
+                r.get::<_, Option<i64>>(0)
+            })
+            .ok();
+        Ok(row.flatten())
     }
 
     /// Path the journal lives at. May not exist yet on very fresh

@@ -10,6 +10,16 @@ audience: "Open-source project maintainers, documentation architects, technical 
 keywords: ["TOGAF", "documentation", "open source", "architecture", "pattern"]
 ---
 
+> **Note to Russell readers.** This document is the **pattern**
+> behind Russell's documentation standard, authored for the
+> Peripheral repo (which has `plans/`, `operations/DEPLOYMENT.md`,
+> etc.). Russell's actual layout is smaller; see
+> [`../README.md`](../README.md) for the realised structure.
+> Template links below that point at generic locations
+> (`architecture/`, `plans/`, `operations/DEPLOYMENT.md`) are
+> **illustrative**, not broken Russell links.
+
+
 # TOGAF-Lite for Open Source
 
 **A reusable pattern for applying TOGAF's content framework to open-source documentation without governance overhead**

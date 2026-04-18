@@ -19,3 +19,4 @@ Formal, pinned statements of what Russell is and is not.
 |---|---|
 | [`MVP_SPEC.md`](MVP_SPEC.md) | The pinned MVP boundary. Read before adding a feature. |
 | [`PERSISTENCE_CATALOG.md`](PERSISTENCE_CATALOG.md) | Every byte Russell writes, named. |
+| [`TOGAF_LITE_FOR_OPEN_SOURCE.md`](TOGAF_LITE_FOR_OPEN_SOURCE.md) | The pattern our documentation standard is derived from. Reference only. |

@@ -1,13 +1,11 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 //! `russell` — command-line entry point.
 //!
-//! Phase 0 (`cybernetic-health-harness.md` §20) ships read-only
-//! subcommands: `list`, `status`, `profile`, `digest`, plus the
-//! `sentinel-once` helper used to populate the journal in
-//! development and to provide the 7-day samples that Phase 0
-//! defines as its success criterion.
+//! Phase 1 (`cybernetic-health-harness.md` §20,
+//! `docs/specifications/MVP_SPEC.md` §2) ships the six read-only
+//! verbs plus the Doctor's `help` cry-for-help channel.
 
-#![forbid(unsafe_code)]
+#![deny(unsafe_code)]
 #![deny(rust_2018_idioms)]
 #![warn(missing_docs)]
 
@@ -57,12 +55,31 @@ enum Command {
         since_hours: u32,
     },
     /// Run the Sentinel once and append samples to the journal.
-    /// Phase-0 helper; the full timer-driven Sentinel lands in
-    /// Phase 1.
     SentinelOnce,
+    /// Ask Jack for help — composes a SOAP bundle, consults the
+    /// LLM (or offline fallback), writes evidence, prints the
+    /// response.
+    #[command(name = "jack")]
+    Jack {
+        /// Free-text context to include as Subjective.
+        #[arg(long)]
+        note: Option<String>,
+    },
 }
 
-fn main() -> Result<()> {
+#[tokio::main(flavor = "multi_thread")]
+async fn main() -> Result<()> {
+    // Load operator env file before anything else. Existing env wins.
+    let paths_probe = match std::env::var_os("RUSSELL_ROOT") {
+        Some(r) => russell_core::paths::Paths::rooted(std::path::PathBuf::from(r)),
+        None => russell_core::paths::Paths::from_env().unwrap_or_else(|_| {
+            // Fallback if HOME is missing — tests and CI.
+            russell_core::paths::Paths::rooted("/tmp")
+        }),
+    };
+    let env_file = paths_probe.config.join("russell.env");
+    russell_core::env::load_env_file(&env_file);
+
     russell_core::telemetry::init();
     let cli = Cli::parse();
 
@@ -78,5 +95,6 @@ fn main() -> Result<()> {
         Command::Profile { init } => commands::profile::run(&paths, init),
         Command::Digest { since_hours } => commands::digest::run(&paths, since_hours),
         Command::SentinelOnce => commands::sentinel_once::run(&paths),
+        Command::Jack { note } => commands::help::run(&paths, note.as_deref()).await,
     }
 }

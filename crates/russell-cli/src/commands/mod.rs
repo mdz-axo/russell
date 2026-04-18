@@ -2,6 +2,7 @@
 //! Subcommand handlers. One module per verb.
 
 pub mod digest;
+pub mod help;
 pub mod list;
 pub mod profile;
 pub mod sentinel_once;

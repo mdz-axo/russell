@@ -13,7 +13,7 @@ status: "Active"
 <!-- VERSION: 1.0.0 -->
 <!-- STATUS: Active -->
 
-The 8 ADRs that are load-bearing for MVP. Deferred ADRs live
+The 10 ADRs that are load-bearing for MVP. Deferred ADRs live
 under [`deferred/`](deferred/) with their own README.
 
 | # | Subject |
@@ -26,6 +26,8 @@ under [`deferred/`](deferred/) with their own README.
 | [0011](0011-testing-strategy.md) | Testing layers |
 | [0013](0013-rust-workspace-layout.md) | Seven-crate workspace, DAG at `russell-core` |
 | [0015](0015-proprioception-self-health.md) | Proprioception — Jack watches Jack |
+| [0016](0016-doctor-and-llm-router.md) | MVP Doctor — single round-trip to ZDR frontier LLM |
+| [0017](0017-reuse-over-dependency.md) | Reuse over dependency — copy-with-provenance |
 
 To author a new ADR, see
 [`../standards/adr.md`](../standards/adr.md) and

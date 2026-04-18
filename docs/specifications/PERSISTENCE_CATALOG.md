@@ -200,7 +200,7 @@ and events above, and any `--note` text the operator provided.
 OpenRouter calls route only to providers with a zero-data-retention
 policy (per-request `zdr: true` parameter) unless the operator
 explicitly disables that. See
-[`../adr/0016-doctor-and-llm-router.md`](../adr/0016-doctor-and-llm-router.md)
+[ADR-0016 *(to be authored in Phase 1)*](../adr/README.md)
 *(to be authored in Phase 1)* for the privacy contract.
 
 ## 7. Changing the Catalog

@@ -29,11 +29,18 @@ pub struct Migration {
 }
 
 /// Canonical list of migrations. Order matters.
-pub const MIGRATIONS: &[Migration] = &[Migration {
-    version: 1,
-    slug: "init",
-    sql: include_str!("migrations/0001_init.sql"),
-}];
+pub const MIGRATIONS: &[Migration] = &[
+    Migration {
+        version: 1,
+        slug: "init",
+        sql: include_str!("migrations/0001_init.sql"),
+    },
+    Migration {
+        version: 2,
+        slug: "help_sessions",
+        sql: include_str!("migrations/0002_help_sessions.sql"),
+    },
+];
 
 /// Apply any migrations newer than the DB's current version.
 ///
@@ -121,17 +128,23 @@ mod tests {
     fn runs_once_then_noop() {
         let c = fresh();
         run(&c).unwrap();
-        assert_eq!(current_version(&c).unwrap(), 1);
+        assert_eq!(current_version(&c).unwrap(), 2);
         // Second run must not re-apply.
         run(&c).unwrap();
-        assert_eq!(current_version(&c).unwrap(), 1);
+        assert_eq!(current_version(&c).unwrap(), 2);
     }
 
     #[test]
     fn init_creates_all_core_tables() {
         let c = fresh();
         run(&c).unwrap();
-        for t in ["samples", "events", "baselines", "confirmations"] {
+        for t in [
+            "samples",
+            "events",
+            "baselines",
+            "confirmations",
+            "help_sessions",
+        ] {
             let n: i64 = c
                 .query_row(
                     "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name=?1",

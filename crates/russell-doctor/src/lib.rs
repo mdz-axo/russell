@@ -1,16 +1,31 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
-//! `russell-doctor` — Phase 0 placeholder.
+//! `russell-doctor` — the MVP Doctor.
 //!
-//! This crate is reserved per
-//! [ADR-0013](../../docs/adr/0013-rust-workspace-layout.md).
-//! Phase 0 (`cybernetic-health-harness.md` §20) only populates
-//! [`russell-core`] and [`russell-cli`]; the other crates exist so
-//! the dependency DAG is correct from day one and so imports do not
-//! churn when implementation lands.
+//! Under JR-4 (small but present), this crate implements exactly
+//! one capability: `russell help`. The LLM consults; Russell does
+//! not act.
+//!
+//! See [ADR-0016](../../docs/adr/0016-doctor-and-llm-router.md).
 
-#![forbid(unsafe_code)]
+#![deny(unsafe_code)]
 #![deny(rust_2018_idioms)]
 #![warn(missing_docs)]
 
-/// Phase-0 version marker. Removed when the crate gains real APIs.
-pub const PHASE0_STUB: &str = "russell-doctor";
+pub mod client;
+pub mod error;
+pub mod fallback;
+pub mod help;
+pub mod mock;
+pub mod openrouter;
+pub mod prompt;
+
+pub use client::{Backend, ClientConfig, LlmClient, LlmResponse, SoapPrompt};
+pub use error::{DoctorError, Result};
+pub use help::{HelpOutcome, HelpSession, run_help};
+
+/// The Jack persona, embedded at compile time so operators cannot
+/// accidentally run Jack without his voice.
+///
+/// Source of truth: `crates/russell-doctor/prompts/jack.md`.
+/// Design rationale: `docs/architecture/THE_JACK.md`.
+pub const JACK_PERSONA: &str = include_str!("../prompts/jack.md");

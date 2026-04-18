@@ -1,0 +1,370 @@
+// SPDX-License-Identifier: MIT OR Apache-2.0
+//! The `run_help` orchestrator — the one public entry point.
+
+use std::path::PathBuf;
+
+use serde::Serialize;
+use serde_json::json;
+use tracing::{info, warn};
+use ulid::Ulid;
+
+use russell_core::event::{Event, Severity};
+use russell_core::journal::JournalWriter;
+use russell_core::paths::Paths;
+
+use crate::client::{Backend, ClientConfig, LlmClient};
+use crate::error::{DoctorError, Result};
+use crate::{fallback, mock, openrouter, prompt};
+
+/// Outcome from a `run_help` call.
+#[derive(Debug, Clone, Serialize)]
+pub struct HelpOutcome {
+    /// Session ID (ULID).
+    pub session_id: String,
+    /// Backend used — may be `offline` if fallback kicked in.
+    pub backend: &'static str,
+    /// Path to the evidence bundle on disk.
+    pub evidence_dir: PathBuf,
+    /// The response text Jack printed.
+    pub response: String,
+    /// Whether this call used the offline fallback.
+    pub fell_back: bool,
+}
+
+/// Minimal session record mirrored into the `help_sessions` table.
+#[derive(Debug, Clone, Serialize)]
+pub struct HelpSession {
+    /// ULID.
+    pub id: String,
+    /// Unix timestamp.
+    pub ts_unix: i64,
+    /// RFC3339 timestamp.
+    pub ts: String,
+    /// Backend label.
+    pub backend: &'static str,
+    /// Model, if any.
+    pub model: Option<String>,
+    /// Operator note.
+    pub note: Option<String>,
+    /// Prompt character count.
+    pub prompt_chars: i64,
+    /// Response character count.
+    pub response_chars: i64,
+    /// Round-trip latency (ms); `None` for offline.
+    pub latency_ms: Option<i64>,
+    /// `ok | error | fallback`.
+    pub status: &'static str,
+    /// Short error kind, if status=error.
+    pub error_kind: Option<String>,
+    /// Path to evidence bundle.
+    pub evidence_ref: String,
+}
+
+/// Run the help flow end to end: compose, call (or fall back), journal, print-ready.
+///
+/// `paths` and `writer` come from the CLI. The CLI is the only caller.
+///
+/// # Errors
+///
+/// Returns `DoctorError` if the filesystem write or journal write fails.
+/// Provider errors are *caught* — the fallback handles them and the
+/// function returns success with `fell_back = true`.
+pub async fn run_help(
+    paths: &Paths,
+    writer: &JournalWriter,
+    note: Option<&str>,
+) -> Result<HelpOutcome> {
+    let cfg = ClientConfig::from_env();
+    run_help_with_config(paths, writer, note, cfg).await
+}
+
+/// Same as [`run_help`] but with an explicit [`ClientConfig`]. Useful in
+/// tests where mutating process env racily is undesirable.
+pub async fn run_help_with_config(
+    paths: &Paths,
+    writer: &JournalWriter,
+    note: Option<&str>,
+    cfg: ClientConfig,
+) -> Result<HelpOutcome> {
+    let session_id = Ulid::new().to_string();
+    let ts_unix = russell_core::time::now_unix();
+    let ts = russell_core::time::now_rfc3339();
+
+    let evidence_dir = paths.evidence().join("help").join(&session_id);
+    std::fs::create_dir_all(&evidence_dir).map_err(|e| DoctorError::io(&evidence_dir, e))?;
+
+    let profile_path = paths.profile();
+    let profile = if profile_path.exists() {
+        russell_core::Profile::load(&profile_path).ok()
+    } else {
+        None
+    };
+
+    let soap = prompt::compose(&writer.reader(), profile.as_ref(), note)?;
+    let soap_path = evidence_dir.join("soap.md");
+    std::fs::write(&soap_path, &soap.rendered).map_err(|e| DoctorError::io(&soap_path, e))?;
+
+    info!(backend = %cfg.backend.label(), model = %cfg.model, session = %session_id, "russell help starting");
+
+    // Attempt the configured backend. Any failure → fall back to offline.
+    let (backend_used, maybe_response, error_kind) = match cfg.backend {
+        Backend::OpenRouter => {
+            let client = openrouter::OpenRouterClient::new(&cfg)?;
+            match client.chat(&soap).await {
+                Ok(resp) => ("openrouter", Some(resp), None),
+                Err(e) => {
+                    warn!(error = %e, "openrouter call failed — falling back");
+                    ("openrouter", None, Some(error_kind_of(&e)))
+                }
+            }
+        }
+        Backend::Ollama => {
+            // Ollama speaks the same OpenAI-compatible API at :11434/v1
+            let mut ollama_cfg = cfg.clone();
+            if ollama_cfg.base_url.is_none() {
+                ollama_cfg.base_url = Some("http://127.0.0.1:11434/v1".into());
+            }
+            if ollama_cfg.api_key.is_none() {
+                ollama_cfg.api_key = Some("ollama".into());
+            }
+            let client = openrouter::OpenRouterClient::new(&ollama_cfg)?;
+            match client.chat(&soap).await {
+                Ok(resp) => ("ollama", Some(resp), None),
+                Err(e) => {
+                    warn!(error = %e, "ollama call failed — falling back");
+                    ("ollama", None, Some(error_kind_of(&e)))
+                }
+            }
+        }
+        Backend::Mock => {
+            let client = mock::MockClient::jack_default();
+            match client.chat(&soap).await {
+                Ok(resp) => ("mock", Some(resp), None),
+                Err(e) => ("mock", None, Some(error_kind_of(&e))),
+            }
+        }
+        Backend::Offline => ("offline", None, None),
+    };
+
+    let fell_back = maybe_response.is_none();
+
+    let (response_text, latency_ms, model) = match maybe_response {
+        Some(resp) => (
+            resp.content.clone(),
+            Some(resp.latency_ms as i64),
+            resp.model,
+        ),
+        None => {
+            let text = fallback::summarise(&writer.reader(), note)?;
+            (text, None, None)
+        }
+    };
+
+    // Persist request/response/transcript artefacts for inspection.
+    let request_path = evidence_dir.join("request.json");
+    let request_rec = json!({
+        "backend": backend_used,
+        "model": &cfg.model,
+        "base_url": &cfg.base_url,
+        "note": note,
+        "soap_chars": soap.rendered.len(),
+    });
+    std::fs::write(&request_path, serde_json::to_vec_pretty(&request_rec)?)
+        .map_err(|e| DoctorError::io(&request_path, e))?;
+
+    let response_path = evidence_dir.join("response.json");
+    let response_rec = json!({
+        "status": if fell_back { "fallback" } else { "ok" },
+        "error_kind": error_kind,
+        "latency_ms": latency_ms,
+        "model": model,
+        "content_chars": response_text.len(),
+    });
+    std::fs::write(&response_path, serde_json::to_vec_pretty(&response_rec)?)
+        .map_err(|e| DoctorError::io(&response_path, e))?;
+
+    let transcript_path = evidence_dir.join("transcript.jsonl");
+    let line = json!({
+        "schema": "harness.llm-transcript.v1",
+        "ts": &ts,
+        "backend": backend_used,
+        "model": &cfg.model,
+        "fell_back": fell_back,
+        "prompt_chars": soap.rendered.len(),
+        "response_chars": response_text.len(),
+        "response": &response_text,
+    });
+    std::fs::write(&transcript_path, format!("{line}\n"))
+        .map_err(|e| DoctorError::io(&transcript_path, e))?;
+
+    // Journal: events row + help_sessions row.
+    let evidence_ref_str = evidence_dir.to_string_lossy().into_owned();
+    let status: &'static str = if fell_back { "fallback" } else { "ok" };
+
+    let mut ev = Event::new("help", Severity::Info);
+    ev.id = russell_core::event::EventId(Ulid::from_string(&session_id).unwrap_or_default());
+    ev.run_id = Some(session_id.clone());
+    ev.tier = Some("doctor".into());
+    ev.module = Some("doctor/help".into());
+    ev.summary = Some(format!(
+        "backend={} status={} chars={}",
+        backend_used,
+        status,
+        response_text.len()
+    ));
+    ev.evidence_ref = Some(evidence_ref_str.clone());
+    ev.duration_ms = latency_ms.map(|v| v as u64);
+    if let Some(ref k) = error_kind {
+        ev.outputs
+            .insert("error_kind".into(), serde_json::Value::from(k.as_str()));
+    }
+    writer.append(&ev)?;
+
+    let session = HelpSession {
+        id: session_id.clone(),
+        ts_unix,
+        ts: ts.clone(),
+        backend: backend_used,
+        model,
+        note: note.map(str::to_string),
+        prompt_chars: soap.rendered.len() as i64,
+        response_chars: response_text.len() as i64,
+        latency_ms,
+        status,
+        error_kind,
+        evidence_ref: evidence_ref_str,
+    };
+    insert_help_session(writer, &session)?;
+
+    Ok(HelpOutcome {
+        session_id,
+        backend: backend_used,
+        evidence_dir,
+        response: response_text,
+        fell_back,
+    })
+}
+
+/// Short tag for the `error_kind` column.
+fn error_kind_of(e: &DoctorError) -> String {
+    match e {
+        DoctorError::Io { .. } => "io".into(),
+        DoctorError::Json(_) => "json".into(),
+        DoctorError::Core(_) => "core".into(),
+        DoctorError::Http {
+            is_timeout: true, ..
+        } => "http_timeout".into(),
+        DoctorError::Http {
+            is_connect: true, ..
+        } => "http_connect".into(),
+        DoctorError::Http {
+            status: Some(s), ..
+        } => format!("http_{s}"),
+        DoctorError::Http { .. } => "http".into(),
+        DoctorError::Authentication(_) => "auth".into(),
+        DoctorError::ModelNotFound(_) => "model_not_found".into(),
+        DoctorError::RateLimited { .. } => "rate_limited".into(),
+        DoctorError::ZdrRoutingFailed(_) => "zdr_failed".into(),
+        DoctorError::Config(_) => "config".into(),
+        DoctorError::BadResponse(_) => "bad_response".into(),
+        DoctorError::Fmt(_) => "fmt".into(),
+        DoctorError::Other(_) => "other".into(),
+    }
+}
+
+fn insert_help_session(writer: &JournalWriter, s: &HelpSession) -> Result<()> {
+    // russell-core owns DB access; expose a typed method on the writer.
+    writer.append_help_session_row(
+        &s.id,
+        s.ts_unix,
+        &s.ts,
+        s.backend,
+        s.model.as_deref(),
+        s.note.as_deref(),
+        s.prompt_chars,
+        s.response_chars,
+        s.latency_ms,
+        s.status,
+        s.error_kind.as_deref(),
+        &s.evidence_ref,
+    )?;
+    Ok(())
+}
+
+// paths is used only for ::join; leave for future expansion.
+#[allow(dead_code)]
+fn _evidence_subdir(paths: &Paths, id: &str) -> PathBuf {
+    paths.evidence().join("help").join(id)
+}
+
+/// Return the path to the most-recent evidence bundle under
+/// `paths.evidence()/help/`, if any. Used by tests.
+#[must_use]
+pub fn last_evidence_dir(paths: &Paths) -> Option<PathBuf> {
+    let root = paths.evidence().join("help");
+    let mut entries: Vec<_> = std::fs::read_dir(&root)
+        .ok()?
+        .filter_map(std::result::Result::ok)
+        .map(|e| e.path())
+        .filter(|p: &PathBuf| p.is_dir())
+        .collect();
+    entries.sort();
+    entries.into_iter().next_back()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn offline_path_produces_fallback_outcome() {
+        let tmp = tempfile::tempdir().unwrap();
+        let paths = Paths::rooted(tmp.path());
+        paths.ensure_dirs().unwrap();
+        let writer = JournalWriter::open(&paths.journal()).unwrap();
+
+        let cfg = ClientConfig {
+            backend: Backend::Offline,
+            model: "test".into(),
+            base_url: None,
+            api_key: None,
+            timeout: std::time::Duration::from_secs(5),
+        };
+        let out = run_help_with_config(&paths, &writer, Some("unit test"), cfg)
+            .await
+            .unwrap();
+
+        assert!(out.fell_back);
+        assert_eq!(out.backend, "offline");
+        assert!(out.response.contains("Offline"));
+        assert!(out.evidence_dir.join("soap.md").exists());
+        assert!(out.evidence_dir.join("transcript.jsonl").exists());
+
+        // Verify the help_sessions row landed.
+        let reader = russell_core::journal::JournalReader::new(paths.journal());
+        assert!(reader.recent(1).unwrap().iter().any(|r| r.action == "help"));
+    }
+
+    #[tokio::test]
+    async fn mock_path_produces_ok_outcome() {
+        let tmp = tempfile::tempdir().unwrap();
+        let paths = Paths::rooted(tmp.path());
+        paths.ensure_dirs().unwrap();
+        let writer = JournalWriter::open(&paths.journal()).unwrap();
+
+        let cfg = ClientConfig {
+            backend: Backend::Mock,
+            model: "test".into(),
+            base_url: None,
+            api_key: None,
+            timeout: std::time::Duration::from_secs(5),
+        };
+        let out = run_help_with_config(&paths, &writer, None, cfg)
+            .await
+            .unwrap();
+
+        assert!(!out.fell_back);
+        assert_eq!(out.backend, "mock");
+        assert!(out.response.contains("Mock Jack"));
+    }
+}
