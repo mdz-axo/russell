@@ -17,4 +17,5 @@ Operator-facing and developer-facing runbooks.
 
 | Document | Purpose |
 |---|---|
+| [`INSTALL.md`](INSTALL.md) | Operator runbook for install, update, uninstall, troubleshoot |
 | [`REUSE_MANIFEST.md`](REUSE_MANIFEST.md) | Register of every file Russell copied from upstream workspaces |

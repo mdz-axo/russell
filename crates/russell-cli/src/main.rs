@@ -69,16 +69,17 @@ enum Command {
 
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> Result<()> {
-    // Load operator env file before anything else. Existing env wins.
-    let paths_probe = match std::env::var_os("RUSSELL_ROOT") {
-        Some(r) => russell_core::paths::Paths::rooted(std::path::PathBuf::from(r)),
-        None => russell_core::paths::Paths::from_env().unwrap_or_else(|_| {
-            // Fallback if HOME is missing — tests and CI.
-            russell_core::paths::Paths::rooted("/tmp")
-        }),
-    };
-    let env_file = paths_probe.config.join("russell.env");
-    russell_core::env::load_env_file(&env_file);
+    // Discover and load an env file before anything else. Existing
+    // env always wins. See `russell_core::env::load_discovered` for
+    // the precedence order.
+    let paths_probe = std::env::var_os("RUSSELL_ROOT")
+        .map(|r| russell_core::paths::Paths::rooted(std::path::PathBuf::from(r)))
+        .or_else(|| russell_core::paths::Paths::from_env().ok())
+        .unwrap_or_else(|| russell_core::paths::Paths::rooted("/tmp"));
+    let loaded_env = russell_core::env::load_discovered(&paths_probe.config, None);
+    if let Some(p) = &loaded_env {
+        tracing::debug!(path = %p.display(), "env file loaded");
+    }
 
     russell_core::telemetry::init();
     let cli = Cli::parse();

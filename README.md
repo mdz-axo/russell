@@ -17,7 +17,7 @@ He does not fix things he does not understand.
 ## What Russell is today
 
 Phase 0 (read-only skeleton) is complete. Phase 1 (the MVP
-Doctor — `russell help`) is the current target.
+Doctor — `russell jack`) is the current target.
 
 **Six verbs.** All read-only. See
 [`docs/specifications/MVP_SPEC.md`](docs/specifications/MVP_SPEC.md) §2.
@@ -28,7 +28,7 @@ russell list --limit 20                # recent events
 russell profile --init                 # one-shot stub
 russell digest --since-hours 168       # Markdown report
 russell sentinel-once                  # one observation cycle
-russell help --note "ollama hangs"     # ask Jack    [Phase 1]
+russell jack --note "ollama hangs"     # ask Jack    [Phase 1]
 ```
 
 ## Reading order (do not skip)
@@ -50,7 +50,7 @@ russell help --note "ollama hangs"     # ask Jack    [Phase 1]
 See [`docs/status/CONSOLIDATED-STATUS.md`](docs/status/CONSOLIDATED-STATUS.md).
 
 - [x] Phase 0 — Skeleton. Read-only CLI verbs. Journal. Profile.
-- [ ] **Phase 1 — Doctor (`russell help`).** Kimi K2 via
+- [ ] **Phase 1 — Doctor (`russell jack`).** Kimi K2 via
       OpenRouter with `zdr: true`. Offline fallback. This is
       current.
 - [ ] Phase 1b — systemd unit files.

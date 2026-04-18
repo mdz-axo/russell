@@ -46,13 +46,13 @@ The MVP CLI exposes exactly six verbs. No more.
 | `russell profile [--init]` | none | Show / initialise `profile.json` | local fs |
 | `russell digest [--since-hours N]` | none | Markdown summary of recent activity | local sqlite |
 | `russell sentinel-once` | none | Fire the Sentinel once and append samples | local fs |
-| `russell help [--note "..."]` | none | Compose SOAP-shaped prompt and consult the LLM; print response | network *(opt-in)* |
+| `russell jack [--note "..."]` | none | Compose SOAP-shaped prompt and consult the LLM; print response | network *(opt-in)* |
 
 All six are read-only with respect to host state. The only thing
 any of them writes is Russell's own journal and evidence bundles
 under `~/.local/state/harness/`.
 
-### 2.1 The help verb — the "cry for help"
+### 2.1 The `jack` verb — the "cry for help"
 
 Under JR-4, Russell must be able to escalate from day one.
 
@@ -78,7 +78,7 @@ request fails, Jack still speaks: a rule-based summary of severity
 counts, most-recent events, and proprioception state is printed.
 Jack is never silent.
 
-**What `russell help` does NOT do:**
+**What `russell jack` does NOT do:**
 
 - Parse the LLM's output for commands to execute.
 - Mutate any file outside `~/.local/state/harness/`.

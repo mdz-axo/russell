@@ -1,0 +1,27 @@
+# SPDX-License-Identifier: MIT OR Apache-2.0
+# Run once per Sentinel cycle. Installed to ~/.config/systemd/user/.
+
+[Unit]
+Description=Russell Sentinel — observe the host
+Documentation=file://%h/Clones/russell/docs/specifications/MVP_SPEC.md
+OnFailure=russell-failure@%n.service
+
+[Service]
+Type=oneshot
+Nice=15
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+# Narrow filesystem access. Russell in MVP never mutates host state,
+# but defence in depth: only these directories are writable.
+# These directives work under `systemd --user` without CAP_*.
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=%h/.local/state/harness %h/.local/share/harness
+PrivateTmp=yes
+NoNewPrivileges=yes
+ExecStart=%h/.local/bin/russell sentinel-once
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target

@@ -1,0 +1,13 @@
+# SPDX-License-Identifier: MIT OR Apache-2.0
+# Templated failure capture. %i is the unit that failed.
+
+[Unit]
+Description=Russell failure capture for %i
+
+[Service]
+Type=oneshot
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=%h/.local/state/harness
+NoNewPrivileges=yes
+ExecStart=/bin/sh -c 'journalctl --user -u %i -n 50 --no-pager > %h/.local/state/harness/runs/failure-%i-$(date -u +%%Y%%m%%dT%%H%%M%%SZ).log 2>&1'

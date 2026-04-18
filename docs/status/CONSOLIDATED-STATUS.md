@@ -21,7 +21,8 @@ of every meaningful development session.
 
 - **Phase 0 (skeleton, read-only observation) — COMPLETE** as of
   2026-04-18.
-- **Phase 1 (MVP Doctor — `russell help`) — IN PLANNING.** Spec
+- **Phase 1 (MVP Doctor — `russell jack`) — IMPLEMENTED + verified against real Kimi K2.5.**
+- **Phase 1b (install artifacts + systemd units) — SHIPPED + installed on the observed machine.** 5-min timer firing; 44 tests green. Spec
   pinned at [`../specifications/MVP_SPEC.md`](../specifications/MVP_SPEC.md).
 - **Architecture pivoted to JR-1 austerity** on 2026-04-18.
   Seven ADRs deferred to `adr/deferred/`; two architecture docs
@@ -85,18 +86,18 @@ are met on the observed machine.
 - **Tasks:**
   1. ~~Author ADR-0016 (Doctor and LLM router for MVP).~~ **Done 2026-04-18.**
   2. ~~Author ADR-0017 (Reuse over dependency).~~ **Done 2026-04-18.**
-  3. Copy `stack-llm` files per §4.1 of `REUSE_MANIFEST.md`;
-     update §3 of that file with actual rows.
-  4. Author persona `crates/russell-doctor/prompts/jack.md`.
-  5. Implement `russell-doctor::help::compose` (SOAP assembly).
-  6. Implement `russell-doctor::help::call` (LLM round-trip).
-  7. Implement `russell-doctor::help::fallback` (offline
-     rule-based summary).
-  8. Add migration `0002_help_sessions.sql`.
-  9. Implement `russell-cli::commands::help`.
-  10. Wire env loader in `russell-core::env`.
-  11. Tests: mock backend round-trip, offline fallback,
-      migration idempotence, SOAP composition snapshot.
+  3. ~~Copy `stack-llm` files per §4.1 of `REUSE_MANIFEST.md`;
+     update §3 of that file with actual rows.~~ **Done 2026-04-18 (row 1 populated; openai.rs + wire.rs pattern-copied into `russell-doctor::openrouter`).**
+  4. ~~Author persona `crates/russell-doctor/prompts/jack.md`.~~ **Done 2026-04-18 (131 lines).**
+  5. ~~Implement `russell-doctor::help::compose` (SOAP assembly).~~ **Done.**
+  6. ~~Implement `russell-doctor::help::call` (LLM round-trip).~~ **Done (`openrouter::OpenRouterClient`).**
+  7. ~~Implement `russell-doctor::help::fallback` (offline
+     rule-based summary).~~ **Done.**
+  8. ~~Add migration `0002_help_sessions.sql`.~~ **Done.**
+  9. ~~Implement `russell-cli::commands::help` → `russell jack`.~~ **Done.**
+  10. ~~Wire env loader in `russell-core::env`.~~ **Done.**
+  11. ~~Tests: mock backend round-trip, offline fallback,
+      migration idempotence, SOAP composition snapshot.~~ **Done (14 new tests in `russell-doctor`, 3 in `russell-core::env`).**
 - **Success:**
   1. `russell help` returns a response from Kimi K2 when
      `OPENROUTER_API_KEY` is set.
@@ -109,13 +110,18 @@ are met on the observed machine.
      `transcript.jsonl`.
   5. All CI gates green.
 
-### Phase 1b — Install artifacts (after Phase 1)
+### Phase 1b — Install artifacts (COMPLETE)
 
 - **Goal:** Russell installs cleanly as a systemd user timer.
-- **Tasks:** `russell-sentinel.timer` / `.service`, install
-  instructions, first-run `russell profile --init` hook.
-- **Success:** The observed machine runs Russell unattended
-  for 7 consecutive days with zero mystery gaps.
+- **Shipped 2026-04-18:**
+  - `packaging/systemd/russell-sentinel.{timer,service}` — 5-minute cadence, persistent (catches up after sleep).
+  - `packaging/systemd/russell-digest.{timer,service}` — Sunday 09:00 weekly.
+  - `packaging/systemd/russell-failure@.service` — templated failure capture.
+  - `packaging/bin/install.sh` / `uninstall.sh` — idempotent, no-root.
+  - `.env.example` — template; seeded into `~/.config/harness/russell.env` on first install.
+  - [`docs/operations/INSTALL.md`](../operations/INSTALL.md) — operator runbook.
+  - Env discovery in `russell-core::env::load_discovered`: process env → `~/.config/harness/russell.env` → repo `.env` → `./.env`.
+- **Next empirical gate:** 7-day unattended soak on the observed machine.
 
 ### Phase 1c — MVP Close (the 30-day soak)
 

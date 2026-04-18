@@ -7,6 +7,110 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — Phase 1b: Install artifacts + systemd units
+
+- **systemd user units** under `packaging/systemd/`:
+  - `russell-sentinel.{timer,service}` — 5-minute cadence, persistent
+    across sleep, 15s jitter. User-scope hardening: `ProtectSystem=strict`,
+    `ProtectHome=read-only`, `ReadWritePaths` narrowed to state/share,
+    `PrivateTmp`, `NoNewPrivileges`. No `SystemCallFilter` — that requires
+    caps user units can't drop.
+  - `russell-digest.{timer,service}` — Sunday 09:00 local with 10m jitter,
+    renders Markdown digest into `~/.local/state/harness/digest/YYYY-WNN.md`.
+  - `russell-failure@.service` — templated capture of 50 lines of
+    `journalctl` into `~/.local/state/harness/runs/failure-*.log`.
+- **`packaging/bin/install.sh`** — idempotent operator installer:
+  builds, installs binary to `~/.local/bin/russell`, installs units to
+  `~/.config/systemd/user/`, seeds `~/.config/harness/russell.env`
+  from `.env.example` (template) or repo `.env` (if populated with a
+  real key), ensures state directories, reloads systemd, enables +
+  starts timers, runs a smoke `sentinel-once`, prints `status`.
+  Flags: `--no-start`, `--release`.
+- **`packaging/bin/uninstall.sh`** — clean removal; preserves data by
+  default, `--purge` for destructive wipe.
+- **`.env.example`** — non-secret operator template, 39 lines.
+  `.gitignore` uses `!.env.example` to permit commit.
+- **`docs/operations/INSTALL.md`** — 216-line operator runbook: install,
+  verify, daily ops, update, uninstall, troubleshoot.
+- **Env discovery layering** — `russell-core::env::load_discovered` now
+  layers files in precedence order (process env > config > repo > cwd)
+  instead of first-file-wins. Empty values in a file are skipped so a
+  blank template doesn't mask real keys from a lower-precedence file.
+  Added 4 new tests; **44 total passing** (up from 39).
+- **Live verification on the Framework 16 / HX 370 / Ubuntu 25.10**
+  machine (`MACHINE_PROFILE.md`): timer fires every 5 min, Sentinel
+  captures 3 samples per cycle at 5.1 MB peak memory / 25 ms CPU.
+  Real Kimi K2.5 round-trip via OpenRouter tested end-to-end; Jack
+  reads his own event history and narrates the machine's state in
+  persona-accurate voice.
+
+### Changed
+
+- `.gitignore` hardened: `.env`, `.env.*` ignored; `.env.example` /
+  `.env.template` explicitly whitelisted. `.env` was never tracked.
+
+### Next
+
+- **Phase 1c — 30-day unattended soak** on the Framework 16. No new
+  code until the soak completes per `MVP_SPEC.md` §6.
+- Optional: `russell digest` HTML rendering for the Sunday email.
+
+## [Unreleased-prior]
+
+### Added — Phase 1: The Doctor (`russell jack`)
+
+- **ADR-0016** — MVP Doctor spec: single round-trip, ZDR enforced,
+  Kimi K2.5 default, offline fallback mandatory.
+- **ADR-0017** — Reuse over dependency: JR-6 mechanism codified.
+- **`russell-doctor` crate** — Phase-1 implementation:
+  - `LlmClient` trait, minimal Russell-shaped types.
+  - `OpenRouterClient` backend — pattern-copied from
+    `slate/stack/crates/stack-llm/src/{openai,wire}.rs` per
+    `REUSE_MANIFEST.md` row 1. Drops streaming, tool-calling,
+    structured-output, retry. Adds per-request ZDR enforcement.
+    Retains Kimi K2.5 `reasoning_details` content normalisation.
+  - `MockClient` for tests and `RUSSELL_DOCTOR_BACKEND=mock`.
+  - `fallback::summarise` — the offline rule-based response.
+    Jack is never silent.
+  - `prompt::compose` — SOAP-shaped Markdown prompt builder.
+  - `run_help_with_config` — the orchestrator. Takes an
+    explicit `ClientConfig` so tests don't race on process env.
+  - `JACK_PERSONA` — `crates/russell-doctor/prompts/jack.md`
+    embedded via `include_str!` so Jack always has his voice.
+- **`russell jack [--note "..."]`** CLI verb added. Named
+  `jack` (not `help`) because clap reserves `help`; the name
+  honours the persona per `THE_JACK.md` anyway.
+- **`help_sessions` table** — migration `0002_help_sessions.sql`.
+  Records every Doctor round-trip with backend, model, chars,
+  latency, status, error_kind, evidence_ref.
+- **`russell-core::env::load_env_file`** — minimal loader for
+  `~/.config/harness/russell.env`. Existing env always wins.
+- **Evidence bundle format** — `~/.local/state/harness/evidence/help/<ulid>/`
+  with `soap.md`, `request.json`, `response.json`,
+  `transcript.jsonl`.
+- **39 tests passing** (up from 22): 24 in `russell-core`,
+  14 in `russell-doctor`, 1 in `russell-sentinel`.
+
+### Changed
+
+- `russell-core` relaxed `#![forbid(unsafe_code)]` →
+  `#![deny(unsafe_code)]` to allow narrow `#[allow(unsafe_code)]`
+  annotations on environment-mutation calls (Rust 2024 edition
+  made `env::set_var` unsafe). Every use site carries a SAFETY
+  comment.
+- `CLI main` is now `#[tokio::main(flavor = "multi_thread")]`
+  to support the Doctor's async HTTP call.
+
+### Verified
+
+- `cargo fmt --check` ✅
+- `cargo clippy --workspace --all-targets -- -D warnings` ✅
+- `cargo test --workspace` ✅ (39 passing)
+- End-to-end sandbox: `sentinel-once` + `jack --note` produces
+  response, journal event, `help_sessions` row, and evidence bundle.
+
+## [Unreleased-prior]
+
 ### Added — Documentation pivot (JR-1 austerity + UDQL-lite governance)
 
 - **Principles catalog** — `docs/architecture/PRINCIPLES_CATALOG.md` —

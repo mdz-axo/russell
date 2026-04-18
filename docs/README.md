@@ -80,6 +80,7 @@ may exist but must not contradict these.
 
 ### 2.5 Operations
 
+- [`operations/INSTALL.md`](operations/INSTALL.md) — operator runbook.
 - [`operations/REUSE_MANIFEST.md`](operations/REUSE_MANIFEST.md)
   — copy-with-provenance register.
 
@@ -162,7 +163,7 @@ They live under [`adr/deferred/`](adr/deferred/):
 
 | Bucket | Count |
 |---|---|
-| Active authoritative docs | 36 |
+| Active authoritative docs | 37 |
 | Active ADRs | 10 |
 | Deferred ADRs | 7 |
 | Archived docs | 2 |

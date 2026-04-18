@@ -58,7 +58,7 @@ blocker.
 
 | # | Russell path | Upstream path | Upstream commit | Russell changes | Sync policy |
 |---|---|---|---|---|---|
-| (none yet — MVP Phase-1 will populate the first rows with the `stack-llm` copy) | | | | | |
+| 1 | `crates/russell-doctor/src/openrouter.rs` | `slate/stack/crates/stack-llm/src/openai.rs` + `src/wire.rs` | `67a13834d8af4efa8c330ce10ef1031bf2cdeee2` | Uses Russell's `DoctorError` + `SoapPrompt`/`LlmResponse` instead of `stack_types`. Drops streaming, tool-calling, structured-output, retry. Adds per-request ZDR enforcement. Keeps the Kimi K2.5 `reasoning_details` content-normalisation. | Review on upstream bug fix; pull fixes, not features. Log changes in §6. |
 
 ## 4. Planned copies for Phase 1
 

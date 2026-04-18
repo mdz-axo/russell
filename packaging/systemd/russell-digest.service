@@ -1,0 +1,23 @@
+# SPDX-License-Identifier: MIT OR Apache-2.0
+# Weekly Markdown digest of Russell's observations.
+
+[Unit]
+Description=Russell weekly digest
+Documentation=file://%h/Clones/russell/docs/specifications/MVP_SPEC.md
+OnFailure=russell-failure@%n.service
+
+[Service]
+Type=oneshot
+Nice=19
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=%h/.local/state/harness
+PrivateTmp=yes
+NoNewPrivileges=yes
+# Render into ~/.local/state/harness/digest/YYYY-WNN.md
+ExecStart=/bin/sh -c '%h/.local/bin/russell digest --since-hours 168 > %h/.local/state/harness/digest/$(date -u +%%Y-W%%V).md'
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target
