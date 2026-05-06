@@ -24,9 +24,9 @@
 #![deny(rust_2018_idioms)]
 #![warn(missing_docs)]
 
+use russell_core::Result;
 use russell_core::event::{Event, Scope, Severity};
 use russell_core::journal::{JournalReader, JournalWriter};
-use russell_core::Result;
 use tracing::debug;
 
 /// Probe name for the one MVP self-vital.
@@ -110,10 +110,8 @@ pub fn run_once(writer: &JournalWriter, reader: &JournalReader) -> Result<Propri
             },
             severity,
         ));
-        ev.outputs.insert(
-            "age_s".into(),
-            serde_json::Value::from(age_s.unwrap_or(-1)),
-        );
+        ev.outputs
+            .insert("age_s".into(), serde_json::Value::from(age_s.unwrap_or(-1)));
         writer.append(&ev)?;
     }
 
@@ -145,7 +143,6 @@ mod tests {
     use super::*;
     use russell_core::event::Scope;
     use russell_core::journal::JournalWriter;
-    use std::path::PathBuf;
 
     fn tmp_journal() -> (tempfile::TempDir, JournalWriter) {
         let tmp = tempfile::tempdir().unwrap();
@@ -184,15 +181,8 @@ mod tests {
         let (_tmp, w) = tmp_journal();
         let now = russell_core::time::now_unix();
         // Write a host sample 500 s ago (> 450 s threshold).
-        w.append_sample(
-            now - 500,
-            Scope::Host,
-            "loadavg_1m",
-            Some(1.0),
-            None,
-            None,
-        )
-        .unwrap();
+        w.append_sample(now - 500, Scope::Host, "loadavg_1m", Some(1.0), None, None)
+            .unwrap();
 
         let r = w.reader();
         let result = run_once(&w, &r).unwrap();
@@ -205,15 +195,8 @@ mod tests {
         let (_tmp, w) = tmp_journal();
         let now = russell_core::time::now_unix();
         // Write a host sample 2000 s ago (> 1800 s threshold).
-        w.append_sample(
-            now - 2000,
-            Scope::Host,
-            "loadavg_1m",
-            Some(1.0),
-            None,
-            None,
-        )
-        .unwrap();
+        w.append_sample(now - 2000, Scope::Host, "loadavg_1m", Some(1.0), None, None)
+            .unwrap();
 
         let r = w.reader();
         let result = run_once(&w, &r).unwrap();
@@ -225,8 +208,15 @@ mod tests {
     fn self_sample_is_written() {
         let (_tmp, w) = tmp_journal();
         let now = russell_core::time::now_unix();
-        w.append_sample(now, Scope::Host, "mem_available_mib", Some(8000.0), None, Some("MiB"))
-            .unwrap();
+        w.append_sample(
+            now,
+            Scope::Host,
+            "mem_available_mib",
+            Some(8000.0),
+            None,
+            Some("MiB"),
+        )
+        .unwrap();
 
         let r = w.reader();
         run_once(&w, &r).unwrap();

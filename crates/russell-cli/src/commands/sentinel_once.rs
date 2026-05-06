@@ -19,8 +19,7 @@ pub fn run(paths: &Paths) -> Result<()> {
 
     // 2. Proprioception: self-vital (JR-5).
     let reader = journal.reader();
-    let proprio = russell_proprio::run_once(&journal, &reader)
-        .context("running proprioception")?;
+    let proprio = russell_proprio::run_once(&journal, &reader).context("running proprioception")?;
 
     // 3. Cycle event.
     let mut ev = Event::new("observe", Severity::Info);

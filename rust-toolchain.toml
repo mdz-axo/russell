@@ -1,6 +1,8 @@
 # SPDX-License-Identifier: MIT OR Apache-2.0
 # Pinned per CONTRIBUTING.md §1.
+# MSRV is enforced by `rust-version` in Cargo.toml; this file
+# ensures the right components are present for CI and dev.
 [toolchain]
-channel = "1.94.1"
-components = ["rustfmt", "clippy", "rust-src"]
+channel = "stable"
+components = ["rustfmt", "clippy"]
 profile = "minimal"

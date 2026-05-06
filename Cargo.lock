@@ -1153,11 +1153,10 @@ dependencies = [
 name = "russell-proprio"
 version = "0.1.0-phase0"
 dependencies = [
+ "rusqlite",
  "russell-core",
- "russell-skills",
- "serde",
- "thiserror",
- "tokio",
+ "serde_json",
+ "tempfile",
  "tracing",
 ]
 
