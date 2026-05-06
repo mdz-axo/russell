@@ -22,7 +22,8 @@ of every meaningful development session.
 - **Phase 0 (skeleton, read-only observation) — COMPLETE** as of
   2026-04-18.
 - **Phase 1 (MVP Doctor — `russell jack`) — IMPLEMENTED + verified against real Kimi K2.5.**
-- **Phase 1b (install artifacts + systemd units) — SHIPPED + installed on the observed machine.** 5-min timer firing; 44 tests green. Spec
+- **Phase 1b (install artifacts + systemd units) — SHIPPED + installed on the observed machine.** 5-min timer firing; 44 tests green.
+- **Phase 1c (30-day unattended soak) — RUNNING.** Day 4 checkpoint 2026-04-21: 641 cycles, 99.84% reliability, healthy. See [`SOAK_FINDINGS.md`](SOAK_FINDINGS.md) for observed findings (none require breaking the soak). Spec
   pinned at [`../specifications/MVP_SPEC.md`](../specifications/MVP_SPEC.md).
 - **Architecture pivoted to JR-1 austerity** on 2026-04-18.
   Seven ADRs deferred to `adr/deferred/`; two architecture docs

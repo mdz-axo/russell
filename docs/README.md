@@ -88,6 +88,8 @@ may exist but must not contradict these.
 
 - [`status/CONSOLIDATED-STATUS.md`](status/CONSOLIDATED-STATUS.md)
   — where we are.
+- [`status/SOAK_FINDINGS.md`](status/SOAK_FINDINGS.md)
+  — observational backlog during Phase 1c.
 
 ### 2.7 ADRs (active)
 
@@ -163,7 +165,7 @@ They live under [`adr/deferred/`](adr/deferred/):
 
 | Bucket | Count |
 |---|---|
-| Active authoritative docs | 37 |
+| Active authoritative docs | 38 |
 | Active ADRs | 10 |
 | Deferred ADRs | 7 |
 | Archived docs | 2 |
