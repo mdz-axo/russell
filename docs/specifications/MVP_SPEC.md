@@ -12,7 +12,7 @@ status: "Active"
 <!-- TOGAF_DOMAIN: Requirements Management -->
 <!-- VERSION: 1.0.0 -->
 <!-- STATUS: Active -->
-<!-- LAST_UPDATED: 2026-04-18 -->
+<!-- LAST_UPDATED: 2026-05-06 -->
 
 This is the **pinned boundary** of MVP Russell. Anything outside
 this boundary is explicitly deferred; adding anything inside it

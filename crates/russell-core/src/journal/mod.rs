@@ -360,6 +360,28 @@ impl JournalReader {
         Ok(row.flatten())
     }
 
+    /// Timestamp (unix seconds) of the most-recent **host-scope**
+    /// sample, or `None` if no host samples exist.
+    ///
+    /// Used by proprioception ([`russell_proprio`]) to compute
+    /// `sentinel_last_run_age_s` without being confused by its own
+    /// self-scope writes.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`CoreError::Sqlite`] on DB errors.
+    pub fn last_host_sample_ts(&self) -> Result<Option<i64>> {
+        let conn = self.open_ro()?;
+        let row: Option<Option<i64>> = conn
+            .query_row(
+                "SELECT MAX(ts) FROM samples WHERE scope = 'host'",
+                [],
+                |r| r.get::<_, Option<i64>>(0),
+            )
+            .ok();
+        Ok(row.flatten())
+    }
+
     /// Path the journal lives at. May not exist yet on very fresh
     /// installs.
     #[must_use]
