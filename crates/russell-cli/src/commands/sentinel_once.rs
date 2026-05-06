@@ -1,8 +1,13 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 //! `russell sentinel-once` — fire the Sentinel once.
 //!
-//! Runs the host probe set, then the proprioception self-vital
-//! (JR-5), and emits a cycle event summarising both.
+//! Runs the proprioception self-vital (JR-5) FIRST — measuring
+//! how stale the previous cycle's data is — then the host probe
+//! set, then emits a cycle event summarising both.
+//!
+//! The ordering matters: proprio must read `MAX(ts)` from host
+//! samples *before* the current cycle writes new ones, otherwise
+//! the age is always ~0 s and the self-vital can never trigger.
 
 use anyhow::{Context, Result};
 use russell_core::event::{Event, Severity};
@@ -14,12 +19,14 @@ pub fn run(paths: &Paths) -> Result<()> {
     let journal = JournalWriter::open(&paths.journal())
         .with_context(|| format!("opening journal {}", paths.journal().display()))?;
 
-    // 1. Host probes.
-    let n = russell_sentinel::run_once(&journal).context("running Sentinel")?;
-
-    // 2. Proprioception: self-vital (JR-5).
+    // 1. Proprioception: self-vital (JR-5).
+    //    Must run BEFORE host probes so it measures the age of the
+    //    *previous* cycle's samples, not the ones we're about to write.
     let reader = journal.reader();
     let proprio = russell_proprio::run_once(&journal, &reader).context("running proprioception")?;
+
+    // 2. Host probes.
+    let n = russell_sentinel::run_once(&journal).context("running Sentinel")?;
 
     // 3. Cycle event.
     let mut ev = Event::new("observe", Severity::Info);
