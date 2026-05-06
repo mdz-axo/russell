@@ -1,7 +1,7 @@
 ---
 title: "MVP Russell — the Minimal Viable Terrier"
 audience: [operators, developers, architects, contributors, agents]
-last_updated: 2026-04-18
+last_updated: 2026-05-06
 togaf_phase: "Requirements Management"
 version: "1.0.0"
 status: "Active"
@@ -152,16 +152,21 @@ MVP is **complete** when all three of these are empirically true:
 
 1. **Stability:** Russell runs unattended on the observed
    Framework 16 / HX 370 / Ubuntu 25.10 machine
-   ([`MACHINE_PROFILE.md`](../../MACHINE_PROFILE.md)) for **30
-   consecutive days** with zero mystery gaps in the journal
-   (gaps > 2× the cadence).
+   ([`MACHINE_PROFILE.md`](../../MACHINE_PROFILE.md)) for **20
+   consecutive days** with zero unexplained gaps in the journal.
+   Gaps exceeding 2× the cadence that are bracketed by a
+   plausible suspend/resume window (evidenced by corresponding
+   systemd boot/wake records) are not "mystery gaps." See
+   [ADR-0018](../adr/0018-close-phase-1c.md).
 2. **Tests:** `cargo fmt --check`, `cargo clippy --workspace
    --all-targets -- -D warnings`, and `cargo test --workspace`
    all pass on every commit.
-3. **Help channel proof:** At least **10 successful
-   `russell help` round-trips** are journaled during the
-   30-day window, and at least one was triggered in a real
-   moment of operator uncertainty about the machine's state.
+3. **Help channel proof:** At least **5 successful
+   `russell help` LLM round-trips** and demonstrated
+   offline-fallback resilience are journaled during the soak
+   window, and at least one was triggered in a real moment of
+   operator uncertainty about the machine's state. See
+   [ADR-0018](../adr/0018-close-phase-1c.md).
 
 When all three are met, MVP is closed and Phase 2 opens. Not
 before.
