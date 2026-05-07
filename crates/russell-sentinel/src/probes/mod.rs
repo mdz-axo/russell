@@ -1,11 +1,15 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
-//! A deliberately tiny probe set for Phase 0.
+//! Probe orchestrator.
 //!
-//! Each probe is infallible and returns `None` when the source is
-//! unavailable. No panic, no I/O-propagated error — Sentinel's job
-//! is to record what it can see and keep going.
+//! Composes probe families into collection functions. Each family
+//! lives in its own module; this module is the pipeline stage that
+//! iterates them.
+//!
+//! CTHA: `ctha.pipeline.sentinel_collect.duration_ms`, `items_out`
 
-use std::fs;
+pub mod connectors;
+pub mod memory;
+pub mod tools;
 
 /// One sample emitted by a probe.
 #[derive(Debug, Clone)]
@@ -22,9 +26,18 @@ pub struct Sample {
 
 /// Collect one sample per probe. Returns only probes that
 /// produced a value on this invocation.
+///
+/// CTHA: `ctha.pipeline.sentinel_collect`
+#[tracing::instrument(
+    level = "debug",
+    fields(
+        ctha.pipeline.sentinel_collect.items_out,
+    )
+)]
 pub fn collect() -> Vec<Sample> {
     let mut out = Vec::new();
-    if let Some(v) = mem_available_mib() {
+
+    if let Some(v) = memory::mem_available_mib() {
         out.push(Sample {
             name: "mem_available_mib".into(),
             value_num: Some(v),
@@ -32,7 +45,7 @@ pub fn collect() -> Vec<Sample> {
             unit: Some("MiB"),
         });
     }
-    if let Some(v) = swap_used_mib() {
+    if let Some(v) = memory::swap_used_mib() {
         out.push(Sample {
             name: "swap_used_mib".into(),
             value_num: Some(v),
@@ -40,7 +53,7 @@ pub fn collect() -> Vec<Sample> {
             unit: Some("MiB"),
         });
     }
-    if let Some(v) = load_avg_1m() {
+    if let Some(v) = memory::load_avg_1m() {
         out.push(Sample {
             name: "loadavg_1m".into(),
             value_num: Some(v),
@@ -48,35 +61,9 @@ pub fn collect() -> Vec<Sample> {
             unit: None,
         });
     }
+
+    tracing::Span::current().record("ctha.pipeline.sentinel_collect.items_out", out.len());
     out
-}
-
-fn read_meminfo_kib(key: &str) -> Option<u64> {
-    let text = fs::read_to_string("/proc/meminfo").ok()?;
-    for line in text.lines() {
-        if let Some(rest) = line.strip_prefix(key) {
-            let rest = rest.trim_start_matches(':').trim();
-            let first = rest.split_whitespace().next()?;
-            return first.parse::<u64>().ok();
-        }
-    }
-    None
-}
-
-fn mem_available_mib() -> Option<f64> {
-    read_meminfo_kib("MemAvailable").map(|kib| kib as f64 / 1024.0)
-}
-
-fn swap_used_mib() -> Option<f64> {
-    let total = read_meminfo_kib("SwapTotal")?;
-    let free = read_meminfo_kib("SwapFree")?;
-    let used_kib = total.saturating_sub(free);
-    Some(used_kib as f64 / 1024.0)
-}
-
-fn load_avg_1m() -> Option<f64> {
-    let text = fs::read_to_string("/proc/loadavg").ok()?;
-    text.split_whitespace().next()?.parse::<f64>().ok()
 }
 
 #[cfg(test)]
