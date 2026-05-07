@@ -1,7 +1,7 @@
 ---
 title: "Architecture Overview"
 audience: [architects, developers, contributors]
-last_updated: 2026-04-18
+last_updated: 2026-05-06
 togaf_phase: "A — Architecture Vision"
 version: "1.1.0"
 status: "Active"
@@ -10,7 +10,7 @@ status: "Active"
 <!-- TOGAF_DOMAIN: Architecture Vision -->
 <!-- VERSION: 1.1.0 -->
 <!-- STATUS: Active -->
-<!-- LAST_UPDATED: 2026-04-18 -->
+<!-- LAST_UPDATED: 2026-05-06 -->
 
 <!--
 audience: contributors orienting themselves before editing code
@@ -95,7 +95,7 @@ a corresponding ADR and a corresponding area of the code:
 |---|---|---|
 | Policy | [ADR-0005](../adr/deferred/0005-privileged-operations.md), [safety.md](../standards/safety.md) | `russell-cli` confirm flow, kill switches |
 | Intelligence | [ADR-0008](../adr/0008-llm-triage-never-emits-shell.md) | `russell-doctor::llm`, `russell-doctor::bootstrap` |
-| Control | [ADR-0007](../adr/deferred/0007-yaml-manifest-subprocess-skill-model.md), [ADR-0015](../adr/0015-proprioception-self-health.md) | `russell-doctor`, `russell-proprio` |
+| Control | [ADR-0007](../adr/deferred/0007-yaml-manifest-subprocess-skill-model.md), [ADR-0015](../adr/0015-proprioception-self-health.md) | `russell-doctor`, `russell-proprio` (MVP self-vital) |
 | Coordination | [ADR-0009](../adr/deferred/0009-tokio-runtime.md) + systemd timers | Unit files under `units/`; timers are OS-level |
 | Operations | [ADR-0004](../adr/0004-sqlite-journal.md), [ADR-0006](../adr/0006-profile-abstraction.md) | `russell-sentinel`, `russell-skills` |
 
@@ -207,10 +207,15 @@ It consults `rules.d/*.toml` to compute severity from each
 probe's value against the EWMA baseline. Samples and any
 generated events land in the journal.
 
-The Meta-Sentinel is the same thing pointed at Russell itself
-(see [`../archive/proprioception.md`](../archive/proprioception.md)). Timer drift,
-dispatcher latency, journal-writer lag, subprocess zombies,
-LLM round-trip times, MCP error rate.
+The Meta-Sentinel (`russell-proprio`) observes Russell himself.
+In MVP it implements one self-vital: `sentinel_last_run_age_s`
+(seconds since the last host sample landed in the journal). It
+runs BEFORE host probes in each cycle so the measurement is
+never stale-by-one. Full meta-Sentinel (timer drift, dispatcher
+latency, journal-writer lag, subprocess zombies, LLM round-trip
+times, MCP error rate) is deferred to Phase 4. See
+[`../archive/proprioception.md`](../archive/proprioception.md)
+for the aspirational design.
 
 ## 6. Honeymoon and first 30 days
 
@@ -231,7 +236,34 @@ aggressive intervention.
 | New CLI subcommand | `russell-cli::commands` | `CONTRIBUTING.md` §9; mirror in MCP if user-facing |
 | New self-health vital | `russell-proprio::probes` | [`../archive/proprioception.md`](../archive/proprioception.md); ADR if new failure class |
 
-## 8. What this document is not
+## 8. Kask integration surface
+
+Russell's journal (`~/.local/state/harness/journal.db`) is read by
+`arsenal-mcp-russell` — an MCP tool server that lives in the Kask
+repo (`~/Clones/kask`). It exposes 6 tools:
+
+| MCP tool | Purpose |
+|---|---|
+| `russell_host_snapshot` | Latest sample from each host probe |
+| `russell_journal_query` | Arbitrary time-range query over samples |
+| `russell_recent_events` | Recent `harness.event.v1` rows |
+| `russell_probe_history` | Time-series for a single probe |
+| `russell_health_summary` | Aggregated health status |
+| `russell_curator_assess` | Duncan's structured health assessment |
+
+**Duncan** is an infrastructure Curator in Kask's
+`stack-control-plane` that calls `russell_curator_assess` to
+produce health reports with findings and recommendations.
+
+**Integration boundary:** no cross-crate dependency. Russell does
+not import Kask; Kask does not import Russell. The MCP tool server
+reads the SQLite journal in read-only mode. Russell is unaware of
+Kask's existence.
+
+See [`../proposals/russell-kask-integration.md`](../proposals/russell-kask-integration.md)
+for the full design.
+
+## 9. What this document is not
 
 - Not a spec. The spec is the ADRs plus the design document.
 - Not an API reference. That lives in rustdoc.

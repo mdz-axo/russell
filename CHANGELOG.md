@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — 2026-05-06: Phase 1c closed, self-vital, Kask integration
+
+- **Phase 1c closed** per [ADR-0018](docs/adr/0018-close-phase-1c.md).
+  20-day soak: 2 062 cycles, ~99.95% reliability. Findings F-1
+  through F-9 recorded; F-7 (self-vital) and F-2 (SOAP samples)
+  carry into Phase 2.
+- **`russell-proprio`: JR-5 self-vital implemented.**
+  `sentinel_last_run_age_s` reads the journal for the most recent
+  Sentinel sample, computes staleness in seconds, writes a
+  `scope='self'` sample. Severity: `ok` (≤360s), `warning` (>360s).
+- **Self-vital timing fix.** Proprio now runs BEFORE host probes in
+  each sentinel cycle, so the self-vital is never stale-by-one.
+- **`rust-toolchain.toml` fixed.** Pinned to `stable` channel;
+  dropped `rust-src` component (was causing snap-based rustup hangs
+  on exact-version pins).
+- **Kask integration: `arsenal-mcp-russell` MCP server + Duncan
+  Curator.** 6 MCP tools (`russell_host_snapshot`,
+  `russell_journal_query`, `russell_recent_events`,
+  `russell_probe_history`, `russell_health_summary`,
+  `russell_curator_assess`) live in the Kask repo. Duncan
+  (infrastructure Curator in `stack-control-plane`) reads Russell's
+  journal via MCP and produces structured health assessments.
+  Registered in `~/.config/stack/mcp-registry.json`. No cross-crate
+  dependency — communication via SQLite journal + MCP.
+- **Test count: 50** (was 44). Breakdown: 29 core + 14 doctor +
+  6 proprio + 1 sentinel.
+
 ### Added — Phase 1b: Install artifacts + systemd units
 
 - **systemd user units** under `packaging/systemd/`:

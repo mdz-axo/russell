@@ -1,7 +1,7 @@
 # Proposal: Russell as Kask's Local System Agent
 
 **Date:** 2026-05-06
-**Status:** Draft
+**Status:** Accepted — Phase A complete
 **Audience:** Kask maintainers, Russell maintainers, operators
 
 ---
@@ -338,3 +338,40 @@ With the proposed integration:
 That's the cybernetic loop closing: sense → classify → advise → fix →
 verify. Russell provides the first two; Kask's Curators provide the
 middle two; the operator provides the last one.
+
+---
+
+## 11. Implementation Status (2026-05-06)
+
+### Phase A — Complete
+
+All Phase A steps are done:
+
+1. ✅ Russell binary deployed to `~/.local/bin/russell`.
+2. ✅ `russell-sentinel.timer` firing every 5 minutes (20-day soak
+   completed, 2 062 cycles).
+3. ✅ `arsenal-mcp-russell` MCP tool server built in Kask repo
+   (6 tools: `russell_host_snapshot`, `russell_journal_query`,
+   `russell_recent_events`, `russell_probe_history`,
+   `russell_health_summary`, `russell_curator_assess`).
+4. ✅ Registered in `~/.config/stack/mcp-registry.json`.
+5. ✅ `russell jack` operational for operators.
+
+### Phase C (partial) — Complete
+
+Duncan (the infrastructure Curator) was implemented ahead of
+schedule in `stack-control-plane`:
+
+- `russell_curator_assess` tool is live and returning structured
+  health reports with findings and recommendations.
+- Duncan reads Russell's journal via the MCP tool server (no
+  direct SQLite access from Kask code).
+
+### Next: Phase B
+
+Kask-aware probes in Russell's sentinel:
+- Ollama liveness
+- Disk space
+- systemd service state for Kask units
+- Requires Russell's rule engine (Phase 2 work) for threshold
+  evaluation.

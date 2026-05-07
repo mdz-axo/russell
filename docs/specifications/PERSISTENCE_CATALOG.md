@@ -1,7 +1,7 @@
 ---
 title: "Persistence Catalog — where Russell remembers"
 audience: [operators, developers, architects]
-last_updated: 2026-04-18
+last_updated: 2026-05-06
 togaf_phase: "C — Data Architecture"
 version: "1.0.0"
 status: "Active"
@@ -12,7 +12,7 @@ status: "Active"
 <!-- TOGAF_DOMAIN: Data Architecture -->
 <!-- VERSION: 1.0.0 -->
 <!-- STATUS: Active -->
-<!-- LAST_UPDATED: 2026-04-18 -->
+<!-- LAST_UPDATED: 2026-05-06 -->
 
 Under JR-7 (persistence is auditable), every byte Russell writes
 is registered here. If you add a new persistent artifact, you
@@ -72,7 +72,7 @@ against the file.
 | Table | Purpose | Authored by | Read by |
 |---|---|---|---|
 | `schema_migrations` | Forward-only migration log | `journal::migrations::apply_one` | migration runner |
-| `samples` | Time-series probe observations | Sentinel, Meta-Sentinel | digest, baselines |
+| `samples` | Time-series probe observations | Sentinel, Meta-Sentinel, Proprio | digest, baselines, `arsenal-mcp-russell` |
 | `events` | Structured log rows conforming to `harness.event.v1` | every mutating + observational action | `list`, `digest`, `help` |
 | `baselines` | EWMA mean/var + p50/p95/p99 per probe | (reserved, unused in MVP) | Phase 2 rules |
 | `confirmations` | Andon-cord records for risk≥medium actions | (reserved, unused in MVP) | Phase 3 dispatcher |
@@ -85,6 +85,23 @@ follow-up numbered migrations.
 The `help_sessions` table is introduced by the Phase-1 migration
 `0002_help_sessions.sql`; it is **not** in the current 0001 file
 and must land before `russell help` ships.
+
+#### Self-scope samples (`russell-proprio`)
+
+The `samples` table also holds self-observation rows written by
+`russell-proprio`. These are distinguished by `scope='self'`:
+
+| Column | Value |
+|---|---|
+| `scope` | `'self'` |
+| `probe` | `sentinel_last_run_age_s` |
+| `value` | Seconds since the most recent Sentinel host sample |
+| `severity` | `ok` (≤360s) or `warning` (>360s) |
+
+**Owner.** `russell-proprio` (writes one row per cycle, before
+host probes run).
+**Retention.** Same as host samples — unbounded until Phase-2
+digest compaction prunes.
 
 ### 2.2 `~/.local/state/harness/profile.json`
 

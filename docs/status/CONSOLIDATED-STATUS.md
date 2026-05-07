@@ -22,7 +22,7 @@ of every meaningful development session.
 - **Phase 0 (skeleton, read-only observation) — COMPLETE** as of
   2026-04-18.
 - **Phase 1 (MVP Doctor — `russell jack`) — IMPLEMENTED + verified against real Kimi K2.5.**
-- **Phase 1b (install artifacts + systemd units) — SHIPPED + installed on the observed machine.** 5-min timer firing; 44 tests green.
+- **Phase 1b (install artifacts + systemd units) — SHIPPED + installed on the observed machine.** 5-min timer firing; 50 tests green.
 - **Phase 1c (20-day unattended soak) — CLOSED.** Day 20 (2026-05-06): 2 062 cycles, ~99.95% reliability. Closed per [ADR-0018](../adr/0018-close-phase-1c.md). Findings F-1 through F-9 recorded in [`SOAK_FINDINGS.md`](SOAK_FINDINGS.md); F-7 (JR-5 self-vital) and F-2 (SOAP samples) carry into Phase 2.
 - **Phase 2 (observation sharpened) — OPEN.** Self-vital, rule engine, EWMA baselines. Spec pinned at [`../specifications/MVP_SPEC.md`](../specifications/MVP_SPEC.md).
 - **Architecture pivoted to JR-1 austerity** on 2026-04-18.
@@ -44,23 +44,43 @@ of every meaningful development session.
 
 ### Code
 
-- Rust workspace with 7 crates (2 active, 5 stubs per JR-6
+- Rust workspace with 7 crates (3 active, 4 stubs per JR-6
   scaffold-for-later discipline).
 - `russell-core` implements paths, event schema, profile,
   journal (SQLite + WAL + migrations), telemetry, time.
 - `russell-sentinel` implements three `/proc`-based probes.
+- `russell-proprio` implements the JR-5 self-vital
+  (`sentinel_last_run_age_s`): reads the journal for the most
+  recent Sentinel sample, computes staleness in seconds, writes
+  a `scope='self'` sample. Runs BEFORE host probes in each
+  cycle so the self-vital is never stale-by-one.
 - `russell-cli` implements five read-only verbs: `status`,
   `list`, `profile [--init]`, `digest`, `sentinel-once`.
-- 44 tests passing.
+- 50 tests passing (29 core + 14 doctor + 6 proprio + 1 sentinel).
 - `cargo fmt --check` ✅, `cargo clippy -- -D warnings` ✅,
   `cargo test` ✅.
 
+### Kask Integration
+
+- **`arsenal-mcp-russell`** MCP tool server (6 tools) lives in the
+  Kask repo (`~/Clones/kask`). Reads Russell's SQLite journal
+  read-only; exposes `russell_host_snapshot`, `russell_journal_query`,
+  `russell_recent_events`, `russell_probe_history`,
+  `russell_health_summary`, and `russell_curator_assess`.
+- **Duncan** — infrastructure Curator in Kask's
+  `stack-control-plane`. Calls `russell_curator_assess` to produce
+  health reports from Russell's telemetry.
+- Registered in `~/.config/stack/mcp-registry.json`.
+- **Integration boundary:** no cross-crate dependency between Russell
+  and Kask. Communication is via Russell's SQLite journal (read-only
+  from Kask's side) + the MCP tool server.
+
 ### Not yet
 
-- JR-5 self-vital (`sentinel_last_run_age_s`) in `russell-proprio` (Phase 2).
 - Rule engine (`rules.d/*.toml`, lift ADR-0012) (Phase 2).
 - EWMA baselines (30-day rolling p50/p95/p99) (Phase 2).
 - Fix F-2: extend `prompt::compose` with 24h sample summary (Phase 2).
+- Kask-aware probes: Ollama, disk, systemd services (Phase B of integration).
 - Skill dispatcher, tier engines, MCP server (post-MVP).
 
 ## 3. Phase-by-phase plan
@@ -131,7 +151,7 @@ are met on the observed machine.
 Rule engine, EWMA baselines, self-vital, sample summary in SOAP.
 Phase 1c is closed; work begins.
 
-- [ ] JR-5 self-vital (`sentinel_last_run_age_s`) in `russell-proprio`
+- [x] JR-5 self-vital (`sentinel_last_run_age_s`) in `russell-proprio`
 - [ ] Rule engine (`rules.d/*.toml`, lift ADR-0012)
 - [ ] EWMA baselines (30-day rolling p50/p95/p99)
 - [ ] Fix F-2: extend `prompt::compose` with 24h sample summary

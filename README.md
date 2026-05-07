@@ -50,12 +50,12 @@ russell jack --note "ollama hangs"     # ask Jack    [Phase 1]
 See [`docs/status/CONSOLIDATED-STATUS.md`](docs/status/CONSOLIDATED-STATUS.md).
 
 - [x] Phase 0 — Skeleton. Read-only CLI verbs. Journal. Profile.
-- [ ] **Phase 1 — Doctor (`russell jack`).** Kimi K2 via
-      OpenRouter with `zdr: true`. Offline fallback. This is
-      current.
-- [ ] Phase 1b — systemd unit files.
-- [ ] Phase 1c — 30-day unattended soak.
-- [ ] Phase 2 — Rules engine, EWMA baselines, Tier I modules.
+- [x] Phase 1 — Doctor (`russell jack`). Kimi K2 via OpenRouter
+      with `zdr: true`. Offline fallback.
+- [x] Phase 1b — systemd unit files.
+- [x] Phase 1c — 20-day soak (closed per ADR-0018).
+- [ ] **Phase 2 — Rules engine, EWMA baselines, Tier I modules.
+      Self-vital active. Kask integration live.**
 - [ ] Phase 3+ — Skills, dispatch, MCP surface, full proprio.
       See `cybernetic-health-harness.md` §20.
 
