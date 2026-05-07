@@ -100,8 +100,11 @@ ok "Wrote Quadlet file: ${QUADLET_FILE}"
 # ─── 6. Reload systemd and start the service ────────────────────────────────
 echo -e "\n${CYN}━━━ Step 5: Activate Quadlet service${RST}"
 systemctl --user daemon-reload
-systemctl --user enable --now kask-qdrant
-ok "kask-qdrant.service enabled and started"
+# Quadlet-generated units cannot be `enable`d — systemd treats them as
+# transient/generated. Auto-start is handled by the [Install] WantedBy=
+# directive in the .container file, which the Quadlet generator wires up.
+systemctl --user start kask-qdrant
+ok "kask-qdrant.service started (auto-starts on boot via Quadlet)"
 
 # ─── 7. Enable auto-update timer ────────────────────────────────────────────
 echo -e "\n${CYN}━━━ Step 6: Enable container auto-updates${RST}"
