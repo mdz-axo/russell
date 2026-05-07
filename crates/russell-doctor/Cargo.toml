@@ -21,7 +21,7 @@ tokio.workspace = true
 tracing.workspace = true
 time.workspace = true
 ulid.workspace = true
-reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "gzip"] }
+reqwest.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true

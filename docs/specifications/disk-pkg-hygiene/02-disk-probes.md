@@ -52,8 +52,9 @@ layer is unit-testable without filesystem access.
 
 New file: `crates/russell-sentinel/src/probes/disk.rs`
 
-The existing `probes.rs` becomes `probes/mod.rs` (re-exports
-`collect()` which now delegates to sub-modules).
+The module restructuring is complete (per ADR-0019): `probes.rs`
+has been decomposed into `probes/mod.rs` + sub-modules. The disk
+probe module slots in alongside the existing `memory.rs`.
 
 ```
 crates/russell-sentinel/src/

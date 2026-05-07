@@ -77,8 +77,8 @@ Timer fires (systemd)
 ### Extended Cadence (hourly/daily) — Package Probes
 
 ```
-Timer fires (cadence TBD)
-  → russell pkg-sentinel-once (or conditional in existing timer)
+Timer fires (hourly — russell-sentinel-extended.timer per ADR-0019)
+  → russell sentinel-once --extended
     → probes::collect_extended()
       → packages::collect_packages()
         → for each provider in registry:

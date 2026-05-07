@@ -54,14 +54,14 @@ In this domain:
 Before implementation begins:
 
 1. **MVP must be closed** (20-day soak, per `MVP_SPEC.md` §6).
-2. **ADR for cadence separation** (Task 6, Question 1) must be decided.
+2. ~~**ADR for cadence separation** (Task 6, Question 1) must be decided.~~ **Done** — [ADR-0019](../adr/0019-probe-cadence-and-ctha.md).
 3. **`nix` crate** must be added to `russell-sentinel/Cargo.toml` for `statvfs`.
 4. **`Sample` type** should be evaluated for promotion from `russell-sentinel` to `russell-core` (it's a domain type used across crate boundaries via the `ProviderHealth` trait).
 
 ## Implementation Order
 
 1. Move `Sample` to `russell-core` (or define `ProviderHealth` to return a core-level type).
-2. Refactor `probes.rs` → `probes/mod.rs` + `probes/memory.rs` (extract existing probes).
+2. ~~Refactor `probes.rs` → `probes/mod.rs` + `probes/memory.rs`.~~ **Done** (ADR-0019).
 3. Implement `probes/disk.rs` (Task 2) — cheapest, highest value, no new dependencies beyond `nix`.
 4. Implement `ProviderHealth` trait in `russell-core/src/provider.rs` (Task 3 port).
 5. Implement provider adapters in `probes/packages.rs` (Task 3 adapters).
