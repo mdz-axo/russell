@@ -42,7 +42,8 @@ mod tests {
 
     #[test]
     fn parse_meminfo_kib_extracts_value() {
-        let content = "MemTotal:       94321 kB\nMemFree:         1234 kB\nMemAvailable:   56789 kB\n";
+        let content =
+            "MemTotal:       94321 kB\nMemFree:         1234 kB\nMemAvailable:   56789 kB\n";
         assert_eq!(parse_meminfo_kib(content, "MemAvailable"), Some(56789));
         assert_eq!(parse_meminfo_kib(content, "MemTotal"), Some(94321));
         assert_eq!(parse_meminfo_kib(content, "MemFree"), Some(1234));
