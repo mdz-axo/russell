@@ -48,6 +48,8 @@ In this domain:
 | 4 | [`disk-pkg-hygiene/04-provenance-registry.md`](disk-pkg-hygiene/04-provenance-registry.md) | Tracking curl-installed binaries via operator-maintained TOML registry |
 | 5 | [`disk-pkg-hygiene/05-integration.md`](disk-pkg-hygiene/05-integration.md) | Wiring into hexagonal architecture; sequence diagrams; rules integration |
 | 6 | [`disk-pkg-hygiene/06-open-questions.md`](disk-pkg-hygiene/06-open-questions.md) | Deferred decisions; ADR requirements; cadence, thresholds, ownership |
+| 7 | [`disk-pkg-hygiene/07-dependency-drag-policy.md`](disk-pkg-hygiene/07-dependency-drag-policy.md) | **Policy:** Detecting and managing packages that pin stale dependencies |
+| — | [`disk-pkg-hygiene/audit-russell-sentinel.md`](disk-pkg-hygiene/audit-russell-sentinel.md) | Three-layer audit of sentinel crate (completed) |
 
 ## Prerequisites
 
