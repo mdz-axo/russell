@@ -12,9 +12,18 @@ use russell_core::event::{Event, Severity};
 use russell_core::journal::JournalWriter;
 use russell_core::paths::Paths;
 
-use crate::client::{Backend, ClientConfig, LlmClient};
+use crate::client::{Backend, ClientConfig, EscalateMin, LlmClient};
 use crate::error::{DoctorError, Result};
 use crate::{fallback, mock, openrouter, prompt};
+
+/// Why the LLM was not called.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+pub enum SkipReason {
+    /// Network/key unavailable; offline fallback engaged.
+    OfflineFallback,
+    /// Severity below threshold; rule-based summary returned.
+    ThresholdSkip,
+}
 
 /// Outcome from a `run_help` call.
 #[derive(Debug, Clone, Serialize)]
@@ -27,8 +36,8 @@ pub struct HelpOutcome {
     pub evidence_dir: PathBuf,
     /// The response text Jack printed.
     pub response: String,
-    /// Whether this call used the offline fallback.
-    pub fell_back: bool,
+    /// Why the LLM was skipped; `None` if the LLM was called.
+    pub skip_reason: Option<SkipReason>,
 }
 
 /// Minimal session record mirrored into the `help_sessions` table.
@@ -52,7 +61,7 @@ pub struct HelpSession {
     pub response_chars: i64,
     /// Round-trip latency (ms); `None` for offline.
     pub latency_ms: Option<i64>,
-    /// `ok | error | fallback`.
+    /// `ok | error | fallback | threshold_skip`.
     pub status: &'static str,
     /// Short error kind, if status=error.
     pub error_kind: Option<String>,
@@ -106,15 +115,24 @@ pub async fn run_help_with_config(
 
     info!(backend = %cfg.backend.label(), model = %cfg.model, session = %session_id, "russell help starting");
 
+    // ADR-0020: threshold gate — check severity before waking the LLM.
+    let counts = {
+        let now = russell_core::time::now_unix();
+        let window_start = now - 24 * 3600;
+        writer.reader().severity_counts(window_start, i64::MAX).unwrap_or_default()
+    };
+    let escalate = cfg.escalate_min.satisfied_by(&counts);
+    tracing::debug!(escalate = escalate, alert = %counts.alert, crit = %counts.crit, "threshold gate");
+
     // Attempt the configured backend. Any failure → fall back to offline.
-    let (backend_used, maybe_response, error_kind) = match cfg.backend {
+    let (backend_used, maybe_response, error_kind, skip_reason) = match cfg.backend {
         Backend::OpenRouter => {
             let client = openrouter::OpenRouterClient::new(&cfg)?;
             match client.chat(&soap).await {
-                Ok(resp) => ("openrouter", Some(resp), None),
+                Ok(resp) => ("openrouter", Some(resp), None, None),
                 Err(e) => {
                     warn!(error = %e, "openrouter call failed — falling back");
-                    ("openrouter", None, Some(error_kind_of(&e)))
+                    ("openrouter", None, Some(error_kind_of(&e)), Some(SkipReason::OfflineFallback))
                 }
             }
         }
@@ -129,24 +147,29 @@ pub async fn run_help_with_config(
             }
             let client = openrouter::OpenRouterClient::new(&ollama_cfg)?;
             match client.chat(&soap).await {
-                Ok(resp) => ("ollama", Some(resp), None),
+                Ok(resp) => ("ollama", Some(resp), None, None),
                 Err(e) => {
                     warn!(error = %e, "ollama call failed — falling back");
-                    ("ollama", None, Some(error_kind_of(&e)))
+                    ("ollama", None, Some(error_kind_of(&e)), Some(SkipReason::OfflineFallback))
                 }
             }
         }
         Backend::Mock => {
             let client = mock::MockClient::jack_default();
             match client.chat(&soap).await {
-                Ok(resp) => ("mock", Some(resp), None),
-                Err(e) => ("mock", None, Some(error_kind_of(&e))),
+                Ok(resp) => ("mock", Some(resp), None, None),
+                Err(e) => ("mock", None, Some(error_kind_of(&e)), Some(SkipReason::OfflineFallback)),
             }
         }
-        Backend::Offline => ("offline", None, None),
+        Backend::Offline => ("offline", None, None, Some(SkipReason::OfflineFallback)),
     };
 
-    let fell_back = maybe_response.is_none();
+    // If threshold not met, short-circuit to rule-based summary.
+    let skip_reason = if !escalate {
+        Some(SkipReason::ThresholdSkip)
+    } else {
+        skip_reason
+    };
 
     let (response_text, latency_ms, model) = match maybe_response {
         Some(resp) => (
@@ -174,7 +197,14 @@ pub async fn run_help_with_config(
 
     let response_path = evidence_dir.join("response.json");
     let response_rec = json!({
-        "status": if fell_back { "fallback" } else { "ok" },
+        "status": if skip_reason.is_some() {
+            match skip_reason.unwrap() {
+                SkipReason::OfflineFallback => "fallback",
+                SkipReason::ThresholdSkip => "threshold_skip",
+            }
+        } else {
+            "ok"
+        },
         "error_kind": error_kind,
         "latency_ms": latency_ms,
         "model": model,
@@ -189,7 +219,11 @@ pub async fn run_help_with_config(
         "ts": &ts,
         "backend": backend_used,
         "model": &cfg.model,
-        "fell_back": fell_back,
+        "fell_back": skip_reason.is_some(),
+        "skip_reason": skip_reason.map(|s| match s {
+            SkipReason::OfflineFallback => "offline_fallback",
+            SkipReason::ThresholdSkip => "threshold_skip",
+        }),
         "prompt_chars": soap.rendered.len(),
         "response_chars": response_text.len(),
         "response": &response_text,
@@ -199,7 +233,14 @@ pub async fn run_help_with_config(
 
     // Journal: events row + help_sessions row.
     let evidence_ref_str = evidence_dir.to_string_lossy().into_owned();
-    let status: &'static str = if fell_back { "fallback" } else { "ok" };
+    let status: &'static str = if skip_reason.is_some() {
+        match skip_reason.unwrap() {
+            SkipReason::OfflineFallback => "fallback",
+            SkipReason::ThresholdSkip => "threshold_skip",
+        }
+    } else {
+        "ok"
+    };
 
     let mut ev = Event::new("help", Severity::Info);
     ev.id = russell_core::event::EventId(Ulid::from_string(&session_id).unwrap_or_default());
@@ -217,6 +258,15 @@ pub async fn run_help_with_config(
     if let Some(ref k) = error_kind {
         ev.outputs
             .insert("error_kind".into(), serde_json::Value::from(k.as_str()));
+    }
+    if let Some(sr) = skip_reason {
+        ev.outputs.insert(
+            "skip_reason".into(),
+            serde_json::Value::from(match sr {
+                SkipReason::OfflineFallback => "offline_fallback",
+                SkipReason::ThresholdSkip => "threshold_skip",
+            }),
+        );
     }
     writer.append(&ev)?;
 
@@ -241,7 +291,7 @@ pub async fn run_help_with_config(
         backend: backend_used,
         evidence_dir,
         response: response_text,
-        fell_back,
+        skip_reason,
     })
 }
 
@@ -329,12 +379,13 @@ mod tests {
             base_url: None,
             api_key: None,
             timeout: std::time::Duration::from_secs(5),
+            escalate_min: EscalateMin::Alert,
         };
         let out = run_help_with_config(&paths, &writer, Some("unit test"), cfg)
             .await
             .unwrap();
 
-        assert!(out.fell_back);
+        assert!(out.skip_reason.is_some());
         assert_eq!(out.backend, "offline");
         assert!(out.response.contains("Offline"));
         assert!(out.evidence_dir.join("soap.md").exists());
@@ -358,12 +409,13 @@ mod tests {
             base_url: None,
             api_key: None,
             timeout: std::time::Duration::from_secs(5),
+            escalate_min: EscalateMin::Alert,
         };
         let out = run_help_with_config(&paths, &writer, None, cfg)
             .await
             .unwrap();
 
-        assert!(!out.fell_back);
+        assert!(out.skip_reason.is_none());
         assert_eq!(out.backend, "mock");
         assert!(out.response.contains("Mock Jack"));
     }

@@ -19,7 +19,7 @@ pub mod mock;
 pub mod openrouter;
 pub mod prompt;
 
-pub use client::{Backend, ClientConfig, LlmClient, LlmResponse, SoapPrompt};
+pub use client::{Backend, ClientConfig, EscalateMin, LlmClient, LlmResponse, SoapPrompt};
 pub use error::{DoctorError, Result};
 pub use help::{HelpOutcome, HelpSession, run_help};
 

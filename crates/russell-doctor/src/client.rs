@@ -60,6 +60,51 @@ impl Backend {
     }
 }
 
+/// Minimum severity to trigger LLM escalation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EscalateMin {
+    /// Escalate only when crit > 0.
+    Crit,
+    /// Escalate when crit > 0 OR alert > 0 (default).
+    Alert,
+    /// Escalate when crit > 0 OR alert > 0 OR warn > 0.
+    Warn,
+    /// Always escalate (defeats the purpose; testing only).
+    Always,
+}
+
+impl Default for EscalateMin {
+    fn default() -> Self {
+        Self::Alert
+    }
+}
+
+impl EscalateMin {
+    /// Parse from `RUSSELL_ESCALATE_MIN` env var.
+    pub fn from_env() -> Self {
+        match std::env::var("RUSSELL_ESCALATE_MIN").ok().as_deref() {
+            Some("crit") => Self::Crit,
+            Some("warn") => Self::Warn,
+            Some("always") => Self::Always,
+            Some("alert") | None => Self::Alert,
+            Some(other) => {
+                tracing::warn!(value = other, "unknown RUSSELL_ESCALATE_MIN; using alert");
+                Self::Alert
+            }
+        }
+    }
+
+    /// Returns `true` if the given severity counts meet the threshold.
+    pub fn satisfied_by(self, counts: &russell_core::journal::SeverityCounts) -> bool {
+        match self {
+            Self::Always => true,
+            Self::Crit => counts.crit > 0,
+            Self::Alert => counts.crit > 0 || counts.alert > 0,
+            Self::Warn => counts.crit > 0 || counts.alert > 0 || counts.warn > 0,
+        }
+    }
+}
+
 /// Configuration resolved at call time from env + defaults.
 #[derive(Debug, Clone)]
 pub struct ClientConfig {
@@ -73,6 +118,8 @@ pub struct ClientConfig {
     pub api_key: Option<String>,
     /// Request timeout.
     pub timeout: std::time::Duration,
+    /// Minimum severity for LLM escalation.
+    pub escalate_min: EscalateMin,
 }
 
 impl ClientConfig {
@@ -90,6 +137,7 @@ impl ClientConfig {
             base_url,
             api_key,
             timeout: std::time::Duration::from_secs(60),
+            escalate_min: EscalateMin::from_env(),
         }
     }
 }

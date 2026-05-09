@@ -1,0 +1,11 @@
+-- ADR-0020: threshold-gated LLM escalation
+-- No schema change. The help_sessions.status column is TEXT NOT NULL
+-- and already accepts any string. This migration is a no-op that
+-- records the ADR in the schema_migrations table.
+--
+-- Valid status values after this migration:
+--   ok              — LLM called successfully
+--   error           — LLM call failed (provider error)
+--   fallback        — network/key unavailable; offline fallback used
+--   threshold_skip  — severity below threshold; rule-based summary used
+SELECT 1;

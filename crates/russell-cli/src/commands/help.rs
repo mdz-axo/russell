@@ -22,8 +22,19 @@ pub async fn run(paths: &Paths, note: Option<&str>) -> Result<()> {
         outcome.session_id,
         outcome.evidence_dir.display()
     );
-    if outcome.fell_back {
-        println!("  [offline fallback engaged — set OPENROUTER_API_KEY for the real Kimi]");
+
+    // ADR-0020: skip_reason replaces fell_back
+    if let Some(sr) = outcome.skip_reason {
+        let msg = match sr {
+            russell_doctor::help::SkipReason::OfflineFallback => {
+                "  [offline fallback engaged — set OPENROUTER_API_KEY for the real Kimi]"
+            }
+            russell_doctor::help::SkipReason::ThresholdSkip => {
+                "  [below escalation threshold — rule-based summary returned]"
+            }
+        };
+        println!("{msg}");
     }
+
     Ok(())
 }
