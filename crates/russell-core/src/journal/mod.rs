@@ -20,11 +20,12 @@
 pub mod migrations;
 
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicI64, Ordering};
 
 use rusqlite::{Connection, OpenFlags, params};
 use tracing::{debug, info};
 
-use crate::error::Result;
+use crate::error::{Result, CoreError};
 use crate::event::{Event, Scope, Severity};
 
 /// Write-capable journal handle. Cheap to construct; holds an
@@ -32,6 +33,9 @@ use crate::event::{Event, Scope, Severity};
 pub struct JournalWriter {
     conn: Connection,
     path: PathBuf,
+    /// Atomically updated on every write (append / append_sample).
+    /// Records the unix timestamp of the most recent write.
+    last_write_unix_s: AtomicI64,
 }
 
 /// Read-only journal handle. Constructs fresh connections as needed.
@@ -89,6 +93,7 @@ impl JournalWriter {
         Ok(Self {
             conn,
             path: path.to_path_buf(),
+            last_write_unix_s: AtomicI64::new(crate::time::now_unix()),
         })
     }
 
@@ -136,6 +141,8 @@ impl JournalWriter {
             ],
         )?;
         debug!(id = %event.id, action = %event.action, "event appended");
+        self.last_write_unix_s
+            .store(crate::time::now_unix(), Ordering::Relaxed);
         Ok(())
     }
 
@@ -163,6 +170,8 @@ impl JournalWriter {
               VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
             params![ts_unix, scope_s, probe, value_num, value_text, unit],
         )?;
+        self.last_write_unix_s
+            .store(crate::time::now_unix(), Ordering::Relaxed);
         Ok(())
     }
 
@@ -208,6 +217,8 @@ impl JournalWriter {
                 evidence_ref
             ],
         )?;
+        self.last_write_unix_s
+            .store(crate::time::now_unix(), Ordering::Relaxed);
         Ok(())
     }
 
@@ -380,6 +391,82 @@ impl JournalReader {
             )
             .ok();
         Ok(row.flatten())
+    }
+
+    /// Unix timestamp of the most-recent journal write
+    /// (append / append_sample / append_help_session_row).
+    ///
+    /// Used by [`russell_proprio`] to compute `journal_writer_stall_s`.
+    #[must_use]
+    pub fn last_write_unix_s(&self) -> i64 {
+        // Reads are always consistent because we only ever store from
+        // the same thread that owns the writer.
+        self.last_write_unix_s.load(Ordering::Relaxed)
+    }
+
+    /// Compute the p95 of `latency_ms` from `help_sessions` rows
+    /// in the last 24 hours.
+    ///
+    /// Returns `None` if fewer than 4 rows exist (p95 is undefined
+    /// on a small sample).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`CoreError::Sqlite`] on DB errors.
+    pub fn llm_latency_p95_ms(&self) -> Result<Option<f64>> {
+        let conn = self.open_ro()?;
+        let since = crate::time::now_unix() - 86_400;
+        let mut stmt = conn.prepare(
+            "SELECT latency_ms FROM help_sessions
+             WHERE ts_unix >= ?1 AND latency_ms IS NOT NULL
+             ORDER BY latency_ms ASC",
+        )?;
+        let mut latencies: Vec<i64> = stmt
+            .query_map(params![since], |r| r.get(0))
+            .map_err(|e: rusqlite::Error| CoreError::Sqlite(e))?
+            .filter_map(std::result::Result::ok)
+            .collect();
+        if latencies.len() < 4 {
+            return Ok(None);
+        }
+        // p95 index = floor(0.95 * n)
+        let idx = ((latencies.len() as f64) * 0.95).floor() as usize;
+        // Clamp to last element
+        let idx = idx.min(latencies.len() - 1);
+        Ok(Some(latencies[idx] as f64))
+    }
+
+    /// Compute the help-session error rate (error + fallback +
+    /// threshold_skip) as a percentage of total sessions in the
+    /// last 24 hours.
+    ///
+    /// Returns `None` if no sessions exist in the window.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`CoreError::Sqlite`] on DB errors.
+    pub fn help_error_rate_pct(&self) -> Result<Option<f64>> {
+        let conn = self.open_ro()?;
+        let since = crate::time::now_unix() - 86_400;
+        let total: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM help_sessions WHERE ts_unix >= ?1",
+                params![since],
+                |r| r.get(0),
+            )
+            .map_err(|e: rusqlite::Error| CoreError::Sqlite(e))?;
+        if total == 0 {
+            return Ok(None);
+        }
+        let bad: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM help_sessions
+                 WHERE ts_unix >= ?1 AND status IN ('error','fallback','threshold_skip')",
+                params![since],
+                |r| r.get(0),
+            )
+            .map_err(|e: rusqlite::Error| CoreError::Sqlite(e))?;
+        Ok(Some((bad as f64 / total as f64) * 100.0))
     }
 
     /// Path the journal lives at. May not exist yet on very fresh
