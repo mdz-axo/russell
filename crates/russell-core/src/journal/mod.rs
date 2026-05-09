@@ -393,17 +393,6 @@ impl JournalReader {
         Ok(row.flatten())
     }
 
-    /// Unix timestamp of the most-recent journal write
-    /// (append / append_sample / append_help_session_row).
-    ///
-    /// Used by [`russell_proprio`] to compute `journal_writer_stall_s`.
-    #[must_use]
-    pub fn last_write_unix_s(&self) -> i64 {
-        // Reads are always consistent because we only ever store from
-        // the same thread that owns the writer.
-        self.last_write_unix_s.load(Ordering::Relaxed)
-    }
-
     /// Compute the p95 of `latency_ms` from `help_sessions` rows
     /// in the last 24 hours.
     ///
@@ -421,7 +410,7 @@ impl JournalReader {
              WHERE ts_unix >= ?1 AND latency_ms IS NOT NULL
              ORDER BY latency_ms ASC",
         )?;
-        let mut latencies: Vec<i64> = stmt
+        let latencies: Vec<i64> = stmt
             .query_map(params![since], |r| r.get(0))
             .map_err(|e: rusqlite::Error| CoreError::Sqlite(e))?
             .filter_map(std::result::Result::ok)
