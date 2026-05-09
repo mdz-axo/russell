@@ -61,22 +61,17 @@ impl Backend {
 }
 
 /// Minimum severity to trigger LLM escalation.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum EscalateMin {
     /// Escalate only when crit > 0.
     Crit,
     /// Escalate when crit > 0 OR alert > 0 (default).
+    #[default]
     Alert,
     /// Escalate when crit > 0 OR alert > 0 OR warn > 0.
     Warn,
     /// Always escalate (defeats the purpose; testing only).
     Always,
-}
-
-impl Default for EscalateMin {
-    fn default() -> Self {
-        Self::Alert
-    }
 }
 
 impl EscalateMin {

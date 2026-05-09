@@ -12,7 +12,7 @@ use russell_core::event::{Event, Severity};
 use russell_core::journal::JournalWriter;
 use russell_core::paths::Paths;
 
-use crate::client::{Backend, ClientConfig, EscalateMin, LlmClient};
+use crate::client::{Backend, ClientConfig, LlmClient};
 use crate::error::{DoctorError, Result};
 use crate::{fallback, mock, openrouter, prompt};
 
@@ -119,7 +119,10 @@ pub async fn run_help_with_config(
     let counts = {
         let now = russell_core::time::now_unix();
         let window_start = now - 24 * 3600;
-        writer.reader().severity_counts(window_start, i64::MAX).unwrap_or_default()
+        writer
+            .reader()
+            .severity_counts(window_start, i64::MAX)
+            .unwrap_or_default()
     };
     let escalate = cfg.escalate_min.satisfied_by(&counts);
     tracing::debug!(escalate = escalate, alert = %counts.alert, crit = %counts.crit, "threshold gate");
@@ -132,7 +135,12 @@ pub async fn run_help_with_config(
                 Ok(resp) => ("openrouter", Some(resp), None, None),
                 Err(e) => {
                     warn!(error = %e, "openrouter call failed — falling back");
-                    ("openrouter", None, Some(error_kind_of(&e)), Some(SkipReason::OfflineFallback))
+                    (
+                        "openrouter",
+                        None,
+                        Some(error_kind_of(&e)),
+                        Some(SkipReason::OfflineFallback),
+                    )
                 }
             }
         }
@@ -150,7 +158,12 @@ pub async fn run_help_with_config(
                 Ok(resp) => ("ollama", Some(resp), None, None),
                 Err(e) => {
                     warn!(error = %e, "ollama call failed — falling back");
-                    ("ollama", None, Some(error_kind_of(&e)), Some(SkipReason::OfflineFallback))
+                    (
+                        "ollama",
+                        None,
+                        Some(error_kind_of(&e)),
+                        Some(SkipReason::OfflineFallback),
+                    )
                 }
             }
         }
@@ -158,7 +171,12 @@ pub async fn run_help_with_config(
             let client = mock::MockClient::jack_default();
             match client.chat(&soap).await {
                 Ok(resp) => ("mock", Some(resp), None, None),
-                Err(e) => ("mock", None, Some(error_kind_of(&e)), Some(SkipReason::OfflineFallback)),
+                Err(e) => (
+                    "mock",
+                    None,
+                    Some(error_kind_of(&e)),
+                    Some(SkipReason::OfflineFallback),
+                ),
             }
         }
         Backend::Offline => ("offline", None, None, Some(SkipReason::OfflineFallback)),
@@ -197,8 +215,8 @@ pub async fn run_help_with_config(
 
     let response_path = evidence_dir.join("response.json");
     let response_rec = json!({
-        "status": if skip_reason.is_some() {
-            match skip_reason.unwrap() {
+        "status": if let Some(sr) = skip_reason {
+            match sr {
                 SkipReason::OfflineFallback => "fallback",
                 SkipReason::ThresholdSkip => "threshold_skip",
             }
@@ -233,8 +251,8 @@ pub async fn run_help_with_config(
 
     // Journal: events row + help_sessions row.
     let evidence_ref_str = evidence_dir.to_string_lossy().into_owned();
-    let status: &'static str = if skip_reason.is_some() {
-        match skip_reason.unwrap() {
+    let status: &'static str = if let Some(sr) = skip_reason {
+        match sr {
             SkipReason::OfflineFallback => "fallback",
             SkipReason::ThresholdSkip => "threshold_skip",
         }
@@ -365,6 +383,7 @@ pub fn last_evidence_dir(paths: &Paths) -> Option<PathBuf> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::client::EscalateMin;
 
     #[tokio::test]
     async fn offline_path_produces_fallback_outcome() {
@@ -409,7 +428,7 @@ mod tests {
             base_url: None,
             api_key: None,
             timeout: std::time::Duration::from_secs(5),
-            escalate_min: EscalateMin::Alert,
+            escalate_min: EscalateMin::Always,
         };
         let out = run_help_with_config(&paths, &writer, None, cfg)
             .await

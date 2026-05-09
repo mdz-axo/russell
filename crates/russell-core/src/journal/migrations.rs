@@ -40,6 +40,16 @@ pub const MIGRATIONS: &[Migration] = &[
         slug: "help_sessions",
         sql: include_str!("migrations/0002_help_sessions.sql"),
     },
+    Migration {
+        version: 3,
+        slug: "help_sessions_threshold",
+        sql: include_str!("migrations/0003_help_sessions_threshold.sql"),
+    },
+    Migration {
+        version: 4,
+        slug: "threshold_skip_status",
+        sql: include_str!("migrations/0004_threshold_skip_status.sql"),
+    },
 ];
 
 /// Apply any migrations newer than the DB's current version.
@@ -128,10 +138,10 @@ mod tests {
     fn runs_once_then_noop() {
         let c = fresh();
         run(&c).unwrap();
-        assert_eq!(current_version(&c).unwrap(), 2);
+        assert_eq!(current_version(&c).unwrap(), 4);
         // Second run must not re-apply.
         run(&c).unwrap();
-        assert_eq!(current_version(&c).unwrap(), 2);
+        assert_eq!(current_version(&c).unwrap(), 4);
     }
 
     #[test]

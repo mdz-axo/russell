@@ -1,9 +1,26 @@
 -- ADR-0020: threshold-gated LLM escalation
 -- Adds 'threshold_skip' as a valid help_sessions status value.
--- Migration 0002 has a CHECK constraint that only allows
--- 'ok','error','fallback'. This ALTER TABLE drops and recreates
--- the constraint with the new valid value added.
-
-ALTER TABLE help_sessions DROP CONSTRAINT IF EXISTS help_sessions_status_check;
-ALTER TABLE help_sessions ADD CONSTRAINT help_sessions_status_check
-  CHECK (status IN ('ok','error','fallback','threshold_skip'));
+-- SQLite doesn't support DROP CONSTRAINT, so we recreate the table.
+-- Step 1: create new table with updated CHECK
+CREATE TABLE help_sessions_new (
+  id            TEXT PRIMARY KEY,
+  ts_unix       INTEGER NOT NULL,
+  ts            TEXT    NOT NULL,
+  backend       TEXT    NOT NULL,
+  model         TEXT,
+  note          TEXT,
+  prompt_chars  INTEGER NOT NULL,
+  response_chars INTEGER NOT NULL,
+  latency_ms    INTEGER,
+  status        TEXT    NOT NULL CHECK(status IN ('ok','error','fallback','threshold_skip')),
+  error_kind    TEXT,
+  evidence_ref  TEXT NOT NULL
+);
+-- Step 2: copy all existing data
+INSERT INTO help_sessions_new SELECT * FROM help_sessions;
+-- Step 3: drop old table
+DROP TABLE help_sessions;
+-- Step 4: rename to original name
+ALTER TABLE help_sessions_new RENAME TO help_sessions;
+-- Step 5: recreate the index
+CREATE INDEX IF NOT EXISTS help_sessions_ts ON help_sessions(ts_unix);
