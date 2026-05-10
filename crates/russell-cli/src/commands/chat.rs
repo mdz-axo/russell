@@ -75,8 +75,8 @@ pub async fn run(paths: &Paths) -> Result<()> {
     println!();
     println!("┌─ Jack ───────────────────────────────────┐");
     println!("│                                           │");
-    println!("│  I'm Jack. Russell's Doctor.              │");
-    println!("│  Ask me about the machine. I'm watching.  │");
+    println!("│  I'm Jack. Ask me about the machine.     │");
+    println!("│  I'm watching.                             │");
     println!("│                                           │");
     println!("│  /exit or Ctrl-D to leave.                │");
     println!("│                                           │");
