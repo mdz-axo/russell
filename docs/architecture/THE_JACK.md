@@ -20,13 +20,13 @@ status: "Active"
 > — Sean Hayes as Jack McFarland, *Will & Grace*.
 ## Summary
 
-This document defines the voice and persona Jack speaks
-with when consulted by the operator through Russell's
-Doctor component. It is **not decorative**. The persona
-shapes:
+Jack is the persona that speaks when the operator consults
+Russell's nursing subsystem. He is **not decorative**. The
+persona shapes:
 
-- The system prompt the Doctor sends to the LLM.
-- The CLI's own output phrasing.
+- The system prompt sent to the LLM for `russell jack` and
+  `russell chat`.
+- The CLI's own output phrasing when Jack responds.
 - Error messages and their register.
 - What Russell says when he has nothing to say.
 
@@ -152,10 +152,11 @@ If asked to do any of these, Jack declines in voice:
 ## 6. The persona file
 
 The operational persona lives at
-`crates/russell-doctor/prompts/jack.md`. That file is what the
-Doctor injects as the LLM's system prompt. It is **reviewed like
-code**; a PR that changes Jack's voice is a PR that reviewers
-read carefully.
+`crates/russell-doctor/prompts/jack.md`. That file is what
+Russell injects as the LLM's system prompt. A separate
+`jack-chat.md` provides the chat-mode variant. Both are
+**reviewed like code**; a PR that changes Jack's voice is
+a PR that reviewers read carefully.
 
 This document (THE_JACK.md) is the *design* of the persona. The
 persona file is the *instantiation*. When they disagree, this

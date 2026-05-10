@@ -80,7 +80,7 @@ These live in full at
 | **JR-1** | *Though she be but little, she is fierce.* Austere by default. When in doubt, cut. |
 | **JR-2** | Observe > Recommend > Act. Mutations obey IDRS. |
 | **JR-3** | The LLM never emits shell. It ranks IDs; it does not compose commands. |
-| **JR-4** | Small but present: the Doctor. `russell help` exists from day one. |
+| **JR-4** | Small but present: the Nurse. `russell jack` exists from day one. |
 | **JR-5** | Proprioception: Jack watches Jack. One self-vital is non-optional. |
 | **JR-6** | Reuse, don't depend. Copy-with-provenance via `REUSE_MANIFEST.md`. |
 | **JR-7** | Persistence is auditable. Registered in `PERSISTENCE_CATALOG.md`. |
@@ -95,8 +95,8 @@ addition to this table.
 | Term | Meaning |
 |---|---|
 | **Sentinel** | The continuous low-cost telemetry collector; writes `samples` rows. |
-| **Doctor** | Supervisor that consults the LLM when the operator runs `russell help`. In MVP, he does **not** dispatch; he just consults. |
-| **Jack** | The Doctor's persona — terrier + *Will & Grace* Jack McFarland + Rust/Linux/cybernetics fluency. See [`docs/architecture/THE_JACK.md`](docs/architecture/THE_JACK.md). |
+| **Nurse** | The subsystem that consults the LLM when the operator runs `russell jack` or `russell chat`. Jack watches over the machine; he doesn't "diagnose" — he notices, checks in, and cares. |
+| **Jack** | The persona: terrier + *Will & Grace* Jack McFarland + Rust/Linux/cybernetics fluency. He's a nurse, not a doctor — loyal, attentive, never pretends to hands he doesn't have. See [`docs/architecture/THE_JACK.md`](docs/architecture/THE_JACK.md). |
 | **Skill module** | YAML manifest + scripts encoding one playbook. **Deferred in MVP.** |
 | **IDRS** | Idempotent / Dry-run / Rollback / Structured-log contract for every mutation. |
 | **SOAP bundle** | Evidence folder laid out Subjective / Objective / Assessment / Plan. |
@@ -108,7 +108,7 @@ addition to this table.
 | **Andon cord** | Operator's stop-the-line signal. Deferred. |
 | **Proprioception** | Russell's self-observation. Active in MVP (one self-vital). |
 | **Meta-Sentinel** | The self-facing Sentinel. Full form deferred; the one-vital MVP form is active. |
-| **Self-triage** | A Doctor run whose subject is Russell himself. Deferred. |
+| **Self-triage** | A Nurse run whose subject is Russell himself. Deferred. |
 | **Reflex arc** | Fast-path fault handler inside Russell. Deferred. |
 | **Autoimmune check** | Recursion guard on self-triage. Deferred. |
 | **VSM layers** | Ops (Sentinel), Coordination (timers), Control (Doctor), Intelligence (Bootstrap + LLM), Policy (the human). |
