@@ -139,7 +139,7 @@ pub async fn run(paths: &Paths) -> Result<()> {
     let base_url = std::env::var("RUSSELL_DOCTOR_BASE_URL")
         .unwrap_or_else(|_| "http://127.0.0.1:11434/v1".into());
     let mut current_model =
-        std::env::var("RUSSELL_DOCTOR_MODEL").unwrap_or_else(|_| "deepseek-v4-pro:cloud".into());
+        std::env::var("RUSSELL_DOCTOR_MODEL").unwrap_or_else(|_| "qwen3:8b".into());
     let ollama_models: Vec<String> = ollama_list_models(&base_url).await.unwrap_or_default();
 
     // Banner.
