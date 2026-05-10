@@ -50,6 +50,7 @@ insta = { version = "1", features = ["yaml", "json"] }
 tempfile = "3"
 reqwest = { version = "0.13", default-features = false, features = ["json", "rustls", "gzip"] }
 strsim = "0.11"
+rand = "0.8"
 
 [profile.dev]
 opt-level = 0

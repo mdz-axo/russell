@@ -13,6 +13,7 @@
 //! Type `/exit`, `/quit`, or Ctrl-D to end the session.
 
 use anyhow::{Context, Result};
+use rand::seq::SliceRandom;
 use russell_core::journal::{JournalReader, JournalWriter};
 use russell_core::paths::Paths;
 use russell_skills::Skill;
@@ -21,6 +22,7 @@ use rustyline::error::ReadlineError;
 use serde::{Deserialize, Serialize};
 use std::fmt::Write as _;
 use std::io::Write;
+use tokio::sync::oneshot;
 use tracing::{info, warn};
 
 /// One turn in the conversation.
@@ -405,16 +407,16 @@ pub async fn run(paths: &Paths) -> Result<()> {
                 // Persist history before calling LLM (user message is saved).
                 save_history(&chat_path, &history)?;
 
-                // Call the LLM.
-                print!("Jack → ");
-                std::io::stdout().flush().unwrap();
-
+                // Call the LLM with an animated thinking spinner.
                 let cfg = russell_doctor::client::ClientConfig::from_env();
-                let response = call_ollama(&cfg, &current_model, &messages).await;
+                let response = call_ollama_with_spinner(&cfg, &current_model, &messages).await;
 
                 match response {
                     Ok(content) => {
-                        println!("{content}\n");
+                        // Clear the spinner line and print the response.
+                        print!("\r\x1b[K");
+                        std::io::stdout().flush().unwrap();
+                        println!("Jack → {content}\n");
                         history.turns.push(Turn {
                             role: "assistant".into(),
                             content: content.clone(),
@@ -576,8 +578,70 @@ fn fmt_f64(v: Option<f64>) -> String {
     }
 }
 
-/// Send messages to the Ollama chat API.
-async fn call_ollama(
+/// Braille spinner frames for the thinking animation.
+const SPINNER_FRAMES: &[&str] = &["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+
+/// Jack's thinking expressions — a mix of terrier and McFarland energy.
+/// One is picked at random each LLM call so it never gets old.
+const THINKING_EXPRESSIONS: &[&str] = &[
+    "🐶 digging digging digging",         // pure terrier
+    "✨ hey hey! hold your kibble",       // McFarland energy + terrier
+    "🐶 *sniff* *sniff* checking things", // terrier investigative
+    "💅 working it. just a moment.",      // pure McFarland theatrical
+    "🔍 just checking on you",            // protective nurse (both Jacks)
+];
+
+/// Call the LLM with an animated thinking spinner on stdout.
+/// The spinner is cleared the instant the response arrives.
+async fn call_ollama_with_spinner(
+    cfg: &russell_doctor::client::ClientConfig,
+    model: &str,
+    messages: &[serde_json::Value],
+) -> std::result::Result<String, String> {
+    let expression = THINKING_EXPRESSIONS
+        .choose(&mut rand::thread_rng())
+        .unwrap_or(&"⏳");
+
+    // Spawn the actual LLM call; receive result via oneshot.
+    let (tx, rx) = oneshot::channel();
+    let cfg = cfg.clone();
+    let model = model.to_string();
+    let messages = messages.to_vec();
+    tokio::spawn(async move {
+        let result = call_ollama_direct(&cfg, &model, &messages).await;
+        let _ = tx.send(result);
+    });
+
+    let mut rx = rx;
+    let mut interval = tokio::time::interval(std::time::Duration::from_millis(180));
+    let mut frame_idx = 0usize;
+
+    // Print initial spinner line.
+    print!(
+        "\r\x1b[KJack → \x1b[1;36m{expression}\x1b[0m {}",
+        SPINNER_FRAMES[0]
+    );
+    std::io::stdout().flush().unwrap();
+
+    loop {
+        tokio::select! {
+            result = &mut rx => {
+                return result.unwrap_or(Err("internal error: channel closed".into()));
+            }
+            _ = interval.tick() => {
+                frame_idx = (frame_idx + 1) % SPINNER_FRAMES.len();
+                print!(
+                    "\r\x1b[KJack → \x1b[1;36m{expression}\x1b[0m {}",
+                    SPINNER_FRAMES[frame_idx]
+                );
+                std::io::stdout().flush().unwrap();
+            }
+        }
+    }
+}
+
+/// Send messages to the Ollama chat API (no spinner — raw call).
+async fn call_ollama_direct(
     cfg: &russell_doctor::client::ClientConfig,
     model: &str,
     messages: &[serde_json::Value],
