@@ -19,30 +19,7 @@ is registered here. If you add a new persistent artifact, you
 update this file **in the same commit**. Unregistered state is a
 review-blocker.
 
-## 1. Summary
 
-Russell uses **one SQLite database** for structured state, **one
-JSON file** for the machine profile, and **one directory** for
-evidence bundles. Plus the operator's own env file and optional
-kill switch. That is the entire persistence surface.
-
-```mermaid
-flowchart LR
-    subgraph STATE["~/.local/state/harness/ (Russell-owned)"]
-        DB[(journal.db<br/>samples, events,<br/>baselines, confirmations,<br/>help_sessions)]
-        PROF[profile.json]
-        EVID[evidence/help/&lt;id&gt;/]
-        RUNS[runs/ &nbsp;<em>(reserved)</em>]
-    end
-    subgraph CONFIG["~/.config/harness/ (operator-owned)"]
-        ENV[russell.env]
-        KILL[disable]
-        RULES[rules.d/ &nbsp;<em>(reserved)</em>]
-    end
-    subgraph DATA["~/.local/share/harness/ (reserved)"]
-        SKILLS[skills/ &nbsp;<em>(empty in MVP)</em>]
-    end
-```
 
 <!-- DIAGRAM_ALIGNMENT
 id: DIAG-PERSIST-TOPO-001

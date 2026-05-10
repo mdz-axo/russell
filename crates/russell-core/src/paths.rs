@@ -13,12 +13,18 @@
 //! ├── runs/
 //! ├── evidence/
 //! ├── proposals/
-//! └── digest/
+//! ├── digest/
+//! └── memory/
+//!     ├── REVIEW.md       (Russell's self-assessment review surface)
+//!     └── daily/
+//!         └── YYYY-MM-DD.md  (daily Markdown logs, rebuildable)
 //!
 //! $XDG_CONFIG_HOME/harness/
 //! ├── config.toml
 //! ├── rules.d/
-//! └── disable            (empty file = global kill switch)
+//! ├── disable            (empty file = global kill switch)
+//! ├── PERSONA.md         (operator-owned Jack persona customisation)
+//! └── USER.md            (operator-owned profile: timezone, prefs)
 //!
 //! $XDG_DATA_HOME/harness/
 //! ├── skills/
@@ -133,6 +139,36 @@ impl Paths {
         self.config.join("rules.d")
     }
 
+    /// Directory that holds Russell's Markdown memory layer
+    /// (daily logs, REVIEW.md). All files in this tree are
+    /// derived exports rebuildable from the journal.
+    #[must_use]
+    pub fn memory_dir(&self) -> PathBuf {
+        self.state.join("memory")
+    }
+
+    /// Directory that holds daily Markdown logs
+    /// (`memory/daily/YYYY-MM-DD.md`).
+    #[must_use]
+    pub fn memory_daily_dir(&self) -> PathBuf {
+        self.state.join("memory").join("daily")
+    }
+
+    /// Path to the operator-owned user profile Markdown file.
+    /// Russell reads this at startup if it exists; never writes it.
+    #[must_use]
+    pub fn user_md(&self) -> PathBuf {
+        self.config.join("USER.md")
+    }
+
+    /// Path to the operator-owned persona customisation file.
+    /// If present, the Doctor appends it to the compiled-in
+    /// Jack persona. Russell reads it; never writes it.
+    #[must_use]
+    pub fn persona_md(&self) -> PathBuf {
+        self.config.join("PERSONA.md")
+    }
+
     /// Ensure every well-known directory exists. Idempotent.
     ///
     /// # Errors
@@ -149,6 +185,8 @@ impl Paths {
             &self.digest_dir(),
             &self.skills(),
             &self.rules(),
+            &self.memory_dir(),
+            &self.memory_daily_dir(),
         ] {
             ensure_dir(dir)?;
         }
