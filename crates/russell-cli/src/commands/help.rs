@@ -27,7 +27,7 @@ pub async fn run(paths: &Paths, note: Option<&str>) -> Result<()> {
     if let Some(sr) = outcome.skip_reason {
         let msg = match sr {
             russell_doctor::help::SkipReason::OfflineFallback => {
-                "  [offline fallback engaged — set OPENROUTER_API_KEY for the real Kimi]"
+                "  [offline fallback engaged — Ollama unreachable or LLM call failed]"
             }
             russell_doctor::help::SkipReason::ThresholdSkip => {
                 "  [below escalation threshold — rule-based summary returned]"

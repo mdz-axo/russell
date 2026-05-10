@@ -136,7 +136,7 @@ sequenceDiagram
     participant Journal as journal.db
     participant Digest as russell digest
     participant Doctor as russell jack
-    participant LLM as OpenRouter (Kimi K2)
+    participant LLM as Ollama (DeepSeek V4 Pro)
 
     Timer->>Sentinel: 5-min tick
     Sentinel->>DiskProbes: collect()

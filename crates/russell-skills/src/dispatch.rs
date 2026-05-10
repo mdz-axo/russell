@@ -18,7 +18,23 @@ use std::time::Duration;
 use russell_core::Result;
 use russell_core::event::{Event, Severity};
 use russell_core::journal::JournalWriter;
-use tracing::debug;
+use tracing::{debug, warn};
+
+// Re-export RiskBand from the parent crate for convenience.
+pub use crate::RiskBand;
+
+/// Errors that can occur during risk checking.
+#[derive(Debug, Clone, thiserror::Error)]
+pub enum RiskError {
+    /// The intervention's risk exceeds the auto-execute cap.
+    #[error("risk {:?} exceeds max_auto_risk {:?}", risk, max_allowed)]
+    RiskTooHigh {
+        /// The intervention's declared risk.
+        risk: RiskBand,
+        /// The maximum risk the dispatcher may auto-run.
+        max_allowed: RiskBand,
+    },
+}
 
 /// Controls whether subprocesses actually execute.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -60,6 +76,10 @@ pub struct Dispatcher {
     pub probe_timeout: Duration,
     /// Default timeout for interventions.
     pub intervention_timeout: Duration,
+    /// Maximum risk band that may be auto-executed.
+    /// Interventions above this cap are refused with [`RiskError::RiskTooHigh`].
+    /// Default: `Low`.
+    pub max_auto_risk: RiskBand,
 }
 
 impl Dispatcher {
@@ -71,7 +91,34 @@ impl Dispatcher {
             dry_run: DryRun::Disabled,
             probe_timeout: Duration::from_secs(30),
             intervention_timeout: Duration::from_secs(120),
+            max_auto_risk: RiskBand::Low,
         }
+    }
+
+    /// Check whether an intervention at the given risk band may auto-execute.
+    ///
+    /// Returns `Ok(())` if the risk is at or below `max_auto_risk`.
+    /// Returns `Err(RiskError::RiskTooHigh)` if the risk exceeds the cap
+    /// — the caller should refuse to dispatch and instead flag for human
+    /// confirmation.
+    ///
+    /// Dry-run is always allowed regardless of risk (it doesn't mutate).
+    pub fn check_risk(&self, risk: RiskBand, dry_run: bool) -> std::result::Result<(), RiskError> {
+        if dry_run {
+            return Ok(());
+        }
+        if risk > self.max_auto_risk {
+            warn!(
+                risk = ?risk,
+                max_auto_risk = ?self.max_auto_risk,
+                "intervention blocked: risk exceeds auto cap"
+            );
+            return Err(RiskError::RiskTooHigh {
+                risk,
+                max_allowed: self.max_auto_risk,
+            });
+        }
+        Ok(())
     }
 
     /// Run a command and return its output.
@@ -309,6 +356,7 @@ mod tests {
             dry_run: DryRun::Enabled,
             probe_timeout: Duration::from_secs(5),
             intervention_timeout: Duration::from_secs(5),
+            max_auto_risk: RiskBand::Low,
         };
         let outcome = d.run(&["echo".into(), "hello".into()], None).await.unwrap();
         assert!(outcome.dry_run);
@@ -340,6 +388,7 @@ mod tests {
             dry_run: DryRun::Disabled,
             probe_timeout: Duration::from_secs(1),
             intervention_timeout: Duration::from_secs(1),
+            max_auto_risk: RiskBand::Low,
         };
         // Sleep longer than the timeout.
         let outcome = d
@@ -415,6 +464,7 @@ mod tests {
             dry_run: DryRun::Enabled,
             probe_timeout: Duration::from_secs(5),
             intervention_timeout: Duration::from_secs(5),
+            max_auto_risk: RiskBand::Low,
         };
         let outcome = d
             .run_and_journal(
@@ -435,5 +485,64 @@ mod tests {
         let reader = journal.reader();
         let rows = reader.recent(5).unwrap();
         assert_eq!(rows[0].action, "would_skill_intervention");
+    }
+
+    // --- Risk-band enforcement tests ---
+
+    #[test]
+    fn low_risk_allowed_at_low_cap() {
+        let d = Dispatcher {
+            skill_dir: "/tmp".into(),
+            dry_run: DryRun::Disabled,
+            probe_timeout: Duration::from_secs(5),
+            intervention_timeout: Duration::from_secs(5),
+            max_auto_risk: RiskBand::Low,
+        };
+        assert!(d.check_risk(RiskBand::None, false).is_ok());
+        assert!(d.check_risk(RiskBand::Low, false).is_ok());
+        assert!(d.check_risk(RiskBand::Medium, false).is_err());
+        assert!(d.check_risk(RiskBand::High, false).is_err());
+        assert!(d.check_risk(RiskBand::Critical, false).is_err());
+    }
+
+    #[test]
+    fn dry_run_bypasses_risk_cap() {
+        let d = Dispatcher {
+            skill_dir: "/tmp".into(),
+            dry_run: DryRun::Disabled,
+            probe_timeout: Duration::from_secs(5),
+            intervention_timeout: Duration::from_secs(5),
+            max_auto_risk: RiskBand::Low,
+        };
+        // High risk in dry-run mode should still pass — no mutation occurs.
+        assert!(d.check_risk(RiskBand::Critical, true).is_ok());
+    }
+
+    #[test]
+    fn medium_risk_allowed_at_medium_cap() {
+        let d = Dispatcher {
+            skill_dir: "/tmp".into(),
+            dry_run: DryRun::Disabled,
+            probe_timeout: Duration::from_secs(5),
+            intervention_timeout: Duration::from_secs(5),
+            max_auto_risk: RiskBand::Medium,
+        };
+        assert!(d.check_risk(RiskBand::Medium, false).is_ok());
+        assert!(d.check_risk(RiskBand::High, false).is_err());
+    }
+
+    #[test]
+    fn risk_too_high_error_is_descriptive() {
+        let d = Dispatcher {
+            skill_dir: "/tmp".into(),
+            dry_run: DryRun::Disabled,
+            probe_timeout: Duration::from_secs(5),
+            intervention_timeout: Duration::from_secs(5),
+            max_auto_risk: RiskBand::Low,
+        };
+        let err = d.check_risk(RiskBand::High, false).unwrap_err();
+        let msg = err.to_string();
+        assert!(msg.contains("High"));
+        assert!(msg.contains("Low"));
     }
 }
