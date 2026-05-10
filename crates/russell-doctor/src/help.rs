@@ -110,6 +110,10 @@ pub async fn run_help_with_config(
     };
 
     let soap = prompt::compose(&writer.reader(), profile.as_ref(), note)?;
+
+    // ADR-0022: augment the system prompt with operator identity files if present.
+    let soap = augment_system_prompt(paths, soap);
+
     let soap_path = evidence_dir.join("soap.md");
     std::fs::write(&soap_path, &soap.rendered).map_err(|e| DoctorError::io(&soap_path, e))?;
 
@@ -304,6 +308,9 @@ pub async fn run_help_with_config(
     };
     insert_help_session(writer, &session)?;
 
+    // ADR-0022: append a session note to today's daily log if it exists.
+    append_session_note(paths, &session_id, note, status);
+
     Ok(HelpOutcome {
         session_id,
         backend: backend_used,
@@ -311,6 +318,69 @@ pub async fn run_help_with_config(
         response: response_text,
         skip_reason,
     })
+}
+
+/// ADR-0022: augment the compiled-in Jack persona with operator identity files.
+fn augment_system_prompt(
+    paths: &Paths,
+    soap: crate::client::SoapPrompt,
+) -> crate::client::SoapPrompt {
+    let mut soap = soap;
+    let mut extras = String::new();
+
+    if let Ok(persona) = std::fs::read_to_string(paths.persona_md()) {
+        if !persona.trim().is_empty() {
+            tracing::debug!("loaded PERSONA.md for session context");
+            extras.push_str("\n\n---\n\n");
+            extras.push_str(&persona);
+        }
+    }
+    if let Ok(user) = std::fs::read_to_string(paths.user_md()) {
+        if !user.trim().is_empty() {
+            tracing::debug!("loaded USER.md for session context");
+            extras.push_str("\n\n---\n\n");
+            extras.push_str(&user);
+        }
+    }
+
+    if !extras.is_empty() {
+        soap.system.push_str(&extras);
+    }
+    soap
+}
+
+/// ADR-0022: append a one-line session note to the current day's daily log.
+/// Non-fatal — failures are logged but never returned as errors.
+fn append_session_note(paths: &Paths, session_id: &str, note: Option<&str>, status: &str) {
+    let now = russell_core::time::now_unix();
+    let today = match time::OffsetDateTime::from_unix_timestamp(now) {
+        Ok(dt) => dt,
+        Err(_) => return,
+    };
+    let (year, month, day) = (today.year(), u8::from(today.month()), today.day());
+    let filename = format!("{year:04}-{month:02}-{day:02}.md");
+    let path = paths.memory_daily_dir().join(&filename);
+
+    // Only append if the file already exists (lazy creation by digest).
+    if !path.exists() {
+        return;
+    }
+
+    let summary = match note {
+        Some(n) if !n.trim().is_empty() => format!("{n} [{status}]"),
+        _ => format!("(no note) [{status}]"),
+    };
+    let line = format!("- [{session_id}] — {summary}\n");
+
+    if let Err(e) = std::fs::OpenOptions::new()
+        .append(true)
+        .open(&path)
+        .and_then(|mut f| std::io::Write::write_all(&mut f, line.as_bytes()))
+    {
+        tracing::warn!(error = %e, path = %path.display(), "failed to append session note to daily log");
+    } else {
+        tracing::debug!(session = %session_id, "appended session note to daily log");
+    }
 }
 
 /// Short tag for the `error_kind` column.

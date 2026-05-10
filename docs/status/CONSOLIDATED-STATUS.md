@@ -1,7 +1,7 @@
 ---
 title: "Russell Consolidated Status"
 audience: [operators, developers, contributors, architects, agents]
-last_updated: 2026-05-06
+last_updated: 2026-05-09
 togaf_phase: "G — Governance"
 version: "2.0.0"
 status: "Active"
@@ -24,7 +24,7 @@ of every meaningful development session.
 - **Phase 1 (MVP Doctor — `russell jack`) — IMPLEMENTED + verified against real Kimi K2.5.**
 - **Phase 1b (install artifacts + systemd units) — SHIPPED + installed on the observed machine.** 5-min timer firing; 50 tests green.
 - **Phase 1c (20-day unattended soak) — CLOSED.** Day 20 (2026-05-06): 2 062 cycles, ~99.95% reliability. Closed per [ADR-0018](../adr/0018-close-phase-1c.md). Findings F-1 through F-9 recorded in [`SOAK_FINDINGS.md`](SOAK_FINDINGS.md); F-7 (JR-5 self-vital) and F-2 (SOAP samples) carry into Phase 2.
-- **Phase 2 (observation sharpened) — OPEN.** Self-vital, rule engine, EWMA baselines. Spec pinned at [`../specifications/MVP_SPEC.md`](../specifications/MVP_SPEC.md).
+- **Phase 2 (observation sharpened) — OPEN.** Self-vital, rule engine, EWMA baselines, Markdown memory layer. Spec pinned at [`../specifications/MVP_SPEC.md`](../specifications/MVP_SPEC.md).
 - **Architecture pivoted to JR-1 austerity** on 2026-04-18.
   Seven ADRs deferred to `adr/deferred/`; two architecture docs
   archived.
@@ -152,6 +152,7 @@ Rule engine, EWMA baselines, self-vital, sample summary in SOAP.
 Phase 1c is closed; work begins.
 
 - [x] JR-5 self-vital (`sentinel_last_run_age_s`) in `russell-proprio`
+- [x] Markdown memory layer (ADR-0022): paths, persistence catalog, identity files, Doctor integration
 - [ ] Rule engine (`rules.d/*.toml`, lift ADR-0012)
 - [ ] EWMA baselines (30-day rolling p50/p95/p99)
 - [ ] Fix F-2: extend `prompt::compose` with 24h sample summary

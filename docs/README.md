@@ -1,7 +1,7 @@
 ---
 title: "Russell Documentation Portal"
 audience: [operators, developers, contributors, architects, agents]
-last_updated: 2026-04-18
+last_updated: 2026-05-09
 togaf_phase: "Cross-cutting — Documentation Governance"
 version: "1.0.0"
 status: "Active"
@@ -12,7 +12,7 @@ status: "Active"
 <!-- TOGAF_DOMAIN: Cross-cutting — Documentation Governance -->
 <!-- VERSION: 1.0.0 -->
 <!-- STATUS: Active -->
-<!-- LAST_UPDATED: 2026-04-18 -->
+<!-- LAST_UPDATED: 2026-05-09 -->
 
 This is the **single navigation entrypoint** for Russell's active
 documentation corpus. Russell is small; the corpus should be too.
@@ -24,7 +24,7 @@ not belong in the corpus (yet).
 | Section | Contents | TOGAF Phase | Audience |
 |---|---|---|---|
 | [`architecture/`](architecture/) | System architecture & principles | A / Preliminary | All |
-| [`architecture/adr/`](adr/) | Architecture Decision Records (10 active, 7 deferred) | H | Developers |
+| [`architecture/adr/`](adr/) | Architecture Decision Records (13 active, 7 deferred) | H | Developers |
 | [`specifications/`](specifications/) | MVP boundary, persistence catalog | Requirements | All |
 | [`standards/`](standards/) | Documentation, coding, commits, safety, ADR process | Preliminary | Contributors |
 | [`operations/`](operations/) | Reuse manifest, operator runbooks | D / G | Developers, Operators |
@@ -103,6 +103,11 @@ may exist but must not contradict these.
 - [`adr/0015-proprioception-self-health.md`](adr/0015-proprioception-self-health.md)
 - [`adr/0016-doctor-and-llm-router.md`](adr/0016-doctor-and-llm-router.md)
 - [`adr/0017-reuse-over-dependency.md`](adr/0017-reuse-over-dependency.md)
+- [`adr/0018-close-phase-1c.md`](adr/0018-close-phase-1c.md)
+- [`adr/0019-probe-cadence-and-ctha.md`](adr/0019-probe-cadence-and-ctha.md)
+- [`adr/0020-threshold-gated-llm-escalation.md`](adr/0020-threshold-gated-llm-escalation.md)
+- [`adr/0021-proprioception-phase2-reflex-arcs.md`](adr/0021-proprioception-phase2-reflex-arcs.md)
+- [`adr/0022-markdown-memory-layer.md`](adr/0022-markdown-memory-layer.md)
 
 ### 2.8 ADRs (deferred — not MVP-load-bearing but retained)
 
@@ -166,10 +171,10 @@ They live under [`adr/deferred/`](adr/deferred/):
 | Bucket | Count |
 |---|---|
 | Active authoritative docs | 38 |
-| Active ADRs | 10 |
+| Active ADRs | 13 |
 | Deferred ADRs | 7 |
 | Archived docs | 2 |
-| Templates | 3 |
+| Templates | 5 |
 
 _Verify with `find docs -type f -name '*.md' -not -path 'docs/archive/*' | wc -l`; current as of `last_updated`._
 
