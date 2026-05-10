@@ -35,6 +35,7 @@ Deferred ADRs live under
 | [0020](0020-threshold-gated-llm-escalation.md) | Threshold-gated LLM escalation |
 | [0021](0021-proprioception-phase2-reflex-arcs.md) | Proprioception Phase 2 — reflex arcs and self-vitals |
 | [0022](0022-markdown-memory-layer.md) | Markdown memory layer — derived exports for human legibility |
+| [0023](0023-lift-adr-0007-phase3-skills.md) | Lift ADR-0007 deferral — Phase 3 Skills and Dispatch |
 
 To author a new ADR, see
 [`../standards/adr.md`](../standards/adr.md) and

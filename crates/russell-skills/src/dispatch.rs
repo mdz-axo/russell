@@ -132,7 +132,7 @@ impl Dispatcher {
             }),
             Ok(Err(e)) => Err(russell_core::CoreError::io(
                 &self.skill_dir,
-                std::io::Error::new(std::io::ErrorKind::Other, format!("subprocess error: {e}")),
+                std::io::Error::other(format!("subprocess error: {e}")),
             )),
             Err(_elapsed) => {
                 // Timeout.

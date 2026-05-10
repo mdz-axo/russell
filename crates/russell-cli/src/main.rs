@@ -69,6 +69,25 @@ enum Command {
         #[arg(long)]
         note: Option<String>,
     },
+    /// List or run skill probes.
+    Skill {
+        #[command(subcommand)]
+        cmd: SkillCmd,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+enum SkillCmd {
+    /// List all loaded skills and their probes/interventions.
+    List,
+    /// Run a probe or intervention from a loaded skill.
+    Run {
+        /// Skill reference in `<skill-id>/<probe-id>` format.
+        id: String,
+        /// Print what would run without executing.
+        #[arg(long)]
+        dry_run: bool,
+    },
 }
 
 #[tokio::main(flavor = "multi_thread")]
@@ -104,5 +123,9 @@ async fn main() -> Result<()> {
         } => commands::digest::run(&paths, since_hours, &format),
         Command::SentinelOnce => commands::sentinel_once::run(&paths),
         Command::Jack { note } => commands::help::run(&paths, note.as_deref()).await,
+        Command::Skill { cmd } => match cmd {
+            SkillCmd::List => commands::skill::list(&paths),
+            SkillCmd::Run { id, dry_run } => commands::skill::run(&paths, &id, dry_run).await,
+        },
     }
 }

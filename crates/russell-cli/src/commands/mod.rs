@@ -6,4 +6,5 @@ pub mod help;
 pub mod list;
 pub mod profile;
 pub mod sentinel_once;
+pub mod skill;
 pub mod status;

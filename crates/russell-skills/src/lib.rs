@@ -27,6 +27,9 @@ use serde::Deserialize;
 
 mod symptom_catalog;
 
+/// Subprocess dispatcher for probe and intervention execution.
+pub mod dispatch;
+
 pub use symptom_catalog::SYMPTOMS;
 
 /// Errors that can occur during manifest loading.
@@ -474,7 +477,7 @@ fn validate(
 
     // 2. All symptoms are known.
     for symptom in &raw.symptoms {
-        if !SYMPTOMS.contains(symptom.as_str()) {
+        if !SYMPTOMS.contains(&symptom.as_str()) {
             return Err(LoadError::UnknownSymptom {
                 skill_id: raw.id.clone(),
                 symptom: symptom.clone(),
