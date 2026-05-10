@@ -497,6 +497,8 @@ fn gather_timer_drift(writer: &JournalWriter, now: i64) -> (Option<i64>, Severit
 
 /// Read the `LastTriggerUSec` from the Russell sentinel systemd timer.
 fn read_timer_last_trigger() -> std::result::Result<Option<u64>, String> {
+    // Try LastTriggerUSec first (microseconds since epoch on newer systemd).
+    // Fall back to parsing the human-readable timestamp if that's what we get.
     let output = Command::new("systemctl")
         .args([
             "--user",
@@ -518,17 +520,55 @@ fn read_timer_last_trigger() -> std::result::Result<Option<u64>, String> {
     let stdout = String::from_utf8_lossy(&output.stdout);
     let line = stdout.trim();
 
-    // Expected format: "LastTriggerUSec=1746800000000000"
+    // Formats we handle:
+    // - "LastTriggerUSec=1746800000000000" (microseconds since epoch, preferred)
+    // - "LastTriggerUSec=Sat 2026-05-09 21:55:25 PDT" (human-readable, fallback)
     if let Some(value_str) = line.strip_prefix("LastTriggerUSec=") {
-        let us: u64 = value_str
-            .trim()
-            .parse()
-            .map_err(|e| format!("invalid LastTriggerUSec '{value_str}': {e}"))?;
-        Ok(Some(us))
-    } else {
-        // Property not found — timer may not exist.
-        Ok(None)
+        let value_str = value_str.trim();
+
+        // Try numeric microseconds first.
+        if let Ok(us) = value_str.parse::<u64>() {
+            return Ok(Some(us));
+        }
+
+        // Try parsing as a human-readable timestamp via the `date` command.
+        // This is a fallback; it won't produce microsecond precision but
+        // it's close enough for a drift check (> 90 s threshold).
+        if let Ok(epoch_s) = parse_human_timestamp(value_str) {
+            return Ok(Some(epoch_s * 1_000_000));
+        }
+
+        return Err(format!(
+            "unrecognised LastTriggerUSec format: '{value_str}'"
+        ));
     }
+
+    // Property not found — timer may not exist.
+    Ok(None)
+}
+
+/// Parse a human-readable timestamp like "Sat 2026-05-09 21:55:25 PDT"
+/// into Unix seconds. Uses `date -d` as a subprocess (simplest correct
+/// parser for arbitrary locale formats).
+fn parse_human_timestamp(s: &str) -> std::result::Result<u64, String> {
+    let output = Command::new("date")
+        .args(["-d", s, "+%s"])
+        .output()
+        .map_err(|e| format!("date exec failed: {e}"))?;
+
+    if !output.status.success() {
+        return Err(format!(
+            "date exited with {}: {}",
+            output.status,
+            String::from_utf8_lossy(&output.stderr).trim()
+        ));
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    stdout
+        .trim()
+        .parse::<u64>()
+        .map_err(|e| format!("invalid epoch seconds from date: {e}"))
 }
 
 /// Gather the help error rate vital.
