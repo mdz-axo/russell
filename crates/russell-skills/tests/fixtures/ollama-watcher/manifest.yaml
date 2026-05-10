@@ -1,0 +1,40 @@
+# SPDX-License-Identifier: MIT OR Apache-2.0
+# ollama-watcher — monitor local Ollama instance health and model inventory.
+#
+# Install: copy this directory to ~/.local/share/harness/skills/ollama-watcher/
+
+id: ollama-watcher
+version: 0.1.0
+authored: 2026-05-09
+min_harness_version: 0.1.0
+
+symptoms:
+  - llm_slow
+  - resource_exhaustion
+
+applies_when:
+  - os_family: linux
+
+probes:
+  - id: probe-health
+    cmd: ["bash", "./scripts/probe-health.sh"]
+    capture: stdout
+    timeout: 10s
+  - id: probe-models
+    cmd: ["bash", "./scripts/probe-models.sh"]
+    capture: stdout
+    timeout: 10s
+
+interventions:
+  - id: restart-ollama
+    cmd: ["systemctl", "--user", "restart", "ollama"]
+    risk: low
+    idempotent: true
+    rollback: none_needed
+    timeout: 30s
+
+safety:
+  max_auto_risk: low
+
+references:
+  - https://ollama.com/docs/api
