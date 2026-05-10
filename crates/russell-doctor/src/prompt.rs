@@ -324,7 +324,9 @@ mod tests {
         e.summary = Some("one vm fault".into());
         w.append(&e).unwrap();
         let reader = w.reader();
-        let prompt = compose(&reader, None, Some("ollama is slow"), &[]).unwrap();
+        let skills_dir = tmp.path().join("skills");
+        std::fs::create_dir_all(&skills_dir).unwrap();
+        let prompt = compose(&reader, None, Some("ollama is slow"), &[], &skills_dir).unwrap();
         assert!(prompt.rendered.contains("ollama is slow"));
         assert!(prompt.rendered.contains("daily/gpu-sanity"));
         assert!(prompt.rendered.contains("warn"));
