@@ -54,9 +54,12 @@ See [`docs/status/CONSOLIDATED-STATUS.md`](docs/status/CONSOLIDATED-STATUS.md).
       (`deepseekv4pro`). OpenRouter opt-in. Offline fallback.
 - [x] Phase 1b — systemd unit files.
 - [x] Phase 1c — 20-day soak (closed per ADR-0018).
-- [ ] **Phase 2 — Rules engine, EWMA baselines, Tier I modules.
-      Self-vital active. Kask integration live.**
-- [ ] Phase 3+ — Skills, dispatch, MCP surface, full proprio.
+- [x] Phase 2 — Rules engine, EWMA baselines, proprioception.
+      5 self-vitals + AutoimmuneGuard + Markdown memory layer.
+- [x] Phase 3 — Skills (manifest parser, dispatcher, CLI verbs,
+      risk-band enforcement, rollback execution, first fixture).
+      `russell chat` interactive REPL.
+- [ ] Phase 4 — MCP surface, real skills, operational depth.
       See `cybernetic-health-harness.md` §20.
 
 ## The four-question contract

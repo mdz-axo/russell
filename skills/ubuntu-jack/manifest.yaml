@@ -1,0 +1,50 @@
+# SPDX-License-Identifier: MIT OR Apache-2.0
+# ubuntu-jack — Ubuntu expertise skill for Jack's knowledge base.
+#
+# This is a knowledge skill — it has no probes or interventions.
+# When loaded, its KNOWLEDGE.md content is appended to Jack's
+# system prompt, giving him up-to-date Ubuntu 25.10 best practices.
+# Refresh every 2 months to stay current with distro changes.
+#
+# Install: copy this directory to ~/.local/share/harness/skills/ubuntu-jack/
+
+id: ubuntu-jack
+version: 0.1.0
+authored: 2026-05-09
+valid_until: 2026-07-09
+min_harness_version: 0.1.0
+
+# Symptoms Jack can now reason about with Ubuntu-specific context.
+symptoms:
+  - systemd_service_degraded
+  - apt_stale
+  - snap_autorefresh_stall
+  - btrfs_fragmented
+  - zfs_scrub_overdue
+  - unattended_upgrades_failed
+  - kernel_livepatch_stale
+  - fwupd_outdated
+  - netplan_misconfigured
+  - apparmor_denial_spike
+  - journald_corruption
+  - tmp_mount_nosuid_missing
+
+applies_when:
+  - os_family: linux
+
+# No probes or interventions — this is a pure knowledge skill.
+probes: []
+interventions: []
+
+safety:
+  max_auto_risk: low
+
+references:
+  - https://ubuntu.com/docs
+  - https://ubuntu.com/server/docs
+  - https://manpages.ubuntu.com/manpages/questing/
+  - https://discourse.ubuntu.com/
+  - https://www.freedesktop.org/wiki/Software/systemd/
+  - https://help.ubuntu.com/community/Security
+  - https://ubuntu.com/security/livepatch
+  - https://github.com/canonical/fwupd

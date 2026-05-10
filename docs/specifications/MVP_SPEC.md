@@ -124,27 +124,37 @@ Every byte Russell writes is named. Full catalog at
 `rm -rf ~/.config/harness/` is the operator's intentional reset
 of their own configuration. Neither produces orphans.
 
-## 5. Boundaries — what MVP does NOT do
+## 5. Boundaries — what is deferred beyond MVP/Phase 2/3
 
-All of these are deferred, with their ADRs living under
-[`../adr/deferred/`](../adr/deferred/) where applicable:
+Some items from the original MVP boundary are now implemented.
+Deferred items with their ADRs living under
+[`../adr/deferred/`](../adr/deferred/):
 
-- **No MCP server.** The `russell mcp` subcommand does not
-  exist. (Deferred ADR-0003.)
-- **No skill dispatcher.** The `skills/` directory is empty.
-  (Deferred ADR-0007.)
+- **No MCP server.** The `russell mcp` crate exists as a
+  placeholder; full MCP surface is deferred. (Deferred ADR-0003.)
 - **No privileged operations.** No PolKit helpers, no sudo.
   (Deferred ADR-0005.)
-- **No auto-mutation.** Even low-risk mutations (trash-empty,
-  thumbnail prune) are deferred to Phase 2.
-- **No LLM-driven intervention.** `russell jack` calls the LLM
-  for a *summary*, not a *plan-to-execute*.
 - **No remote skill registry.** (Deferred part of ADR-0007.)
 - **No tiered Tier I / II / III cadences.** One Sentinel
-  cadence; the tier engines land in Phase 2+.
+  cadence; the tier engines land later.
 - **No chaos probe.** Deferred.
-- **No rules engine.** The one self-vital rule is hard-coded.
-- **No EWMA baselines.** Computed in Phase 2.
+
+### Items now implemented (formerly deferred)
+
+- **Skill dispatcher.** `russell-skills` crate with manifest
+  parser, subprocess dispatcher, CLI verbs. ADR-0007 deferral
+  lifted per ADR-0023.
+- **Rules engine.** Per-probe TOML rules with operator overrides
+  in `rules.d/*.toml`. `RuleSet` in `russell-core`, wired into
+  `sentinel-once`.
+- **EWMA baselines.** 30-day rolling p50/p95/p99.
+  `compute_baselines()` + `upsert_baseline()` + daily refresh.
+- **Self-vitals.** 5 active: `sentinel_last_run_age_s`,
+  `journal_writer_stall_s`, `llm_p95_latency_ms`,
+  `timer_drift_s`, `help_error_rate_pct`. Plus
+  `AutoimmuneGuard`.
+- **Proprioception reflex arcs.** Detection-only arcs implemented
+  (Phase 2A). Corrective arcs remain deferred.
 
 ## 6. Success Criteria
 

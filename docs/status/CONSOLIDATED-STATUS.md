@@ -79,11 +79,12 @@ of every meaningful development session.
 
 ### Not yet
 
-- Rule engine (`rules.d/*.toml`, lift ADR-0012) (Phase 2).
-- EWMA baselines (30-day rolling p50/p95/p99) (Phase 2).
-- Fix F-2: extend `prompt::compose` with 24h sample summary (Phase 2).
 - Kask-aware probes: Ollama, disk, systemd services (Phase B of integration).
-- Skill dispatcher, tier engines, MCP server (post-MVP).
+- Full MCP server surface (Phase 4).
+- Corrective reflex arcs — require mutation and IDRS (deferred).
+- Tier I / II / III separate cadences (Phase 4).
+- Remote skill registry (Phase 4).
+- Chaos probes (deferred).
 
 ## 3. Phase-by-phase plan
 

@@ -97,20 +97,20 @@ addition to this table.
 | **Sentinel** | The continuous low-cost telemetry collector; writes `samples` rows. |
 | **Nurse** | The subsystem that consults the LLM when the operator runs `russell jack` or `russell chat`. Jack watches over the machine; he doesn't "diagnose" — he notices, checks in, and cares. |
 | **Jack** | The persona: terrier + *Will & Grace* Jack McFarland + Rust/Linux/cybernetics fluency. He's a nurse, not a doctor — loyal, attentive, never pretends to hands he doesn't have. See [`docs/architecture/THE_JACK.md`](docs/architecture/THE_JACK.md). |
-| **Skill module** | YAML manifest + scripts encoding one playbook. **Deferred in MVP.** |
+| **Skill module** | YAML manifest + scripts encoding one playbook. **Active.** `russell-skills` crate with manifest parser, dispatcher, CLI verbs (`russell skill list`, `russell skill run`). |
 | **IDRS** | Idempotent / Dry-run / Rollback / Structured-log contract for every mutation. |
 | **SOAP bundle** | Evidence folder laid out Subjective / Objective / Assessment / Plan. |
 | **Honeymoon window** | First 30 days after bootstrap; elevated caution. Deferred mechanism in MVP. |
-| **Risk band** | `none` / `low` / `medium` / `high` / `critical`. MVP interventions are all `none`. |
-| **EWMA baseline** | Per-probe mean + variance, 30-day rolling p50/p95/p99. Deferred to Phase 2. |
+| **Risk band** | `none` / `low` / `medium` / `high` / `critical`. Enforced by dispatcher's `max_auto_risk` cap. |
+| **EWMA baseline** | Per-probe mean + variance, 30-day rolling p50/p95/p99. **Active.** `compute_baselines()` + daily refresh. |
 | **Chaos probe** | Deliberate bounded failure to verify recovery. Deferred. |
-| **Poka-yoke** | The dispatcher refusing any ID not in the loaded manifest. Relevant post-MVP. |
+| **Poka-yoke** | The dispatcher refusing any ID not in the loaded manifest. **Active.** Validated at dispatch time. |
 | **Andon cord** | Operator's stop-the-line signal. Deferred. |
-| **Proprioception** | Russell's self-observation. Active in MVP (one self-vital). |
-| **Meta-Sentinel** | The self-facing Sentinel. Full form deferred; the one-vital MVP form is active. |
+| **Proprioception** | Russell's self-observation. **Active.** 5 self-vitals: `sentinel_last_run_age_s`, `journal_writer_stall_s`, `llm_p95_latency_ms`, `timer_drift_s`, `help_error_rate_pct`. |
+| **Meta-Sentinel** | The self-facing Sentinel. Full form deferred; 5-vital form active. |
 | **Self-triage** | A Nurse run whose subject is Russell himself. Deferred. |
-| **Reflex arc** | Fast-path fault handler inside Russell. Deferred. |
-| **Autoimmune check** | Recursion guard on self-triage. Deferred. |
+| **Reflex arc** | Fast-path fault handler inside Russell. Detection-only arcs active (Phase 2A); corrective arcs deferred. |
+| **Autoimmune check** | Recursion guard on self-triage. `AutoimmuneGuard` active in `russell-proprio`. |
 | **VSM layers** | Ops (Sentinel), Coordination (timers), Control (Nurse), Intelligence (Bootstrap + LLM), Policy (the human). |
 | **"First, do no harm"** | The refusal posture: observe > recommend > act. |
 
