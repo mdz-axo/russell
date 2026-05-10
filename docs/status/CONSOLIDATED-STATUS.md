@@ -161,9 +161,10 @@ Phase 1c is closed; work begins.
 - [x] EWMA baselines (30-day rolling p50/p95/p99): `compute_baselines()` query + `upsert_baseline()` writer + daily refresh in sentinel-once
 - [x] Fix F-2: extend `prompt::compose` with 24h sample summary (per-probe min/avg/max/last/count table)
 
-### Phase 3 — Skills and dispatch (CURRENT)
+### Phase 3 — Skills and dispatch (COMPLETE)
 
-Skill manifest loader, dispatcher, first host-scope skill.
+Skill manifest loader, dispatcher, first host-scope skill, IDRS
+journaling, risk enforcement, rollback, `russell chat`.
 ADR-0007 deferral lifted per ADR-0023.
 
 - [x] ADR-0023: formal lift of ADR-0007 deferral
@@ -171,13 +172,17 @@ ADR-0007 deferral lifted per ADR-0023.
 - [x] Subprocess dispatcher: env scrubbing, timeout, stdout/stderr capture, dry-run
 - [x] CLI verbs: `russell skill list`, `russell skill run <id> [--dry-run]`
 - [x] First skill: `gpu-doctor` fixture (manifest + rocm-smi probe script)
-- [x] Doctor integration: symptom-to-skill mapping in `russell jack` (skills table in SOAP prompt, RECOMMEND format)
+- [x] Nurse integration: skills table in SOAP prompt, RECOMMEND format
+- [x] IDRS journaling: `run_and_journal` with evidence bundles per run
+- [x] Risk-band enforcement: `max_auto_risk` cap, `check_risk()` gate
+- [x] Rollback execution: `run_intervention_with_rollback()` chains reverse interventions
+- [x] `russell chat` — interactive readline REPL with Jack's chat persona
+- [x] Persona shift: Jack is a nurse, not a doctor
 
-### Phase 4+ — Tracks the design document
+### Phase 4 — MCP surface, real skills, operational depth (NEXT)
 
-Remote skill registry, MCP surface, full proprioception, chaos
-probes. Each requires lifting its ADR's deferral with evidence
-that the simpler layer beneath has stabilised.
+MCP server is still a stub crate. No live Ollama/GPU/disk probes
+beyond the MVP three. No operator-facing skill authoring tools.
 
 ## 4. Open questions
 
