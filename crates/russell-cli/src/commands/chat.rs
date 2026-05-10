@@ -288,25 +288,25 @@ fn build_objective(
     }
 
     // Sample summary.
-    if let Ok(summaries) = reader.host_samples_summary(window_start, i64::MAX) {
-        if !summaries.is_empty() {
-            let _ = writeln!(obj, "\n### Host samples — last 24h");
-            let _ = writeln!(obj, "| probe | count | min | avg | max | last | unit |");
-            let _ = writeln!(obj, "|---|---|---|---|---|---|---|");
-            for s in &summaries {
-                let unit = s.unit.as_deref().unwrap_or("");
-                let _ = writeln!(
-                    obj,
-                    "| {} | {} | {} | {} | {} | {} | {} |",
-                    s.probe,
-                    s.count,
-                    fmt_f64(s.min),
-                    fmt_f64(s.avg),
-                    fmt_f64(s.max),
-                    fmt_f64(s.last),
-                    unit,
-                );
-            }
+    if let Ok(summaries) = reader.host_samples_summary(window_start, i64::MAX)
+        && !summaries.is_empty()
+    {
+        let _ = writeln!(obj, "\n### Host samples — last 24h");
+        let _ = writeln!(obj, "| probe | count | min | avg | max | last | unit |");
+        let _ = writeln!(obj, "|---|---|---|---|---|---|---|");
+        for s in &summaries {
+            let unit = s.unit.as_deref().unwrap_or("");
+            let _ = writeln!(
+                obj,
+                "| {} | {} | {} | {} | {} | {} | {} |",
+                s.probe,
+                s.count,
+                fmt_f64(s.min),
+                fmt_f64(s.avg),
+                fmt_f64(s.max),
+                fmt_f64(s.last),
+                unit,
+            );
         }
     }
 
@@ -317,18 +317,18 @@ fn build_objective(
     }
 
     // Recent events (last 5).
-    if let Ok(rows) = reader.recent(5) {
-        if !rows.is_empty() {
-            let _ = writeln!(obj, "\n### Recent events");
-            for r in &rows {
-                let _ = writeln!(
-                    obj,
-                    "- [{sev:?}] {action}: {summary}",
-                    sev = r.severity,
-                    action = r.action,
-                    r.summary.as_deref().unwrap_or("(no summary)")
-                );
-            }
+    if let Ok(rows) = reader.recent(5)
+        && !rows.is_empty()
+    {
+        let _ = writeln!(obj, "\n### Recent events");
+        for r in &rows {
+            let _ = writeln!(
+                obj,
+                "- [{sev:?}] {action}: {summary}",
+                summary = r.summary.as_deref().unwrap_or("(no summary)"),
+                sev = r.severity,
+                action = r.action,
+            );
         }
     }
 
