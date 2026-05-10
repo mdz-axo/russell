@@ -305,7 +305,7 @@ mod tests {
         let reader = w.reader();
         let skills_dir = tmp.path().join("skills");
         std::fs::create_dir_all(&skills_dir).unwrap();
-        let prompt = compose(&reader, None, None, &[], &skills_dir).unwrap();
+        let prompt = compose(&reader, None, None, &[], Path::new("/nonexistent")).unwrap();
         assert!(prompt.rendered.contains("## Subjective"));
         assert!(prompt.rendered.contains("(no operator note)"));
         assert!(prompt.rendered.contains("(no events recorded)"));
@@ -326,7 +326,14 @@ mod tests {
         let reader = w.reader();
         let skills_dir = tmp.path().join("skills");
         std::fs::create_dir_all(&skills_dir).unwrap();
-        let prompt = compose(&reader, None, Some("ollama is slow"), &[], &skills_dir).unwrap();
+        let prompt = compose(
+            &reader,
+            None,
+            Some("ollama is slow"),
+            &[],
+            Path::new("/nonexistent"),
+        )
+        .unwrap();
         assert!(prompt.rendered.contains("ollama is slow"));
         assert!(prompt.rendered.contains("daily/gpu-sanity"));
         assert!(prompt.rendered.contains("warn"));
@@ -398,7 +405,16 @@ mod tests {
         .unwrap();
 
         let reader = w.reader();
-        let prompt = compose(&reader, None, Some("checking trends"), &[]).unwrap();
+        let skills_dir = tmp.path().join("skills");
+        std::fs::create_dir_all(&skills_dir).unwrap();
+        let prompt = compose(
+            &reader,
+            None,
+            Some("checking trends"),
+            &[],
+            Path::new("/nonexistent"),
+        )
+        .unwrap();
 
         // The sample summary table should appear with all three probes.
         assert!(
