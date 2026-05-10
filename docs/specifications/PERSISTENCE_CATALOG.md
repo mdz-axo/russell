@@ -19,7 +19,33 @@ is registered here. If you add a new persistent artifact, you
 update this file **in the same commit**. Unregistered state is a
 review-blocker.
 
+## 1. Summary
 
+Russell uses **one SQLite database** for structured state, **one
+JSON file** for the machine profile, **one directory** for
+evidence bundles, and a **Markdown memory layer** for human-readable
+exports derived from the journal. Plus the operator's own env file,
+optional identity files, and optional kill switch.
+
+```mermaid
+flowchart LR
+    subgraph STATE["~/.local/state/harness/ (Russell-owned)"]
+        DB[(journal.db<br/>samples, events,<br/>baselines, confirmations,<br/>help_sessions)]
+        PROF[profile.json]
+        EVID[evidence/help/&lt;id&gt;/]
+        RUNS[runs/ &nbsp;<em>(reserved)</em>]
+        MEM[memory/<br/>REVIEW.md + daily/]
+    end
+    subgraph CONFIG["~/.config/harness/ (operator-owned)"]
+        ENV[russell.env]
+        KILL[disable]
+        RULES[rules.d/ &nbsp;<em>(reserved)</em>]
+        ID[PERSONA.md<br/>USER.md]
+    end
+    subgraph DATA["~/.local/share/harness/ (reserved)"]
+        SKILLS[skills/ &nbsp;<em>(empty in MVP)</em>]
+    end
+```
 
 <!-- DIAGRAM_ALIGNMENT
 id: DIAG-PERSIST-TOPO-001
@@ -146,6 +172,53 @@ Empty in MVP. Phase 2 rule overrides will land here.
 
 Empty in MVP. Skill manifests will land here in Phase 3.
 
+### 2.9 `~/.local/state/harness/memory/` (Russell-owned Markdown memory)
+
+**Owner.** `russell-cli::commands::reflect` (planned verb) and
+`russell-doctor::help::run_help` (session log appends).
+**Contents.**
+
+- `REVIEW.md` — Russell's self-assessment review surface.
+  Structured entries with confidence scores, evidence links,
+  and type tags (`W`=world fact, `B`=biographical,
+  `O`=opinion). Human-reviewed before observations graduate
+  to durable memory. See
+  [`../templates/review-entry.md`](../templates/review-entry.md).
+- `daily/YYYY-MM-DD.md` — Daily logs with a `## Retain`
+  section containing 2–5 durable observations tagged `[W]`,
+  `[B]`, or `[O](c=N)`. Rebuildable from journal via
+  `russell digest --format markdown`. See
+  [`../templates/daily-log.md`](../templates/daily-log.md).
+
+**Design contract.** All Markdown files in this tree are
+**derived exports** from the journal. The journal is the sole
+canonical store per C-2 and JR-7. Markdown files can be
+regenerated from the journal at any time without data loss.
+
+**Retention.** Unbounded (daily logs); REVIEW.md is
+append-only with human trimming.
+
+### 2.10 `~/.config/harness/PERSONA.md` (operator-owned)
+
+**Owner.** The operator.
+**Content.** Runtime persona customisation for Jack. If present,
+the Doctor appends its content to the compiled-in
+`JACK_PERSONA` from `crates/russell-doctor/prompts/jack.md`.
+**Format.** Free-form Markdown. Not parsed by Russell; read by
+the Doctor at help-session startup. Russell never writes to
+this file.
+**Design reference.** [`../architecture/THE_JACK.md`](../architecture/THE_JACK.md).
+
+### 2.11 `~/.config/harness/USER.md` (operator-owned)
+
+**Owner.** The operator.
+**Content.** Operator profile: timezone, communication style
+preferences, what counts as "urgent", preferred cadence for
+proactive notifications.
+**Format.** Free-form Markdown. Not parsed; included in the
+Doctor's system context if present. Russell never writes to
+this file.
+
 ## 3. Reset Procedures
 
 | What | How | Consequence |
@@ -165,6 +238,7 @@ If it did, we would document them here.
 | `samples` rows | unbounded (MVP) | Phase-2 digest compaction |
 | `events` rows | unbounded (MVP) | Phase-2 digest compaction |
 | `help_sessions` rows | unbounded (MVP); 90 days (Phase 2) | future |
+| Memory Markdown (`memory/`) | rebuildable (derived) | None needed — regenerated from journal |
 | Evidence bundles | 90 days nominally, manual in MVP | Phase-2 reaper |
 | WAL / SHM files | ephemeral | SQLite (automatic) |
 
