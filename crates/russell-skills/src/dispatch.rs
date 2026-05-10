@@ -306,6 +306,133 @@ impl Dispatcher {
 
         Ok(outcome)
     }
+
+    /// Run an intervention with automatic rollback on failure.
+    ///
+    /// This is the IDRS-compliant entry point for mutating steps:
+    ///
+    /// 1. Runs the forward intervention via [`run_and_journal`].
+    /// 2. If it succeeds (exit=0), returns the outcome.
+    /// 3. If it fails, runs the rollback (if one is configured)
+    ///    and journals both the failure and the rollback.
+    ///
+    /// `rollback` is the rollback strategy from the manifest.
+    /// `get_rollback_cmd` is a callback that resolves a `rollback_id`
+    /// to the actual command argv. It's called only when rollback is
+    /// needed, so the caller (manifest loader) provides the lookup.
+    ///
+    /// Returns the rollback outcome on forward failure, or the forward
+    /// outcome on success. `rollback_applied` in the outcome indicates
+    /// whether rollback was triggered.
+    pub async fn run_intervention_with_rollback<F>(
+        &self,
+        journal: &JournalWriter,
+        evidence_base: &Path,
+        skill_id: &str,
+        step_id: &str,
+        cmd: &[String],
+        risk_band: &str,
+        rollback: RollbackStrategy,
+        get_rollback_cmd: F,
+        timeout_override: Option<Duration>,
+    ) -> Result<RollbackOutcome>
+    where
+        F: FnOnce(&str) -> Option<Vec<String>>,
+    {
+        // Forward run.
+        let forward = self
+            .run_and_journal(
+                journal,
+                evidence_base,
+                cmd,
+                skill_id,
+                step_id,
+                StepType::Intervention,
+                risk_band,
+                timeout_override,
+            )
+            .await?;
+
+        let succeeded = forward.exit_code == Some(0) && !forward.timed_out;
+        if succeeded {
+            return Ok(RollbackOutcome {
+                forward,
+                rollback: None,
+                rollback_applied: false,
+            });
+        }
+
+        // Rollback needed.
+        match rollback {
+            RollbackStrategy::NoneNeeded => {
+                debug!(
+                    skill_id,
+                    step_id, "intervention failed; rollback: none_needed — no action"
+                );
+                Ok(RollbackOutcome {
+                    forward,
+                    rollback: None,
+                    rollback_applied: false,
+                })
+            }
+            RollbackStrategy::Reboot => {
+                warn!(
+                    skill_id,
+                    step_id, "intervention failed; rollback: reboot required"
+                );
+                Ok(RollbackOutcome {
+                    forward,
+                    rollback: None,
+                    rollback_applied: false,
+                })
+            }
+            RollbackStrategy::RollbackId { ref id } => {
+                let rollback_cmd = match get_rollback_cmd(id) {
+                    Some(cmd) => cmd,
+                    None => {
+                        warn!(
+                            skill_id,
+                            step_id,
+                            rollback_id = %id,
+                            "rollback command not found — rollback skipped"
+                        );
+                        return Ok(RollbackOutcome {
+                            forward,
+                            rollback: None,
+                            rollback_applied: false,
+                        });
+                    }
+                };
+
+                warn!(
+                    skill_id,
+                    step_id,
+                    rollback_id = %id,
+                    exit_code = ?forward.exit_code,
+                    "intervention failed — running rollback"
+                );
+
+                let rollback_outcome = self
+                    .run_and_journal(
+                        journal,
+                        evidence_base,
+                        &rollback_cmd,
+                        skill_id,
+                        id,
+                        StepType::Intervention,
+                        risk_band,
+                        timeout_override,
+                    )
+                    .await?;
+
+                Ok(RollbackOutcome {
+                    forward,
+                    rollback: Some(rollback_outcome),
+                    rollback_applied: true,
+                })
+            }
+        }
+    }
 }
 
 /// Whether a dispatch is a probe (read-only) or intervention (mutating).
