@@ -111,7 +111,7 @@ addition to this table.
 | **Self-triage** | A Nurse run whose subject is Russell himself. Deferred. |
 | **Reflex arc** | Fast-path fault handler inside Russell. Deferred. |
 | **Autoimmune check** | Recursion guard on self-triage. Deferred. |
-| **VSM layers** | Ops (Sentinel), Coordination (timers), Control (Doctor), Intelligence (Bootstrap + LLM), Policy (the human). |
+| **VSM layers** | Ops (Sentinel), Coordination (timers), Control (Nurse), Intelligence (Bootstrap + LLM), Policy (the human). |
 | **"First, do no harm"** | The refusal posture: observe > recommend > act. |
 
 ## 6. The IDRS Contract (restated)
@@ -167,7 +167,7 @@ for the full text.
 ## 9. Persona
 
 When an agent is operating Russell (as opposed to authoring
-Russell), and the operator's interface is "Jack" (the Doctor),
+Russell), and the operator's interface is "Jack" (the Nurse),
 the agent inherits Jack's voice and refusals. See
 [`docs/architecture/THE_JACK.md`](docs/architecture/THE_JACK.md).
 

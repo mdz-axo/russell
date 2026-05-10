@@ -268,8 +268,7 @@ and events above, and any `--note` text the operator provided.
 Ollama calls stay entirely local. OpenRouter calls route only
 to providers with a zero-data-retention policy (per-request
 `zdr: true` parameter). See
-[ADR-0016 *(to be authored in Phase 1)*](../adr/README.md)
-*(to be authored in Phase 1)* for the privacy contract.
+[ADR-0016](../adr/0016-doctor-and-llm-router.md) for the full contract.
 
 ## 7. Changing the Catalog
 

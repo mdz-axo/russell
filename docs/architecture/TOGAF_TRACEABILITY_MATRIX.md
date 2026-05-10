@@ -78,9 +78,9 @@ has an anchor document per TOGAF phase.
 | JR-1 Jack Russell | ● | ● |   |   |   | ADR-0001, ADR-0013 |
 | JR-2 Observe first |   |   |   |   | ● | ADR-0008, ADR-0011 |
 | JR-3 No shell |   |   |   |   |   | ADR-0008 |
-| JR-4 Doctor present |   | ●  | ● |   |   | ADR-0008, ADR-0016 *(to be authored)* |
+| JR-4 Doctor present |   | ●  | ● |   |   | ADR-0008, ADR-0016 |
 | JR-5 Proprioception |   |   |   |   | ● | ADR-0015 |
-| JR-6 Reuse |   |   |   | ● |   | ADR-0013, ADR-0017 *(to be authored)* |
+| JR-6 Reuse |   |   |   | ● |   | ADR-0013, ADR-0017 |
 | JR-7 Persistence audited |   |   | ● |   |   | ADR-0004, ADR-0006 |
 
 ## 4. Coverage Gaps

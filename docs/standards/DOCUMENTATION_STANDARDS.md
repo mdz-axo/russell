@@ -174,7 +174,7 @@ boundaries.
 
 | Diataxis | Reader mode | Russell documents |
 |---|---|---|
-| **Tutorials** | Learning | `GETTING_STARTED.md` (to be authored), `docs/architecture/THE_JACK.md` (to be authored) |
+| **Tutorials** | Learning | `docs/architecture/THE_JACK.md` |
 | **How-to guides** | Doing | `CONTRIBUTING.md`, `docs/operations/*.md` |
 | **Reference** | Checking facts | `docs/adr/`, `docs/specifications/`, `docs/architecture/overview.md` |
 | **Explanation** | Understanding | `docs/architecture/PRINCIPLES_CATALOG.md`, `cybernetic-health-harness.md` |

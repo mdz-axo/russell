@@ -113,25 +113,26 @@ mutation.
 
 **Linked ADRs.** ADR-0008.
 
-### JR-4 — Small but present: the Doctor
+### JR-4 — Small but present: the Nurse
 
 **Statement.** Russell must be able to **cry for help** from day
-one. The MVP Doctor is a single verb (`russell help`) that
-assembles the current observations, sends them through the
-LLM router (default: local Ollama, opt-in: OpenRouter with ZDR),
-writes the round-trip to disk, and prints the response. It does
-not act. It does not parse. It does not dispatch. It **calls**.
+one. The Nurse is a single verb (`russell jack`) that assembles
+the current observations, sends them through the LLM router
+(default: local Ollama, opt-in: OpenRouter with ZDR), writes
+the round-trip to disk, and prints the response. It does not
+act. It does not parse. It does not dispatch. It **notices**.
 
-**Rationale.** A system that *can never* escalate never escalates.
-If Russell grows into the full Doctor later, the help channel must
-already exist in habit form.
+**Rationale.** A system that *can never* check in never does.
+Russell's nurse-channel must already exist in habit form from
+day one — the operator should be able to ask "how's the
+machine?" and get an answer, not a configuration wizard.
 
 **Consequence.** Cost: one round-trip to the configured LLM
-backend per `russell help`, one persona file. Buy: Russell's
+backend per `russell jack`, one persona file. Buy: Russell's
 operator is never alone with a wedged machine — Jack can at
 least *say* what he sees.
 
-**Linked ADRs.** ADR-0008, ADR-0016 *(to be authored)*.
+**Linked ADRs.** ADR-0008, ADR-0016.
 
 ### JR-5 — Proprioception: Jack watches Jack
 
@@ -171,8 +172,7 @@ waiting to happen. Copy-with-provenance gives us:
 periodically rebase copies against upstream. Buy: Russell stays
 small, self-contained, and always-builds.
 
-**Linked ADRs.** ADR-0013 (workspace), ADR-0017 *(reuse-over-
-dependency, to be authored)*.
+**Linked ADRs.** ADR-0013 (workspace), ADR-0017.
 
 ### JR-7 — Persistence is auditable
 
@@ -220,7 +220,7 @@ flowchart TB
     JR1[JR-1 The Jack Russell Principle<br/><small>small but mighty</small>]
     JR2[JR-2 Observe &gt; Recommend &gt; Act]
     JR3[JR-3 LLM never emits shell]
-    JR4[JR-4 Doctor present from day one]
+    JR4[JR-4 Nurse present from day one]
     JR5[JR-5 Proprioception: Jack watches Jack]
     JR6[JR-6 Reuse, don't depend]
     JR7[JR-7 Persistence is auditable]
