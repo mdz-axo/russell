@@ -51,6 +51,104 @@ impl ChatHistory {
     }
 }
 
+/// An Ollama model entry from `/api/tags`.
+#[derive(Debug, Clone, Deserialize)]
+struct OllamaModel {
+    name: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+struct OllamaTagsResponse {
+    models: Vec<OllamaModel>,
+}
+
+/// Fetch the list of available models from Ollama's `/api/tags`.
+async fn ollama_list_models(base_url: &str) -> Result<Vec<String>, String> {
+    let tags_url = format!(
+        "{}/api/tags",
+        base_url.trim_end_matches("/v1").trim_end_matches('/')
+    );
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(5))
+        .build()
+        .map_err(|e| format!("HTTP client: {e}"))?;
+    let resp = client
+        .get(&tags_url)
+        .send()
+        .await
+        .map_err(|e| format!("Ollama unreachable: {e}"))?;
+    if !resp.status().is_success() {
+        return Err(format!("Ollama returned HTTP {}", resp.status()));
+    }
+    let body: OllamaTagsResponse = resp.json().await.map_err(|e| format!("parse error: {e}"))?;
+    Ok(body.models.into_iter().map(|m| m.name).collect())
+}
+
+/// Find top fuzzy matches for `needle` in `models`.
+///
+/// Two-layer strategy:
+/// 1. **Exact/substring match** — if one model contains the needle as a
+///    case-insensitive substring and is the *only* such match, return it.
+/// 2. **Jaro-Winkler fuzzy** — score all models; if one clear winner
+///    (≥0.9 with >0.1 gap), return it; otherwise return all above 0.5
+///    for disambiguation.
+fn fuzzy_match_models<'a>(needle: &str, models: &'a [String]) -> Vec<&'a str> {
+    let needle_lower = needle.to_lowercase();
+
+    // --- Layer 1: case-insensitive substring match ---
+    let substr_matches: Vec<&str> = models
+        .iter()
+        .map(|m| m.as_str())
+        .filter(|m| m.to_lowercase().contains(&needle_lower))
+        .collect();
+    if substr_matches.len() == 1 {
+        return vec![substr_matches[0]];
+    }
+
+    // --- Layer 2: Jaro-Winkler fuzzy scoring ---
+    let mut scored: Vec<(&str, f64)> = models
+        .iter()
+        .map(|m| {
+            let name_lower = m.to_lowercase();
+            // Strip :cloud / :latest tags for a second (shorter) comparison.
+            let short_lower = name_lower
+                .trim_end_matches(":cloud")
+                .trim_end_matches(":latest");
+            let full = strsim::jaro_winkler(&needle_lower, &name_lower);
+            let short = strsim::jaro_winkler(&needle_lower, short_lower);
+            (m.as_str(), full.max(short))
+        })
+        .collect();
+    scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+
+    // Perfect Jaro-Winkler (1.0) → auto-select regardless of gap.
+    if let Some(first) = scored.first() {
+        if first.1 >= 0.999 {
+            return vec![first.0];
+        }
+    }
+
+    // Clear winner: ≥0.9 and well ahead of #2.
+    if let (Some(first), Some(second)) = (scored.first(), scored.get(1)) {
+        if first.1 >= 0.9 && (first.1 - second.1) > 0.1 {
+            return vec![first.0];
+        }
+    }
+
+    // If substring already gave us matches, return those.
+    if !substr_matches.is_empty() {
+        return substr_matches;
+    }
+
+    // Otherwise return all fuzzy-scored above 0.5 (up to 10).
+    scored
+        .into_iter()
+        .filter(|(_, s)| *s >= 0.5)
+        .take(10)
+        .map(|(name, _)| name)
+        .collect()
+}
+
 /// Run the chat REPL.
 pub async fn run(paths: &Paths) -> Result<()> {
     let session_id = ulid::Ulid::new().to_string();
@@ -71,6 +169,13 @@ pub async fn run(paths: &Paths) -> Result<()> {
     let mut history = ChatHistory::new(session_id.clone());
     let mut editor = DefaultEditor::new().context("initialising readline")?;
 
+    // Resolve the default model from env, and fetch available models from Ollama.
+    let base_url = std::env::var("RUSSELL_DOCTOR_BASE_URL")
+        .unwrap_or_else(|_| "http://127.0.0.1:11434/v1".into());
+    let mut current_model =
+        std::env::var("RUSSELL_DOCTOR_MODEL").unwrap_or_else(|_| "deepseek-v4-pro:cloud".into());
+    let ollama_models: Vec<String> = ollama_list_models(&base_url).await.unwrap_or_default();
+
     // Banner.
     println!();
     println!("┌─ Jack ───────────────────────────────────┐");
@@ -78,7 +183,9 @@ pub async fn run(paths: &Paths) -> Result<()> {
     println!("│  I'm Jack. Ask me about the machine.     │");
     println!("│  I'm watching.                             │");
     println!("│                                           │");
+    println!("│  model: {current_model:<33}│");
     println!("│  /exit or Ctrl-D to leave.                │");
+    println!("│  /model [list|<name>] to switch models.   │");
     println!("│                                           │");
     println!("└───────────────────────────────────────────┘");
     println!();
@@ -111,6 +218,9 @@ pub async fn run(paths: &Paths) -> Result<()> {
                             );
                             println!("  /history      — show conversation history summary");
                             println!("  /skills       — list available skills");
+                            println!("  /model        — show current model");
+                            println!("  /model list   — list available Ollama models");
+                            println!("  /model <name> — switch to a model (fuzzy match)");
                             println!();
                             continue;
                         }
@@ -151,6 +261,83 @@ pub async fn run(paths: &Paths) -> Result<()> {
                             continue;
                         }
                         other => {
+                            if other == "/model" {
+                                println!("  Current model: {current_model}");
+                                println!();
+                                continue;
+                            }
+                            if other == "/model list" {
+                                println!("  Available models ({}):", ollama_models.len());
+                                for m in &ollama_models {
+                                    let marker = if m == &current_model {
+                                        " ← current"
+                                    } else {
+                                        ""
+                                    };
+                                    println!("    {m}{marker}");
+                                }
+                                println!();
+                                continue;
+                            }
+                            if let Some(name) = other.strip_prefix("/model ") {
+                                let name = name.trim();
+                                if name.is_empty() {
+                                    println!("  Current model: {current_model}");
+                                    println!();
+                                    continue;
+                                }
+                                let matches = fuzzy_match_models(name, &ollama_models);
+                                match matches.len() {
+                                    0 => {
+                                        println!(
+                                            "  No model found matching \"{name}\". Try /model list."
+                                        );
+                                    }
+                                    1 => {
+                                        current_model = matches[0].to_string();
+                                        println!("  Switched to model: {current_model}");
+                                    }
+                                    n => {
+                                        println!("  Multiple models match \"{name}\":");
+                                        for (i, m) in matches.iter().enumerate() {
+                                            let marker = if *m == current_model {
+                                                " ← current"
+                                            } else {
+                                                ""
+                                            };
+                                            println!("    {}. {m}{marker}", i + 1);
+                                        }
+                                        println!(
+                                            "  Type /model <number> to select, or /model cancel."
+                                        );
+                                        // Read one more line for the selection.
+                                        editor.add_history_entry(trimmed)?;
+                                        if let Ok(sel_line) = editor.readline("select → ") {
+                                            let sel = sel_line.trim();
+                                            if sel == "cancel" || sel == "/model cancel" {
+                                                println!("  Cancelled.");
+                                            } else if let Ok(idx) = sel
+                                                .trim_start_matches("/model ")
+                                                .trim()
+                                                .parse::<usize>()
+                                            {
+                                                if idx >= 1 && idx <= n {
+                                                    current_model = matches[idx - 1].to_string();
+                                                    println!(
+                                                        "  Switched to model: {current_model}"
+                                                    );
+                                                } else {
+                                                    println!("  Invalid number. Cancelled.");
+                                                }
+                                            } else {
+                                                println!("  Unrecognised. Cancelled.");
+                                            }
+                                        }
+                                    }
+                                }
+                                println!();
+                                continue;
+                            }
                             println!("  Unknown command: {other}. Try /help.");
                             continue;
                         }
@@ -201,7 +388,7 @@ pub async fn run(paths: &Paths) -> Result<()> {
                 std::io::stdout().flush().unwrap();
 
                 let cfg = russell_doctor::client::ClientConfig::from_env();
-                let response = call_ollama(&cfg, &messages).await;
+                let response = call_ollama(&cfg, &current_model, &messages).await;
 
                 match response {
                     Ok(content) => {
@@ -213,7 +400,7 @@ pub async fn run(paths: &Paths) -> Result<()> {
                         save_history(&chat_path, &history)?;
 
                         // Also journal the chat turn as a help-session event.
-                        journal_chat_turn(&journal, &session_id, trimmed, &content);
+                        journal_chat_turn(&journal, &session_id, &current_model, trimmed, &content);
                     }
                     Err(e) => {
                         let msg = format!("(can't reach the LLM right now — {e})");
@@ -370,6 +557,7 @@ fn fmt_f64(v: Option<f64>) -> String {
 /// Send messages to the Ollama chat API.
 async fn call_ollama(
     cfg: &russell_doctor::client::ClientConfig,
+    model: &str,
     messages: &[serde_json::Value],
 ) -> std::result::Result<String, String> {
     let base_url = cfg
@@ -379,7 +567,7 @@ async fn call_ollama(
     let url = format!("{}/chat/completions", base_url.trim_end_matches('/'));
 
     let body = serde_json::json!({
-        "model": cfg.model,
+        "model": model,
         "messages": messages,
         "temperature": 0.7,
         "max_tokens": 1024,
@@ -428,6 +616,7 @@ fn save_history(chat_path: &std::path::Path, history: &ChatHistory) -> Result<()
 fn journal_chat_turn(
     journal: &JournalWriter,
     session_id: &str,
+    model: &str,
     user_msg: &str,
     assistant_msg: &str,
 ) {
@@ -438,7 +627,7 @@ fn journal_chat_turn(
         ts_unix,
         &ts,
         "ollama",
-        Some("deepseekv4pro"),
+        Some(model),
         Some(user_msg),
         user_msg.len() as i64,
         assistant_msg.len() as i64,

@@ -115,11 +115,11 @@ pub struct ClientConfig {
 
 impl ClientConfig {
     /// Resolve from the environment, applying MVP defaults
-    /// (`deepseekv4pro`, 60s timeout, Ollama backend).
+    /// (`deepseek-v4-pro:cloud`, 60s timeout, Ollama backend).
     pub fn from_env() -> Self {
         let backend = Backend::from_env();
-        let model =
-            std::env::var("RUSSELL_DOCTOR_MODEL").unwrap_or_else(|_| "deepseekv4pro".into());
+        let model = std::env::var("RUSSELL_DOCTOR_MODEL")
+            .unwrap_or_else(|_| "deepseek-v4-pro:cloud".into());
         let base_url = std::env::var("RUSSELL_DOCTOR_BASE_URL").ok();
         let api_key = std::env::var("OPENROUTER_API_KEY").ok();
         Self {

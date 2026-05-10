@@ -31,9 +31,9 @@ for the full map.
 - `sqlite3` in your `PATH` (only needed for the debug recipes below;
   Russell has SQLite statically-linked for its own use).
 - Ollama installed and running (or auto-startable) with the
-  `deepseekv4pro` model pulled. Russell's Doctor will attempt
+  `deepseek-v4-pro:cloud` model pulled. Russell's Doctor will attempt
   to start Ollama automatically, but does not manage model
-  downloads — `ollama pull deepseekv4pro` is up to you.
+  downloads — `ollama pull deepseek-v4-pro:cloud` is up to you.
 - Optionally, an OpenRouter API key if you want Jack to consult
   a frontier cloud model instead. Russell works fine without
   one — Ollama is the default.
@@ -168,8 +168,8 @@ systemctl --user status ollama
 # If that fails (no unit), install and enable Ollama first:
 #   systemctl --user enable --now ollama
 ollama list
-# Check that deepseekv4pro is available:
-#   ollama pull deepseekv4pro
+# Check that deepseek-v4-pro:cloud is available:
+#   ollama pull deepseek-v4-pro:cloud
 ```
 
 ### Sentinel hasn't run
