@@ -17,4 +17,6 @@ pub const SYMPTOMS: &[&str] = &[
     "oom_killer_active",
     "swap_pressure",
     "loadavg_high",
+    "llm_slow",
+    "resource_exhaustion",
 ];

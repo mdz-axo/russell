@@ -831,16 +831,21 @@ safety:
     fn loads_gpu_doctor_fixture() {
         let fixture = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures");
         let skills = load_all(&fixture).unwrap();
-        assert_eq!(skills.len(), 1);
-        let gpu = &skills[0];
-        assert_eq!(gpu.id, "gpu-doctor");
+        assert_eq!(skills.len(), 2);
+
+        let gpu = skills.iter().find(|s| s.id == "gpu-doctor").unwrap();
         assert_eq!(gpu.probes.len(), 3);
         assert_eq!(gpu.interventions.len(), 1);
         assert!(gpu.symptoms.contains(&"vram_oom".into()));
         assert!(gpu.symptoms.contains(&"amdgpu_ring_hang".into()));
-        // The reset-gpu intervention is medium risk with confirmation.
         let reset = &gpu.interventions[0];
         assert_eq!(reset.id, "reset-gpu");
         assert!(matches!(reset.risk, RiskBand::Medium));
+
+        let ollama = skills.iter().find(|s| s.id == "ollama-watcher").unwrap();
+        assert_eq!(ollama.probes.len(), 2);
+        assert_eq!(ollama.interventions.len(), 1);
+        assert!(ollama.symptoms.contains(&"llm_slow".into()));
+        assert_eq!(ollama.interventions[0].id, "restart-ollama");
     }
 }
