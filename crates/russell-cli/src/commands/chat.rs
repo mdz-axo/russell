@@ -21,7 +21,7 @@ use rustyline::error::ReadlineError;
 use serde::{Deserialize, Serialize};
 use std::fmt::Write as _;
 use std::io::Write;
-use tracing::{debug, info, warn};
+use tracing::{info, warn};
 
 /// One turn in the conversation.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -165,7 +165,7 @@ pub async fn run(paths: &Paths) -> Result<()> {
 
                 // Build the fresh SOAP objective.
                 let objective = build_objective(&reader, &skills, profile.as_ref());
-                let system = crate::JACK_CHAT_PERSONA.to_string();
+                let system = russell_doctor::JACK_CHAT_PERSONA.to_string();
 
                 // Build the messages array for the LLM.
                 let mut messages: Vec<serde_json::Value> = Vec::new();
@@ -323,9 +323,9 @@ fn build_objective(
             for r in &rows {
                 let _ = writeln!(
                     obj,
-                    "- [{}] {}: {}",
-                    r.severity,
-                    r.action,
+                    "- [{sev:?}] {action}: {summary}",
+                    sev = r.severity,
+                    action = r.action,
                     r.summary.as_deref().unwrap_or("(no summary)")
                 );
             }
