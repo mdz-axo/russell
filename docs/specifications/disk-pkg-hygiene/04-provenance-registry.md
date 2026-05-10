@@ -226,8 +226,7 @@ fn check_github_latest(owner_repo: &str) -> Option<String> {
 **Design decision pending:** Should Russell use `ureq` (minimal,
 blocking) or `reqwest` (async, heavier)? Per JR-1, `ureq` is
 preferred for its small footprint. However, if `reqwest` is
-already in the workspace for the Doctor's OpenRouter calls, reuse
-it (JR-6).
+already in the workspace for the Doctor's LLM calls, reuse it (JR-6).
 
 ---
 

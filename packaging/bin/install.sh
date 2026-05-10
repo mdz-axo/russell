@@ -75,7 +75,7 @@ if [ ! -f "$HOME/.config/harness/russell.env" ]; then
     say "Seeding ~/.config/harness/russell.env from .env.example (template)"
     cp "$REPO/.env.example" "$HOME/.config/harness/russell.env"
     chmod 0600 "$HOME/.config/harness/russell.env"
-    say "⚠ edit ~/.config/harness/russell.env and add your OPENROUTER_API_KEY"
+    say "Defaults: Ollama + deepseekv4pro. Set RUSSELL_DOCTOR_BACKEND=openrouter + OPENROUTER_API_KEY if you want the cloud path."
   fi
 fi
 

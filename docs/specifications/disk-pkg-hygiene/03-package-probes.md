@@ -314,7 +314,7 @@ Package probe results flow to the LLM (Jack) or Kask platform via:
 
 1. **Samples → Journal** (connector: `JournalWriter::append_sample`)
 2. **Journal → SOAP bundle** (tool: compose Objective text from recent samples)
-3. **SOAP bundle → LLM** (connector: OpenRouter HTTP POST)
+3. **SOAP bundle → LLM** (connector: Ollama or OpenRouter HTTP POST)
 
 The package probes are **never sent directly** to the LLM. They
 flow through the journal first (JR-7: persistence is auditable),

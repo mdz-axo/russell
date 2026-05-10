@@ -64,6 +64,59 @@ pub struct RunOutcome {
     pub duration: Duration,
 }
 
+/// Rollback strategy as resolved by the manifest loader.
+#[derive(Debug, Clone)]
+pub enum RollbackStrategy {
+    /// Roll back via a named intervention.
+    RollbackId { id: String },
+    /// No rollback needed (declared in manifest).
+    NoneNeeded,
+    /// Reboot required to undo (requires human confirmation).
+    Reboot,
+}
+
+/// Outcome of a rollback-protected intervention.
+#[derive(Debug, Clone, PartialEq)]
+pub struct RollbackOutcome {
+    /// The forward (original) run outcome.
+    pub forward: RunOutcome,
+    /// The rollback run outcome, if rollback was triggered.
+    pub rollback: Option<RunOutcome>,
+    /// Whether rollback was actually applied.
+    pub rollback_applied: bool,
+}
+
+impl RollbackOutcome {
+    /// Whether the overall operation was successful.
+    #[must_use]
+    pub fn is_safe(&self) -> bool {
+        if self.forward.exit_code == Some(0) && !self.forward.timed_out {
+            return true;
+        }
+        self.rollback
+            .as_ref()
+            .map_or(false, |r| r.exit_code == Some(0) && !r.timed_out)
+    }
+}
+
+/// Whether a dispatch is a probe (read-only) or intervention (mutating).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StepType {
+    /// Read-only observation.
+    Probe,
+    /// Mutating action.
+    Intervention,
+}
+
+impl StepType {
+    fn to_string(self) -> &'static str {
+        match self {
+            StepType::Probe => "probe",
+            StepType::Intervention => "intervention",
+        }
+    }
+}
+
 /// A subprocess dispatcher. Constructed with the skills base directory
 /// (working directory for spawned processes).
 #[derive(Debug, Clone)]
@@ -435,6 +488,50 @@ impl Dispatcher {
     }
 }
 
+/// Rollback strategy as resolved by the manifest loader.
+///
+/// This is a simplified, Clone-able version of the manifest's
+/// [`Rollback`](crate::Rollback) enum. The dispatcher doesn't
+/// own skill manifests, so the caller resolves the strategy.
+#[derive(Debug, Clone)]
+pub enum RollbackStrategy {
+    /// Roll back via a named intervention.
+    RollbackId {
+        /// The intervention ID to run in reverse.
+        id: String,
+    },
+    /// No rollback needed (declared in manifest).
+    NoneNeeded,
+    /// Reboot required to undo (requires human confirmation).
+    Reboot,
+}
+
+/// Outcome of a rollback-protected intervention.
+#[derive(Debug, Clone, PartialEq)]
+pub struct RollbackOutcome {
+    /// The forward (original) run outcome.
+    pub forward: RunOutcome,
+    /// The rollback run outcome, if rollback was triggered.
+    pub rollback: Option<RunOutcome>,
+    /// Whether rollback was actually applied.
+    pub rollback_applied: bool,
+}
+
+impl RollbackOutcome {
+    /// Whether the overall operation was successful (forward succeeded
+    /// OR forward failed but rollback succeeded).
+    #[must_use]
+    pub fn is_safe(&self) -> bool {
+        if self.forward.exit_code == Some(0) && !self.forward.timed_out {
+            return true; // forward succeeded
+        }
+        // Forward failed; check rollback.
+        self.rollback
+            .as_ref()
+            .map_or(false, |r| r.exit_code == Some(0) && !r.timed_out)
+    }
+}
+
 /// Whether a dispatch is a probe (read-only) or intervention (mutating).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum StepType {
@@ -450,6 +547,21 @@ impl StepType {
             StepType::Probe => "probe",
             StepType::Intervention => "intervention",
         }
+    }
+}
+
+/// Convert a manifest [`Rollback`](crate::Rollback) to a dispatcher [`RollbackStrategy`].
+///
+/// The dispatcher doesn't own manifests, so the caller resolves the
+/// strategy before calling `run_intervention_with_rollback`.
+#[must_use]
+pub fn resolve_rollback_strategy(rollback: &crate::Rollback) -> RollbackStrategy {
+    match rollback {
+        crate::Rollback::RollbackId { rollback_id } => RollbackStrategy::RollbackId {
+            id: rollback_id.clone(),
+        },
+        crate::Rollback::NoneNeeded { .. } => RollbackStrategy::NoneNeeded,
+        crate::Rollback::Reboot { .. } => RollbackStrategy::Reboot,
     }
 }
 

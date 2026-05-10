@@ -110,7 +110,7 @@ russell digest --since-hours 24
 russell jack --note "disk seems full"
   → JournalReader::query_samples(last_24h)  [connector: read from journal]
   → compose_soap_objective(samples, events) [tool: form the SOAP bundle]
-  → OpenRouter POST with zdr:true           [connector: transfer to LLM]
+  → LLM POST (Ollama or OpenRouter)     [connector: transfer to LLM]
   → print response                          [connector: transfer to operator]
   → JournalWriter::append_help_session()    [connector: persist evidence]
 ```

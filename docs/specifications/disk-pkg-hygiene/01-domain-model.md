@@ -234,7 +234,7 @@ connector boundary is:
 
 | Direction | Connector | Data shape |
 |---|---|---|
-| Russell → Jack (LLM) | OpenRouter HTTP POST | SOAP bundle with samples serialized as Objective text |
+| Russell → Jack (LLM) | Ollama / OpenRouter HTTP POST | SOAP bundle with samples serialized as Objective text |
 | Russell → Kask (MCP) | MCP tool response | JSON conforming to `harness.event.v1` or sample arrays |
 | Jack → Russell | LLM response text | Unstructured assessment (Russell does NOT parse for commands — JR-3) |
 
