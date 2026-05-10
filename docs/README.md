@@ -43,8 +43,7 @@ may exist but must not contradict these.
   hierarchy, what Russell is.
 - [`../README.md`](../README.md) — one-liner + reading order.
 - [`../CONTRIBUTING.md`](../CONTRIBUTING.md) — dev environment,
-  tests, local MCP wiring *(MCP deferred — reference is
-  forward-looking)*.
+  tests, local build.
 - [`../MACHINE_PROFILE.md`](../MACHINE_PROFILE.md) — the patient's
   chart.
 - [`../cybernetic-health-harness.md`](../cybernetic-health-harness.md)

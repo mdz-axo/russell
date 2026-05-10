@@ -55,9 +55,10 @@ of every meaningful development session.
   Includes `AutoimmuneGuard` (process-wide mutex for future meta-Doctor).
   Detects degraded internal state (slow LLM, journal stall, timer drift)
   before the operator notices. All vitals are read-only; no mutation.
-- `russell-cli` implements five read-only verbs: `status`,
-  `list`, `profile [--init]`, `digest`, `sentinel-once`.
-- 76 tests passing (29 core + 14 doctor + 17 proprio + 8 sentinel + 8 CLI lib).
+- `russell-cli` implements six verbs: `status`,
+  `list`, `profile [--init]`, `digest`, `sentinel-once`,
+  `jack`.
+- 109 tests passing (37 core + 15 doctor + 17 proprio + 8 sentinel + 4 CLI + 28 skills).
 - `cargo fmt --check` ✅, `cargo clippy -- -D warnings` ✅,
   `cargo test` ✅.
 
@@ -183,10 +184,8 @@ that the simpler layer beneath has stabilised.
 - (ADR-0016 v2) Default backend is Ollama with model
   `deepseekv4pro`. OpenRouter is opt-in via
   `RUSSELL_DOCTOR_BACKEND=openrouter`.
-- (ADR-0016 will answer) Retry policy — copied from `stack-llm`;
-  determine max attempts.
-- (Phase 1) Whether `russell-doctor` earns its own crate from day
-  one (decision: **yes**, per user direction).
+- ADR-0016 settled the retry policy: single round-trip, no retry.
+- `russell-doctor` split into its own crate during Phase 1.
 
 ## 5. Risk register (current)
 

@@ -60,49 +60,11 @@ blocker.
 |---|---|---|---|---|---|
 | 1 | `crates/russell-doctor/src/openrouter.rs` | `slate/stack/crates/stack-llm/src/openai.rs` + `src/wire.rs` | `67a13834d8af4efa8c330ce10ef1031bf2cdeee2` | Uses Russell's `DoctorError` + `SoapPrompt`/`LlmResponse` instead of `stack_types`. Drops streaming, tool-calling, structured-output, retry. Adds per-request ZDR enforcement. Keeps reasoning-details content-normalisation for models that emit it. | Review on upstream bug fix; pull fixes, not features. Log changes in §6. |
 
-## 4. Planned copies for Phase 1
+## 4. Planned copies (removed — copies completed in Phase 1)
 
-These are the copies Russell will land when `russell help` is
-implemented. This section is **forward-looking**; the actual
-copies populate §3 at copy time.
-
-### 4.1 `stack-llm` — the LLM router
-
-**From:** `Clones/slate/stack/crates/stack-llm/`
-**To:** `russell/crates/russell-doctor/src/llm/`
-**Files planned:**
-
-- `provider.rs` — the `Provider` trait
-- `backend.rs` — the `AnyBackend` enum
-- `openai.rs` — `OpenAiCompatibleBackend` (OpenRouter uses this)
-- `mock.rs` — the mock backend for tests
-- `wire.rs` — request/response wire types
-- `retry.rs` — retry-with-backoff
-- `circuit.rs` — circuit breaker
-
-**Features dropped during copy:**
-
-- Streaming (`streaming.rs` not copied — MVP is single round-trip).
-- Structured output (`structured.rs` not copied — MVP returns plain
-  text).
-- Tool calling (`tools.rs` not copied — JR-3 forbids shell
-  emission).
-- Catalog (`catalog.rs` not copied — MVP uses one env-configured
-  model).
-
-**Russell additions:**
-
-- A thin adapter `russell-doctor::llm::jack::JackClient` that
-  wraps the copied types and adds Russell's persona/prompting
-  discipline.
-
-### 4.2 (Optional) `peripheral-store` SQLite patterns
-
-**From:** `Clones/peripheral/crates/peripheral-store/src/sqlite.rs`
-**Status:** reference only — Russell already has its own
-SQLite layer in `russell-core::journal`. We may crib specific
-patterns (e.g., the connection pool shape) but no code is
-copied. This row exists so reviewers know we considered it.
+All planned copies from Phase 1 have been completed. Row 1
+in §3 records the only copy currently in use. Future copies
+will be added to §3 directly at copy time.
 
 ## 5. Sync Cadence
 

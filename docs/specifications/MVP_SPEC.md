@@ -137,7 +137,7 @@ All of these are deferred, with their ADRs living under
   (Deferred ADR-0005.)
 - **No auto-mutation.** Even low-risk mutations (trash-empty,
   thumbnail prune) are deferred to Phase 2.
-- **No LLM-driven intervention.** `russell help` calls the LLM
+- **No LLM-driven intervention.** `russell jack` calls the LLM
   for a *summary*, not a *plan-to-execute*.
 - **No remote skill registry.** (Deferred part of ADR-0007.)
 - **No tiered Tier I / II / III cadences.** One Sentinel
@@ -162,7 +162,7 @@ MVP is **complete** when all three of these are empirically true:
    --all-targets -- -D warnings`, and `cargo test --workspace`
    all pass on every commit.
 3. **Help channel proof:** At least **5 successful
-   `russell help` LLM round-trips** and demonstrated
+   `russell jack` LLM round-trips** and demonstrated
    offline-fallback resilience are journaled during the soak
    window, and at least one was triggered in a real moment of
    operator uncertainty about the machine's state. See
@@ -173,13 +173,12 @@ before.
 
 ## 7. Status and Next Step
 
-Phase 0 (skeleton, read-only observation loop minus `help`) is
-**complete** as of 2026-04-18. See
+Phase 1 (MVP Doctor) is **complete** as of 2026-05-09.
+Phase 1b (install artifacts) and Phase 1c (20-day soak)
+are complete. Phase 2 (observation sharpened) and Phase 3
+(skills and dispatch) are in progress. See
 [`../status/CONSOLIDATED-STATUS.md`](../status/CONSOLIDATED-STATUS.md)
-for current state. The next concrete milestone is Phase 1:
-implement `russell help` by copying `stack-llm` per JR-6 and
-landing the persona, the env loader, the `help_sessions` table,
-and the offline fallback.
+for current state.
 
 ## 8. References
 

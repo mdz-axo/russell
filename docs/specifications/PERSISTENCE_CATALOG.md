@@ -79,15 +79,9 @@ against the file.
 | `events` | Structured log rows conforming to `harness.event.v1` | every mutating + observational action | `list`, `digest`, `help` |
 | `baselines` | EWMA mean/var + p50/p95/p99 per probe | (reserved, unused in MVP) | Phase 2 rules |
 | `confirmations` | Andon-cord records for risk≥medium actions | (reserved, unused in MVP) | Phase 3 dispatcher |
-| `help_sessions` | One row per `russell help` round-trip | `russell-doctor::help` | `digest`, future UI |
+| `help_sessions` | One row per `russell jack` round-trip | `russell-doctor::help` | `digest`, future UI |
 
-Column details live in
-`crates/russell-core/src/journal/migrations/0001_init.sql` and any
-follow-up numbered migrations.
-
-The `help_sessions` table is introduced by the Phase-1 migration
-`0002_help_sessions.sql`; it is **not** in the current 0001 file
-and must land before `russell help` ships.
+Column details are in `crates/russell-core/src/journal/migrations/`.
 
 #### Self-scope samples (`russell-proprio`)
 

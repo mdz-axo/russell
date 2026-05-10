@@ -1,7 +1,7 @@
 ---
 title: "Russell — Agent Orientation"
 audience: [agents, operators, developers, contributors, architects]
-last_updated: 2026-04-18
+last_updated: 2026-05-09
 togaf_phase: "Preliminary / Governance"
 version: "1.0.0"
 status: "Active"
@@ -10,7 +10,7 @@ status: "Active"
 <!-- TOGAF_DOMAIN: Governance -->
 <!-- VERSION: 1.0.0 -->
 <!-- STATUS: Active -->
-<!-- LAST_UPDATED: 2026-04-18 -->
+<!-- LAST_UPDATED: 2026-05-09 -->
 
 # AGENTS.md — contributing to Russell
 

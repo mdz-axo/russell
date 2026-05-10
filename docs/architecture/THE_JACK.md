@@ -179,6 +179,6 @@ The persona is reviewed whenever:
 - The default LLM model changes (some models handle tone
   differently).
 
-Thresholds for drift concern: if a week of `russell help` outputs
+Thresholds for drift concern: if a week of `russell jack` outputs
 starts sounding like a generic assistant, read this document,
 read the persona file, and adjust.
