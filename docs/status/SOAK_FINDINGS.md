@@ -260,7 +260,7 @@ Confirmed healthy as of 2026-05-06:
   the last 15 days.**
 - **Spec impact.**
   [`MVP_SPEC.md` §6 (3)](../specifications/MVP_SPEC.md)
-  requires "at least 10 successful `russell help` round-trips …
+  requires "at least 10 successful `russell jack` round-trips …
   *journaled during the 30-day window*, and at least one was
   triggered in a real moment of operator uncertainty about the
   machine's state." We currently have:

@@ -169,10 +169,10 @@ They live under [`adr/deferred/`](adr/deferred/):
 
 | Bucket | Count |
 |---|---|
-| Active authoritative docs | 38 |
-| Active ADRs | 13 |
-| Deferred ADRs | 7 |
-| Archived docs | 2 |
+| Active authoritative docs | 67 |
+| Active ADRs | 16 |
+| Deferred ADRs | 8 |
+| Archived docs | 3 |
 | Templates | 5 |
 
 _Verify with `find docs -type f -name '*.md' -not -path 'docs/archive/*' | wc -l`; current as of `last_updated`._

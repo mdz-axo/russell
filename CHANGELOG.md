@@ -230,7 +230,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Next
 
-- **Phase 1 — MVP Doctor.** Implement `russell help` by copying
+- **Phase 1 — MVP Doctor.** Implement `russell jack` by copying
   `stack-llm` per `REUSE_MANIFEST.md` §4.1, authoring ADR-0016
   (Doctor and LLM router) and ADR-0017 (Reuse-over-dependency),
   adding migration `0002_help_sessions.sql`, wiring the env

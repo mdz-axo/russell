@@ -37,7 +37,7 @@ of every meaningful development session.
 - UDQL-derived documentation standard.
 - Pinned MVP boundary (`MVP_SPEC.md`).
 - Persistence catalog (`PERSISTENCE_CATALOG.md`).
-- Reuse manifest (`REUSE_MANIFEST.md`, forward-looking).
+- Reuse manifest (`REUSE_MANIFEST.md`).
 - TOGAF traceability matrix.
 - 10 active ADRs + 7 deferred.
 - 3 templates (ADR, skill manifest, SOAP bundle).
