@@ -107,8 +107,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added — Phase 1: The Doctor (`russell jack`)
 
-- **ADR-0016** — MVP Doctor spec: single round-trip, ZDR enforced,
-  Kimi K2.5 default, offline fallback mandatory.
+- **ADR-0016** — MVP Doctor spec: single round-trip, Ollama
+  default (`deepseekv4pro`), OpenRouter opt-in, offline
+  fallback mandatory.
 - **ADR-0017** — Reuse over dependency: JR-6 mechanism codified.
 - **`russell-doctor` crate** — Phase-1 implementation:
   - `LlmClient` trait, minimal Russell-shaped types.
@@ -116,7 +117,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     `slate/stack/crates/stack-llm/src/{openai,wire}.rs` per
     `REUSE_MANIFEST.md` row 1. Drops streaming, tool-calling,
     structured-output, retry. Adds per-request ZDR enforcement.
-    Retains Kimi K2.5 `reasoning_details` content normalisation.
+    Retains DeepSeek / Kimi `reasoning_details` content
+    normalisation.
   - `MockClient` for tests and `RUSSELL_DOCTOR_BACKEND=mock`.
   - `fallback::summarise` — the offline rule-based response.
     Jack is never silent.
