@@ -466,6 +466,46 @@ impl JournalReader {
         Ok(Some((bad as f64 / total as f64) * 100.0))
     }
 
+    /// Fetch help-session rows within a time range, newest first.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`CoreError::Sqlite`] on DB errors.
+    pub fn help_sessions_in_range(
+        &self,
+        since_unix: i64,
+        until_unix: i64,
+    ) -> Result<Vec<HelpSessionRow>> {
+        let conn = self.open_ro()?;
+        let mut stmt = conn.prepare(
+            "SELECT id, ts_unix, ts, backend, model, note,
+                     prompt_chars, response_chars, latency_ms,
+                     status, error_kind, evidence_ref
+              FROM help_sessions
+              WHERE ts_unix >= ?1 AND ts_unix < ?2
+              ORDER BY ts_unix DESC",
+        )?;
+        let rows = stmt
+            .query_map(params![since_unix, until_unix], |r| {
+                Ok(HelpSessionRow {
+                    id: r.get(0)?,
+                    ts_unix: r.get(1)?,
+                    ts: r.get(2)?,
+                    backend: r.get(3)?,
+                    model: r.get(4)?,
+                    note: r.get(5)?,
+                    prompt_chars: r.get(6)?,
+                    response_chars: r.get(7)?,
+                    latency_ms: r.get(8)?,
+                    status: r.get(9)?,
+                    error_kind: r.get(10)?,
+                    evidence_ref: r.get(11)?,
+                })
+            })?
+            .collect::<std::result::Result<Vec<_>, _>>()?;
+        Ok(rows)
+    }
+
     /// Path the journal lives at. May not exist yet on very fresh
     /// installs.
     #[must_use]
@@ -494,6 +534,35 @@ pub struct SeverityCounts {
     pub alert: i64,
     /// `crit`-severity rows.
     pub crit: i64,
+}
+
+/// A `help_sessions` row, as returned by [`JournalReader::help_sessions_in_range`].
+#[derive(Debug, Clone)]
+pub struct HelpSessionRow {
+    /// ULID.
+    pub id: String,
+    /// Unix timestamp.
+    pub ts_unix: i64,
+    /// RFC3339 timestamp.
+    pub ts: String,
+    /// Backend label.
+    pub backend: String,
+    /// Model, if any.
+    pub model: Option<String>,
+    /// Operator note.
+    pub note: Option<String>,
+    /// Prompt character count.
+    pub prompt_chars: i64,
+    /// Response character count.
+    pub response_chars: i64,
+    /// Round-trip latency (ms); `None` for offline.
+    pub latency_ms: Option<i64>,
+    /// `ok | error | fallback | threshold_skip`.
+    pub status: String,
+    /// Short error kind, if status=error.
+    pub error_kind: Option<String>,
+    /// Path to evidence bundle.
+    pub evidence_ref: String,
 }
 
 fn configure_pragmas(conn: &Connection) -> Result<()> {
