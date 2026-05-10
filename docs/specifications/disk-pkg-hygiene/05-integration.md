@@ -43,7 +43,7 @@ The audit-crate.md discipline applied to the full data flow:
 │ read_dir(cache_path)    Command::new("pip")                     │
 │ read_provenance_toml()  github_releases_api()                   │
 │ JournalWriter::append_sample()                                  │
-│ OpenRouter HTTP POST (Doctor → LLM)                             │
+│ Ollama / OpenRouter HTTP POST (Doctor → LLM)                    │
 │ MCP tool response (Russell → Kask)                              │
 └─────────────────────────────────────────────────────────────────┘
 ```

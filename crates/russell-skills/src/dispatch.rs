@@ -46,7 +46,7 @@ pub enum DryRun {
 }
 
 /// Outcome of a single subprocess run.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct RunOutcome {
     /// The command that was executed (or would have been).
     pub cmd: Vec<String>,
@@ -65,10 +65,17 @@ pub struct RunOutcome {
 }
 
 /// Rollback strategy as resolved by the manifest loader.
+///
+/// This is a simplified, Clone-able version of the manifest's
+/// [`Rollback`](crate::Rollback) enum. The dispatcher doesn't
+/// own skill manifests, so the caller resolves the strategy.
 #[derive(Debug, Clone)]
 pub enum RollbackStrategy {
     /// Roll back via a named intervention.
-    RollbackId { id: String },
+    RollbackId {
+        /// The intervention ID to run in reverse.
+        id: String,
+    },
     /// No rollback needed (declared in manifest).
     NoneNeeded,
     /// Reboot required to undo (requires human confirmation).
@@ -87,15 +94,17 @@ pub struct RollbackOutcome {
 }
 
 impl RollbackOutcome {
-    /// Whether the overall operation was successful.
+    /// Whether the overall operation was successful (forward succeeded
+    /// OR forward failed but rollback succeeded).
     #[must_use]
     pub fn is_safe(&self) -> bool {
         if self.forward.exit_code == Some(0) && !self.forward.timed_out {
-            return true;
+            return true; // forward succeeded
         }
+        // Forward failed; check rollback.
         self.rollback
             .as_ref()
-            .map_or(false, |r| r.exit_code == Some(0) && !r.timed_out)
+            .is_some_and(|r| r.exit_code == Some(0) && !r.timed_out)
     }
 }
 
@@ -377,6 +386,7 @@ impl Dispatcher {
     /// Returns the rollback outcome on forward failure, or the forward
     /// outcome on success. `rollback_applied` in the outcome indicates
     /// whether rollback was triggered.
+    #[allow(clippy::too_many_arguments)]
     pub async fn run_intervention_with_rollback<F>(
         &self,
         journal: &JournalWriter,
@@ -484,68 +494,6 @@ impl Dispatcher {
                     rollback_applied: true,
                 })
             }
-        }
-    }
-}
-
-/// Rollback strategy as resolved by the manifest loader.
-///
-/// This is a simplified, Clone-able version of the manifest's
-/// [`Rollback`](crate::Rollback) enum. The dispatcher doesn't
-/// own skill manifests, so the caller resolves the strategy.
-#[derive(Debug, Clone)]
-pub enum RollbackStrategy {
-    /// Roll back via a named intervention.
-    RollbackId {
-        /// The intervention ID to run in reverse.
-        id: String,
-    },
-    /// No rollback needed (declared in manifest).
-    NoneNeeded,
-    /// Reboot required to undo (requires human confirmation).
-    Reboot,
-}
-
-/// Outcome of a rollback-protected intervention.
-#[derive(Debug, Clone, PartialEq)]
-pub struct RollbackOutcome {
-    /// The forward (original) run outcome.
-    pub forward: RunOutcome,
-    /// The rollback run outcome, if rollback was triggered.
-    pub rollback: Option<RunOutcome>,
-    /// Whether rollback was actually applied.
-    pub rollback_applied: bool,
-}
-
-impl RollbackOutcome {
-    /// Whether the overall operation was successful (forward succeeded
-    /// OR forward failed but rollback succeeded).
-    #[must_use]
-    pub fn is_safe(&self) -> bool {
-        if self.forward.exit_code == Some(0) && !self.forward.timed_out {
-            return true; // forward succeeded
-        }
-        // Forward failed; check rollback.
-        self.rollback
-            .as_ref()
-            .map_or(false, |r| r.exit_code == Some(0) && !r.timed_out)
-    }
-}
-
-/// Whether a dispatch is a probe (read-only) or intervention (mutating).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum StepType {
-    /// Read-only observation.
-    Probe,
-    /// Mutating action.
-    Intervention,
-}
-
-impl StepType {
-    fn to_string(self) -> &'static str {
-        match self {
-            StepType::Probe => "probe",
-            StepType::Intervention => "intervention",
         }
     }
 }
@@ -783,5 +731,163 @@ mod tests {
         let msg = err.to_string();
         assert!(msg.contains("High"));
         assert!(msg.contains("Low"));
+    }
+
+    // --- Rollback tests ---
+
+    #[tokio::test]
+    async fn rollback_runs_on_forward_failure() {
+        let tmp = tempfile::tempdir().unwrap();
+        let journal_path = tmp.path().join("journal.db");
+        let journal = JournalWriter::open(&journal_path).unwrap();
+        let evidence_base = tmp.path().join("evidence");
+
+        let d = Dispatcher::new("/tmp");
+
+        // Forward: a command that exits non-zero.
+        // Rollback: echo "rolled back".
+        let outcome = d
+            .run_intervention_with_rollback(
+                &journal,
+                &evidence_base,
+                "test-skill",
+                "iv-bad",
+                &["sh".into(), "-c".into(), "exit 1".into()],
+                "low",
+                RollbackStrategy::RollbackId {
+                    id: "iv-revert".into(),
+                },
+                |_id| Some(vec!["echo".into(), "rolled-back".into()]),
+                None,
+            )
+            .await
+            .unwrap();
+
+        // Forward failed.
+        assert_eq!(outcome.forward.exit_code, Some(1));
+        // Rollback was applied.
+        assert!(outcome.rollback_applied);
+        let rb = outcome.rollback.unwrap();
+        assert_eq!(rb.exit_code, Some(0));
+        assert!(rb.stdout.contains("rolled-back"));
+    }
+
+    #[tokio::test]
+    async fn no_rollback_when_forward_succeeds() {
+        let tmp = tempfile::tempdir().unwrap();
+        let journal_path = tmp.path().join("journal.db");
+        let journal = JournalWriter::open(&journal_path).unwrap();
+        let evidence_base = tmp.path().join("evidence");
+
+        let d = Dispatcher::new("/tmp");
+
+        let outcome = d
+            .run_intervention_with_rollback(
+                &journal,
+                &evidence_base,
+                "test-skill",
+                "iv-good",
+                &["echo".into(), "ok".into()],
+                "low",
+                RollbackStrategy::NoneNeeded,
+                |_id| None,
+                None,
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(outcome.forward.exit_code, Some(0));
+        assert!(!outcome.rollback_applied);
+        assert!(outcome.rollback.is_none());
+        assert!(outcome.is_safe());
+    }
+
+    #[tokio::test]
+    async fn none_needed_skips_rollback() {
+        let tmp = tempfile::tempdir().unwrap();
+        let journal_path = tmp.path().join("journal.db");
+        let journal = JournalWriter::open(&journal_path).unwrap();
+        let evidence_base = tmp.path().join("evidence");
+
+        let d = Dispatcher::new("/tmp");
+
+        let outcome = d
+            .run_intervention_with_rollback(
+                &journal,
+                &evidence_base,
+                "test-skill",
+                "iv-restart",
+                &["sh".into(), "-c".into(), "exit 2".into()],
+                "low",
+                RollbackStrategy::NoneNeeded,
+                |_id| None,
+                None,
+            )
+            .await
+            .unwrap();
+
+        // Forward failed but rollback is none_needed.
+        assert_eq!(outcome.forward.exit_code, Some(2));
+        assert!(!outcome.rollback_applied);
+        assert!(outcome.rollback.is_none());
+    }
+
+    #[tokio::test]
+    async fn reboot_skips_rollback_and_warns() {
+        let tmp = tempfile::tempdir().unwrap();
+        let journal_path = tmp.path().join("journal.db");
+        let journal = JournalWriter::open(&journal_path).unwrap();
+        let evidence_base = tmp.path().join("evidence");
+
+        let d = Dispatcher::new("/tmp");
+
+        let outcome = d
+            .run_intervention_with_rollback(
+                &journal,
+                &evidence_base,
+                "test-skill",
+                "iv-reboot",
+                &["sh".into(), "-c".into(), "exit 3".into()],
+                "high",
+                RollbackStrategy::Reboot,
+                |_id| None,
+                None,
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(outcome.forward.exit_code, Some(3));
+        assert!(!outcome.rollback_applied);
+        assert!(outcome.rollback.is_none());
+    }
+
+    #[test]
+    fn resolve_rollback_strategy_converts_correctly() {
+        use crate::{Rollback, RollbackNone, RollbackReboot};
+
+        let with_id = Rollback::RollbackId {
+            rollback_id: "revert-id".into(),
+        };
+        if let RollbackStrategy::RollbackId { id } = resolve_rollback_strategy(&with_id) {
+            assert_eq!(id, "revert-id");
+        } else {
+            panic!("expected RollbackId");
+        }
+
+        let none_needed = Rollback::NoneNeeded {
+            rollback: RollbackNone::NoneNeeded,
+        };
+        assert!(matches!(
+            resolve_rollback_strategy(&none_needed),
+            RollbackStrategy::NoneNeeded
+        ));
+
+        let reboot = Rollback::Reboot {
+            rollback: RollbackReboot::Reboot,
+        };
+        assert!(matches!(
+            resolve_rollback_strategy(&reboot),
+            RollbackStrategy::Reboot
+        ));
     }
 }

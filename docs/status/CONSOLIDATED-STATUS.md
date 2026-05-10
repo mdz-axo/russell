@@ -170,7 +170,7 @@ ADR-0007 deferral lifted per ADR-0023.
 - [x] Subprocess dispatcher: env scrubbing, timeout, stdout/stderr capture, dry-run
 - [x] CLI verbs: `russell skill list`, `russell skill run <id> [--dry-run]`
 - [x] First skill: `gpu-doctor` fixture (manifest + rocm-smi probe script)
-- [ ] Doctor integration: symptom-to-skill mapping in `russell jack`
+- [x] Doctor integration: symptom-to-skill mapping in `russell jack` (skills table in SOAP prompt, RECOMMEND format)
 
 ### Phase 4+ — Tracks the design document
 
