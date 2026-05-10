@@ -41,6 +41,59 @@ use russell_core::journal::{JournalReader, JournalWriter};
 use tracing::{debug, warn};
 
 // ---------------------------------------------------------------------------
+// TimerSource — abstraction over systemd timer queries
+// ---------------------------------------------------------------------------
+
+/// Abstracts the query for the sentinel timer's last trigger time.
+///
+/// The production implementation shells out to `systemctl`; tests use a
+/// fixed value so they don't depend on the host's systemd state.
+///
+/// Returns `Ok(Some(microseconds_since_epoch))` on success,
+/// `Ok(None)` if the timer property isn't found, or `Err(...)` on failure.
+pub trait TimerSource {
+    /// Read `LastTriggerUSec` from the sentinel timer.
+    ///
+    /// # Errors
+    ///
+    /// Returns a human-readable error string on subprocess or parse failure.
+    fn read_last_trigger_us(&self) -> std::result::Result<Option<u64>, String>;
+}
+
+/// Production [`TimerSource`] that queries systemd via `systemctl`.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct SystemdTimerSource;
+
+impl TimerSource for SystemdTimerSource {
+    fn read_last_trigger_us(&self) -> std::result::Result<Option<u64>, String> {
+        read_timer_last_trigger()
+    }
+}
+
+/// Test [`TimerSource`] that returns a fixed microsecond-since-epoch value.
+///
+/// Pass `None` to simulate a missing timer (drift = `None`); pass
+/// `Some(us)` to simulate a timer that last triggered at that instant.
+#[derive(Debug, Clone, Copy)]
+pub struct FixedTimerSource {
+    last_trigger_us: Option<u64>,
+}
+
+impl FixedTimerSource {
+    /// Create a source that returns the given fixed value.
+    #[must_use]
+    pub fn new(last_trigger_us: Option<u64>) -> Self {
+        Self { last_trigger_us }
+    }
+}
+
+impl TimerSource for FixedTimerSource {
+    fn read_last_trigger_us(&self) -> std::result::Result<Option<u64>, String> {
+        Ok(self.last_trigger_us)
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Probe constants
 // ---------------------------------------------------------------------------
 
@@ -212,13 +265,32 @@ pub struct ProprioResult {
 
 /// Run the proprioception cycle once.
 ///
-/// Reads the journal, computes all five self-vitals, writes self-scope
-/// samples, and emits events for any breached thresholds.
+/// Convenience wrapper around [`run_once_with`] that uses the real
+/// [`SystemdTimerSource`].
 ///
 /// # Errors
 ///
 /// Returns [`russell_core::CoreError`] on journal I/O failures.
 pub fn run_once(writer: &JournalWriter, reader: &JournalReader) -> Result<ProprioResult> {
+    run_once_with(writer, reader, &SystemdTimerSource)
+}
+
+/// Run the proprioception cycle once with a caller-provided [`TimerSource`].
+///
+/// Reads the journal, computes all five self-vitals, writes self-scope
+/// samples, and emits events for any breached thresholds.
+///
+/// Tests should use [`FixedTimerSource`] to avoid depending on the host's
+/// systemd state.
+///
+/// # Errors
+///
+/// Returns [`russell_core::CoreError`] on journal I/O failures.
+pub fn run_once_with(
+    writer: &JournalWriter,
+    reader: &JournalReader,
+    timer: &dyn TimerSource,
+) -> Result<ProprioResult> {
     let now = russell_core::time::now_unix();
 
     // 1. Sentinel age (existing MVP vital).
@@ -249,7 +321,7 @@ pub fn run_once(writer: &JournalWriter, reader: &JournalReader) -> Result<Propri
     let (llm_p95_latency_ms, llm_p95_severity) = gather_llm_p95_latency(writer, reader, now)?;
 
     // 4. Timer drift.
-    let (timer_drift_s, drift_severity) = gather_timer_drift(writer, now);
+    let (timer_drift_s, drift_severity) = gather_timer_drift(writer, now, timer);
 
     // 5. Help error rate.
     let (help_error_rate_pct, error_rate_severity) = gather_help_error_rate(writer, reader, now)?;
@@ -455,21 +527,25 @@ fn gather_llm_p95_latency(
 
 /// Gather the timer drift vital.
 ///
-/// Runs `systemctl --user show russell-sentinel.timer --property=LastTriggerUSec`.
-/// Gracefully returns `None` if systemctl is unavailable or the timer
+/// Uses the provided [`TimerSource`] to query the sentinel timer's last
+/// trigger time. Gracefully returns `None` if the query fails or the timer
 /// doesn't exist.
-fn gather_timer_drift(writer: &JournalWriter, now: i64) -> (Option<i64>, Severity) {
-    let drift = match read_timer_last_trigger() {
+fn gather_timer_drift(
+    writer: &JournalWriter,
+    now: i64,
+    timer: &dyn TimerSource,
+) -> (Option<i64>, Severity) {
+    let drift = match timer.read_last_trigger_us() {
         Ok(Some(trigger_us)) => {
             let trigger_s = (trigger_us / 1_000_000) as i64;
             Some(now.saturating_sub(trigger_s))
         }
         Ok(None) => {
-            debug!("proprio: systemctl succeeded but timer property not found");
+            debug!("proprio: timer source returned None (timer not found)");
             None
         }
         Err(e) => {
-            warn!(error = %e, "proprio: failed to read systemd timer, skipping timer_drift_s");
+            warn!(error = %e, "proprio: failed to read timer, skipping timer_drift_s");
             None
         }
     };
@@ -636,13 +712,26 @@ mod tests {
         (tmp, w)
     }
 
-    // -- Sentinel age (existing tests, preserved) --
+    /// A [`FixedTimerSource`] that reports no timer found — drift is always
+    /// `None`, severity is always `Info`, no event is emitted. Use this for
+    /// tests that don't care about timer drift.
+    fn no_timer() -> FixedTimerSource {
+        FixedTimerSource::new(None)
+    }
+
+    /// A [`FixedTimerSource`] that reports the timer triggered at the given
+    /// Unix epoch second. Useful for testing drift thresholds.
+    fn timer_at(epoch_s: i64) -> FixedTimerSource {
+        FixedTimerSource::new(Some(epoch_s as u64 * 1_000_000))
+    }
+
+    // -- Sentinel age --
 
     #[test]
     fn first_cycle_no_host_samples_is_info() {
         let (_tmp, w) = tmp_journal();
         let r = w.reader();
-        let result = run_once(&w, &r).unwrap();
+        let result = run_once_with(&w, &r, &no_timer()).unwrap();
         assert_eq!(result.severity, Severity::Info);
         assert_eq!(result.age_s, None);
         assert!(!result.event_emitted);
@@ -656,7 +745,7 @@ mod tests {
             .unwrap();
 
         let r = w.reader();
-        let result = run_once(&w, &r).unwrap();
+        let result = run_once_with(&w, &r, &no_timer()).unwrap();
         assert_eq!(result.severity, Severity::Info);
         assert!(result.age_s.unwrap() < SENTINEL_WARN_THRESHOLD_S);
         assert!(!result.event_emitted);
@@ -670,7 +759,7 @@ mod tests {
             .unwrap();
 
         let r = w.reader();
-        let result = run_once(&w, &r).unwrap();
+        let result = run_once_with(&w, &r, &no_timer()).unwrap();
         assert_eq!(result.severity, Severity::Warn);
         assert!(result.event_emitted);
     }
@@ -683,7 +772,7 @@ mod tests {
             .unwrap();
 
         let r = w.reader();
-        let result = run_once(&w, &r).unwrap();
+        let result = run_once_with(&w, &r, &no_timer()).unwrap();
         assert_eq!(result.severity, Severity::Alert);
         assert!(result.event_emitted);
     }
@@ -703,7 +792,7 @@ mod tests {
         .unwrap();
 
         let r = w.reader();
-        run_once(&w, &r).unwrap();
+        run_once_with(&w, &r, &no_timer()).unwrap();
 
         let conn = rusqlite::Connection::open_with_flags(
             w.path(),
@@ -759,7 +848,7 @@ mod tests {
         w.append_sample(0, Scope::Host, "test", Some(0.0), None, None)
             .unwrap();
         let r = w.reader();
-        let result = run_once(&w, &r).unwrap();
+        let result = run_once_with(&w, &r, &no_timer()).unwrap();
         // Just wrote, so stall should be small
         assert!(result.journal_stall_s.unwrap() < STALL_WARN_THRESHOLD_S);
         assert_eq!(result.journal_stall_severity, Severity::Info);
@@ -771,7 +860,7 @@ mod tests {
     fn llm_p95_is_none_with_no_sessions() {
         let (_tmp, w) = tmp_journal();
         let r = w.reader();
-        let result = run_once(&w, &r).unwrap();
+        let result = run_once_with(&w, &r, &no_timer()).unwrap();
         assert_eq!(result.llm_p95_latency_ms, None);
         assert_eq!(result.llm_p95_severity, Severity::Info);
     }
@@ -782,7 +871,7 @@ mod tests {
     fn help_error_rate_is_none_with_no_sessions() {
         let (_tmp, w) = tmp_journal();
         let r = w.reader();
-        let result = run_once(&w, &r).unwrap();
+        let result = run_once_with(&w, &r, &no_timer()).unwrap();
         assert_eq!(result.help_error_rate_pct, None);
         assert_eq!(result.help_error_rate_severity, Severity::Info);
     }
@@ -812,7 +901,7 @@ mod tests {
             .unwrap();
         }
         let r = w.reader();
-        let result = run_once(&w, &r).unwrap();
+        let result = run_once_with(&w, &r, &no_timer()).unwrap();
         // p95 of [100,200,...,1000] with 10 values: idx = floor(0.95*10) = 9, value = 1000
         assert_eq!(result.llm_p95_latency_ms, Some(1000.0));
         assert_eq!(result.llm_p95_severity, Severity::Info);
@@ -841,7 +930,7 @@ mod tests {
             .unwrap();
         }
         let r = w.reader();
-        let result = run_once(&w, &r).unwrap();
+        let result = run_once_with(&w, &r, &no_timer()).unwrap();
         // p95 of 4 values sorted: [9000,9100,9200,9300], idx=floor(0.95*4)=3, value=9300 > 8000
         assert!(result.llm_p95_latency_ms.unwrap() > LLM_P95_WARN_THRESHOLD_MS);
         assert_eq!(result.llm_p95_severity, Severity::Warn);
@@ -881,7 +970,7 @@ mod tests {
             .unwrap();
         }
         let r = w.reader();
-        let result = run_once(&w, &r).unwrap();
+        let result = run_once_with(&w, &r, &no_timer()).unwrap();
         // 3/7 * 100 ≈ 42.86% — triggers warn (>20%) but not alert (<=50%)
         let rate = result.help_error_rate_pct.unwrap();
         assert!(rate > ERROR_RATE_WARN_THRESHOLD_PCT);
@@ -913,7 +1002,7 @@ mod tests {
             .unwrap();
         }
         let r = w.reader();
-        let result = run_once(&w, &r).unwrap();
+        let result = run_once_with(&w, &r, &no_timer()).unwrap();
         assert_eq!(result.help_error_rate_severity, Severity::Alert);
     }
 
