@@ -12,6 +12,8 @@
 
 pub mod probes;
 
+pub mod check;
+
 use russell_core::Result;
 use russell_core::event::Scope;
 use russell_core::journal::JournalWriter;
@@ -37,4 +39,32 @@ pub fn run_once(writer: &JournalWriter) -> Result<usize> {
         )?;
     }
     Ok(samples.len())
+}
+
+/// Run the probe set and threshold checks against the given profile
+/// (used for CPU core count in loadavg thresholds).
+/// Returns (sample count, threshold events).
+///
+/// # Errors
+///
+/// Returns [`russell_core::CoreError::Sqlite`] or related core
+/// errors if a journal write fails.
+pub fn run_once_with_checks(
+    writer: &JournalWriter,
+    profile: Option<&russell_core::Profile>,
+) -> Result<(usize, Vec<russell_core::event::Event>)> {
+    let ts = russell_core::time::now_unix();
+    let samples = probes::collect();
+    for s in &samples {
+        writer.append_sample(
+            ts,
+            Scope::Host,
+            &s.name,
+            s.value_num,
+            s.value_text.as_deref(),
+            s.unit,
+        )?;
+    }
+    let events = check::check_thresholds(&samples, profile);
+    Ok((samples.len(), events))
 }

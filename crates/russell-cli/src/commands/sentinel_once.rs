@@ -25,15 +25,28 @@ pub fn run(paths: &Paths) -> Result<()> {
     let reader = journal.reader();
     let proprio = russell_proprio::run_once(&journal, &reader).context("running proprioception")?;
 
-    // 2. Host probes.
-    let n = russell_sentinel::run_once(&journal).context("running Sentinel")?;
+    // 2. Host probes with threshold checks.
+    let profile_path = paths.profile();
+    let profile = if profile_path.exists() {
+        russell_core::Profile::load(&profile_path).ok()
+    } else {
+        None
+    };
+    let (n, threshold_events) = russell_sentinel::run_once_with_checks(&journal, profile.as_ref())
+        .context("running Sentinel")?;
+
+    // Write threshold breach events.
+    for ev in &threshold_events {
+        journal.append(ev)?;
+    }
 
     // 3. Cycle event.
     let mut ev = Event::new("observe", Severity::Info);
     ev.tier = Some("sentinel".into());
     ev.module = Some("sentinel/cycle".into());
     ev.summary = Some(format!(
-        "captured {n} host samples; proprio: age={}s stall={}s llm_p95={}ms drift={}s err_rate={}%",
+        "captured {n} host samples, {} threshold breaches; proprio: age={}s stall={}s llm_p95={}ms drift={}s err_rate={}%",
+        threshold_events.len(),
         proprio
             .age_s
             .map(|a| a.to_string())
@@ -90,7 +103,8 @@ pub fn run(paths: &Paths) -> Result<()> {
     journal.append(&ev)?;
 
     println!(
-        "sentinel: captured {n} samples in {} ms; proprio: age={}s stall={}s llm_p95={}ms drift={}s err_rate={}%",
+        "sentinel: captured {n} samples, {} threshold breaches in {} ms; proprio: age={}s stall={}s llm_p95={}ms drift={}s err_rate={}%",
+        threshold_events.len(),
         started.elapsed().as_millis(),
         proprio
             .age_s
