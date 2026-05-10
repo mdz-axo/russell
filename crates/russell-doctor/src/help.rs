@@ -116,7 +116,13 @@ pub async fn run_help_with_config(
         "loaded skills for help session"
     );
 
-    let soap = prompt::compose(&writer.reader(), profile.as_ref(), note, &loaded_skills)?;
+    let soap = prompt::compose(
+        &writer.reader(),
+        profile.as_ref(),
+        note,
+        &loaded_skills,
+        &paths.skills(),
+    )?;
 
     // ADR-0022: augment the system prompt with operator identity files if present.
     let soap = augment_system_prompt(paths, soap);

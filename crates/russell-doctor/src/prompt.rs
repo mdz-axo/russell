@@ -204,12 +204,69 @@ The operator may run `russell skill run <skill-id>/<id>` to execute it."
     )?;
     writeln!(rendered, "## Plan\n\n*(your job, Jack — one next step.)*\n")?;
 
+    let mut system_prompt = crate::JACK_PERSONA.to_string();
+
+    // Append KNOWLEDGE.md from applicable skills.
+    append_skill_knowledge(&mut system_prompt, loaded_skills, skills_base_dir);
+
     Ok(SoapPrompt {
-        system: crate::JACK_PERSONA.to_string(),
+        system: system_prompt,
         subjective,
         objective,
         rendered,
     })
+}
+
+/// Append KNOWLEDGE.md content from any loaded skill that has one.
+///
+/// Knowledge files give Jack domain expertise (Ubuntu conventions,
+/// ROCm troubleshooting, etc.) without bloating the base persona.
+/// Only skills whose `applies_when` matches the machine profile
+/// (currently: Linux) are included.
+fn append_skill_knowledge(system: &mut String, skills: &[Skill], skills_base_dir: &Path) {
+    for skill in skills {
+        // Skip skills with no applies_when or that don't match Linux.
+        let applies = skill.applies_when.iter().any(|clause| {
+            matches!(clause, russell_skills::AppliesWhen::Scalar {
+                os_family: Some(os),
+                ..
+            } if os == "linux")
+        });
+        if !applies && !skill.applies_when.is_empty() {
+            continue;
+        }
+
+        let knowledge_path = skills_base_dir.join(&skill.id).join("KNOWLEDGE.md");
+        if !knowledge_path.exists() {
+            continue;
+        }
+
+        match std::fs::read_to_string(&knowledge_path) {
+            Ok(content) => {
+                if content.trim().is_empty() {
+                    continue;
+                }
+                system.push_str("\n\n---\n\n");
+                system.push_str("# Knowledge: ");
+                system.push_str(&skill.id);
+                system.push_str("\n\n");
+                system.push_str(&content);
+                tracing::debug!(
+                    skill = %skill.id,
+                    chars = content.len(),
+                    "appended skill knowledge to system prompt",
+                );
+            }
+            Err(e) => {
+                tracing::warn!(
+                    skill = %skill.id,
+                    path = %knowledge_path.display(),
+                    error = %e,
+                    "failed to read skill knowledge file",
+                );
+            }
+        }
+    }
 }
 
 fn last_sample_age(reader: &JournalReader) -> Option<i64> {
