@@ -303,7 +303,9 @@ mod tests {
         let db = tmp.path().join("journal.db");
         let w = JournalWriter::open(&db).unwrap();
         let reader = w.reader();
-        let prompt = compose(&reader, None, None, &[]).unwrap();
+        let skills_dir = tmp.path().join("skills");
+        std::fs::create_dir_all(&skills_dir).unwrap();
+        let prompt = compose(&reader, None, None, &[], &skills_dir).unwrap();
         assert!(prompt.rendered.contains("## Subjective"));
         assert!(prompt.rendered.contains("(no operator note)"));
         assert!(prompt.rendered.contains("(no events recorded)"));
