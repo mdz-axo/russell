@@ -244,6 +244,39 @@ impl JournalWriter {
     pub fn path(&self) -> &Path {
         &self.path
     }
+
+    /// Upsert an EWMA baseline row. Used by the periodic
+    /// baseline computation (Phase 2) to populate the
+    /// `baselines` table.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`CoreError::Sqlite`] on DB errors.
+    #[allow(clippy::too_many_arguments)]
+    pub fn upsert_baseline(
+        &self,
+        probe: &str,
+        scope: Scope,
+        ewma_mean: Option<f64>,
+        ewma_var: Option<f64>,
+        p50: Option<f64>,
+        p95: Option<f64>,
+        p99: Option<f64>,
+    ) -> Result<()> {
+        let scope_s = match scope {
+            Scope::Host => "host",
+            Scope::Self_ => "self",
+        };
+        let now = crate::time::now_unix();
+        self.conn.execute(
+            r"INSERT OR REPLACE INTO baselines
+                  (probe, scope, ewma_mean, ewma_var, p50, p95, p99, updated_ts)
+              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+            params![probe, scope_s, ewma_mean, ewma_var, p50, p95, p99, now],
+        )?;
+        self.last_write_unix_s.store(now, Ordering::Relaxed);
+        Ok(())
+    }
 }
 
 impl JournalReader {
@@ -575,6 +608,62 @@ impl JournalReader {
         Ok(summaries)
     }
 
+    /// Compute percentiles (p50, p95, p99) for the last `window_days`
+    /// days of host-scope samples, grouped by probe. Returns a list
+    /// of (probe, p50, p95, p99, count).
+    ///
+    /// For each probe, values are sorted and percentiles computed
+    /// by index interpolation.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`CoreError::Sqlite`] on DB errors.
+    pub fn compute_baselines(&self, window_days: u32) -> Result<Vec<BaselineRow>> {
+        let conn = self.open_ro()?;
+        let since = crate::time::now_unix() - i64::from(window_days) * 86_400;
+
+        // Get all host-scope numeric samples in the window, sorted by probe.
+        let mut stmt = conn.prepare(
+            "SELECT probe, value_num
+              FROM samples
+              WHERE scope = 'host'
+                AND ts >= ?1
+                AND value_num IS NOT NULL
+              ORDER BY probe ASC, value_num ASC",
+        )?;
+        let rows = stmt
+            .query_map(params![since], |r| {
+                let probe: String = r.get(0)?;
+                let val: f64 = r.get(1)?;
+                Ok((probe, val))
+            })?
+            .collect::<std::result::Result<Vec<_>, _>>()?;
+
+        // Group by probe.
+        use std::collections::BTreeMap;
+        let mut groups: BTreeMap<String, Vec<f64>> = BTreeMap::new();
+        for (probe, val) in rows {
+            groups.entry(probe).or_default().push(val);
+        }
+
+        let mut results = Vec::new();
+        for (probe, vals) in groups {
+            let count = vals.len() as i64;
+            // Already sorted by the ORDER BY.
+            let p50 = percentile(&vals, 50.0);
+            let p95 = percentile(&vals, 95.0);
+            let p99 = percentile(&vals, 99.0);
+            results.push(BaselineRow {
+                probe,
+                p50,
+                p95,
+                p99,
+                count,
+            });
+        }
+        Ok(results)
+    }
+
     /// Path the journal lives at. May not exist yet on very fresh
     /// installs.
     #[must_use]
@@ -656,6 +745,39 @@ pub struct SampleSummary {
     pub last_ts: Option<i64>,
     /// Number of data points in the window.
     pub count: i64,
+}
+
+/// Per-probe baseline statistics.
+#[derive(Debug, Clone)]
+pub struct BaselineRow {
+    /// Probe name.
+    pub probe: String,
+    /// 50th percentile.
+    pub p50: Option<f64>,
+    /// 95th percentile.
+    pub p95: Option<f64>,
+    /// 99th percentile.
+    pub p99: Option<f64>,
+    /// Number of samples in the window.
+    pub count: i64,
+}
+
+/// Compute a percentile value from a sorted slice.
+fn percentile(sorted: &[f64], pct: f64) -> Option<f64> {
+    if sorted.is_empty() {
+        return None;
+    }
+    if sorted.len() == 1 {
+        return Some(sorted[0]);
+    }
+    let rank = (pct / 100.0) * (sorted.len() - 1) as f64;
+    let lower = rank.floor() as usize;
+    let upper = rank.ceil() as usize;
+    if lower == upper {
+        return Some(sorted[lower]);
+    }
+    let frac = rank - lower as f64;
+    Some(sorted[lower] * (1.0 - frac) + sorted[upper] * frac)
 }
 
 fn configure_pragmas(conn: &Connection) -> Result<()> {

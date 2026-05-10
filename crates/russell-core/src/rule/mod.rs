@@ -136,7 +136,7 @@ impl RuleSet {
 
         for entry in entries.flatten() {
             let path = entry.path();
-            if path.extension().map_or(true, |e| e != "toml") {
+            if path.extension().is_none_or(|e| e != "toml") {
                 continue;
             }
 
@@ -157,16 +157,16 @@ impl RuleSet {
             };
 
             // Schema check.
-            if let Some(ref schema) = file.schema {
-                if schema != RULE_SCHEMA {
-                    warn!(
-                        path = %path.display(),
-                        expected = RULE_SCHEMA,
-                        found = %schema,
-                        "skipping rule file with unknown schema",
-                    );
-                    continue;
-                }
+            if let Some(ref schema) = file.schema
+                && schema != RULE_SCHEMA
+            {
+                warn!(
+                    path = %path.display(),
+                    expected = RULE_SCHEMA,
+                    found = %schema,
+                    "skipping rule file with unknown schema",
+                );
+                continue;
             }
 
             let count = file.rule.len();
@@ -199,37 +199,37 @@ impl RuleSet {
 
         // "too low" checks (value decreases → more severe).
         // Check in order: crit < alert < warn, so the most severe wins.
-        if let Some(threshold) = rule.crit_below {
-            if value <= threshold {
-                return Severity::Crit;
-            }
+        if let Some(threshold) = rule.crit_below
+            && value <= threshold
+        {
+            return Severity::Crit;
         }
-        if let Some(threshold) = rule.alert_below {
-            if value <= threshold {
-                return Severity::Alert;
-            }
+        if let Some(threshold) = rule.alert_below
+            && value <= threshold
+        {
+            return Severity::Alert;
         }
-        if let Some(threshold) = rule.warn_below {
-            if value <= threshold {
-                return Severity::Warn;
-            }
+        if let Some(threshold) = rule.warn_below
+            && value <= threshold
+        {
+            return Severity::Warn;
         }
 
         // "too high" checks (value increases → more severe).
-        if let Some(threshold) = rule.crit_above {
-            if value >= threshold {
-                return Severity::Crit;
-            }
+        if let Some(threshold) = rule.crit_above
+            && value >= threshold
+        {
+            return Severity::Crit;
         }
-        if let Some(threshold) = rule.alert_above {
-            if value >= threshold {
-                return Severity::Alert;
-            }
+        if let Some(threshold) = rule.alert_above
+            && value >= threshold
+        {
+            return Severity::Alert;
         }
-        if let Some(threshold) = rule.warn_above {
-            if value >= threshold {
-                return Severity::Warn;
-            }
+        if let Some(threshold) = rule.warn_above
+            && value >= threshold
+        {
+            return Severity::Warn;
         }
 
         Severity::Info
@@ -407,7 +407,7 @@ alert_below = 4096
 
     #[test]
     fn malformed_file_skipped_gracefully() {
-        let mut rs = RuleSet::with_defaults();
+        let rs = RuleSet::with_defaults();
         let before_count = rs.len();
 
         // This won't parse as valid TOML rules.

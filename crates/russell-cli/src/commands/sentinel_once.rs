@@ -10,6 +10,7 @@
 //! the age is always ~0 s and the self-vital can never trigger.
 
 use anyhow::{Context, Result};
+use russell_core::RuleSet;
 use russell_core::event::{Event, Severity};
 use russell_core::journal::JournalWriter;
 use russell_core::paths::Paths;
@@ -19,21 +20,19 @@ pub fn run(paths: &Paths) -> Result<()> {
     let journal = JournalWriter::open(&paths.journal())
         .with_context(|| format!("opening journal {}", paths.journal().display()))?;
 
+    // Load rule set: defaults + operator overrides from rules.d/.
+    let mut rules = RuleSet::with_defaults();
+    rules.load_from_dir(&paths.rules());
+
     // 1. Proprioception: self-vital (JR-5).
     //    Must run BEFORE host probes so it measures the age of the
     //    *previous* cycle's samples, not the ones we're about to write.
     let reader = journal.reader();
     let proprio = russell_proprio::run_once(&journal, &reader).context("running proprioception")?;
 
-    // 2. Host probes with threshold checks.
-    let profile_path = paths.profile();
-    let profile = if profile_path.exists() {
-        russell_core::Profile::load(&profile_path).ok()
-    } else {
-        None
-    };
-    let (n, threshold_events) = russell_sentinel::run_once_with_checks(&journal, profile.as_ref())
-        .context("running Sentinel")?;
+    // 2. Host probes with rule evaluation.
+    let (n, threshold_events) =
+        russell_sentinel::run_once_with_rules(&journal, &rules).context("running Sentinel")?;
 
     // Write threshold breach events.
     for ev in &threshold_events {

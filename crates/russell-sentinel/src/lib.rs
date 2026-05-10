@@ -1,10 +1,8 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
-//! `russell-sentinel` — Phase-0 scaffold.
+//! `russell-sentinel` — host probe collection and rule evaluation.
 //!
-//! Ships a tiny, OS-neutral probe set sufficient to drive the
-//! `status` / `digest` read-only CLI subcommands listed for
-//! Phase 0 in `cybernetic-health-harness.md` §20. The full rule
-//! engine, EWMA baselines, and probe catalogue arrive in Phase 1.
+//! Collects host probes and evaluates them against the rule engine.
+//! Thresholds are configurable via `rules.d/*.toml` (ADR-0012).
 
 #![forbid(unsafe_code)]
 #![deny(rust_2018_idioms)]
@@ -12,19 +10,13 @@
 
 pub mod probes;
 
-pub mod check;
-
 use russell_core::Result;
-use russell_core::event::Scope;
+use russell_core::RuleSet;
+use russell_core::event::{Event, Scope, Severity};
 use russell_core::journal::JournalWriter;
 
-/// Run the Phase-0 probe set once and append the samples to the
-/// journal. Returns the number of samples written.
-///
-/// # Errors
-///
-/// Returns [`russell_core::CoreError::Sqlite`] or related core
-/// errors if a journal write fails.
+/// Run the probe set once and append samples to the journal.
+/// No rule evaluation — samples only.
 pub fn run_once(writer: &JournalWriter) -> Result<usize> {
     let ts = russell_core::time::now_unix();
     let samples = probes::collect();
@@ -41,18 +33,13 @@ pub fn run_once(writer: &JournalWriter) -> Result<usize> {
     Ok(samples.len())
 }
 
-/// Run the probe set and threshold checks against the given profile
-/// (used for CPU core count in loadavg thresholds).
-/// Returns (sample count, threshold events).
+/// Run the probe set with rule evaluation.
 ///
-/// # Errors
+/// Evaluates each numeric sample against the [`RuleSet`] and emits
+/// threshold-breach events for any severity above `Info`.
 ///
-/// Returns [`russell_core::CoreError::Sqlite`] or related core
-/// errors if a journal write fails.
-pub fn run_once_with_checks(
-    writer: &JournalWriter,
-    profile: Option<&russell_core::Profile>,
-) -> Result<(usize, Vec<russell_core::event::Event>)> {
+/// Returns (sample count, threshold breach events).
+pub fn run_once_with_rules(writer: &JournalWriter, rules: &RuleSet) -> Result<(usize, Vec<Event>)> {
     let ts = russell_core::time::now_unix();
     let samples = probes::collect();
     for s in &samples {
@@ -65,6 +52,24 @@ pub fn run_once_with_checks(
             s.unit,
         )?;
     }
-    let events = check::check_thresholds(&samples, profile);
+
+    let mut events = Vec::new();
+    for s in &samples {
+        if let Some(v) = s.value_num {
+            let sev = rules.evaluate(&s.name, v);
+            if sev != Severity::Info {
+                let mut ev = Event::new("threshold_breach", sev);
+                ev.tier = Some("sentinel".into());
+                ev.module = Some(format!("sentinel/threshold/{}", s.name));
+                ev.summary = Some(format!("{} = {v:.2} breached threshold ({sev:?})", s.name,));
+                ev.outputs.insert("probe".into(), s.name.clone().into());
+                ev.outputs.insert("value".into(), v.into());
+                if let Some(u) = s.unit {
+                    ev.outputs.insert("unit".into(), u.into());
+                }
+                events.push(ev);
+            }
+        }
+    }
     Ok((samples.len(), events))
 }
