@@ -1,0 +1,38 @@
+# SPDX-License-Identifier: MIT
+# pragmatic-semantics — semantic perspective for Russell's Nurse (Jack).
+#
+# A knowledge skill: no probes or interventions. When loaded, its
+# KNOWLEDGE.md content is appended to Jack's system prompt, giving him
+# a pragmatic semantic lens for reasoning about Russell's data (SOAP
+# bundles, journal rows, skill manifests, memory layer, evidence bundles).
+#
+# Install: copy this directory to ~/.local/share/harness/skills/pragmatic-semantics/
+
+id: pragmatic-semantics
+version: 1.0.0
+authored: 2026-05-10
+min_harness_version: 0.1.0
+
+# Symptoms Jack can now reason about with semantic depth.
+symptoms:
+  - provenance_gap
+  - confidence_decay
+  - classification_ambiguity
+  - constraint_violation
+  - discourse_incoherence
+  - implicit_expectation_mismatch
+  - reference_implementation_drift
+
+applies_when:
+  - os_family: linux
+
+# Pure knowledge skill — no probes or interventions.
+probes: []
+interventions: []
+
+safety:
+  max_auto_risk: low
+
+references:
+  - skills/pragmatic-semantics/SKILL.md
+  - skills/pragmatic-semantics/references/

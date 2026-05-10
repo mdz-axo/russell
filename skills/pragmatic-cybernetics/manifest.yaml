@@ -1,0 +1,42 @@
+# SPDX-License-Identifier: MIT
+# pragmatic-cybernetics — cybernetic perspective for Russell's Nurse (Jack).
+#
+# A knowledge skill: no probes or interventions. When loaded, its
+# KNOWLEDGE.md content is appended to Jack's system prompt, giving him
+# a cybernetic lens for analyzing Russell's own architecture (Sentinel,
+# Nurse, IDRS, proprioception, rule engine, memory layer).
+#
+# Install: copy this directory to ~/.local/share/harness/skills/pragmatic-cybernetics/
+
+id: pragmatic-cybernetics
+version: 1.0.0
+authored: 2026-05-10
+min_harness_version: 0.1.0
+
+# Symptoms Jack can now reason about with cybernetic depth.
+symptoms:
+  - broken_feedback_loop
+  - alert_fatigue
+  - variety_deficit
+  - model_reality_divergence
+  - observer_coupling
+  - missing_double_loop
+  - homeostatic_drift
+  - coordination_oscillation
+  - context_saturation
+  - monitoring_independence_failure
+
+applies_when:
+  - os_family: linux
+
+# Pure knowledge skill — no probes or interventions.
+probes: []
+interventions: []
+
+safety:
+  max_auto_risk: low
+
+references:
+  - https://en.wikipedia.org/wiki/Cybernetics
+  - https://en.wikipedia.org/wiki/Viable_system_model
+  - https://en.wikipedia.org/wiki/Variety_(cybernetics)
