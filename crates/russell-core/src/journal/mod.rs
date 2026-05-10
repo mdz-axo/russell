@@ -506,6 +506,75 @@ impl JournalReader {
         Ok(rows)
     }
 
+    /// Aggregate host-scope samples in a time window, grouped by probe.
+    /// Returns min, avg, max, last, last_ts, and count per probe.
+    ///
+    /// Only probes with at least one data point are included.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`CoreError::Sqlite`] on DB errors.
+    pub fn host_samples_summary(
+        &self,
+        since_unix: i64,
+        until_unix: i64,
+    ) -> Result<Vec<SampleSummary>> {
+        let conn = self.open_ro()?;
+        let mut stmt = conn.prepare(
+            r"SELECT
+                probe,
+                unit,
+                MIN(value_num),
+                AVG(value_num),
+                MAX(value_num),
+                COUNT(*)
+              FROM samples
+              WHERE scope = 'host'
+                AND ts >= ?1 AND ts < ?2
+                AND value_num IS NOT NULL
+              GROUP BY probe
+              ORDER BY probe",
+        )?;
+        let rows = stmt
+            .query_map(params![since_unix, until_unix], |r| {
+                let probe: String = r.get(0)?;
+                let unit: Option<String> = r.get(1)?;
+                let min: Option<f64> = r.get(2)?;
+                let avg: Option<f64> = r.get(3)?;
+                let max: Option<f64> = r.get(4)?;
+                let count: i64 = r.get(5)?;
+                Ok((probe, unit, min, avg, max, count))
+            })?
+            .collect::<std::result::Result<Vec<_>, _>>()?;
+
+        // For "last" and "last_ts", query separately per probe.
+        let mut summaries = Vec::with_capacity(rows.len());
+        for (probe, unit, min, avg, max, count) in rows {
+            let (last, last_ts) = conn
+                .query_row(
+                    "SELECT value_num, ts FROM samples
+                     WHERE scope = 'host' AND probe = ?1
+                       AND ts >= ?2 AND ts < ?3
+                       AND value_num IS NOT NULL
+                     ORDER BY ts DESC LIMIT 1",
+                    params![&probe, since_unix, until_unix],
+                    |r| Ok((r.get::<_, Option<f64>>(0)?, r.get::<_, Option<i64>>(1)?)),
+                )
+                .unwrap_or((None, None));
+            summaries.push(SampleSummary {
+                probe,
+                unit,
+                min,
+                avg,
+                max,
+                last,
+                last_ts,
+                count,
+            });
+        }
+        Ok(summaries)
+    }
+
     /// Path the journal lives at. May not exist yet on very fresh
     /// installs.
     #[must_use]
@@ -563,6 +632,30 @@ pub struct HelpSessionRow {
     pub error_kind: Option<String>,
     /// Path to evidence bundle.
     pub evidence_ref: String,
+}
+
+/// Per-probe statistical summary of host-scope samples over a
+/// time window.
+///
+/// Queried by [`JournalReader::host_samples_summary`].
+#[derive(Debug, Clone)]
+pub struct SampleSummary {
+    /// Probe name (e.g. `loadavg_1m`).
+    pub probe: String,
+    /// Unit, if any (e.g. `MiB`, `s`).
+    pub unit: Option<String>,
+    /// Minimum value in the window.
+    pub min: Option<f64>,
+    /// Average value in the window.
+    pub avg: Option<f64>,
+    /// Maximum value in the window.
+    pub max: Option<f64>,
+    /// Most-recent value in the window.
+    pub last: Option<f64>,
+    /// Timestamp of the most-recent value (unix seconds).
+    pub last_ts: Option<i64>,
+    /// Number of data points in the window.
+    pub count: i64,
 }
 
 fn configure_pragmas(conn: &Connection) -> Result<()> {

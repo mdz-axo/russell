@@ -4,6 +4,10 @@
 //! Reads the last 24h of samples + last 20 events from the
 //! journal and renders a Markdown-formatted SOAP bundle the LLM
 //! can read directly.
+//!
+//! F-2 (Phase 2): includes a per-probe sample summary table
+//! (min, avg, max, last, count) so Jack can reason about trends,
+//! not just event counts.
 
 use std::fmt::Write as _;
 
@@ -70,6 +74,48 @@ pub fn compose(
         counts.info, counts.warn, counts.alert, counts.crit
     )?;
 
+    // F-2: per-probe sample summary for the last 24h.
+    // Gives Jack actual telemetry to reason about, not just event counts.
+    writeln!(objective, "\n### Host probe samples — last 24h")?;
+    let summaries = reader
+        .host_samples_summary(window_start, i64::MAX)
+        .unwrap_or_default();
+    if summaries.is_empty() {
+        writeln!(objective, "- (no samples recorded)")?;
+    } else {
+        writeln!(
+            objective,
+            "| probe | count | min | avg | max | last | unit |"
+        )?;
+        writeln!(objective, "|---|---|---|---|---|---|---|")?;
+        for s in &summaries {
+            let unit = s.unit.as_deref().unwrap_or("");
+            writeln!(
+                objective,
+                "| {} | {} | {} | {} | {} | {} | {} |",
+                s.probe,
+                s.count,
+                fmt_opt_f64(s.min),
+                fmt_opt_f64(s.avg),
+                fmt_opt_f64(s.max),
+                fmt_opt_f64(s.last),
+                unit,
+            )?;
+        }
+    }
+
+    writeln!(objective, "\n### Sentinel freshness")?;
+    let last_sample_age_s = last_sample_age(reader).unwrap_or(-1);
+    if last_sample_age_s >= 0 {
+        writeln!(
+            objective,
+            "- Last sample {} seconds ago.",
+            last_sample_age_s
+        )?;
+    } else {
+        writeln!(objective, "- No samples recorded.")?;
+    }
+
     writeln!(objective, "\n### Most-recent events (up to 20)")?;
     let rows = reader.recent(20)?;
     if rows.is_empty() {
@@ -104,19 +150,6 @@ pub fn compose(
         }
     }
 
-    writeln!(objective, "\n### Sentinel freshness")?;
-    // Approximate by counting the most recent sample across any probe.
-    let last_sample_age_s = last_sample_age(reader).unwrap_or(-1);
-    if last_sample_age_s >= 0 {
-        writeln!(
-            objective,
-            "- Last sample {} seconds ago.",
-            last_sample_age_s
-        )?;
-    } else {
-        writeln!(objective, "- No samples recorded.")?;
-    }
-
     let mut rendered = String::new();
     writeln!(rendered, "# SOAP — russell help\n")?;
     writeln!(rendered, "## Subjective\n\n{subjective}\n")?;
@@ -141,6 +174,22 @@ fn last_sample_age(reader: &JournalReader) -> Option<i64> {
     Some(now - ts)
 }
 
+/// Format an `Option<f64>` for a Markdown table cell.
+fn fmt_opt_f64(v: Option<f64>) -> String {
+    match v {
+        Some(x) => {
+            if x.fract() == 0.0 && x.abs() < 1_000_000.0 {
+                format!("{x:.0}")
+            } else if x.abs() < 100.0 {
+                format!("{x:.2}")
+            } else {
+                format!("{x:.1}")
+            }
+        }
+        None => "—".into(),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -158,6 +207,8 @@ mod tests {
         assert!(prompt.rendered.contains("(no operator note)"));
         assert!(prompt.rendered.contains("(no events recorded)"));
         assert!(prompt.system.contains("You are Jack"));
+        // F-2: empty sample summary should show placeholder.
+        assert!(prompt.rendered.contains("(no samples recorded)"));
     }
 
     #[test]
@@ -174,5 +225,93 @@ mod tests {
         assert!(prompt.rendered.contains("ollama is slow"));
         assert!(prompt.rendered.contains("daily/gpu-sanity"));
         assert!(prompt.rendered.contains("warn"));
+    }
+
+    #[test]
+    fn compose_includes_sample_summary() {
+        let tmp = tempfile::tempdir().unwrap();
+        let db = tmp.path().join("journal.db");
+        let w = JournalWriter::open(&db).unwrap();
+        let now = russell_core::time::now_unix();
+
+        // Write a few host-scope samples across multiple probes.
+        w.append_sample(
+            now - 3600,
+            Scope::Host,
+            "mem_available_mib",
+            Some(91000.0),
+            None,
+            Some("MiB"),
+        )
+        .unwrap();
+        w.append_sample(
+            now - 1800,
+            Scope::Host,
+            "mem_available_mib",
+            Some(90500.0),
+            None,
+            Some("MiB"),
+        )
+        .unwrap();
+        w.append_sample(
+            now - 600,
+            Scope::Host,
+            "mem_available_mib",
+            Some(90200.0),
+            None,
+            Some("MiB"),
+        )
+        .unwrap();
+        w.append_sample(
+            now - 3600,
+            Scope::Host,
+            "loadavg_1m",
+            Some(0.45),
+            None,
+            None,
+        )
+        .unwrap();
+        w.append_sample(now - 600, Scope::Host, "loadavg_1m", Some(1.2), None, None)
+            .unwrap();
+        w.append_sample(
+            now - 3600,
+            Scope::Host,
+            "swap_used_mib",
+            Some(3200.0),
+            None,
+            Some("MiB"),
+        )
+        .unwrap();
+        w.append_sample(
+            now - 600,
+            Scope::Host,
+            "swap_used_mib",
+            Some(3500.0),
+            None,
+            Some("MiB"),
+        )
+        .unwrap();
+
+        let reader = w.reader();
+        let prompt = compose(&reader, None, Some("checking trends")).unwrap();
+
+        // The sample summary table should appear with all three probes.
+        assert!(
+            prompt
+                .rendered
+                .contains("### Host probe samples — last 24h")
+        );
+        assert!(prompt.rendered.contains("mem_available_mib"));
+        assert!(prompt.rendered.contains("loadavg_1m"));
+        assert!(prompt.rendered.contains("swap_used_mib"));
+
+        // Count column should reflect the number of data points.
+        assert!(prompt.rendered.contains("| mem_available_mib | 3 |"));
+
+        // Should see the MiB unit for mem/swap probes.
+        assert!(prompt.rendered.contains("| MiB |"));
+
+        // F-2: operator note still present.
+        assert!(prompt.rendered.contains("checking trends"));
     }
 }

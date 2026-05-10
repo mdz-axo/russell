@@ -157,7 +157,7 @@ Phase 1c is closed; work begins.
 - [x] Proprioception Phase 2A (ADR-0021): 4 new self-vitals (`journal_writer_stall_s`, `llm_p95_latency_ms`, `timer_drift_s`, `help_error_rate_pct`) + `AutoimmuneGuard`
 - [ ] Rule engine (`rules.d/*.toml`, lift ADR-0012)
 - [ ] EWMA baselines (30-day rolling p50/p95/p99)
-- [ ] Fix F-2: extend `prompt::compose` with 24h sample summary
+- [x] Fix F-2: extend `prompt::compose` with 24h sample summary (per-probe min/avg/max/last/count table)
 
 ### Phase 3 — Skills and dispatch
 
