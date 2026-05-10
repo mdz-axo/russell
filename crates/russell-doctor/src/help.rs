@@ -109,7 +109,14 @@ pub async fn run_help_with_config(
         None
     };
 
-    let soap = prompt::compose(&writer.reader(), profile.as_ref(), note, &[])?;
+    // Phase 3A: load available skills so Jack can recommend interventions.
+    let loaded_skills = russell_skills::load_all(&paths.skills()).unwrap_or_default();
+    tracing::debug!(
+        count = loaded_skills.len(),
+        "loaded skills for help session"
+    );
+
+    let soap = prompt::compose(&writer.reader(), profile.as_ref(), note, &loaded_skills)?;
 
     // ADR-0022: augment the system prompt with operator identity files if present.
     let soap = augment_system_prompt(paths, soap);
