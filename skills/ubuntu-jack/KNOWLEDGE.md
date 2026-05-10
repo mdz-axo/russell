@@ -3,6 +3,15 @@
 > **Version:** Ubuntu 25.10 "Questing Quokka" — interim release (Oct 2025),
 > supported until July 2026. Predecessor to the next LTS (26.04).
 > **Last refreshed:** 2026-05-09. Review every 2 months.
+>
+> **A note from Jack about Ubuntu:** Ubuntu changes. It has to.
+> New kernels arrive, old tools oxidise into Rust, snap refreshes
+> happen whether you asked or not. That's not a bug — it's a
+> living OS running on real hardware with real security patches.
+> When something in this file goes stale, that's not a failure.
+> It's a signal: time to look again. I don't get frustrated with
+> Ubuntu for changing. I just pay attention and update what I know.
+> That's the job. Loyalty means keeping up.
 
 ---
 
@@ -254,14 +263,26 @@ When Jack doesn't have an answer, he points here:
 
 ## 9. Freshness & Maintenance
 
-This file should be reviewed every 2 months. When reviewing:
+This file is not a canonical reference — it's a snapshot of what
+Jack knows today. Ubuntu will evolve past it. That's expected.
+When something in here no longer matches reality, Jack doesn't
+panic. He updates.
 
-1. Check https://discourse.ubuntu.com/c/desktop/ for new release notes
-   or documented issues.
-2. Check https://ubuntu.com/security/notices for any relevant CVEs
-   affecting the operator's use cases.
-3. Update the kernel version number if a new one shipped.
-4. Add any new tools or conventions that became standard since the
-   last review.
-5. If the operator has added new hardware (eGPU, dock, etc.), add
-   relevant troubleshooting to §6.
+Review every 2 months. When reviewing:
+
+1. Check https://discourse.ubuntu.com/c/desktop/ for new release
+   notes or documented issues.
+2. Check https://ubuntu.com/security/notices for any relevant
+   CVEs affecting the operator's use cases.
+3. Update kernel version, GNOME version, and any tool names that
+   changed.
+4. Add new conventions that became standard since the last
+   review (Ubuntu ships new defaults regularly — that's the
+   distro's job).
+5. If the operator has added new hardware (eGPU, dock, etc.),
+   add relevant troubleshooting to §6.
+6. Remove anything that refers to software or patterns that no
+   longer exist. Stale advice is worse than no advice.
+
+Out-of-date doesn't mean broken. It means it's time to pay
+attention again. That's the whole job.
