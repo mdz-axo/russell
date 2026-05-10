@@ -159,6 +159,143 @@ impl Dispatcher {
             }
         }
     }
+
+    /// Run a command and journal the result.
+    ///
+    /// This is the IDRS-compliant entry point. It:
+    ///
+    /// 1. Calls [`run`] to execute the command (or dry-run).
+    /// 2. Writes a `harness.event.v1` event to the journal with
+    ///    action `"skill_probe"` (risk=none) or `"skill_intervention"`
+    ///    (risk from manifest).
+    /// 3. Writes an evidence bundle to
+    ///    `evidence/skills/<skill_id>/<step_id>/<ts>/` containing
+    ///    stdout, stderr, and the event JSON.
+    ///
+    /// `step_type` distinguishes probes from interventions for the
+    /// event action field. `risk_band` is the risk level from the
+    /// manifest (probes are always `none`).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`russell_core::CoreError`] on journal I/O failure
+    /// or subprocess spawn failure.
+    #[allow(clippy::too_many_arguments)]
+    pub async fn run_and_journal(
+        &self,
+        journal: &JournalWriter,
+        evidence_base: &Path,
+        cmd: &[String],
+        skill_id: &str,
+        step_id: &str,
+        step_type: StepType,
+        risk_band: &str,
+        timeout_override: Option<Duration>,
+    ) -> Result<RunOutcome> {
+        let outcome = self.run(cmd, timeout_override).await?;
+
+        let action = match step_type {
+            StepType::Probe => "skill_probe",
+            StepType::Intervention => {
+                if outcome.dry_run {
+                    "would_skill_intervention"
+                } else {
+                    "skill_intervention"
+                }
+            }
+        };
+
+        let severity = if outcome.exit_code == Some(0) || outcome.dry_run {
+            Severity::Info
+        } else {
+            Severity::Warn
+        };
+
+        let mut ev = Event::new(action, severity);
+        ev.tier = Some("skill".into());
+        ev.module = Some(format!("skill/{skill_id}/{step_id}"));
+        ev.dry_run = outcome.dry_run;
+        ev.duration_ms = Some(outcome.duration.as_millis() as u64);
+        ev.summary = Some(format!(
+            "{} {}/{}{}",
+            if outcome.dry_run { "[DRY RUN]" } else { "" },
+            skill_id,
+            step_id,
+            match outcome.exit_code {
+                Some(c) => format!(" exit={c}"),
+                None if outcome.timed_out => " TIMEOUT".into(),
+                None => " (no exit code)".into(),
+            },
+        ));
+        ev.outputs
+            .insert("exit_code".into(), outcome.exit_code.into());
+        ev.outputs
+            .insert("timed_out".into(), outcome.timed_out.into());
+        ev.outputs.insert("risk".into(), risk_band.into());
+        ev.outputs
+            .insert("step_type".into(), step_type.to_string().into());
+
+        // Write evidence bundle.
+        let evidence_dir = evidence_base
+            .join("skills")
+            .join(skill_id)
+            .join(step_id)
+            .join(russell_core::time::now_rfc3339().replace(':', "-"));
+        if let Err(e) = write_evidence(&evidence_dir, &outcome, &ev) {
+            tracing::warn!(dir = %evidence_dir.display(), error = %e, "failed to write evidence bundle");
+        }
+        ev.evidence_ref = Some(evidence_dir.display().to_string());
+
+        journal.append(&ev)?;
+
+        debug!(
+            skill_id,
+            step_id,
+            exit_code = ?outcome.exit_code,
+            dry_run = outcome.dry_run,
+            duration_ms = %outcome.duration.as_millis(),
+            "dispatched skill step",
+        );
+
+        Ok(outcome)
+    }
+}
+
+/// Whether a dispatch is a probe (read-only) or intervention (mutating).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StepType {
+    /// Read-only observation.
+    Probe,
+    /// Mutating action.
+    Intervention,
+}
+
+impl StepType {
+    fn to_string(self) -> &'static str {
+        match self {
+            StepType::Probe => "probe",
+            StepType::Intervention => "intervention",
+        }
+    }
+}
+
+/// Write stdout, stderr, and event JSON to the evidence directory.
+fn write_evidence(dir: &Path, outcome: &RunOutcome, event: &Event) -> Result<()> {
+    std::fs::create_dir_all(dir).map_err(|e| russell_core::CoreError::io(dir, e))?;
+
+    std::fs::write(dir.join("stdout.txt"), &outcome.stdout)
+        .map_err(|e| russell_core::CoreError::io(dir, e))?;
+
+    if !outcome.stderr.is_empty() {
+        std::fs::write(dir.join("stderr.txt"), &outcome.stderr)
+            .map_err(|e| russell_core::CoreError::io(dir, e))?;
+    }
+
+    let event_json = serde_json::to_string_pretty(event)?;
+    std::fs::write(dir.join("event.json"), event_json)
+        .map_err(|e| russell_core::CoreError::io(dir, e))?;
+
+    Ok(())
 }
 
 #[cfg(test)]
@@ -214,5 +351,89 @@ mod tests {
             .unwrap();
         assert!(outcome.timed_out);
         assert!(outcome.exit_code.is_none());
+    }
+
+    // --- IDRS journaling tests ---
+
+    #[tokio::test]
+    async fn run_and_journal_writes_event_and_evidence() {
+        let tmp = tempfile::tempdir().unwrap();
+        let journal_path = tmp.path().join("journal.db");
+        let journal = JournalWriter::open(&journal_path).unwrap();
+        let evidence_base = tmp.path().join("evidence");
+
+        let d = Dispatcher::new("/tmp");
+        let outcome = d
+            .run_and_journal(
+                &journal,
+                &evidence_base,
+                &["echo".into(), "hello".into()],
+                "test-skill",
+                "probe-1",
+                StepType::Probe,
+                "none",
+                None,
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(outcome.exit_code, Some(0));
+        assert!(!outcome.dry_run);
+
+        // Journal should have the event.
+        let reader = journal.reader();
+        let rows = reader.recent(5).unwrap();
+        assert!(!rows.is_empty());
+        let row = &rows[0];
+        assert_eq!(row.action, "skill_probe");
+        assert_eq!(row.severity, russell_core::event::Severity::Info);
+
+        // Evidence bundle should exist.
+        let evidence_root = std::fs::read_dir(evidence_base.join("skills/test-skill/probe-1"))
+            .unwrap()
+            .next()
+            .unwrap()
+            .unwrap()
+            .path();
+        assert!(evidence_root.join("stdout.txt").exists());
+        assert!(evidence_root.join("event.json").exists());
+
+        // stdout should contain "hello".
+        let stdout = std::fs::read_to_string(evidence_root.join("stdout.txt")).unwrap();
+        assert!(stdout.contains("hello"));
+    }
+
+    #[tokio::test]
+    async fn dry_run_journals_would_action() {
+        let tmp = tempfile::tempdir().unwrap();
+        let journal_path = tmp.path().join("journal.db");
+        let journal = JournalWriter::open(&journal_path).unwrap();
+        let evidence_base = tmp.path().join("evidence");
+
+        let d = Dispatcher {
+            skill_dir: "/tmp".into(),
+            dry_run: DryRun::Enabled,
+            probe_timeout: Duration::from_secs(5),
+            intervention_timeout: Duration::from_secs(5),
+        };
+        let outcome = d
+            .run_and_journal(
+                &journal,
+                &evidence_base,
+                &["echo".into(), "would-have-run".into()],
+                "test-skill",
+                "iv-1",
+                StepType::Intervention,
+                "low",
+                None,
+            )
+            .await
+            .unwrap();
+
+        assert!(outcome.dry_run);
+
+        let reader = journal.reader();
+        let rows = reader.recent(5).unwrap();
+        assert_eq!(rows[0].action, "would_skill_intervention");
     }
 }

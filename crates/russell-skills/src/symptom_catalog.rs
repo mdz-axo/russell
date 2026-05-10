@@ -8,8 +8,11 @@
 /// causes a [`super::LoadError::UnknownSymptom`] at load time.
 pub const SYMPTOMS: &[&str] = &[
     "amdgpu_ring_hang",
+    "amdgpu_reset",
     "vram_oom",
     "gpu_temp_high",
+    "gpu_fallback_to_cpu",
+    "rocm_unreachable",
     "nvme_media_errors",
     "oom_killer_active",
     "swap_pressure",

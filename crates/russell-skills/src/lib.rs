@@ -826,4 +826,21 @@ safety:
         let err = load_all(tmp.path()).unwrap_err();
         assert!(err.to_string().contains("missing manifest"));
     }
+
+    #[test]
+    fn loads_gpu_doctor_fixture() {
+        let fixture = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures");
+        let skills = load_all(&fixture).unwrap();
+        assert_eq!(skills.len(), 1);
+        let gpu = &skills[0];
+        assert_eq!(gpu.id, "gpu-doctor");
+        assert_eq!(gpu.probes.len(), 3);
+        assert_eq!(gpu.interventions.len(), 1);
+        assert!(gpu.symptoms.contains(&"vram_oom".into()));
+        assert!(gpu.symptoms.contains(&"amdgpu_ring_hang".into()));
+        // The reset-gpu intervention is medium risk with confirmation.
+        let reset = &gpu.interventions[0];
+        assert_eq!(reset.id, "reset-gpu");
+        assert!(matches!(reset.risk, RiskBand::Medium));
+    }
 }
