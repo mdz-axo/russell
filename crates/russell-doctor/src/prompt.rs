@@ -10,6 +10,7 @@
 //! not just event counts.
 
 use std::fmt::Write as _;
+use std::path::Path;
 
 use russell_core::journal::JournalReader;
 use russell_core::{Profile, event::Scope};
@@ -25,11 +26,18 @@ use crate::error::Result;
 /// probes and interventions are available so he can recommend
 /// specific manifest IDs per ADR-0008 (LLM ranks IDs, does not
 /// emit shell).
+///
+/// If any loaded skill has a `KNOWLEDGE.md` file and its
+/// `applies_when` clause matches the machine profile, that
+/// knowledge is appended to Jack's system prompt — giving him
+/// domain expertise (Ubuntu, ROCm, etc.) without bloating
+/// the base persona.
 pub fn compose(
     reader: &JournalReader,
     profile: Option<&Profile>,
     note: Option<&str>,
     loaded_skills: &[Skill],
+    skills_base_dir: &Path,
 ) -> Result<SoapPrompt> {
     let now = russell_core::time::now_unix();
     let window_start = now - 24 * 3600;
