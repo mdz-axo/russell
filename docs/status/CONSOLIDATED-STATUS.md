@@ -153,7 +153,7 @@ Rule engine, EWMA baselines, self-vital, sample summary in SOAP.
 Phase 1c is closed; work begins.
 
 - [x] JR-5 self-vital (`sentinel_last_run_age_s`) in `russell-proprio`
-- [x] Markdown memory layer (ADR-0022): paths, persistence catalog, identity files, Doctor integration
+- [x] Markdown memory layer (ADR-0022): paths, persistence catalog, identity files, Doctor integration, daily log verb (`russell digest --format daily-log`)
 - [x] Proprioception Phase 2A (ADR-0021): 4 new self-vitals (`journal_writer_stall_s`, `llm_p95_latency_ms`, `timer_drift_s`, `help_error_rate_pct`) + `AutoimmuneGuard`
 - [ ] Rule engine (`rules.d/*.toml`, lift ADR-0012)
 - [ ] EWMA baselines (30-day rolling p50/p95/p99)
