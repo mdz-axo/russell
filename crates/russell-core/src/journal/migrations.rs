@@ -109,29 +109,23 @@ fn apply_one(conn: &Connection, m: &Migration) -> Result<()> {
     }
 }
 
-/// Version of the most-recently-applied migration in the DB
-/// reachable through `conn`.
-///
-/// # Errors
-///
-/// Returns [`CoreError::Sqlite`] on DB errors.
-pub fn current_version(conn: &Connection) -> Result<u32> {
-    let v: u32 = conn
-        .query_row(
-            "SELECT COALESCE(MAX(version), 0) FROM schema_migrations",
-            [],
-            |r| r.get(0),
-        )
-        .unwrap_or(0);
-    Ok(v)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
     fn fresh() -> Connection {
         Connection::open_in_memory().unwrap()
+    }
+
+    fn current_version(conn: &Connection) -> Result<u32> {
+        let v: u32 = conn
+            .query_row(
+                "SELECT COALESCE(MAX(version), 0) FROM schema_migrations",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap_or(0);
+        Ok(v)
     }
 
     #[test]

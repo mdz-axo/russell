@@ -494,27 +494,6 @@ fn insert_help_session(writer: &JournalWriter, s: &HelpSession) -> Result<()> {
     Ok(())
 }
 
-// paths is used only for ::join; leave for future expansion.
-#[allow(dead_code)]
-fn _evidence_subdir(paths: &Paths, id: &str) -> PathBuf {
-    paths.evidence().join("help").join(id)
-}
-
-/// Return the path to the most-recent evidence bundle under
-/// `paths.evidence()/help/`, if any. Used by tests.
-#[must_use]
-pub fn last_evidence_dir(paths: &Paths) -> Option<PathBuf> {
-    let root = paths.evidence().join("help");
-    let mut entries: Vec<_> = std::fs::read_dir(&root)
-        .ok()?
-        .filter_map(std::result::Result::ok)
-        .map(|e| e.path())
-        .filter(|p: &PathBuf| p.is_dir())
-        .collect();
-    entries.sort();
-    entries.into_iter().next_back()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

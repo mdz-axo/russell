@@ -70,29 +70,6 @@ impl TimerSource for SystemdTimerSource {
     }
 }
 
-/// Test [`TimerSource`] that returns a fixed microsecond-since-epoch value.
-///
-/// Pass `None` to simulate a missing timer (drift = `None`); pass
-/// `Some(us)` to simulate a timer that last triggered at that instant.
-#[derive(Debug, Clone, Copy)]
-pub struct FixedTimerSource {
-    last_trigger_us: Option<u64>,
-}
-
-impl FixedTimerSource {
-    /// Create a source that returns the given fixed value.
-    #[must_use]
-    pub fn new(last_trigger_us: Option<u64>) -> Self {
-        Self { last_trigger_us }
-    }
-}
-
-impl TimerSource for FixedTimerSource {
-    fn read_last_trigger_us(&self) -> std::result::Result<Option<u64>, String> {
-        Ok(self.last_trigger_us)
-    }
-}
-
 // ---------------------------------------------------------------------------
 // Probe constants
 // ---------------------------------------------------------------------------
@@ -705,24 +682,52 @@ mod tests {
     use russell_core::event::Scope;
     use russell_core::journal::JournalWriter;
 
-    fn tmp_journal() -> (tempfile::TempDir, JournalWriter) {
-        let tmp = tempfile::tempdir().unwrap();
-        let p = tmp.path().join("journal.db");
-        let w = JournalWriter::open(&p).unwrap();
-        (tmp, w)
+    // -----------------------------------------------------------------------
+    // Test TimerSource
+    // -----------------------------------------------------------------------
+
+    /// Test [`TimerSource`] that returns a fixed microsecond-since-epoch value.
+    ///
+    /// Pass `None` to simulate a missing timer (drift = `None`); pass
+    /// `Some(us)` to simulate a timer that last triggered at that instant.
+    #[derive(Debug, Clone, Copy)]
+    struct FixedTimerSource {
+        last_trigger_us: Option<u64>,
+    }
+
+    impl FixedTimerSource {
+        fn new(last_trigger_us: Option<u64>) -> Self {
+            Self { last_trigger_us }
+        }
+    }
+
+    impl TimerSource for FixedTimerSource {
+        fn read_last_trigger_us(&self) -> std::result::Result<Option<u64>, String> {
+            Ok(self.last_trigger_us)
+        }
     }
 
     /// A [`FixedTimerSource`] that reports no timer found — drift is always
-    /// `None`, severity is always `Info`, no event is emitted. Use this for
-    /// tests that don't care about timer drift.
+    /// `None`, severity is always `Info`, no event is emitted.
     fn no_timer() -> FixedTimerSource {
         FixedTimerSource::new(None)
     }
 
     /// A [`FixedTimerSource`] that reports the timer triggered at the given
-    /// Unix epoch second. Useful for testing drift thresholds.
+    /// Unix epoch second.
     fn timer_at(epoch_s: i64) -> FixedTimerSource {
         FixedTimerSource::new(Some(epoch_s as u64 * 1_000_000))
+    }
+
+    // -----------------------------------------------------------------------
+    // Helpers
+    // -----------------------------------------------------------------------
+
+    fn tmp_journal() -> (tempfile::TempDir, JournalWriter) {
+        let tmp = tempfile::tempdir().unwrap();
+        let p = tmp.path().join("journal.db");
+        let w = JournalWriter::open(&p).unwrap();
+        (tmp, w)
     }
 
     // -- Sentinel age --
@@ -1004,6 +1009,52 @@ mod tests {
         let r = w.reader();
         let result = run_once_with(&w, &r, &no_timer()).unwrap();
         assert_eq!(result.help_error_rate_severity, Severity::Alert);
+    }
+
+    // -- Timer drift --
+
+    #[test]
+    fn timer_drift_is_none_when_timer_missing() {
+        let (_tmp, w) = tmp_journal();
+        let r = w.reader();
+        let result = run_once_with(&w, &r, &no_timer()).unwrap();
+        assert_eq!(result.timer_drift_s, None);
+        assert_eq!(result.timer_drift_severity, Severity::Info);
+    }
+
+    #[test]
+    fn timer_drift_is_low_when_recent() {
+        let (_tmp, w) = tmp_journal();
+        let now = russell_core::time::now_unix();
+        // Timer triggered 10 seconds ago — well within the 90 s warn threshold.
+        let r = w.reader();
+        let result = run_once_with(&w, &r, &timer_at(now - 10)).unwrap();
+        assert!(result.timer_drift_s.unwrap() < DRIFT_WARN_THRESHOLD_S);
+        assert_eq!(result.timer_drift_severity, Severity::Info);
+    }
+
+    #[test]
+    fn timer_drift_triggers_warn() {
+        let (_tmp, w) = tmp_journal();
+        let now = russell_core::time::now_unix();
+        // Timer triggered 100 seconds ago — above the 90 s warn threshold.
+        let r = w.reader();
+        let result = run_once_with(&w, &r, &timer_at(now - 100)).unwrap();
+        assert!(result.timer_drift_s.unwrap() > DRIFT_WARN_THRESHOLD_S);
+        assert_eq!(result.timer_drift_severity, Severity::Warn);
+        assert!(result.event_emitted);
+    }
+
+    #[test]
+    fn timer_drift_triggers_alert() {
+        let (_tmp, w) = tmp_journal();
+        let now = russell_core::time::now_unix();
+        // Timer triggered 400 seconds ago — above the 300 s alert threshold.
+        let r = w.reader();
+        let result = run_once_with(&w, &r, &timer_at(now - 400)).unwrap();
+        assert!(result.timer_drift_s.unwrap() > DRIFT_ALERT_THRESHOLD_S);
+        assert_eq!(result.timer_drift_severity, Severity::Alert);
+        assert!(result.event_emitted);
     }
 
     // -- AutoimmuneGuard --

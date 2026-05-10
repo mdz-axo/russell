@@ -14,7 +14,7 @@ pub struct MockClient {
 impl MockClient {
     /// Construct a mock that always replies with `reply`.
     #[must_use]
-    pub fn new(reply: impl Into<String>) -> Self {
+    pub(crate) fn new(reply: impl Into<String>) -> Self {
         Self {
             reply: reply.into(),
         }

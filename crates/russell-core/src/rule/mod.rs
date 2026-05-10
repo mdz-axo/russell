@@ -99,6 +99,7 @@ pub struct RuleSet {
 
 impl RuleSet {
     /// Create an empty rule set (no rules; evaluate always returns Info).
+    #[cfg(test)]
     #[must_use]
     pub fn new() -> Self {
         Self { rules: Vec::new() }
@@ -235,22 +236,11 @@ impl RuleSet {
         Severity::Info
     }
 
-    /// Look up a rule by probe name.
-    #[must_use]
-    pub fn get(&self, probe: &str) -> Option<&Rule> {
-        self.rules.iter().find(|r| r.probe == probe)
-    }
-
     /// Number of loaded rules.
+    #[cfg(test)]
     #[must_use]
     pub fn len(&self) -> usize {
         self.rules.len()
-    }
-
-    /// Whether the rule set is empty.
-    #[must_use]
-    pub fn is_empty(&self) -> bool {
-        self.rules.is_empty()
     }
 }
 

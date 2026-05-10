@@ -15,18 +15,6 @@ use std::path::Path;
 
 use tracing::{debug, warn};
 
-/// Keys Russell recognises and documents
-/// ([`../../../docs/specifications/PERSISTENCE_CATALOG.md`](../../../docs/specifications/PERSISTENCE_CATALOG.md) §2.5).
-pub const KNOWN_KEYS: &[&str] = &[
-    "OPENROUTER_API_KEY",
-    "RUSSELL_DOCTOR_MODEL",
-    "RUSSELL_DOCTOR_BACKEND",
-    "RUSSELL_DOCTOR_BASE_URL",
-    "RUSSELL_DRY_RUN",
-    "RUSSELL_LOG",
-    "RUST_LOG",
-];
-
 /// Load an env file at `path` if present. Silent if absent.
 /// Never fails visibly; malformed lines are logged at `warn`.
 pub fn load_env_file(path: &Path) {

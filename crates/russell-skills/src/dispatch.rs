@@ -12,19 +12,27 @@
 //! the subprocess. Rollback pre-state capture is the caller's
 //! responsibility (dispatchers can't know what state to snapshot).
 
-use std::path::{Path, PathBuf};
+#[cfg(test)]
+use std::path::Path;
+use std::path::PathBuf;
 use std::time::Duration;
 
 use russell_core::Result;
+#[cfg(test)]
 use russell_core::event::{Event, Severity};
+#[cfg(test)]
 use russell_core::journal::JournalWriter;
-use tracing::{debug, warn};
+#[cfg(test)]
+use tracing::debug;
+#[cfg(test)]
+use tracing::warn;
 
 // Re-export RiskBand from the parent crate for convenience.
 pub use crate::RiskBand;
 
 /// Errors that can occur during risk checking.
 #[derive(Debug, Clone, thiserror::Error)]
+#[cfg(test)]
 pub enum RiskError {
     /// The intervention's risk exceeds the auto-execute cap.
     #[error("risk {:?} exceeds max_auto_risk {:?}", risk, max_allowed)]
@@ -84,6 +92,7 @@ pub enum RollbackStrategy {
 
 /// Outcome of a rollback-protected intervention.
 #[derive(Debug, Clone, PartialEq)]
+#[cfg(test)]
 pub struct RollbackOutcome {
     /// The forward (original) run outcome.
     pub forward: RunOutcome,
@@ -93,6 +102,7 @@ pub struct RollbackOutcome {
     pub rollback_applied: bool,
 }
 
+#[cfg(test)]
 impl RollbackOutcome {
     /// Whether the overall operation was successful (forward succeeded
     /// OR forward failed but rollback succeeded).
@@ -110,6 +120,7 @@ impl RollbackOutcome {
 
 /// Whether a dispatch is a probe (read-only) or intervention (mutating).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg(test)]
 pub enum StepType {
     /// Read-only observation.
     Probe,
@@ -117,6 +128,7 @@ pub enum StepType {
     Intervention,
 }
 
+#[cfg(test)]
 impl StepType {
     fn to_string(self) -> &'static str {
         match self {
@@ -165,6 +177,7 @@ impl Dispatcher {
     /// confirmation.
     ///
     /// Dry-run is always allowed regardless of risk (it doesn't mutate).
+    #[cfg(test)]
     pub fn check_risk(&self, risk: RiskBand, dry_run: bool) -> std::result::Result<(), RiskError> {
         if dry_run {
             return Ok(());
@@ -289,6 +302,7 @@ impl Dispatcher {
     ///
     /// Returns [`russell_core::CoreError`] on journal I/O failure
     /// or subprocess spawn failure.
+    #[cfg(test)]
     #[allow(clippy::too_many_arguments)]
     pub async fn run_and_journal(
         &self,
@@ -386,6 +400,7 @@ impl Dispatcher {
     /// Returns the rollback outcome on forward failure, or the forward
     /// outcome on success. `rollback_applied` in the outcome indicates
     /// whether rollback was triggered.
+    #[cfg(test)]
     #[allow(clippy::too_many_arguments)]
     pub async fn run_intervention_with_rollback<F>(
         &self,
@@ -502,6 +517,7 @@ impl Dispatcher {
 ///
 /// The dispatcher doesn't own manifests, so the caller resolves the
 /// strategy before calling `run_intervention_with_rollback`.
+#[cfg(test)]
 #[must_use]
 pub fn resolve_rollback_strategy(rollback: &crate::Rollback) -> RollbackStrategy {
     match rollback {
@@ -514,6 +530,7 @@ pub fn resolve_rollback_strategy(rollback: &crate::Rollback) -> RollbackStrategy
 }
 
 /// Write stdout, stderr, and event JSON to the evidence directory.
+#[cfg(test)]
 fn write_evidence(dir: &Path, outcome: &RunOutcome, event: &Event) -> Result<()> {
     std::fs::create_dir_all(dir).map_err(|e| russell_core::CoreError::io(dir, e))?;
 

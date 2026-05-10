@@ -680,8 +680,7 @@ impl JournalReader {
         Ok(conn)
     }
 
-    /// Raw read-only connection. Internal use only.
-    #[doc(hidden)]
+    /// Raw read-only connection for internal harness use.
     pub fn open_ro_conn(&self) -> Result<Connection> {
         self.open_ro()
     }

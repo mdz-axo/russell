@@ -66,7 +66,7 @@ pub enum EscalateMin {
     Alert,
     /// Escalate when crit > 0 OR alert > 0 OR warn > 0.
     Warn,
-    /// Always escalate (defeats the purpose; testing only).
+    /// Always escalate (available via `RUSSELL_ESCALATE_MIN=always`; primarily for integration testing).
     Always,
 }
 
