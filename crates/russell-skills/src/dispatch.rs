@@ -2,12 +2,23 @@
 //! Subprocess dispatcher for Russell skills.
 //!
 //! Runs probe and intervention commands with env scrubbing, timeout,
-//! stdout/stderr capture, and dry-run support per ADR-0007.
+//! stdout/stderr capture, dry-run support, and IDRS journaling.
+//!
+//! ## IDRS integration
+//!
+//! Every dispatch via [`Dispatcher::run_and_journal`] writes a
+//! `harness.event.v1` record to the journal and an evidence bundle
+//! to disk. The dry-run path writes the event but does not execute
+//! the subprocess. Rollback pre-state capture is the caller's
+//! responsibility (dispatchers can't know what state to snapshot).
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use russell_core::Result;
+use russell_core::event::{Event, Severity};
+use russell_core::journal::JournalWriter;
+use tracing::debug;
 
 /// Controls whether subprocesses actually execute.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

@@ -1,0 +1,54 @@
+# gpu-doctor — GPU health probe and intervention for ROCm
+id: gpu-doctor
+version: 0.1.0
+authored: 2026-05-09
+min_harness_version: 0.1.0
+
+symptoms:
+  - amdgpu_ring_hang
+  - vram_oom
+  - gpu_temp_high
+  - rocm_unreachable
+
+applies_when: []
+
+probes:
+  - id: assess
+    cmd: ["bash", "scripts/rocm-smi-probe.sh"]
+    risk: none
+    capture: stdout
+    timeout: 30s
+
+  - id: vram
+    cmd:
+      [
+        "bash",
+        "-c",
+        "rocm-smi --showmeminfo vram --json 2>/dev/null || echo '{}'",
+      ]
+    risk: none
+    capture: stdout
+    timeout: 15s
+
+  - id: temp
+    cmd: ["bash", "-c", "rocm-smi -t --json 2>/dev/null || echo '{}'"]
+    risk: none
+    capture: stdout
+    timeout: 15s
+
+interventions:
+  - id: reset-gpu
+    cmd: ["bash", "-c", "sudo rocm-smi --reset 2>&1"]
+    risk: medium
+    idempotent: true
+    rollback: none_needed
+    requires_confirmation: true
+    timeout: 60s
+
+safety:
+  max_auto_risk: low
+  require_human_for:
+    - reset-gpu
+
+references:
+  - https://rocm.docs.amd.com/projects/rocm-smi-lib/en/latest/

@@ -159,11 +159,17 @@ Phase 1c is closed; work begins.
 - [x] EWMA baselines (30-day rolling p50/p95/p99): `compute_baselines()` query + `upsert_baseline()` writer + daily refresh in sentinel-once
 - [x] Fix F-2: extend `prompt::compose` with 24h sample summary (per-probe min/avg/max/last/count table)
 
-### Phase 3 — Skills and dispatch
+### Phase 3 — Skills and dispatch (CURRENT)
 
-Skill manifest loader, dispatcher, first host-scope skill
-(`gpu-doctor`). Requires formal lifting of ADR-0007's
-deferral.
+Skill manifest loader, dispatcher, first host-scope skill.
+ADR-0007 deferral lifted per ADR-0023.
+
+- [x] ADR-0023: formal lift of ADR-0007 deferral
+- [x] `russell-skills` crate: manifest parser, validation, symptom catalog
+- [x] Subprocess dispatcher: env scrubbing, timeout, stdout/stderr capture, dry-run
+- [x] CLI verbs: `russell skill list`, `russell skill run <id> [--dry-run]`
+- [ ] First skill: `gpu-doctor` (manifest + rocm-smi probe script)
+- [ ] Doctor integration: symptom-to-skill mapping in `russell jack`
 
 ### Phase 4+ — Tracks the design document
 

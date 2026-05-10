@@ -13,8 +13,9 @@ status: "Active"
 <!-- VERSION: 1.0.0 -->
 <!-- STATUS: Active -->
 
-The 13 active ADRs. ADRs 0001–0018 are load-bearing for MVP.
+The 14 active ADRs. ADRs 0001–0018 are load-bearing for MVP.
 ADR-0019 opens Phase 2. ADRs 0020–0022 extend Phase 2.
+ADR-0023 lifts ADR-0007 and opens Phase 3.
 Deferred ADRs live under
 [`deferred/`](deferred/) with their own README.
 
