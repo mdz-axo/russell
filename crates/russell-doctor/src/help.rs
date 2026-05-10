@@ -328,19 +328,19 @@ fn augment_system_prompt(
     let mut soap = soap;
     let mut extras = String::new();
 
-    if let Ok(persona) = std::fs::read_to_string(paths.persona_md()) {
-        if !persona.trim().is_empty() {
-            tracing::debug!("loaded PERSONA.md for session context");
-            extras.push_str("\n\n---\n\n");
-            extras.push_str(&persona);
-        }
+    if let Ok(persona) = std::fs::read_to_string(paths.persona_md())
+        && !persona.trim().is_empty()
+    {
+        tracing::debug!("loaded PERSONA.md for session context");
+        extras.push_str("\n\n---\n\n");
+        extras.push_str(&persona);
     }
-    if let Ok(user) = std::fs::read_to_string(paths.user_md()) {
-        if !user.trim().is_empty() {
-            tracing::debug!("loaded USER.md for session context");
-            extras.push_str("\n\n---\n\n");
-            extras.push_str(&user);
-        }
+    if let Ok(user) = std::fs::read_to_string(paths.user_md())
+        && !user.trim().is_empty()
+    {
+        tracing::debug!("loaded USER.md for session context");
+        extras.push_str("\n\n---\n\n");
+        extras.push_str(&user);
     }
 
     if !extras.is_empty() {

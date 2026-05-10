@@ -4,17 +4,17 @@ audience: [developers, architects]
 last_updated: 2026-05-09
 togaf_phase: "H — Change Management"
 version: "1.0.0"
-status: "Proposed"
+status: "Accepted"
 ---
 
 <!-- TOGAF_DOMAIN: Change Management -->
 <!-- VERSION: 1.0.0 -->
-<!-- STATUS: Proposed -->
+<!-- STATUS: Accepted -->
 <!-- LAST_UPDATED: 2026-05-09 -->
 
 # ADR-0021: Proprioception Phase 2 — Reflex Arcs and Self-Vitals
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-05-09
 - **Deciders:** Project founders
 - **Tags:** `proprioception`, `self-health`, `jr-5`, `jr-2`

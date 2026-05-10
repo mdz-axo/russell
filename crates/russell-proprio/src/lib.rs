@@ -33,7 +33,7 @@
 #![warn(missing_docs)]
 
 use std::process::Command;
-use std::sync::Mutex;
+use std::sync::{Mutex, MutexGuard};
 
 use russell_core::Result;
 use russell_core::event::{Event, Scope, Severity};
@@ -127,12 +127,6 @@ pub const ERROR_RATE_ALERT_THRESHOLD_PCT: f64 = 50.0;
 #[derive(Debug)]
 pub struct AutoimmuneGuard(Mutex<()>);
 
-/// Guard returned by [`AutoimmuneGuard::enter`] or [`AutoimmuneGuard::try_enter`].
-///
-/// The mutex is released when this guard is dropped.
-#[derive(Debug)]
-pub struct GuardGuard<'a>(&'a Mutex<()>);
-
 impl AutoimmuneGuard {
     /// Create a new, unlocked guard.
     #[must_use]
@@ -142,17 +136,14 @@ impl AutoimmuneGuard {
 
     /// Enter the guard, blocking until it is acquired.
     ///
+    /// Returns a standard [`MutexGuard`] that releases the lock on drop.
+    ///
     /// # Panics
     ///
     /// Panics if the mutex is poisoned (i.e., a previous holder panicked
     /// while holding the guard).
-    #[must_use]
-    pub fn enter(&self) -> GuardGuard<'_> {
-        let guard = self.0.lock().expect("AutoimmuneGuard mutex poisoned");
-        // Leak the MutexGuard into a reference-based guard so we don't
-        // need to store the MutexGuard (which has a lifetime tied to &self).
-        std::mem::forget(guard);
-        GuardGuard(&self.0)
+    pub fn enter(&self) -> MutexGuard<'_, ()> {
+        self.0.lock().expect("AutoimmuneGuard mutex poisoned")
     }
 
     /// Try to enter the guard without blocking.
@@ -160,28 +151,14 @@ impl AutoimmuneGuard {
     /// Returns `Some(guard)` if acquired, `None` if the guard is already
     /// held by another caller.
     #[must_use]
-    pub fn try_enter(&self) -> Option<GuardGuard<'_>> {
-        self.0.try_lock().ok().map(|guard| {
-            std::mem::forget(guard);
-            GuardGuard(&self.0)
-        })
+    pub fn try_enter(&self) -> Option<MutexGuard<'_, ()>> {
+        self.0.try_lock().ok()
     }
 }
 
 impl Default for AutoimmuneGuard {
     fn default() -> Self {
         Self::new()
-    }
-}
-
-impl Drop for GuardGuard<'_> {
-    fn drop(&mut self) {
-        // Unlock the mutex. This is safe because we leaked the original
-        // MutexGuard and know that exactly one GuardGuard exists per lock
-        // acquisition.
-        unsafe {
-            self.0.raw_unlock();
-        }
     }
 }
 
@@ -288,7 +265,7 @@ pub fn run_once(writer: &JournalWriter, reader: &JournalReader) -> Result<Propri
             &format!(
                 "{PROBE_SENTINEL_AGE} = {} (threshold: {} for {sentinel_severity:?})",
                 age_s.unwrap_or(-1),
-                if sentinel_severity >= Severity::Alert {
+                if matches!(sentinel_severity, Severity::Alert | Severity::Crit) {
                     SENTINEL_ALERT_THRESHOLD_S
                 } else {
                     SENTINEL_WARN_THRESHOLD_S
@@ -306,7 +283,7 @@ pub fn run_once(writer: &JournalWriter, reader: &JournalReader) -> Result<Propri
             &format!(
                 "{PROBE_JOURNAL_STALL} = {} (threshold: {} for {stall_severity:?})",
                 journal_stall_s.unwrap_or(-1),
-                if stall_severity >= Severity::Alert {
+                if matches!(stall_severity, Severity::Alert | Severity::Crit) {
                     STALL_ALERT_THRESHOLD_S
                 } else {
                     STALL_WARN_THRESHOLD_S
@@ -328,7 +305,7 @@ pub fn run_once(writer: &JournalWriter, reader: &JournalReader) -> Result<Propri
             &format!(
                 "{PROBE_LLM_P95_LATENCY} = {} (threshold: {} for {llm_p95_severity:?})",
                 llm_p95_latency_ms.unwrap_or(-1.0),
-                if llm_p95_severity >= Severity::Alert {
+                if matches!(llm_p95_severity, Severity::Alert | Severity::Crit) {
                     LLM_P95_ALERT_THRESHOLD_MS
                 } else {
                     LLM_P95_WARN_THRESHOLD_MS
@@ -350,7 +327,7 @@ pub fn run_once(writer: &JournalWriter, reader: &JournalReader) -> Result<Propri
             &format!(
                 "{PROBE_TIMER_DRIFT} = {} (threshold: {} for {drift_severity:?})",
                 timer_drift_s.unwrap_or(-1),
-                if drift_severity >= Severity::Alert {
+                if matches!(drift_severity, Severity::Alert | Severity::Crit) {
                     DRIFT_ALERT_THRESHOLD_S
                 } else {
                     DRIFT_WARN_THRESHOLD_S
@@ -372,7 +349,7 @@ pub fn run_once(writer: &JournalWriter, reader: &JournalReader) -> Result<Propri
             &format!(
                 "{PROBE_HELP_ERROR_RATE} = {:.1}% (threshold: {} for {error_rate_severity:?})",
                 help_error_rate_pct.unwrap_or(-1.0),
-                if error_rate_severity >= Severity::Alert {
+                if matches!(error_rate_severity, Severity::Alert | Severity::Crit) {
                     ERROR_RATE_ALERT_THRESHOLD_PCT
                 } else {
                     ERROR_RATE_WARN_THRESHOLD_PCT

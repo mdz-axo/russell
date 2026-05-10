@@ -33,12 +33,27 @@ pub fn run(paths: &Paths) -> Result<()> {
     ev.tier = Some("sentinel".into());
     ev.module = Some("sentinel/cycle".into());
     ev.summary = Some(format!(
-        "captured {n} host samples; self-vital age={}s severity={:?}",
+        "captured {n} host samples; proprio: age={}s stall={}s llm_p95={}ms drift={}s err_rate={}%",
         proprio
             .age_s
             .map(|a| a.to_string())
             .unwrap_or_else(|| "none".into()),
-        proprio.severity,
+        proprio
+            .journal_stall_s
+            .map(|s| s.to_string())
+            .unwrap_or_else(|| "?".into()),
+        proprio
+            .llm_p95_latency_ms
+            .map(|v| format!("{v:.0}"))
+            .unwrap_or_else(|| "?".into()),
+        proprio
+            .timer_drift_s
+            .map(|d| d.to_string())
+            .unwrap_or_else(|| "?".into()),
+        proprio
+            .help_error_rate_pct
+            .map(|v| format!("{v:.1}"))
+            .unwrap_or_else(|| "?".into()),
     ));
     ev.duration_ms = Some(started.elapsed().as_millis() as u64);
     ev.outputs
@@ -54,16 +69,49 @@ pub fn run(paths: &Paths) -> Result<()> {
         "proprio_severity".into(),
         serde_json::Value::from(format!("{:?}", proprio.severity)),
     );
+    if let Some(s) = proprio.journal_stall_s {
+        ev.outputs
+            .insert("journal_stall_s".into(), serde_json::Value::from(s));
+    }
+    if let Some(v) = proprio.llm_p95_latency_ms {
+        ev.outputs
+            .insert("llm_p95_latency_ms".into(), serde_json::Value::from(v));
+    }
+    if let Some(d) = proprio.timer_drift_s {
+        ev.outputs
+            .insert("timer_drift_s".into(), serde_json::Value::from(d));
+    }
+    if let Some(p) = proprio.help_error_rate_pct {
+        ev.outputs.insert(
+            "help_error_rate_pct".into(),
+            serde_json::Value::from((p * 10.0).round() / 10.0),
+        );
+    }
     journal.append(&ev)?;
 
     println!(
-        "sentinel: captured {n} samples in {} ms; self-vital: age={}s ({:?})",
+        "sentinel: captured {n} samples in {} ms; proprio: age={}s stall={}s llm_p95={}ms drift={}s err_rate={}%",
         started.elapsed().as_millis(),
         proprio
             .age_s
             .map(|a| a.to_string())
             .unwrap_or_else(|| "n/a".into()),
-        proprio.severity,
+        proprio
+            .journal_stall_s
+            .map(|s| s.to_string())
+            .unwrap_or_else(|| "?".into()),
+        proprio
+            .llm_p95_latency_ms
+            .map(|v| format!("{v:.0}"))
+            .unwrap_or_else(|| "?".into()),
+        proprio
+            .timer_drift_s
+            .map(|d| d.to_string())
+            .unwrap_or_else(|| "?".into()),
+        proprio
+            .help_error_rate_pct
+            .map(|v| format!("{v:.1}"))
+            .unwrap_or_else(|| "?".into()),
     );
     Ok(())
 }

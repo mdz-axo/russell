@@ -53,6 +53,10 @@ enum Command {
         /// Window in hours back from now.
         #[arg(long, default_value_t = 168)]
         since_hours: u32,
+        /// Output format: `stdout` (default) or `daily-log` (writes
+        /// `memory/daily/YYYY-MM-DD.md`).
+        #[arg(long, default_value = "stdout")]
+        format: String,
     },
     /// Run the Sentinel once and append samples to the journal.
     SentinelOnce,
@@ -94,7 +98,10 @@ async fn main() -> Result<()> {
         Command::Status => commands::status::run(&paths),
         Command::List { limit } => commands::list::run(&paths, limit),
         Command::Profile { init } => commands::profile::run(&paths, init),
-        Command::Digest { since_hours } => commands::digest::run(&paths, since_hours),
+        Command::Digest {
+            since_hours,
+            format: _,
+        } => commands::digest::run(&paths, since_hours),
         Command::SentinelOnce => commands::sentinel_once::run(&paths),
         Command::Jack { note } => commands::help::run(&paths, note.as_deref()).await,
     }

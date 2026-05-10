@@ -12,7 +12,7 @@ status: "Active"
 <!-- TOGAF_DOMAIN: Governance -->
 <!-- VERSION: 2.0.0 -->
 <!-- STATUS: Active -->
-<!-- LAST_UPDATED: 2026-05-06 -->
+<!-- LAST_UPDATED: 2026-05-09 -->
 
 **Single source of truth for "where are we?"** Updated at the end
 of every meaningful development session.
@@ -49,14 +49,15 @@ of every meaningful development session.
 - `russell-core` implements paths, event schema, profile,
   journal (SQLite + WAL + migrations), telemetry, time.
 - `russell-sentinel` implements three `/proc`-based probes.
-- `russell-proprio` implements the JR-5 self-vital
-  (`sentinel_last_run_age_s`): reads the journal for the most
-  recent Sentinel sample, computes staleness in seconds, writes
-  a `scope='self'` sample. Runs BEFORE host probes in each
-  cycle so the self-vital is never stale-by-one.
+- `russell-proprio` implements the JR-5 self-vital plus 4 Phase-2A
+  vitals: `sentinel_last_run_age_s`, `journal_writer_stall_s`,
+  `llm_p95_latency_ms`, `timer_drift_s`, `help_error_rate_pct`.
+  Includes `AutoimmuneGuard` (process-wide mutex for future meta-Doctor).
+  Detects degraded internal state (slow LLM, journal stall, timer drift)
+  before the operator notices. All vitals are read-only; no mutation.
 - `russell-cli` implements five read-only verbs: `status`,
   `list`, `profile [--init]`, `digest`, `sentinel-once`.
-- 50 tests passing (29 core + 14 doctor + 6 proprio + 1 sentinel).
+- 76 tests passing (29 core + 14 doctor + 17 proprio + 8 sentinel + 8 CLI lib).
 - `cargo fmt --check` ✅, `cargo clippy -- -D warnings` ✅,
   `cargo test` ✅.
 
@@ -153,6 +154,7 @@ Phase 1c is closed; work begins.
 
 - [x] JR-5 self-vital (`sentinel_last_run_age_s`) in `russell-proprio`
 - [x] Markdown memory layer (ADR-0022): paths, persistence catalog, identity files, Doctor integration
+- [x] Proprioception Phase 2A (ADR-0021): 4 new self-vitals (`journal_writer_stall_s`, `llm_p95_latency_ms`, `timer_drift_s`, `help_error_rate_pct`) + `AutoimmuneGuard`
 - [ ] Rule engine (`rules.d/*.toml`, lift ADR-0012)
 - [ ] EWMA baselines (30-day rolling p50/p95/p99)
 - [ ] Fix F-2: extend `prompt::compose` with 24h sample summary
