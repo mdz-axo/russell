@@ -11,8 +11,8 @@
 
 use anyhow::{Context, Result};
 use russell_core::RuleSet;
-use russell_core::event::{Event, Severity};
-use russell_core::journal::JournalWriter;
+use russell_core::event::{Event, Scope, Severity};
+use russell_core::journal::{JournalReader, JournalWriter};
 use russell_core::paths::Paths;
 
 pub fn run(paths: &Paths) -> Result<()> {
@@ -150,7 +150,7 @@ fn maybe_refresh_baselines(journal: &JournalWriter, reader: &JournalReader) {
             .ok()
             .flatten()
         })
-        .map_or(true, |last| now - last > 86_400);
+        .is_none_or(|last| now - last > 86_400);
 
     if !needs_refresh {
         return;

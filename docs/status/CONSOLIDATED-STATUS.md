@@ -155,8 +155,8 @@ Phase 1c is closed; work begins.
 - [x] JR-5 self-vital (`sentinel_last_run_age_s`) in `russell-proprio`
 - [x] Markdown memory layer (ADR-0022): paths, persistence catalog, identity files, Doctor integration, daily log verb (`russell digest --format daily-log`)
 - [x] Proprioception Phase 2A (ADR-0021): 4 new self-vitals (`journal_writer_stall_s`, `llm_p95_latency_ms`, `timer_drift_s`, `help_error_rate_pct`) + `AutoimmuneGuard`
-- [x] Rule engine: threshold checks on host probes with hard-coded defaults (mem, swap, loadavg), wired into `sentinel-once`
-- [ ] EWMA baselines (30-day rolling p50/p95/p99)
+- [x] Rule engine: per-probe TOML rules (`rules.d/*.toml`) with operator-overridable thresholds, `RuleSet` in `russell-core`, wired into `sentinel-once`
+- [x] EWMA baselines (30-day rolling p50/p95/p99): `compute_baselines()` query + `upsert_baseline()` writer + daily refresh in sentinel-once
 - [x] Fix F-2: extend `prompt::compose` with 24h sample summary (per-probe min/avg/max/last/count table)
 
 ### Phase 3 — Skills and dispatch
