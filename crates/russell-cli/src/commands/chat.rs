@@ -86,67 +86,31 @@ async fn ollama_list_models(base_url: &str) -> Result<Vec<String>, String> {
 
 /// Find top fuzzy matches for `needle` in `models`.
 ///
-/// Two-layer strategy:
-/// 1. **Exact/substring match** — if one model contains the needle as a
-///    case-insensitive substring and is the *only* such match, return it.
-/// 2. **Jaro-Winkler fuzzy** — score all models; if one clear winner
-///    (≥0.9 with >0.1 gap), return it; otherwise return all above 0.5
-///    for disambiguation.
+/// Strips non-alphanumeric characters from both sides before scoring
+/// (so `deepseekv4pro` matches `deepseek-v4-pro:cloud`).
+/// Returns all models scoring ≥ 0.75 via Jaro-Winkler.
+/// If exactly one, the caller auto-selects it; if multiple, the caller
+/// shows a numbered list for disambiguation.
 fn fuzzy_match_models<'a>(needle: &str, models: &'a [String]) -> Vec<&'a str> {
     let needle_lower = needle.to_lowercase();
-
-    // --- Layer 1: case-insensitive substring match ---
-    let substr_matches: Vec<&str> = models
-        .iter()
-        .map(|m| m.as_str())
-        .filter(|m| m.to_lowercase().contains(&needle_lower))
+    let needle_clean: String = needle_lower
+        .chars()
+        .filter(|c| c.is_alphanumeric())
         .collect();
-    if substr_matches.len() == 1 {
-        return vec![substr_matches[0]];
-    }
 
-    // --- Layer 2: Jaro-Winkler fuzzy scoring ---
     let mut scored: Vec<(&str, f64)> = models
         .iter()
         .map(|m| {
             let name_lower = m.to_lowercase();
-            // Strip :cloud / :latest tags for a second (shorter) comparison.
-            let short_lower = name_lower
-                .trim_end_matches(":cloud")
-                .trim_end_matches(":latest");
-            let full = strsim::jaro_winkler(&needle_lower, &name_lower);
-            let short = strsim::jaro_winkler(&needle_lower, short_lower);
-            (m.as_str(), full.max(short))
+            let name_clean: String = name_lower.chars().filter(|c| c.is_alphanumeric()).collect();
+            let score = strsim::jaro_winkler(&needle_clean, &name_clean);
+            (m.as_str(), score)
         })
+        .filter(|(_, s)| *s >= 0.75)
         .collect();
+
     scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
-
-    // Perfect Jaro-Winkler (1.0) → auto-select regardless of gap.
-    if let Some(first) = scored.first() {
-        if first.1 >= 0.999 {
-            return vec![first.0];
-        }
-    }
-
-    // Clear winner: ≥0.9 and well ahead of #2.
-    if let (Some(first), Some(second)) = (scored.first(), scored.get(1)) {
-        if first.1 >= 0.9 && (first.1 - second.1) > 0.1 {
-            return vec![first.0];
-        }
-    }
-
-    // If substring already gave us matches, return those.
-    if !substr_matches.is_empty() {
-        return substr_matches;
-    }
-
-    // Otherwise return all fuzzy-scored above 0.5 (up to 10).
-    scored
-        .into_iter()
-        .filter(|(_, s)| *s >= 0.5)
-        .take(10)
-        .map(|(name, _)| name)
-        .collect()
+    scored.into_iter().map(|(name, _)| name).collect()
 }
 
 /// Run the chat REPL.
@@ -286,6 +250,64 @@ pub async fn run(paths: &Paths) -> Result<()> {
                                     println!();
                                     continue;
                                 }
+
+                                // Hard-coded tag filters (Ollama convention:
+                                // tags can be ":cloud" or "30b-cloud" etc. —
+                                // "cloud" is always the suffix).
+                                if name == "cloud" || name == "local" {
+                                    let filtered: Vec<&String> = if name == "cloud" {
+                                        ollama_models
+                                            .iter()
+                                            .filter(|m| m.ends_with("cloud"))
+                                            .collect()
+                                    } else {
+                                        ollama_models
+                                            .iter()
+                                            .filter(|m| !m.ends_with("cloud"))
+                                            .collect()
+                                    };
+                                    if filtered.is_empty() {
+                                        println!("  No {name} models found.");
+                                    } else {
+                                        println!("  {name} models ({}):", filtered.len());
+                                        for (i, m) in filtered.iter().enumerate() {
+                                            let marker = if *m == &current_model {
+                                                " ← current"
+                                            } else {
+                                                ""
+                                            };
+                                            println!("    {}. {m}{marker}", i + 1);
+                                        }
+                                        println!(
+                                            "  Type /model <number> to select, or /model cancel."
+                                        );
+                                        editor.add_history_entry(trimmed)?;
+                                        if let Ok(sel_line) = editor.readline("select → ") {
+                                            let sel = sel_line.trim();
+                                            if sel == "cancel" || sel == "/model cancel" {
+                                                println!("  Cancelled.");
+                                            } else if let Ok(idx) = sel
+                                                .trim_start_matches("/model ")
+                                                .trim()
+                                                .parse::<usize>()
+                                            {
+                                                if idx >= 1 && idx <= filtered.len() {
+                                                    current_model = filtered[idx - 1].clone();
+                                                    println!(
+                                                        "  Switched to model: {current_model}"
+                                                    );
+                                                } else {
+                                                    println!("  Invalid number. Cancelled.");
+                                                }
+                                            } else {
+                                                println!("  Unrecognised. Cancelled.");
+                                            }
+                                        }
+                                    }
+                                    println!();
+                                    continue;
+                                }
+
                                 let matches = fuzzy_match_models(name, &ollama_models);
                                 match matches.len() {
                                     0 => {
