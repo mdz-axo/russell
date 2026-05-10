@@ -25,7 +25,7 @@ use std::sync::atomic::{AtomicI64, Ordering};
 use rusqlite::{Connection, OpenFlags, params};
 use tracing::{debug, info};
 
-use crate::error::{Result, CoreError};
+use crate::error::{CoreError, Result};
 use crate::event::{Event, Scope, Severity};
 
 /// Write-capable journal handle. Cheap to construct; holds an
@@ -229,6 +229,14 @@ impl JournalWriter {
         JournalReader {
             path: self.path.clone(),
         }
+    }
+
+    /// Unix timestamp of the most recent write (append / append_sample / append_help_session_row).
+    ///
+    /// Used by proprioception to compute `journal_writer_stall_s`.
+    #[must_use]
+    pub fn last_write_unix_s(&self) -> i64 {
+        self.last_write_unix_s.load(Ordering::Relaxed)
     }
 
     /// Path the journal was opened against.
