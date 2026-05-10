@@ -39,11 +39,10 @@ seam for the richer triage loop when ADR-0007 lifts.
 **v2 revision (2026-05-09).** The original ADR made OpenRouter the
 default backend. Operator preference and the machine's local-first
 posture flipped this: **Ollama is the default**, OpenRouter is
-opt-in. The model changes from `moonshotai/kimi-k2.5` to
-`deepseekv4pro`. Russell now checks for Ollama at `help` time and
-attempts to start it if it's not running. OpenRouter remains
-available, and its ZDR enforcement is preserved unchanged when
-used.
+opt-in. The default model is `deepseekv4pro`. Russell now checks
+for Ollama at `help` time and attempts to start it if it's not
+running. OpenRouter remains available, and its ZDR enforcement is
+preserved unchanged when used.
 
 ## Decision
 

@@ -58,7 +58,7 @@ blocker.
 
 | # | Russell path | Upstream path | Upstream commit | Russell changes | Sync policy |
 |---|---|---|---|---|---|
-| 1 | `crates/russell-doctor/src/openrouter.rs` | `slate/stack/crates/stack-llm/src/openai.rs` + `src/wire.rs` | `67a13834d8af4efa8c330ce10ef1031bf2cdeee2` | Uses Russell's `DoctorError` + `SoapPrompt`/`LlmResponse` instead of `stack_types`. Drops streaming, tool-calling, structured-output, retry. Adds per-request ZDR enforcement. Keeps DeepSeek / Kimi `reasoning_details` content-normalisation. | Review on upstream bug fix; pull fixes, not features. Log changes in §6. |
+| 1 | `crates/russell-doctor/src/openrouter.rs` | `slate/stack/crates/stack-llm/src/openai.rs` + `src/wire.rs` | `67a13834d8af4efa8c330ce10ef1031bf2cdeee2` | Uses Russell's `DoctorError` + `SoapPrompt`/`LlmResponse` instead of `stack_types`. Drops streaming, tool-calling, structured-output, retry. Adds per-request ZDR enforcement. Keeps reasoning-details content-normalisation for models that emit it. | Review on upstream bug fix; pull fixes, not features. Log changes in §6. |
 
 ## 4. Planned copies for Phase 1
 

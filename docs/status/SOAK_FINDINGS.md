@@ -73,7 +73,7 @@ Confirmed healthy as of 2026-05-06:
   2 074 host-scope `harness.event.v1` rows; all `severity=info`
   (no rule engine to emit `warn+` yet — by design, see F-4).
 - **Cry-for-help path (no change since day 4).** 12 total
-  `help_sessions` rows: 7 successful Kimi K2.5 round-trips and
+  `help_sessions` rows: 7 successful LLM round-trips and
   5 clean offline fallbacks, all dated 2026-04-18 or
   2026-04-21. No new `russell jack` invocations since day 4
   (see F-9).
@@ -143,7 +143,7 @@ Confirmed healthy as of 2026-05-06:
 - **Action for Phase 2.** When the rule engine lands, offline
   fallback becomes useful automatically.
 
-### F-5: OpenRouter 60 s timeouts during afternoon peaks
+### F-5: LLM backend timeouts during afternoon peaks
 
 - **Status (Day 19).** No new occurrences — *but* no new
   `russell jack` invocations either (see F-9), so there has
@@ -156,7 +156,7 @@ Confirmed healthy as of 2026-05-06:
   more compact (F-2's fix may *increase* the payload, so we
   weigh together). Do not add retry per ADR-0016.
 
-### F-6: Kimi latency variance — 3.9 s to 31.7 s
+### F-6: LLM latency variance — 3.9 s to 31.7 s
 
 - **Status (Day 19).** Same as F-5 — no new data points; no
   new `russell jack` calls in 15 days.
@@ -264,7 +264,7 @@ Confirmed healthy as of 2026-05-06:
   *journaled during the 30-day window*, and at least one was
   triggered in a real moment of operator uncertainty about the
   machine's state." We currently have:
-  - 7 successful Kimi K2.5 round-trips ✅ (need 10).
+  - 7 successful LLM round-trips ✅ (need 10).
   - 5 offline fallbacks (don't count toward "successful
     round-trips").
   - All 12 sessions occurred in the **first 4 days** of the
@@ -293,7 +293,7 @@ Confirmed healthy as of 2026-05-06:
      the empirical observation that a healthy host generates
      few help-worthy moments.
 - **Note on F-5/F-6.** Their "no recurrence" status is a
-  consequence of F-9, not a separate signal of OpenRouter
+  consequence of F-9, not a separate signal of backend
   improvement.
 
 ## Triage summary (Day 19)

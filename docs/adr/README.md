@@ -29,7 +29,7 @@ Deferred ADRs live under
 | [0011](0011-testing-strategy.md) | Testing layers |
 | [0013](0013-rust-workspace-layout.md) | Seven-crate workspace, DAG at `russell-core` |
 | [0015](0015-proprioception-self-health.md) | Proprioception — Jack watches Jack |
-| [0016](0016-doctor-and-llm-router.md) | MVP Doctor — single round-trip to ZDR frontier LLM |
+| [0016](0016-doctor-and-llm-router.md) | MVP Doctor — local-first Ollama, OpenRouter opt-in |
 | [0017](0017-reuse-over-dependency.md) | Reuse over dependency — copy-with-provenance |
 | [0018](0018-close-phase-1c.md) | Close Phase 1c — 20-day soak sufficient |
 | [0019](0019-probe-cadence-and-ctha.md) | Probe cadence separation + CTHA instrumentation |

@@ -88,7 +88,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Live verification on the Framework 16 / HX 370 / Ubuntu 25.10**
   machine (`MACHINE_PROFILE.md`): timer fires every 5 min, Sentinel
   captures 3 samples per cycle at 5.1 MB peak memory / 25 ms CPU.
-  Real Kimi K2.5 round-trip via OpenRouter tested end-to-end; Jack
+  Real LLM round-trip via Ollama tested end-to-end; Jack
   reads his own event history and narrates the machine's state in
   persona-accurate voice.
 
@@ -116,9 +116,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `OpenRouterClient` backend — pattern-copied from
     `slate/stack/crates/stack-llm/src/{openai,wire}.rs` per
     `REUSE_MANIFEST.md` row 1. Drops streaming, tool-calling,
-    structured-output, retry. Adds per-request ZDR enforcement.
-    Retains DeepSeek / Kimi `reasoning_details` content
-    normalisation.
+    structured-output, retry. Adds per-request ZDR enforcement
+    (when using OpenRouter). Retains reasoning-details content
+    normalisation for models that emit it.
   - `MockClient` for tests and `RUSSELL_DOCTOR_BACKEND=mock`.
   - `fallback::summarise` — the offline rule-based response.
     Jack is never silent.

@@ -26,7 +26,7 @@ Phase 1c began 2026-04-17 as a 30-day unattended soak per
 §6. The soak is now at day 20 (2026-05-06). Empirical data:
 
 - **2 062 Sentinel cycles** recorded, ~99.95% reliability.
-- **12 help sessions:** 7 successful Kimi K2.5 LLM round-trips,
+- **12 help sessions:** 7 successful LLM round-trips,
   5 offline fallbacks.
 - **Journal at 2.0 MB**, healthy linear growth.
 - **No mystery gaps** in active periods; all long gaps are
