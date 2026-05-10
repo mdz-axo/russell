@@ -580,7 +580,9 @@ fn collect_script_names(cmd: &[String], out: &mut BTreeSet<String>) {
     for arg in cmd {
         // Heuristic: script names appear as bare filenames or
         // paths starting with `./` or `scripts/`.
-        let name = if let Some(stripped) = arg.strip_prefix("./") {
+        let name = if let Some(stripped) = arg.strip_prefix("./scripts/") {
+            stripped
+        } else if let Some(stripped) = arg.strip_prefix("./") {
             stripped
         } else if let Some(stripped) = arg.strip_prefix("scripts/") {
             stripped
