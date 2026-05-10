@@ -30,7 +30,7 @@ consequence.
 Russell is a cybernetic health harness for a single Linux AI/ML
 workstation. He has one eye on the host, one eye on himself, and —
 when he needs help he cannot give himself — one phone line to a
-frontier LLM with a zero-data-retention policy.
+local LLM (default: Ollama + DeepSeek V4 Pro; OpenRouter opt-in).
 
 He is **small**. That is the most important thing about him.
 
@@ -117,19 +117,19 @@ mutation.
 
 **Statement.** Russell must be able to **cry for help** from day
 one. The MVP Doctor is a single verb (`russell help`) that
-assembles the current observations, sends them through the LLM
-router to a frontier zero-data-retention endpoint, writes the
-round-trip to disk, and prints the response. It does not act. It
-does not parse. It does not dispatch. It **calls**.
+assembles the current observations, sends them through the
+LLM router (default: local Ollama, opt-in: OpenRouter with ZDR),
+writes the round-trip to disk, and prints the response. It does
+not act. It does not parse. It does not dispatch. It **calls**.
 
 **Rationale.** A system that *can never* escalate never escalates.
 If Russell grows into the full Doctor later, the help channel must
 already exist in habit form.
 
-**Consequence.** Cost: one round-trip to OpenRouter per
-`russell help`, one persona file, one env var for the API key.
-Buy: Russell's operator is never alone with a wedged machine —
-Jack can at least *say* what he sees.
+**Consequence.** Cost: one round-trip to the configured LLM
+backend per `russell help`, one persona file. Buy: Russell's
+operator is never alone with a wedged machine — Jack can at
+least *say* what he sees.
 
 **Linked ADRs.** ADR-0008, ADR-0016 *(to be authored)*.
 

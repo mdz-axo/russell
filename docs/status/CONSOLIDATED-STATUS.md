@@ -21,7 +21,7 @@ of every meaningful development session.
 
 - **Phase 0 (skeleton, read-only observation) — COMPLETE** as of
   2026-04-18.
-- **Phase 1 (MVP Doctor — `russell jack`) — IMPLEMENTED + verified against real Kimi K2.5.**
+- **Phase 1 (MVP Doctor — `russell jack`) — IMPLEMENTED + verified against real LLM backends (Ollama / OpenRouter).**
 - **Phase 1b (install artifacts + systemd units) — SHIPPED + installed on the observed machine.** 5-min timer firing; 50 tests green.
 - **Phase 1c (20-day unattended soak) — CLOSED.** Day 20 (2026-05-06): 2 062 cycles, ~99.95% reliability. Closed per [ADR-0018](../adr/0018-close-phase-1c.md). Findings F-1 through F-9 recorded in [`SOAK_FINDINGS.md`](SOAK_FINDINGS.md); F-7 (JR-5 self-vital) and F-2 (SOAP samples) carry into Phase 2.
 - **Phase 2 (observation sharpened) — OPEN.** Self-vital, rule engine, EWMA baselines, Markdown memory layer. Spec pinned at [`../specifications/MVP_SPEC.md`](../specifications/MVP_SPEC.md).
@@ -98,7 +98,8 @@ are met on the observed machine.
 
 ### Phase 1 — MVP Doctor (CURRENT)
 
-- **Goal:** `russell help` calls Kimi K2 via OpenRouter (ZDR),
+- **Goal:** `russell jack` calls the configured LLM (default
+  Ollama + `deepseekv4pro`; opt-in OpenRouter with ZDR),
   journals the round-trip, prints the response. Offline
   fallback works.
 - **Tasks:**
@@ -117,10 +118,10 @@ are met on the observed machine.
   11. ~~Tests: mock backend round-trip, offline fallback,
       migration idempotence, SOAP composition snapshot.~~ **Done (14 new tests in `russell-doctor`, 3 in `russell-core::env`).**
 - **Success:**
-  1. `russell help` returns a response from Kimi K2 when
-     `OPENROUTER_API_KEY` is set.
-  2. `russell help` returns a rule-based summary when the key
-     is unset.
+  1. `russell jack` returns a response from the configured LLM
+     (Ollama by default; OpenRouter if opted in).
+  2. `russell jack` returns a rule-based summary when the LLM
+     is unreachable.
   3. `help_sessions` rows are journaled and surface in
      `russell list` / `russell digest`.
   4. Evidence bundle under `evidence/help/<id>/` contains
@@ -168,7 +169,7 @@ ADR-0007 deferral lifted per ADR-0023.
 - [x] `russell-skills` crate: manifest parser, validation, symptom catalog
 - [x] Subprocess dispatcher: env scrubbing, timeout, stdout/stderr capture, dry-run
 - [x] CLI verbs: `russell skill list`, `russell skill run <id> [--dry-run]`
-- [ ] First skill: `gpu-doctor` (manifest + rocm-smi probe script)
+- [x] First skill: `gpu-doctor` fixture (manifest + rocm-smi probe script)
 - [ ] Doctor integration: symptom-to-skill mapping in `russell jack`
 
 ### Phase 4+ — Tracks the design document
@@ -179,9 +180,9 @@ that the simpler layer beneath has stabilised.
 
 ## 4. Open questions
 
-- (ADR-0016 will answer) Exact default model — `moonshotai/kimi-k2.5`
-  as MVP default; `moonshotai/kimi-k2` is an accepted alternative
-  if multimodal is not needed.
+- (ADR-0016 v2) Default backend is Ollama with model
+  `deepseekv4pro`. OpenRouter is opt-in via
+  `RUSSELL_DOCTOR_BACKEND=openrouter`.
 - (ADR-0016 will answer) Retry policy — copied from `stack-llm`;
   determine max attempts.
 - (Phase 1) Whether `russell-doctor` earns its own crate from day
@@ -193,8 +194,8 @@ that the simpler layer beneath has stabilised.
 |---|---|---|---|
 | OpenRouter API surface changes | Low | Medium | Copy pattern isolates us; sync log in `REUSE_MANIFEST.md` §6 |
 | `stack-llm` upstream diverges | Low–Med | Low | JR-6 discipline; we copied deliberately |
-| Operator forgets to set `OPENROUTER_API_KEY` | High | Low | Offline fallback always works |
-| ZDR endpoint unavailable for chosen model | Low | Low | Fallback to local Ollama or offline path |
+| Operator's Ollama not installed or model not pulled | Med | Med | Offline fallback always works; operator docs updated |
+| Ollama or OpenRouter becomes slow | Low | Medium | Phase-2 llm_p95_latency_ms vital |
 | Journal grows unboundedly | Med (long run) | Med | Phase-2 compaction skill; MVP note in `PERSISTENCE_CATALOG.md` |
 
 ## 6. Housekeeping debt

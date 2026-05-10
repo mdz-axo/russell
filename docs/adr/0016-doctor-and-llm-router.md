@@ -1,24 +1,24 @@
 ---
-title: "ADR-0016: MVP Doctor — Single Round-Trip to a ZDR Frontier LLM"
+title: "ADR-0016: MVP Doctor — Local-First Ollama with Opt-In OpenRouter"
 audience: [developers, architects, agents]
-last_updated: 2026-04-18
+last_updated: 2026-05-09
 togaf_phase: "H — Change Management"
-version: "1.0.0"
+version: "2.0.0"
 status: "Active"
 ---
 
 <!-- TOGAF_DOMAIN: Change Management -->
-<!-- VERSION: 1.0.0 -->
+<!-- VERSION: 2.0.0 -->
 <!-- STATUS: Active -->
-<!-- LAST_UPDATED: 2026-04-18 -->
+<!-- LAST_UPDATED: 2026-05-09 -->
 
-# ADR-0016: MVP Doctor — Single Round-Trip to a ZDR Frontier LLM
+# ADR-0016: MVP Doctor — Local-First Ollama with Opt-In OpenRouter
 
-- **Status:** Accepted
-- **Date:** 2026-04-18
+- **Status:** Accepted (superseded v1.0.0)
+- **Date:** 2026-04-18 (original), revised 2026-05-09
 - **Deciders:** Project founders
-- **Tags:** `doctor`, `llm`, `openrouter`, `zdr`, `mvp`
-- **Supersedes:** *(none)*
+- **Tags:** `doctor`, `llm`, `ollama`, `openrouter`, `mvp`
+- **Supersedes:** ADR-0016 v1.0.0 (2026-04-18)
 - **Relates to:** ADR-0008 (LLM never emits shell)
 
 ## Context
@@ -36,17 +36,20 @@ preserve ADR-0008's hard rule (the LLM never emits shell), must
 not compromise the IDRS posture (JR-2), and must leave a clean
 seam for the richer triage loop when ADR-0007 lifts.
 
-Simultaneously, operator data privacy rules out sending evidence
-to providers who may log prompts. OpenRouter's per-request `zdr:
-true` parameter, combined with Kimi K2's zero-retention endpoint,
-solves this while giving us access to a frontier open-weight
-reasoning model (1T params, 32B active, 131k-262k context).
+**v2 revision (2026-05-09).** The original ADR made OpenRouter the
+default backend. Operator preference and the machine's local-first
+posture flipped this: **Ollama is the default**, OpenRouter is
+opt-in. The model changes from `moonshotai/kimi-k2.5` to
+`deepseekv4pro`. Russell now checks for Ollama at `help` time and
+attempts to start it if it's not running. OpenRouter remains
+available, and its ZDR enforcement is preserved unchanged when
+used.
 
 ## Decision
 
 ### 1. MVP Doctor is a single verb
 
-`russell help [--note "..."]` is the only Doctor-facing CLI verb
+`russell jack [--note "..."]` is the only Doctor-facing CLI verb
 in MVP. Its behaviour:
 
 1. **Gather**: last 24 hours of samples, last 20 events, current
@@ -71,31 +74,52 @@ The Doctor does **not**:
 - Use tool-calling, function-calling, or any protocol that
   could construct an executable action.
 
-### 2. Backend selection via env
+### 2. Backend selection — default is Ollama
 
 Configuration flows from `~/.config/harness/russell.env` (see
 [`../specifications/PERSISTENCE_CATALOG.md`](../specifications/PERSISTENCE_CATALOG.md) §2.5):
 
 ```
-OPENROUTER_API_KEY=sk-or-...
-RUSSELL_DOCTOR_BACKEND=openrouter   # openrouter | ollama | mock
-RUSSELL_DOCTOR_MODEL=moonshotai/kimi-k2.5
+RUSSELL_DOCTOR_BACKEND=ollama          # ollama | openrouter | mock | offline
+RUSSELL_DOCTOR_MODEL=deepseekv4pro     # default model
+OPENROUTER_API_KEY=sk-or-...           # only required for openrouter backend
 ```
 
 Selection logic at startup:
 
 1. If `RUSSELL_DOCTOR_BACKEND` is set, use it.
-2. Else if `OPENROUTER_API_KEY` is present, default to `openrouter`.
-3. Else, default to `mock` (which produces the offline-fallback
-   response — see §4).
+2. Else, default to `ollama`.
 
-### 3. OpenRouter backend with ZDR enforced
+There is no longer a magic auto-detection path that silently
+switches to OpenRouter when a key is present. OpenRouter is
+**explicit opt-in** via `RUSSELL_DOCTOR_BACKEND=openrouter`.
 
-The OpenRouter backend:
+### 3. Ollama backend — the default
 
-- **Base URL:** `https://openrouter.ai/api/v1` (overridable for
-  testing only).
-- **Default model:** `moonshotai/kimi-k2.5`.
+The Ollama backend:
+
+- **Base URL:** `http://127.0.0.1:11434/v1` (Ollama's
+  OpenAI-compatible endpoint, overridable).
+- **Default model:** `deepseekv4pro`.
+- **Timeout:** 60 seconds. One attempt. No retry.
+- **Auto-start.** Before sending the prompt, Russell checks
+  whether Ollama is reachable via a quick GET to `/api/tags`
+  (3-second timeout). If not reachable, he runs
+  `systemctl --user start ollama` and waits 3 seconds for it
+  to become ready. This is a best-effort convenience; it does
+  not install or configure Ollama.
+- **Fallback on failure.** If Ollama cannot be reached after
+  the auto-start attempt, or if the chat completion fails, the
+  offline rule-based summary is emitted instead.
+
+### 4. OpenRouter backend — opt-in with ZDR enforced
+
+When `RUSSELL_DOCTOR_BACKEND=openrouter`, the backend operates
+as in ADR-0016 v1.0.0:
+
+- **Base URL:** `https://openrouter.ai/api/v1` (overridable).
+- **Default model:** whatever `RUSSELL_DOCTOR_MODEL` says, or
+  `deepseekv4pro`.
 - **Timeout:** 60 seconds. One attempt. No retry.
 - **Provider preferences sent in every request:**
 
@@ -103,23 +127,24 @@ The OpenRouter backend:
   "provider": { "zdr": true, "data_collection": "deny" }
   ```
 
-  This enforces zero data retention at the per-request level
-  (see `openrouter.ai/docs/guides/features/zdr`). A request that
-  cannot be routed to a ZDR endpoint fails rather than silently
-  routing to a retaining provider.
+  This enforces zero data retention at the per-request level.
+  A request that cannot be routed to a ZDR endpoint fails
+  rather than silently routing to a retaining provider.
 
 - **Identification:** `HTTP-Referer` set to a constant
   `https://russell.local/` and `X-Title` to `"Russell"`, per
   OpenRouter's app-attribution conventions.
 
-### 4. Offline fallback is mandatory
+### 5. Offline fallback is mandatory
 
-If any of these is true, `russell help` emits the **rule-based
+If any of these is true, `russell jack` emits the **rule-based
 fallback** instead of calling the LLM:
 
-- `OPENROUTER_API_KEY` is unset AND `RUSSELL_DOCTOR_BACKEND` is
-  not explicitly `ollama` or `mock`.
-- The HTTP call fails (network, timeout, 5xx).
+- The read from Ollama's `/api/tags` fails (i.e., Ollama not
+  running) and the `systemctl --user start ollama` auto-start
+  attempt also fails.
+- The HTTP call to the configured backend fails (network,
+  timeout, 5xx).
 - The response body does not parse as a valid OpenAI-compatible
   chat completion.
 
@@ -128,16 +153,16 @@ deterministic, Jack-voiced summary: severity counts, most-recent
 events, sentinel freshness, one suggested next-step per rules.
 **Jack is never silent.**
 
-### 5. Persona is a reviewed file
+### 6. Persona is a reviewed file
 
 The LLM's system prompt is loaded verbatim from
 `crates/russell-doctor/prompts/jack.md`. Modifying Jack's voice
 is a reviewed code change. The persona's design is documented at
 [`../architecture/THE_JACK.md`](../architecture/THE_JACK.md).
 
-### 6. Evidence bundle and journal table
+### 7. Evidence bundle and journal table
 
-Every `russell help` invocation writes:
+Every `russell jack` invocation writes:
 
 - A new row to the `help_sessions` table (migration `0002`).
 - A directory `~/.local/state/harness/evidence/help/<session-id>/`
@@ -150,7 +175,7 @@ Retention for evidence bundles is 90 days (manual in MVP; reaper
 in Phase 2) per
 [`../specifications/PERSISTENCE_CATALOG.md`](../specifications/PERSISTENCE_CATALOG.md) §2.3.
 
-### 7. How this preserves JR-3 / ADR-0008
+### 8. How this preserves JR-3 / ADR-0008
 
 ADR-0008 says the LLM never emits shell *in a context where the
 dispatcher executes its output*. MVP Russell has no dispatcher.
@@ -165,8 +190,13 @@ the wire path.
 
 ### Positive
 
-- Russell can help an operator on day one.
-- Zero ambiguity about privacy (`zdr: true`, per-request).
+- Russell can help an operator on day one — with zero network
+  dependency (Ollama default).
+- No API key required for the default path. One less obstacle
+  to getting started.
+- All host telemetry stays local in the Ollama case. Privacy
+  is the default, not a ZDR configuration flag.
+- When OpenRouter is used, `zdr: true` is still enforced per-request.
 - Offline fallback removes the "LLM dependency" failure mode.
 - Single round-trip, no streaming, no retry → simple to reason
   about, easy to test (mock backend round-trip + offline path).
@@ -175,65 +205,57 @@ the wire path.
 ### Negative / accepted costs
 
 - Jack cannot follow up on his own answers. One-shot only.
-- No cost-control / rate-limit awareness in MVP. The operator
-  pays per call; no backpressure.
-- The operator's `--note` + the last 24h of samples are sent to
-  OpenRouter on every call. The ZDR parameter mitigates this,
-  but the operator should understand the envelope (documented
-  in `PERSISTENCE_CATALOG.md` §6).
-- Kimi K2.5 availability on a ZDR endpoint depends on OpenRouter
-  provider coverage; if Moonshot's own endpoint goes non-ZDR,
-  the fallback kicks in and the operator is notified.
+- Ollama must be installed and the model (`deepseekv4pro`) must
+  be pulled before the first `russell jack`. Russell does not
+  manage model downloads — the operator does.
+- Auto-start (`systemctl --user start ollama`) assumes the
+  operator has set up a user-scoped systemd unit for Ollama.
+  If they haven't, the auto-start is a harmless no-op and the
+  fallback kicks in.
+- No cost-control / rate-limit awareness in MVP.
+- OpenRouter introduces a third-party dependency when opted
+  in, but under JR-6 we copy the HTTP wire pattern rather than
+  depend on the `stack-llm` crate. The only runtime dep is
+  `reqwest`.
 
 ### Neutral
 
-- OpenRouter introduces a third-party dependency on day one, but
-  under JR-6 we copy the HTTP wire pattern rather than depend on
-  the `stack-llm` crate. The only runtime dep is `reqwest`.
+- The OpenRouter path is fully preserved. Existing operators
+  who prefer it set `RUSSELL_DOCTOR_BACKEND=openrouter` and
+  carry on unchanged.
 
 ## Alternatives Considered
 
-### A. Depend on `stack-llm` directly
+### A. Keep OpenRouter as default (v1.0.0 position)
+
+Rejected in v2. The operator wants a local-first posture.
+Ollama + DeepSeek V4 Pro is the default; OpenRouter is a
+conscious opt-in for users who want a frontier cloud model.
+
+### B. Depend on `stack-llm` directly
 
 Rejected. Violates JR-6: introduces a transitive dependency on
 `stack_types` and the whole slate/stack workspace. Russell
 operator would need that workspace to build.
 
-### B. Vendor `stack-llm` as a subtree
-
-Rejected. Too much code for MVP needs. `stack-llm` has 3,086
-lines; MVP needs ~300 of those (openai HTTP call, error
-mapping, Kimi content-normalisation). The right granularity is
-**copy the functions we need into Russell-shaped types**, cited
-in the file headers.
-
-### C. Use Ollama by default
-
-Rejected as the default. Ollama + a local Kimi is reasonable
-when the operator runs local inference, but it is not what the
-operator asked for. OpenRouter + ZDR + frontier model is the
-MVP default. Local Ollama is available via
-`RUSSELL_DOCTOR_BACKEND=ollama`.
-
-### D. Allow tool-calling
+### C. Allow tool-calling
 
 Rejected. Opens the door to the LLM constructing structured
 actions. Every door we open increases the surface of JR-3
 violation. MVP Jack returns plain text; nothing more.
 
-### E. Multi-turn conversation
+### D. Multi-turn conversation
 
 Rejected for MVP. A single round-trip is enough to help the
 operator in most "what am I seeing?" moments. Multi-turn
 introduces a state machine that earns its weight only when
 skills land.
 
-### F. Retry on 5xx / timeout
+### E. Retry on 5xx / timeout
 
 Rejected for MVP. Retries mask intermittent provider issues;
 the operator should know the call failed and get the offline
-fallback instead. The retry crate from `stack-llm` is
-deliberately *not* copied for MVP.
+fallback instead.
 
 ## Implementation Notes
 
@@ -245,9 +267,15 @@ deliberately *not* copied for MVP.
   - `OpenRouterClient` — copies HTTP wire patterns from
     `stack-llm/src/openai.rs` and `wire.rs` per
     [`../operations/REUSE_MANIFEST.md`](../operations/REUSE_MANIFEST.md).
+    Used for both Ollama and OpenRouter backends (both are
+    OpenAI-compatible).
   - `MockClient` — deterministic scripted responses for tests.
   - `OfflineFallback` — the rule-based summary; always
     available, cannot fail.
+- **Ollama auto-start.** `help.rs` contains `ollama_health_check`
+  (GET to `/api/tags`, 3s timeout) and `ollama_start`
+  (`systemctl --user start ollama`). These run inside the
+  Doctor's async context before the LLM call.
 - The env loader `russell-core::env::load_env` reads
   `~/.config/harness/russell.env` (if present) at startup, per
   ADR-0017.
@@ -264,6 +292,6 @@ deliberately *not* copied for MVP.
   mechanism we follow for copying.
 - [`../specifications/MVP_SPEC.md`](../specifications/MVP_SPEC.md) §2.1 — the verb spec.
 - [`../architecture/THE_JACK.md`](../architecture/THE_JACK.md) — persona design.
+- Ollama docs: `ollama.com/docs`.
 - OpenRouter docs: `openrouter.ai/docs/guides/features/zdr`,
   `openrouter.ai/docs/guides/routing/provider-selection`.
-- Moonshot Kimi K2.5: `openrouter.ai/moonshotai/kimi-k2.5`.

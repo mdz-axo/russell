@@ -14,10 +14,11 @@ use crate::error::Result;
 /// Backend selector, per `RUSSELL_DOCTOR_BACKEND`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Backend {
-    /// OpenRouter (default if `OPENROUTER_API_KEY` is set).
-    OpenRouter,
-    /// Local Ollama (OpenAI-compatible at `http://localhost:11434/v1`).
+    /// Local Ollama — the default backend.
+    /// OpenAI-compatible at `http://localhost:11434/v1`.
     Ollama,
+    /// OpenRouter (opt-in if `OPENROUTER_API_KEY` is set).
+    OpenRouter,
     /// Mock for tests.
     Mock,
     /// Offline rule-based fallback — never calls the network.
@@ -25,8 +26,9 @@ pub enum Backend {
 }
 
 impl Backend {
-    /// Parse from the environment. Returns the MVP default if
-    /// nothing is configured.
+    /// Parse from the environment. Default is Ollama.
+    /// Falls back to Offline if Ollama is not reachable and
+    /// the operator has not opted into OpenRouter.
     #[must_use]
     pub fn from_env() -> Self {
         match std::env::var("RUSSELL_DOCTOR_BACKEND").ok().as_deref() {
@@ -35,16 +37,10 @@ impl Backend {
             Some("mock") => Self::Mock,
             Some("offline") => Self::Offline,
             Some(other) => {
-                tracing::warn!(backend = other, "unknown backend; using mock");
-                Self::Mock
+                tracing::warn!(backend = other, "unknown backend; using ollama");
+                Self::Ollama
             }
-            None => {
-                if std::env::var("OPENROUTER_API_KEY").is_ok() {
-                    Self::OpenRouter
-                } else {
-                    Self::Offline
-                }
-            }
+            None => Self::Ollama,
         }
     }
 
@@ -105,7 +101,7 @@ impl EscalateMin {
 pub struct ClientConfig {
     /// Backend to use.
     pub backend: Backend,
-    /// Model identifier (e.g. `"moonshotai/kimi-k2.5"`).
+    /// Model identifier (e.g. `"deepseekv4pro"`).
     pub model: String,
     /// Base URL; `None` = backend's default.
     pub base_url: Option<String>,
@@ -119,11 +115,11 @@ pub struct ClientConfig {
 
 impl ClientConfig {
     /// Resolve from the environment, applying MVP defaults
-    /// (`moonshotai/kimi-k2.5`, 60s timeout).
+    /// (`deepseekv4pro`, 60s timeout, Ollama backend).
     pub fn from_env() -> Self {
         let backend = Backend::from_env();
         let model =
-            std::env::var("RUSSELL_DOCTOR_MODEL").unwrap_or_else(|_| "moonshotai/kimi-k2.5".into());
+            std::env::var("RUSSELL_DOCTOR_MODEL").unwrap_or_else(|_| "deepseekv4pro".into());
         let base_url = std::env::var("RUSSELL_DOCTOR_BASE_URL").ok();
         let api_key = std::env::var("OPENROUTER_API_KEY").ok();
         Self {

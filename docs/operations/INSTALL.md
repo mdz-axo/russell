@@ -30,10 +30,13 @@ for the full map.
   [`../../CONTRIBUTING.md`](../../CONTRIBUTING.md) §1).
 - `sqlite3` in your `PATH` (only needed for the debug recipes below;
   Russell has SQLite statically-linked for its own use).
-- An OpenRouter API key if you want Jack to consult Kimi K2.5 —
-  free to sign up at `https://openrouter.ai/`. Russell works
-  without one (offline fallback), so this is optional but
-  recommended.
+- Ollama installed and running (or auto-startable) with the
+  `deepseekv4pro` model pulled. Russell's Doctor will attempt
+  to start Ollama automatically, but does not manage model
+  downloads — `ollama pull deepseekv4pro` is up to you.
+- Optionally, an OpenRouter API key if you want Jack to consult
+  a frontier cloud model instead. Russell works fine without
+  one — Ollama is the default.
 
 ## 2. One-liner
 
@@ -69,10 +72,12 @@ Edit the config and add your API key:
 ${EDITOR:-nano} ~/.config/harness/russell.env
 ```
 
-Fill in:
+Fill in (only needed if using the openrouter backend):
 
 ```
-OPENROUTER_API_KEY=sk-or-v1-…
+# Optional — uncomment and fill in to use OpenRouter instead of local Ollama
+# RUSSELL_DOCTOR_BACKEND=openrouter
+# OPENROUTER_API_KEY=sk-or-v1-…
 ```
 
 The other variables have sensible defaults; override only if you
@@ -98,9 +103,10 @@ russell list --limit 5
 russell jack --note "test"
 ```
 
-`russell jack` should produce a Kimi K2.5 response (if key is
-set) or a Jack-voiced offline summary (if not). Either way, Jack
-speaks.
+`russell jack` should produce a response from the configured
+LLM (local Ollama by default, or OpenRouter if you opted in),
+or a Jack-voiced offline summary if Ollama is not running.
+Either way, Jack speaks.
 
 ## 5. Regular Operation
 
@@ -152,24 +158,18 @@ To also remove the data:
 
 ### Jack is always offline
 
-Check the env is loaded:
+Check whether Ollama is running:
 
 ```sh
-systemctl --user cat russell-sentinel.service | grep Environment
-# The units don't set Environment=; they rely on russell's env
-# discovery. If you installed from the repo your API key is in
-# ~/.config/harness/russell.env — verify it's readable:
-ls -la ~/.config/harness/russell.env
-```
-
-The CLI runs `russell` under your shell's env, so:
-
-```sh
-env | grep OPENROUTER_API_KEY
-# If this is empty, russell.env may not be sourced. Russell reads
-# it on every invocation regardless, so just:
-russell jack --note "test" 2>&1 | tail -5
-# The trailer line tells you which backend was used.
+curl -s http://localhost:11434/api/tags | head
+# If this hangs or fails, Ollama is not running.
+systemctl --user status ollama
+# Russell auto-starts Ollama via systemctl --user start ollama.
+# If that fails (no unit), install and enable Ollama first:
+#   systemctl --user enable --now ollama
+ollama list
+# Check that deepseekv4pro is available:
+#   ollama pull deepseekv4pro
 ```
 
 ### Sentinel hasn't run

@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed — 2026-05-09: Ollama-first default, DeepSeek V4 Pro
+
+- **ADR-0016 v2:** Flip default backend from OpenRouter to local
+  Ollama. Default model is `deepseekv4pro`. OpenRouter remains
+  available as explicit opt-in (`RUSSELL_DOCTOR_BACKEND=openrouter`).
+- **Ollama auto-start.** `russell jack` checks for Ollama
+  reachability (`GET /api/tags`, 3s timeout) and runs
+  `systemctl --user start ollama` if it's not responding.
+  Best-effort: does not install or configure Ollama.
+- **Backend selection simplified.** No more silent auto-detection
+  of OpenRouter via `OPENROUTER_API_KEY`. Default is Ollama.
+  Set `RUSSELL_DOCTOR_BACKEND=openrouter` to opt in explicitly.
+- **Code changes:**
+  - `Backend::from_env()` now returns `Ollama` as default.
+  - `ClientConfig::from_env()` defaults model to `deepseekv4pro`.
+  - `help.rs` gains `ollama_health_check()` and `ollama_start()`.
+- **Docs updated:** `AGENTS.md`, `README.md`, `MVP_SPEC.md`,
+  `PRINCIPLES_CATALOG.md`, `PERSISTENCE_CATALOG.md`,
+  `THE_JACK.md`, `INSTALL.md`, `CONSOLIDATED-STATUS.md`,
+  `REUSE_MANIFEST.md`, `0016-doctor-and-llm-router.md` (v2).
+
 ### Added — 2026-05-06: Phase 1c closed, self-vital, Kask integration
 
 - **Phase 1c closed** per [ADR-0018](docs/adr/0018-close-phase-1c.md).

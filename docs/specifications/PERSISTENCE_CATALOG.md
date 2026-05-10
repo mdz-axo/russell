@@ -151,8 +151,8 @@ engines land in Phase 2.
 | Key | Purpose | Optional |
 |---|---|---|
 | `OPENROUTER_API_KEY` | Authenticates the Doctor's LLM calls | yes (fallback kicks in if absent) |
-| `RUSSELL_DOCTOR_MODEL` | Override default model ID | yes |
-| `RUSSELL_DOCTOR_BACKEND` | `openrouter` \| `ollama` \| `mock` | yes (default `openrouter` if key present, else `mock`) |
+| `RUSSELL_DOCTOR_MODEL` | Override default model ID | yes (default `deepseekv4pro`) |
+| `RUSSELL_DOCTOR_BACKEND` | `ollama` \| `openrouter` \| `mock` \| `offline` | yes (default `ollama`) |
 | `RUSSELL_LOG` | Tracing filter | yes |
 
 File is created by the operator. Russell does **not** write to it.
@@ -265,9 +265,9 @@ under `evidence/help/` contain the prompts Russell sent to the
 LLM and the LLM's responses; those prompts include the samples
 and events above, and any `--note` text the operator provided.
 
-OpenRouter calls route only to providers with a zero-data-retention
-policy (per-request `zdr: true` parameter) unless the operator
-explicitly disables that. See
+Ollama calls stay entirely local. OpenRouter calls route only
+to providers with a zero-data-retention policy (per-request
+`zdr: true` parameter). See
 [ADR-0016 *(to be authored in Phase 1)*](../adr/README.md)
 *(to be authored in Phase 1)* for the privacy contract.
 

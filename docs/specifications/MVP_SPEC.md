@@ -29,8 +29,8 @@ under user-scoped systemd on Ubuntu 25.10. He **observes** the
 host every five minutes via a small probe set, **remembers** what
 he saw in a SQLite journal, **reports** what he saw through four
 read-only CLI verbs, **watches himself** through one self-vital,
-and when asked he **cries for help** to a frontier
-zero-data-retention LLM via OpenRouter. He does not mutate host
+and when asked he **cries for help** to a local LLM
+(Ollama by default, DeepSeek V4 Pro). He does not mutate host
 state, he does not run privileged operations, he does not dispatch
 interventions, and he does not load skills. He is small and he is
 fierce.
@@ -65,16 +65,16 @@ Under JR-4, Russell must be able to escalate from day one.
    the LLM to fill.
 3. Submit via the copied `stack-llm` router
    ([`../operations/REUSE_MANIFEST.md`](../operations/REUSE_MANIFEST.md))
-   to OpenRouter with the `zdr: true` parameter, targeting the
-   frontier open-weight model (default:
-   `moonshotai/kimi-k2.5`).
+   to the configured backend (default: Ollama at
+   `http://127.0.0.1:11434/v1`, model `deepseekv4pro`).
 4. Write the full request / response / latency / model to
    the `help_sessions` table and an evidence bundle at
    `~/.local/state/harness/evidence/help/<session-id>/`.
 5. Print the model's response, plain text, to stdout.
 
-**Offline fallback.** If `OPENROUTER_API_KEY` is unset or the
-request fails, Jack still speaks: a rule-based summary of severity
+**Offline fallback.** If Ollama is unreachable (and the
+operator has not opted into OpenRouter) or the request fails,
+Jack still speaks: a rule-based summary of severity
 counts, most-recent events, and proprioception state is printed.
 Jack is never silent.
 

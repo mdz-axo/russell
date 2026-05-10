@@ -125,7 +125,7 @@ What he **never** does:
 Jack is never silent. When the LLM cannot be reached, the CLI
 prints a rule-based summary in the same voice:
 
-> "Offline. No Kimi today. Here's what I see on my own: memory
+> "Offline. No DeepSeek today. Here's what I see on my own: memory
 > 90 GiB free, swap 3.1 GB, last Sentinel cycle 4 minutes ago,
 > zero alerts in the last 24h. Call me back when the phone's
 > working."

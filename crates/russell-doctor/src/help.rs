@@ -109,7 +109,7 @@ pub async fn run_help_with_config(
         None
     };
 
-    let soap = prompt::compose(&writer.reader(), profile.as_ref(), note)?;
+    let soap = prompt::compose(&writer.reader(), profile.as_ref(), note, &[])?;
 
     // ADR-0022: augment the system prompt with operator identity files if present.
     let soap = augment_system_prompt(paths, soap);
@@ -157,6 +157,19 @@ pub async fn run_help_with_config(
             if ollama_cfg.api_key.is_none() {
                 ollama_cfg.api_key = Some("ollama".into());
             }
+
+            // Check if Ollama is reachable; if not, attempt to start it.
+            let base = ollama_cfg.base_url.clone().unwrap_or_default();
+            let health_url = base
+                .trim_end_matches("/v1")
+                .trim_end_matches('/')
+                .to_string()
+                + "/api/tags";
+            if !ollama_health_check(&health_url).await {
+                info!("ollama not reachable — attempting auto-start");
+                ollama_start().await;
+            }
+
             let client = openrouter::OpenRouterClient::new(&ollama_cfg)?;
             match client.chat(&soap).await {
                 Ok(resp) => ("ollama", Some(resp), None, None),
@@ -380,6 +393,45 @@ fn append_session_note(paths: &Paths, session_id: &str, note: Option<&str>, stat
         tracing::warn!(error = %e, path = %path.display(), "failed to append session note to daily log");
     } else {
         tracing::debug!(session = %session_id, "appended session note to daily log");
+    }
+}
+
+/// Check whether Ollama's API is reachable by hitting `/api/tags`.
+async fn ollama_health_check(health_url: &str) -> bool {
+    let Ok(client) = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(3))
+        .build()
+    else {
+        return false;
+    };
+    match client.get(health_url).send().await {
+        Ok(resp) => resp.status().is_success(),
+        Err(_) => false,
+    }
+}
+
+/// Attempt to start Ollama via `systemctl --user start ollama`.
+async fn ollama_start() {
+    let output = tokio::process::Command::new("systemctl")
+        .args(["--user", "start", "ollama"])
+        .output()
+        .await;
+    match output {
+        Ok(o) if o.status.success() => {
+            info!("ollama started via systemctl --user");
+            // Give it a moment to become ready.
+            tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+        }
+        Ok(o) => {
+            warn!(
+                stderr = %String::from_utf8_lossy(&o.stderr),
+                code = o.status.code(),
+                "systemctl --user start ollama returned non-zero"
+            );
+        }
+        Err(e) => {
+            warn!(error = %e, "failed to run systemctl --user start ollama");
+        }
     }
 }
 

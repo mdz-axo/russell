@@ -10,7 +10,7 @@
 //   - No streaming, no tool-calling, no structured-output
 //   - Enforces ZDR via provider preferences on every request
 //   - Single round-trip, no retry
-//   - Normalises Kimi K2.5 reasoning_details content fallback
+//   - Normalises DeepSeek / Kimi reasoning_details content fallback
 // Sync policy: review on upstream bug fix; pull fixes, not features.
 // See docs/operations/REUSE_MANIFEST.md row 1.
 
@@ -218,7 +218,7 @@ fn parse_completion(body: &str) -> Result<ParsedCompletion> {
         .ok_or_else(|| DoctorError::BadResponse("no message in choice".into()))?;
 
     // Content-normalisation, pattern from stack-llm/src/wire.rs:
-    // some models (Kimi K2.5, DeepSeek-R1, GLM-5) emit reasoning in
+    // some models (DeepSeek, Kimi K2.5, GLM-5) emit reasoning in
     // `reasoning_details[].text` or `reasoning_content` rather than
     // `content`. Promote those when `content` is null/missing.
     let content = match msg.get("content") {
@@ -278,13 +278,13 @@ mod tests {
     fn parses_standard_openai_response() {
         let body = r#"{
             "id":"x",
-            "model":"moonshotai/kimi-k2.5",
+            "model":"deepseekv4pro",
             "choices":[{"message":{"role":"assistant","content":"hello"}}],
             "usage":{"prompt_tokens":10,"completion_tokens":2}
         }"#;
         let p = parse_completion(body).unwrap();
         assert_eq!(p.content, "hello");
-        assert_eq!(p.model.as_deref(), Some("moonshotai/kimi-k2.5"));
+        assert_eq!(p.model.as_deref(), Some("deepseekv4pro"));
         assert_eq!(p.prompt_tokens, Some(10));
     }
 

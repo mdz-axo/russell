@@ -13,16 +13,23 @@ use std::fmt::Write as _;
 
 use russell_core::journal::JournalReader;
 use russell_core::{Profile, event::Scope};
+use russell_skills::Skill;
 
 use crate::client::SoapPrompt;
 use crate::error::Result;
 
 /// Build the SOAP prompt. The system prompt is always the
 /// embedded Jack persona.
+///
+/// If `loaded_skills` is provided, Jack is also told what
+/// probes and interventions are available so he can recommend
+/// specific manifest IDs per ADR-0008 (LLM ranks IDs, does not
+/// emit shell).
 pub fn compose(
     reader: &JournalReader,
     profile: Option<&Profile>,
     note: Option<&str>,
+    loaded_skills: &[Skill],
 ) -> Result<SoapPrompt> {
     let now = russell_core::time::now_unix();
     let window_start = now - 24 * 3600;
@@ -116,6 +123,35 @@ pub fn compose(
         writeln!(objective, "- No samples recorded.")?;
     }
 
+    // Phase 3A: available skills for LLM recommendation.
+    if !loaded_skills.is_empty() {
+        writeln!(objective, "\n### Available skills")?;
+        writeln!(objective, "| skill | type | id | risk |")?;
+        writeln!(objective, "|---|---|---|---|")?;
+        for skill in loaded_skills {
+            for p in &skill.probes {
+                writeln!(objective, "| {} | probe | {} | none |", skill.id, p.id,)?;
+            }
+            for iv in &skill.interventions {
+                writeln!(
+                    objective,
+                    "| {} | intervention | {} | {:?} |",
+                    skill.id, iv.id, iv.risk,
+                )?;
+            }
+        }
+        writeln!(
+            objective,
+            "\nWhen you recommend an action, use the format `RECOMMEND: <skill-id>/<id>`
+\
+(e.g. `RECOMMEND: gpu-doctor/probe-vram` for a probe or
+\
+`RECOMMEND: gpu-doctor/restart-ollama` for an intervention).
+\
+The operator may run `russell skill run <skill-id>/<id>` to execute it."
+        )?;
+    }
+
     writeln!(objective, "\n### Most-recent events (up to 20)")?;
     let rows = reader.recent(20)?;
     if rows.is_empty() {
@@ -202,7 +238,7 @@ mod tests {
         let db = tmp.path().join("journal.db");
         let w = JournalWriter::open(&db).unwrap();
         let reader = w.reader();
-        let prompt = compose(&reader, None, None).unwrap();
+        let prompt = compose(&reader, None, None, &[]).unwrap();
         assert!(prompt.rendered.contains("## Subjective"));
         assert!(prompt.rendered.contains("(no operator note)"));
         assert!(prompt.rendered.contains("(no events recorded)"));
@@ -221,7 +257,7 @@ mod tests {
         e.summary = Some("one vm fault".into());
         w.append(&e).unwrap();
         let reader = w.reader();
-        let prompt = compose(&reader, None, Some("ollama is slow")).unwrap();
+        let prompt = compose(&reader, None, Some("ollama is slow"), &[]).unwrap();
         assert!(prompt.rendered.contains("ollama is slow"));
         assert!(prompt.rendered.contains("daily/gpu-sanity"));
         assert!(prompt.rendered.contains("warn"));
@@ -293,7 +329,7 @@ mod tests {
         .unwrap();
 
         let reader = w.reader();
-        let prompt = compose(&reader, None, Some("checking trends")).unwrap();
+        let prompt = compose(&reader, None, Some("checking trends"), &[]).unwrap();
 
         // The sample summary table should appear with all three probes.
         assert!(

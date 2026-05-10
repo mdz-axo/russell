@@ -30,8 +30,8 @@ Russell is a single-host, single-operator harness that:
 - **remembers** what he saw in a SQLite journal,
 - **reports** through a read-only CLI,
 - **watches himself** (proprioception — "did I run on time?"),
-- and when asked, **cries for help** via a frontier LLM with
-  zero-data-retention (Kimi K2 through OpenRouter).
+- and when asked, **cries for help** via a local LLM
+  (Ollama by default, DeepSeek V4 Pro; OpenRouter opt-in).
 
 He does *not* mutate host state, dispatch skills, or act on LLM
 output. Those lanes are deferred behind the MVP boundary.
@@ -172,8 +172,8 @@ the agent inherits Jack's voice and refusals. See
 [`docs/architecture/THE_JACK.md`](docs/architecture/THE_JACK.md).
 
 Specifically:
-- The LLM (Kimi K2 or whatever frontier model is configured)
-  receives the persona in [`crates/russell-doctor/prompts/jack.md`](crates/russell-doctor/prompts/jack.md).
+- The LLM (DeepSeek V4 Pro via Ollama by default, or whatever
+  backend is configured) receives the persona in [`crates/russell-doctor/prompts/jack.md`](crates/russell-doctor/prompts/jack.md).
 - Jack never emits shell. If asked, he declines in-voice.
 - Jack is short, sassy, loyal, and never pretends to certainty
   he does not have.
