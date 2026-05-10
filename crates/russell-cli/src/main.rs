@@ -74,6 +74,10 @@ enum Command {
         #[command(subcommand)]
         cmd: SkillCmd,
     },
+    /// Start an interactive chat with Jack.
+    /// Each turn sends the latest journal state to the LLM,
+    /// maintaining conversation context across turns.
+    Chat,
 }
 
 #[derive(Subcommand, Debug)]
@@ -127,5 +131,6 @@ async fn main() -> Result<()> {
             SkillCmd::List => commands::skill::list(&paths),
             SkillCmd::Run { id, dry_run } => commands::skill::run(&paths, &id, dry_run).await,
         },
+        Command::Chat => commands::chat::run(&paths).await,
     }
 }

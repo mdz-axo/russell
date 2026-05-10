@@ -29,3 +29,11 @@ pub use help::{HelpOutcome, HelpSession, run_help};
 /// Source of truth: `crates/russell-doctor/prompts/jack.md`.
 /// Design rationale: `docs/architecture/THE_JACK.md`.
 pub const JACK_PERSONA: &str = include_str!("../prompts/jack.md");
+
+/// The Jack chat persona — used in `russell chat` interactive mode.
+///
+/// More conversational, supports multi-turn dialogue, and gives Jack
+/// permission to ask clarifying questions and design probes.
+///
+/// Source of truth: `crates/russell-doctor/prompts/jack-chat.md`.
+pub const JACK_CHAT_PERSONA: &str = include_str!("../prompts/jack-chat.md");
