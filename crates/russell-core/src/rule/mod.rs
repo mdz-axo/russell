@@ -200,17 +200,17 @@ impl RuleSet {
         // "too low" checks (value decreases → more severe).
         // Check in order: crit < alert < warn, so the most severe wins.
         if let Some(threshold) = rule.crit_below
-            && value <= threshold
+            && value < threshold
         {
             return Severity::Crit;
         }
         if let Some(threshold) = rule.alert_below
-            && value <= threshold
+            && value < threshold
         {
             return Severity::Alert;
         }
         if let Some(threshold) = rule.warn_below
-            && value <= threshold
+            && value < threshold
         {
             return Severity::Warn;
         }
@@ -397,12 +397,12 @@ alert_below = 4096
             }
         }
 
-        // With the override, 3 GiB is now below warn (8192).
-        assert_eq!(rs.evaluate("mem_available_mib", 3000.0), Severity::Warn);
+        // With the override, 3 GiB is below alert (4096) so it's Alert.
+        assert_eq!(rs.evaluate("mem_available_mib", 3000.0), Severity::Alert);
         // 8 GiB is Info (not below 8192).
         assert_eq!(rs.evaluate("mem_available_mib", 9000.0), Severity::Info);
-        // 3 GiB is below alert (4096).
-        assert_eq!(rs.evaluate("mem_available_mib", 3500.0), Severity::Alert);
+        // 1500 MiB is below alert (4096).
+        assert_eq!(rs.evaluate("mem_available_mib", 1500.0), Severity::Alert);
     }
 
     #[test]

@@ -679,6 +679,12 @@ impl JournalReader {
         conn.busy_timeout(std::time::Duration::from_secs(5))?;
         Ok(conn)
     }
+
+    /// Raw read-only connection. Internal use only.
+    #[doc(hidden)]
+    pub fn open_ro_conn(&self) -> Result<Connection> {
+        self.open_ro()
+    }
 }
 
 /// Count of events by severity.

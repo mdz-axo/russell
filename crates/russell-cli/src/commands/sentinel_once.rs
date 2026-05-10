@@ -101,6 +101,9 @@ pub fn run(paths: &Paths) -> Result<()> {
     }
     journal.append(&ev)?;
 
+    // 4. Refresh EWMA baselines once per 24h.
+    maybe_refresh_baselines(&journal, &reader);
+
     println!(
         "sentinel: captured {n} samples, {} threshold breaches in {} ms; proprio: age={}s stall={}s llm_p95={}ms drift={}s err_rate={}%",
         threshold_events.len(),
@@ -127,4 +130,53 @@ pub fn run(paths: &Paths) -> Result<()> {
             .unwrap_or_else(|| "?".into()),
     );
     Ok(())
+}
+
+/// Compute and persist EWMA baselines if 24h have elapsed since
+/// the last computation. Runs inline (not async) — the cost is
+/// acceptable once per day.
+#[tracing::instrument(level = "info", skip_all)]
+fn maybe_refresh_baselines(journal: &JournalWriter, reader: &JournalReader) {
+    let now = russell_core::time::now_unix();
+
+    // Check if any baseline is older than 24h.
+    let needs_refresh = reader
+        .open_ro_conn()
+        .ok()
+        .and_then(|conn| {
+            conn.query_row("SELECT MAX(updated_ts) FROM baselines", [], |r| {
+                r.get::<_, Option<i64>>(0)
+            })
+            .ok()
+            .flatten()
+        })
+        .map_or(true, |last| now - last > 86_400);
+
+    if !needs_refresh {
+        return;
+    }
+
+    tracing::info!("refreshing EWMA baselines (30-day window)");
+    match reader.compute_baselines(30) {
+        Ok(rows) => {
+            let count = rows.len();
+            for row in &rows {
+                if let Err(e) = journal.upsert_baseline(
+                    &row.probe,
+                    Scope::Host,
+                    None, // ewma_mean — deferred
+                    None, // ewma_var — deferred
+                    row.p50,
+                    row.p95,
+                    row.p99,
+                ) {
+                    tracing::warn!(probe = %row.probe, error = %e, "failed to upsert baseline");
+                }
+            }
+            tracing::info!(probes = count, "baselines refreshed");
+        }
+        Err(e) => {
+            tracing::warn!(error = %e, "failed to compute baselines");
+        }
+    }
 }
