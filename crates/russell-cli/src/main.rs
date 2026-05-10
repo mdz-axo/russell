@@ -100,8 +100,8 @@ async fn main() -> Result<()> {
         Command::Profile { init } => commands::profile::run(&paths, init),
         Command::Digest {
             since_hours,
-            format: _,
-        } => commands::digest::run(&paths, since_hours),
+            format,
+        } => commands::digest::run(&paths, since_hours, &format),
         Command::SentinelOnce => commands::sentinel_once::run(&paths),
         Command::Jack { note } => commands::help::run(&paths, note.as_deref()).await,
     }
