@@ -133,7 +133,7 @@ pub fn parse_io_pressure_some(content: &str) -> Option<f64> {
     content
         .lines()
         .find(|l| l.starts_with("some "))
-        .and_then(|l| parse_pressure_avg10(l))
+        .and_then(parse_pressure_avg10)
 }
 
 /// Parse the "full" pressure average from `/proc/pressure/io`.
@@ -143,7 +143,7 @@ pub fn parse_io_pressure_full(content: &str) -> Option<f64> {
     content
         .lines()
         .find(|l| l.starts_with("full "))
-        .and_then(|l| parse_pressure_avg10(l))
+        .and_then(parse_pressure_avg10)
 }
 
 fn parse_pressure_avg10(line: &str) -> Option<f64> {

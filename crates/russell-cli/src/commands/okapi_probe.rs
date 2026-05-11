@@ -112,12 +112,12 @@ fn extract_samples(m: &OkapiMetricsResponse) -> Vec<OkapiSample> {
     samples.push(OkapiSample::new("okapi_errors_total", m.errors_total as f64, "count"));
     samples.push(OkapiSample::new("okapi_adapter_count", m.loaded_adapters as f64, "count"));
 
-    if let (Some(used), Some(total)) = (m.gpu_memory_used_bytes, m.gpu_memory_total_bytes) {
-        if total > 0 {
+    if let (Some(used), Some(total)) = (m.gpu_memory_used_bytes, m.gpu_memory_total_bytes)
+        && total > 0
+    {
             let pct = (used as f64 / total as f64) * 100.0;
             samples.push(OkapiSample::new("okapi_gpu_memory_used_pct", pct, "%"));
             samples.push(OkapiSample::new("okapi_gpu_memory_used_mib", used as f64 / 1_048_576.0, "MiB"));
-        }
     }
 
     samples
@@ -242,8 +242,9 @@ pub fn run(paths: &Paths, auto_apply: bool, default_model: &str) -> Result<()> {
                 let mut unloaded = 0u32;
                 if let Ok(resp) = resp {
                     let body = resp.text().await.unwrap_or_default();
-                    if let Ok(wrapper) = serde_json::from_str::<serde_json::Value>(&body) {
-                        if let Some(adapters) = wrapper["adapters"].as_array() {
+                    if let Ok(wrapper) = serde_json::from_str::<serde_json::Value>(&body)
+                        && let Some(adapters) = wrapper["adapters"].as_array()
+                    {
                             let model = metrics.model_name.as_deref().unwrap_or("");
                             for adapter in adapters {
                                 if let Some(name) = adapter["name"].as_str() {
@@ -256,17 +257,15 @@ pub fn run(paths: &Paths, auto_apply: bool, default_model: &str) -> Result<()> {
                                         .json(&unload_body)
                                         .send()
                                         .await
+                                        && r.status().is_success()
                                     {
-                                        if r.status().is_success() {
-                                            unloaded += 1;
-                                        }
+                                        unloaded += 1;
                                     }
                                 }
                             }
                         }
                     }
-                }
-                Ok::<u32, anyhow::Error>(unloaded)
+                    Ok::<u32, anyhow::Error>(unloaded)
             })?;
             if unloaded > 0 {
                 actions_taken.push(format!("unloaded {unloaded} adapter(s)"));
