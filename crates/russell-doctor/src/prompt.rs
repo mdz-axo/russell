@@ -133,31 +133,64 @@ pub fn compose(
 
     // Phase 3A: available skills for LLM recommendation.
     if !loaded_skills.is_empty() {
-        writeln!(objective, "\n### Available skills")?;
-        writeln!(objective, "| skill | type | id | risk |")?;
-        writeln!(objective, "|---|---|---|---|")?;
-        for skill in loaded_skills {
-            for p in &skill.probes {
-                writeln!(objective, "| {} | probe | {} | none |", skill.id, p.id,)?;
+        // Separate actionable skills (have probes/interventions) from knowledge-only.
+        let actionable: Vec<&Skill> = loaded_skills
+            .iter()
+            .filter(|s| !s.probes.is_empty() || !s.interventions.is_empty())
+            .collect();
+        let knowledge_only: Vec<&Skill> = loaded_skills
+            .iter()
+            .filter(|s| s.probes.is_empty() && s.interventions.is_empty())
+            .collect();
+
+        if !actionable.is_empty() {
+            writeln!(objective, "\n### Available skills")?;
+            writeln!(objective, "| skill | type | id | risk |")?;
+            writeln!(objective, "|---|---|---|---|")?;
+            for skill in &actionable {
+                for p in &skill.probes {
+                    writeln!(objective, "| {} | probe | {} | none |", skill.id, p.id,)?;
+                }
+                for iv in &skill.interventions {
+                    writeln!(
+                        objective,
+                        "| {} | intervention | {} | {:?} |",
+                        skill.id, iv.id, iv.risk,
+                    )?;
+                }
             }
-            for iv in &skill.interventions {
-                writeln!(
-                    objective,
-                    "| {} | intervention | {} | {:?} |",
-                    skill.id, iv.id, iv.risk,
-                )?;
-            }
-        }
-        writeln!(
-            objective,
-            "\nWhen you recommend an action, use the format `RECOMMEND: <skill-id>/<id>`
+            writeln!(
+                objective,
+                "\nWhen you recommend an action, use the format `RECOMMEND: <skill-id>/<id>`
 \
 (e.g. `RECOMMEND: gpu-doctor/probe-vram` for a probe or
 \
 `RECOMMEND: gpu-doctor/restart-ollama` for an intervention).
 \
 The operator may run `russell skill run <skill-id>/<id>` to execute it."
-        )?;
+            )?;
+        }
+
+        if !knowledge_only.is_empty() {
+            writeln!(objective, "\n### Loaded knowledge")?;
+            writeln!(
+                objective,
+                "The following knowledge skills are active (their expertise is in your system prompt):"
+            )?;
+            for skill in &knowledge_only {
+                let symptoms: String = skill
+                    .symptoms
+                    .iter()
+                    .map(|s| s.as_str())
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                if symptoms.is_empty() {
+                    writeln!(objective, "- **{}**", skill.id)?;
+                } else {
+                    writeln!(objective, "- **{}** — symptoms: {}", skill.id, symptoms)?;
+                }
+            }
+        }
     }
 
     writeln!(objective, "\n### Most-recent events (up to 20)")?;
