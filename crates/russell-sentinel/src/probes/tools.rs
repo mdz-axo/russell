@@ -36,6 +36,72 @@ pub fn parse_loadavg_1m(content: &str) -> Option<f64> {
     content.split_whitespace().next()?.parse::<f64>().ok()
 }
 
+/// Parsed fields from `/proc/<pid>/stat`.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ProcessStat {
+    /// Process name (truncated to 15 chars by the kernel).
+    pub comm: String,
+    /// Process state: R (running), S (sleeping), D (uninterruptible),
+    /// Z (zombie), T (stopped), etc.
+    pub state: char,
+    /// User-mode CPU time in ticks.
+    pub utime_ticks: u64,
+    /// Kernel-mode CPU time in ticks.
+    pub stime_ticks: u64,
+    /// Resident set size in pages.
+    pub rss_pages: u64,
+}
+
+/// Parse `/proc/<pid>/stat` content.
+///
+/// Format (simplified):
+/// ```text
+/// 1234 (comm) S 0 0 ... utime stime ... rss ...
+/// ```
+///
+/// Extracts comm (process name), state, utime, stime, and rss.
+/// Fields are whitespace-delimited after the closing paren.
+pub fn parse_proc_stat(content: &str) -> Option<ProcessStat> {
+    let comm_end = content.rfind(')')?;
+    let comm = content[1..comm_end].to_string();
+
+    let rest = &content[comm_end + 2..];
+    let mut fields = rest.split_whitespace();
+
+    let state = fields.next()?.chars().next()?;
+
+    // Skip 10 fields to reach utime (field 14, 0-indexed 13):
+    // ppid, pgrp, session, tty_nr, tpgid, flags, minflt, cminflt, majflt, cmajflt
+    for _ in 0..10 {
+        fields.next()?;
+    }
+
+    let utime_ticks: u64 = fields.next()?.parse().ok()?;
+    let stime_ticks: u64 = fields.next()?.parse().ok()?;
+
+    // Skip 7 fields to reach rss (field 24, 0-indexed 23):
+    // cutime, cstime, priority, nice, num_threads, itrealvalue, starttime, vsize
+    for _ in 0..7 {
+        fields.next()?;
+    }
+
+    let rss_pages: u64 = fields.next()?.parse().ok()?;
+
+    Some(ProcessStat {
+        comm,
+        state,
+        utime_ticks,
+        stime_ticks,
+        rss_pages,
+    })
+}
+
+/// Total CPU ticks (utime + stime) for a process.
+#[inline]
+pub fn cpu_ticks(s: &ProcessStat) -> u64 {
+    s.utime_ticks + s.stime_ticks
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -81,5 +147,77 @@ mod tests {
     #[test]
     fn parse_loadavg_1m_handles_garbage() {
         assert_eq!(parse_loadavg_1m("not_a_number rest"), None);
+    }
+
+    #[test]
+    fn parse_proc_stat_extracts_fields() {
+        // Real stat line format: pid (comm) state ppid pgrp session tty_nr tpgid
+        // flags minflt cminflt majflt cmajflt utime stime cutime cstime priority
+        // nice num_threads itrealvalue starttime vsize rss ...
+        let content = "1234 (my-process) S 1233 1234 1234 0 -1 4194304 123 \
+                       0 0 0 45 67 0 0 20 0 1 0 123456 12345678 3456 \
+                       18446744073709551615 1 1 0 0 0 0 0 0 0 0 0 0 \
+                       0 0 0 0 0 0 0 0 0 0 0 0 0";
+        let stat = parse_proc_stat(content).expect("should parse");
+        assert_eq!(stat.comm, "my-process");
+        assert_eq!(stat.state, 'S');
+        assert_eq!(stat.utime_ticks, 45);
+        assert_eq!(stat.stime_ticks, 67);
+        assert_eq!(stat.rss_pages, 3456);
+    }
+
+    #[test]
+    fn parse_proc_stat_zombie() {
+        let content = "9999 (zombie-proc) Z 1 1 1 0 -1 0 0 0 0 0 0 0 0 0 \
+                       0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 \
+                       0 0 0 0 0 0 0";
+        let stat = parse_proc_stat(content).expect("should parse");
+        assert_eq!(stat.comm, "zombie-proc");
+        assert_eq!(stat.state, 'Z');
+        assert_eq!(stat.rss_pages, 0);
+    }
+
+    #[test]
+    fn parse_proc_stat_stuck_d_state() {
+        let content = "5555 (stuck-io) D 1 1 1 0 -1 0 100 0 50 0 5000 3000 \
+                       0 0 0 0 1 0 555 10000000 2048 \
+                       0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0";
+        let stat = parse_proc_stat(content).expect("should parse");
+        assert_eq!(stat.state, 'D');
+    }
+
+    #[test]
+    fn parse_proc_stat_comm_with_spaces() {
+        // Comm may be truncated to 15 chars, test with paren-wrapped name
+        let content = "1 (systemd) S 0 1 1 0 -1 4194304 1234 0 0 0 \
+                       100 50 10 5 20 0 1 0 50000 25000000 1024 \
+                       0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0";
+        let stat = parse_proc_stat(content).expect("should parse");
+        assert_eq!(stat.comm, "systemd");
+    }
+
+    #[test]
+    fn parse_proc_stat_empty_input() {
+        assert_eq!(parse_proc_stat(""), None);
+    }
+
+    #[test]
+    fn rss_pages_to_kib_correct() {
+        assert_eq!(rss_pages_to_kib(0), 0);
+        assert_eq!(rss_pages_to_kib(1), 4);
+        assert_eq!(rss_pages_to_kib(1024), 4096);
+        assert_eq!(rss_pages_to_kib(3456), 13824);
+    }
+
+    #[test]
+    fn cpu_ticks_sums_both() {
+        let s = ProcessStat {
+            comm: "test".into(),
+            state: 'R',
+            utime_ticks: 100,
+            stime_ticks: 50,
+            rss_pages: 0,
+        };
+        assert_eq!(cpu_ticks(&s), 150);
     }
 }

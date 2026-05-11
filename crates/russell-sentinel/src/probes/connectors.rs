@@ -25,3 +25,48 @@ pub fn read_file_to_string(path: &str) -> Option<String> {
     tracing::Span::current().record("ctha.connector.fs.success", result.is_some());
     result
 }
+
+/// List numeric PID entries in `/proc`. Returns `None` if `/proc`
+/// is unreadable.
+///
+/// CTHA: `ctha.connector.fs.target=/proc`, `ctha.connector.fs.success`
+#[tracing::instrument(
+    level = "trace",
+    fields(
+        ctha.connector.fs.target = "/proc",
+        ctha.connector.fs.success,
+    )
+)]
+pub fn list_proc_pids() -> Option<Vec<u32>> {
+    let entries = fs::read_dir("/proc").ok()?;
+    let mut pids = Vec::new();
+    for entry in entries.flatten() {
+        let name = entry.file_name();
+        let name_str = name.to_string_lossy();
+        if name_str.chars().all(|c| c.is_ascii_digit()) {
+            if let Ok(pid) = name_str.parse::<u32>() {
+                pids.push(pid);
+            }
+        }
+    }
+    tracing::Span::current().record("ctha.connector.fs.success", true);
+    Some(pids)
+}
+
+/// Read `/proc/<pid>/stat` for a single PID. Returns `None` on
+/// any I/O error (including the process exiting between listing
+/// and reading).
+#[tracing::instrument(
+    level = "trace",
+    fields(
+        ctha.connector.fs.target = tracing::field::Empty,
+        ctha.connector.fs.success,
+    )
+)]
+pub fn read_proc_stat(pid: u32) -> Option<String> {
+    let path = format!("/proc/{pid}/stat");
+    tracing::Span::current().record("ctha.connector.fs.target", path.as_str());
+    let result = fs::read_to_string(&path).ok();
+    tracing::Span::current().record("ctha.connector.fs.success", result.is_some());
+    result
+}

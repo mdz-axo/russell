@@ -9,6 +9,7 @@
 
 pub mod connectors;
 pub mod memory;
+pub mod process;
 pub mod tools;
 
 /// One sample emitted by a probe.
@@ -59,6 +60,62 @@ pub fn collect() -> Vec<Sample> {
             value_num: Some(v),
             value_text: None,
             unit: None,
+        });
+    }
+    if let Some(v) = process::proc_total_count() {
+        out.push(Sample {
+            name: "proc_total_count".into(),
+            value_num: Some(v),
+            value_text: None,
+            unit: Some("count"),
+        });
+    }
+    if let Some(v) = process::proc_zombie_count() {
+        out.push(Sample {
+            name: "proc_zombie_count".into(),
+            value_num: Some(v),
+            value_text: None,
+            unit: Some("count"),
+        });
+    }
+    if let Some(v) = process::proc_stuck_count() {
+        out.push(Sample {
+            name: "proc_stuck_count".into(),
+            value_num: Some(v),
+            value_text: None,
+            unit: Some("count"),
+        });
+    }
+    if let Some(v) = process::proc_running_count() {
+        out.push(Sample {
+            name: "proc_running_count".into(),
+            value_num: Some(v),
+            value_text: None,
+            unit: Some("count"),
+        });
+    }
+    if let Some(v) = process::proc_top_cpu_name() {
+        out.push(Sample {
+            name: "proc_top_cpu_name".into(),
+            value_num: None,
+            value_text: Some(v),
+            unit: None,
+        });
+    }
+    if let Some(v) = process::proc_top_mem_name() {
+        out.push(Sample {
+            name: "proc_top_mem_name".into(),
+            value_num: None,
+            value_text: Some(v),
+            unit: None,
+        });
+    }
+    if let Some(v) = process::proc_top_mem_pct() {
+        out.push(Sample {
+            name: "proc_top_mem_pct".into(),
+            value_num: Some(v),
+            value_text: None,
+            unit: Some("%"),
         });
     }
 
