@@ -43,10 +43,10 @@ pub fn list_proc_pids() -> Option<Vec<u32>> {
     for entry in entries.flatten() {
         let name = entry.file_name();
         let name_str = name.to_string_lossy();
-        if name_str.chars().all(|c| c.is_ascii_digit()) {
-            if let Ok(pid) = name_str.parse::<u32>() {
-                pids.push(pid);
-            }
+        if name_str.chars().all(|c| c.is_ascii_digit())
+            && let Ok(pid) = name_str.parse::<u32>()
+        {
+            pids.push(pid);
         }
     }
     tracing::Span::current().record("ctha.connector.fs.success", true);

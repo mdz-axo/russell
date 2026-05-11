@@ -23,10 +23,10 @@ fn collect_stats() -> Vec<ProcessStat> {
     };
     let mut stats = Vec::with_capacity(pids.len());
     for pid in &pids {
-        if let Some(content) = connectors::read_proc_stat(*pid) {
-            if let Some(stat) = tools::parse_proc_stat(&content) {
-                stats.push(stat);
-            }
+        if let Some(content) = connectors::read_proc_stat(*pid)
+            && let Some(stat) = tools::parse_proc_stat(&content)
+        {
+            stats.push(stat);
         }
     }
     stats

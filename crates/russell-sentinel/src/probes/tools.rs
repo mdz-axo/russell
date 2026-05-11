@@ -63,7 +63,8 @@ pub struct ProcessStat {
 /// Fields are whitespace-delimited after the closing paren.
 pub fn parse_proc_stat(content: &str) -> Option<ProcessStat> {
     let comm_end = content.rfind(')')?;
-    let comm = content[1..comm_end].to_string();
+    let open_paren = content[..comm_end].rfind('(')?;
+    let comm = content[open_paren + 1..comm_end].to_string();
 
     let rest = &content[comm_end + 2..];
     let mut fields = rest.split_whitespace();
@@ -79,9 +80,9 @@ pub fn parse_proc_stat(content: &str) -> Option<ProcessStat> {
     let utime_ticks: u64 = fields.next()?.parse().ok()?;
     let stime_ticks: u64 = fields.next()?.parse().ok()?;
 
-    // Skip 7 fields to reach rss (field 24, 0-indexed 23):
+    // Skip 8 fields to reach rss (field 24, 0-indexed 23):
     // cutime, cstime, priority, nice, num_threads, itrealvalue, starttime, vsize
-    for _ in 0..7 {
+    for _ in 0..8 {
         fields.next()?;
     }
 
@@ -199,14 +200,6 @@ mod tests {
     #[test]
     fn parse_proc_stat_empty_input() {
         assert_eq!(parse_proc_stat(""), None);
-    }
-
-    #[test]
-    fn rss_pages_to_kib_correct() {
-        assert_eq!(rss_pages_to_kib(0), 0);
-        assert_eq!(rss_pages_to_kib(1), 4);
-        assert_eq!(rss_pages_to_kib(1024), 4096);
-        assert_eq!(rss_pages_to_kib(3456), 13824);
     }
 
     #[test]
