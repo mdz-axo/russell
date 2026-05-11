@@ -115,10 +115,11 @@ pub struct ClientConfig {
 
 impl ClientConfig {
     /// Resolve from the environment, applying MVP defaults
-    /// (`qwen3:8b`, 60s timeout, Ollama backend).
+    /// (`nemotron-3-super:cloud`, 60s timeout, Ollama backend).
     pub fn from_env() -> Self {
         let backend = Backend::from_env();
-        let model = std::env::var("RUSSELL_DOCTOR_MODEL").unwrap_or_else(|_| "qwen3:8b".into());
+        let model = std::env::var("RUSSELL_DOCTOR_MODEL")
+            .unwrap_or_else(|_| "nemotron-3-super:cloud".into());
         let base_url = std::env::var("RUSSELL_DOCTOR_BASE_URL").ok();
         let api_key = std::env::var("OPENROUTER_API_KEY").ok();
         Self {

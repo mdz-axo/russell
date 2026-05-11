@@ -64,6 +64,11 @@ mkdir -p "$HOME/.config/harness" "$HOME/.local/state/harness/runs" \
          "$HOME/.local/state/harness/digest" \
          "$HOME/.local/share/harness/skills"
 
+say "Installing skills → ~/.local/share/harness/skills/"
+cp -r "$REPO/skills/ollama-watcher" "$HOME/.local/share/harness/skills/"
+cp -r "$REPO/skills/ubuntu-jack"    "$HOME/.local/share/harness/skills/"
+chmod +x "$HOME/.local/share/harness/skills/ollama-watcher/scripts/"*.sh 2>/dev/null || true
+
 if [ ! -f "$HOME/.config/harness/russell.env" ]; then
   # Prefer the repo .env if it's populated (convenience during dev).
   # Otherwise seed from the template.
