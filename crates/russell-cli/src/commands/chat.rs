@@ -25,6 +25,16 @@ use std::io::Write;
 use tokio::sync::oneshot;
 use tracing::{info, warn};
 
+/// A pending intervention awaiting operator consent.
+#[derive(Debug, Clone)]
+struct PendingAction {
+    skill_id: String,
+    intervention_id: String,
+    risk: russell_skills::RiskBand,
+    needs_sudo: bool,
+    cmd: Vec<String>,
+}
+
 /// One turn in the conversation.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct Turn {
@@ -134,6 +144,7 @@ pub async fn run(paths: &Paths) -> Result<()> {
 
     let mut history = ChatHistory::new(session_id.clone());
     let mut editor = DefaultEditor::new().context("initialising readline")?;
+    let mut pending_action: Option<PendingAction> = None;
 
     // Resolve the default model from env, and fetch available models from Okapi.
     let base_url = std::env::var("RUSSELL_DOCTOR_BASE_URL")
@@ -152,6 +163,7 @@ pub async fn run(paths: &Paths) -> Result<()> {
     println!("│  model: {current_model:<33}│");
     println!("│  /exit or Ctrl-D to leave.                │");
     println!("│  /model [list|<name>] to switch models.   │");
+    println!("│  /approve or /deny to handle proposals.   │");
     println!("│                                           │");
     println!("└───────────────────────────────────────────┘");
     println!();
@@ -167,6 +179,40 @@ pub async fn run(paths: &Paths) -> Result<()> {
                 if trimmed == "/exit" || trimmed == "/quit" {
                     println!("  Jack → Stay fierce. I'll be here.\n");
                     break;
+                }
+
+                // Consent handling — must come before special commands.
+                if let Some(ref pa) = pending_action {
+                    if trimmed == "/approve" {
+                        execute_pending_action(
+                            &journal, paths, pa, None, &session_id, &current_model,
+                        )
+                        .await;
+                        pending_action = None;
+                        continue;
+                    }
+                    if let Some(pw) = trimmed.strip_prefix("/approve ") {
+                        let pw = pw.trim();
+                        if pw.is_empty() {
+                            println!("  Usage: /approve [sudo-password]");
+                        } else {
+                            execute_pending_action(
+                                &journal, paths, pa, Some(pw), &session_id, &current_model,
+                            )
+                            .await;
+                        }
+                        pending_action = None;
+                        continue;
+                    }
+                    if trimmed == "/deny" {
+                        println!("  Denied. Action not executed.");
+                        pending_action = None;
+                        continue;
+                    }
+                    // Any other input clears the pending action and
+                    // falls through to normal chat processing.
+                    println!("  Action no longer pending. Treating as conversation.");
+                    pending_action = None;
                 }
 
                 // Special commands.
@@ -187,6 +233,8 @@ pub async fn run(paths: &Paths) -> Result<()> {
                             println!("  /model        — show current model");
                             println!("  /model list   — list available Okapi models");
                             println!("  /model <name> — switch to a model (fuzzy match)");
+                            println!("  /approve      — consent to Jack's proposed action");
+                            println!("  /deny         — refuse Jack's proposed action");
                             println!();
                             continue;
                         }
@@ -425,6 +473,17 @@ pub async fn run(paths: &Paths) -> Result<()> {
 
                         // Also journal the chat turn as a help-session event.
                         journal_chat_turn(&journal, &session_id, &current_model, trimmed, &content);
+
+                        // Check for ACTION: proposal.
+                        if let Some(pa) = parse_action_from_response(&content, &skills) {
+                            let sudo_tag = if pa.needs_sudo { " [needs sudo]" } else { "" };
+                            println!(
+                                "  → Jack proposes: {}/{} (risk: {:?}{}).",
+                                pa.skill_id, pa.intervention_id, pa.risk, sudo_tag
+                            );
+                            println!("  → /approve to execute, /deny to refuse.");
+                            pending_action = Some(pa);
+                        }
                     }
                     Err(e) => {
                         let msg = format!("(can't reach the LLM right now — {e})");
@@ -455,7 +514,108 @@ pub async fn run(paths: &Paths) -> Result<()> {
     Ok(())
 }
 
-/// Build the Objective section for the current turn.
+/// Parse an `ACTION: <skill-id>/<intervention-id>` line from Jack's
+/// response. Resolves it against the loaded skill set.
+fn parse_action_from_response(response: &str, skills: &[Skill]) -> Option<PendingAction> {
+    let action_line = response
+        .lines()
+        .rev()
+        .find(|line| line.trim().starts_with("ACTION:"))?;
+
+    let spec = action_line.trim().strip_prefix("ACTION:")?.trim();
+    let (skill_id, intervention_id) = spec.split_once('/')?;
+    let skill_id = skill_id.trim();
+    let intervention_id = intervention_id.trim();
+
+    let skill = skills.iter().find(|s| s.id == skill_id)?;
+    let iv = skill
+        .interventions
+        .iter()
+        .find(|i| i.id == intervention_id)?;
+
+    Some(PendingAction {
+        skill_id: skill_id.to_string(),
+        intervention_id: intervention_id.to_string(),
+        risk: iv.risk,
+        needs_sudo: iv.needs_sudo,
+        cmd: iv.cmd.clone(),
+    })
+}
+
+/// Execute a pending intervention via the skill dispatcher. If a sudo
+/// password is provided, it is consumed immediately and never stored.
+async fn execute_pending_action(
+    journal: &JournalWriter,
+    paths: &Paths,
+    action: &PendingAction,
+    sudo_password: Option<&str>,
+    session_id: &str,
+    model: &str,
+) {
+    use russell_skills::dispatch::{Dispatcher, DryRun, StepType};
+    use std::time::Duration;
+
+    let skill_dir = paths.skills().join(&action.skill_id);
+    let evidence_base = paths.evidence();
+
+    let intervention_timeout = Duration::from_secs(120);
+
+    let mut dispatcher = Dispatcher::new(&skill_dir);
+    dispatcher.intervention_timeout = intervention_timeout;
+    dispatcher.max_auto_risk = action.risk;
+    dispatcher.sudo_password = sudo_password.map(|s| s.to_string());
+    dispatcher.dry_run = DryRun::Disabled;
+
+    let result = dispatcher
+        .run_and_journal(
+            journal,
+            &evidence_base,
+            &action.cmd,
+            &action.skill_id,
+            &action.intervention_id,
+            StepType::Intervention,
+            &format!("{:?}", action.risk).to_lowercase(),
+            Some(intervention_timeout),
+        )
+        .await;
+
+    match result {
+        Ok(outcome) => {
+            if outcome.exit_code == Some(0) {
+                println!(
+                    "  → Executed {}/{} successfully.",
+                    action.skill_id, action.intervention_id
+                );
+            } else {
+                println!(
+                    "  → {}/{} exited with code {:?}.",
+                    action.skill_id,
+                    action.intervention_id,
+                    outcome.exit_code
+                );
+                if !outcome.stderr.is_empty() {
+                    println!("  stderr: {}", outcome.stderr.trim());
+                }
+            }
+            // Journal the execution as a chat event.
+            journal_chat_turn(
+                journal,
+                session_id,
+                model,
+                &format!("/approve {}/{}", action.skill_id, action.intervention_id),
+                &format!(
+                    "executed: exit={:?}, stdout_len={}, stderr_len={}",
+                    outcome.exit_code,
+                    outcome.stdout.len(),
+                    outcome.stderr.len()
+                ),
+            );
+        }
+        Err(e) => {
+            println!("  → Failed to execute: {e}");
+        }
+    }
+}
 fn build_objective(
     reader: &JournalReader,
     skills: &[Skill],

@@ -250,14 +250,14 @@ impl Dispatcher {
             .map_err(|e| russell_core::CoreError::io(&self.skill_dir, e))?;
 
         // Pipe sudo password if present.
-        if let Some(ref password) = self.sudo_password {
-            if let Some(mut stdin) = child.stdin.take() {
-                use tokio::io::AsyncWriteExt;
-                let mut pw_with_newline = password.clone();
-                pw_with_newline.push('\n');
-                let _ = stdin.write_all(pw_with_newline.as_bytes()).await;
-                drop(stdin);
-            }
+        if let Some(ref password) = self.sudo_password
+            && let Some(mut stdin) = child.stdin.take()
+        {
+            use tokio::io::AsyncWriteExt;
+            let mut pw_with_newline = password.clone();
+            pw_with_newline.push('\n');
+            let _ = stdin.write_all(pw_with_newline.as_bytes()).await;
+            drop(stdin);
         }
 
         let output = tokio::time::timeout(timeout, child.wait_with_output()).await;
@@ -586,6 +586,7 @@ mod tests {
             probe_timeout: Duration::from_secs(5),
             intervention_timeout: Duration::from_secs(5),
             max_auto_risk: RiskBand::Low,
+            sudo_password: None,
         };
         let outcome = d.run(&["echo".into(), "hello".into()], None).await.unwrap();
         assert!(outcome.dry_run);
@@ -618,6 +619,7 @@ mod tests {
             probe_timeout: Duration::from_secs(1),
             intervention_timeout: Duration::from_secs(1),
             max_auto_risk: RiskBand::Low,
+            sudo_password: None,
         };
         // Sleep longer than the timeout.
         let outcome = d
@@ -694,6 +696,7 @@ mod tests {
             probe_timeout: Duration::from_secs(5),
             intervention_timeout: Duration::from_secs(5),
             max_auto_risk: RiskBand::Low,
+            sudo_password: None,
         };
         let outcome = d
             .run_and_journal(
@@ -726,6 +729,7 @@ mod tests {
             probe_timeout: Duration::from_secs(5),
             intervention_timeout: Duration::from_secs(5),
             max_auto_risk: RiskBand::Low,
+            sudo_password: None,
         };
         assert!(d.check_risk(RiskBand::None, false).is_ok());
         assert!(d.check_risk(RiskBand::Low, false).is_ok());
@@ -742,6 +746,7 @@ mod tests {
             probe_timeout: Duration::from_secs(5),
             intervention_timeout: Duration::from_secs(5),
             max_auto_risk: RiskBand::Low,
+            sudo_password: None,
         };
         // High risk in dry-run mode should still pass — no mutation occurs.
         assert!(d.check_risk(RiskBand::Critical, true).is_ok());
@@ -755,6 +760,7 @@ mod tests {
             probe_timeout: Duration::from_secs(5),
             intervention_timeout: Duration::from_secs(5),
             max_auto_risk: RiskBand::Medium,
+            sudo_password: None,
         };
         assert!(d.check_risk(RiskBand::Medium, false).is_ok());
         assert!(d.check_risk(RiskBand::High, false).is_err());
@@ -768,6 +774,7 @@ mod tests {
             probe_timeout: Duration::from_secs(5),
             intervention_timeout: Duration::from_secs(5),
             max_auto_risk: RiskBand::Low,
+            sudo_password: None,
         };
         let err = d.check_risk(RiskBand::High, false).unwrap_err();
         let msg = err.to_string();
