@@ -176,7 +176,7 @@ the agent inherits Jack's voice and refusals. See
 [`docs/architecture/THE_JACK.md`](docs/architecture/THE_JACK.md).
 
 Specifically:
-- The LLM (DeepSeek V4 Pro via Ollama by default, or whatever
+- The LLM (DeepSeek V4 Pro via Okapi by default, or whatever
   backend is configured) receives the persona in [`crates/russell-doctor/prompts/jack.md`](crates/russell-doctor/prompts/jack.md).
 - Jack never emits shell. If asked, he declines in-voice.
 - Jack is short, sassy, loyal, and never pretends to certainty

@@ -1,11 +1,11 @@
 # SPDX-License-Identifier: MIT OR Apache-2.0
-# ollama-watcher — monitor local Ollama instance health and model inventory.
+# okapi-watcher — monitor local Okapi instance health and model inventory.
 #
-# Install: copy this directory to ~/.local/share/harness/skills/ollama-watcher/
+# Install: copy this directory to ~/.local/share/harness/skills/okapi-watcher/
 
-id: ollama-watcher
-version: 0.1.0
-authored: 2026-05-09
+id: okapi-watcher
+version: 0.2.0
+authored: 2026-05-10
 min_harness_version: 0.1.0
 
 symptoms:
@@ -26,8 +26,8 @@ probes:
     timeout: 10s
 
 interventions:
-  - id: restart-ollama
-    cmd: ["systemctl", "--user", "restart", "ollama"]
+  - id: restart-okapi
+    cmd: ["systemctl", "--user", "restart", "okapi"]
     risk: low
     idempotent: true
     rollback: none_needed
@@ -37,4 +37,4 @@ safety:
   max_auto_risk: low
 
 references:
-  - https://ollama.com/docs/api
+  - ~/Clones/Okapi/AGENTS.md
