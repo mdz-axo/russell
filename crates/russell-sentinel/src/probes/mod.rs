@@ -12,6 +12,7 @@ pub mod disks;
 pub mod gpu;
 pub mod memory;
 pub mod process;
+pub mod systemd;
 pub mod tools;
 
 /// One sample emitted by a probe.
@@ -174,6 +175,30 @@ pub fn collect() -> Vec<Sample> {
             value_num: Some(v),
             value_text: None,
             unit: Some("%"),
+        });
+    }
+    if let Some(v) = systemd::systemd_degraded() {
+        out.push(Sample {
+            name: "systemd_degraded".into(),
+            value_num: Some(v),
+            value_text: None,
+            unit: Some("bool"),
+        });
+    }
+    if let Some(v) = systemd::systemd_user_failed_count() {
+        out.push(Sample {
+            name: "systemd_user_failed_count".into(),
+            value_num: Some(v),
+            value_text: None,
+            unit: Some("count"),
+        });
+    }
+    if let Some(v) = systemd::systemd_system_failed_count() {
+        out.push(Sample {
+            name: "systemd_system_failed_count".into(),
+            value_num: Some(v),
+            value_text: None,
+            unit: Some("count"),
         });
     }
 
