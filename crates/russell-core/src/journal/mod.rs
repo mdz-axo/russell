@@ -664,6 +664,35 @@ impl JournalReader {
         Ok(results)
     }
 
+    /// Read all persisted baselines for host-scope probes from the
+    /// `baselines` table. Returns an empty `Vec` if no baselines
+    /// have been computed yet.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`CoreError::Sqlite`] on DB errors.
+    pub fn read_baselines(&self) -> Result<Vec<BaselineRow>> {
+        let conn = self.open_ro()?;
+        let mut stmt = conn.prepare(
+            "SELECT probe, p50, p95, p99
+               FROM baselines
+              WHERE scope = 'host'
+                AND p95 IS NOT NULL",
+        )?;
+        let rows = stmt
+            .query_map([], |r| {
+                Ok(BaselineRow {
+                    probe: r.get(0)?,
+                    p50: r.get(1)?,
+                    p95: r.get(2)?,
+                    p99: r.get(3)?,
+                    count: 0,
+                })
+            })?
+            .collect::<std::result::Result<Vec<_>, _>>()?;
+        Ok(rows)
+    }
+
     /// Path the journal lives at. May not exist yet on very fresh
     /// installs.
     #[must_use]

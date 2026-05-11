@@ -32,6 +32,7 @@ interventions:
     idempotent: true
     rollback: none_needed
     timeout: 30s
+    needs_sudo: false
 
 safety:
   max_auto_risk: low

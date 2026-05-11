@@ -44,6 +44,7 @@ interventions:
     rollback: none_needed
     requires_confirmation: true
     timeout: 60s
+    needs_sudo: true
 
 safety:
   max_auto_risk: low

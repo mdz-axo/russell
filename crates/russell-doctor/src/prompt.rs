@@ -98,24 +98,60 @@ pub fn compose(
     if summaries.is_empty() {
         writeln!(objective, "- (no samples recorded)")?;
     } else {
-        writeln!(
-            objective,
-            "| probe | count | min | avg | max | last | unit |"
-        )?;
-        writeln!(objective, "|---|---|---|---|---|---|---|")?;
-        for s in &summaries {
-            let unit = s.unit.as_deref().unwrap_or("");
+        // Read 30-day baselines for deviation detection.
+        let baselines: std::collections::BTreeMap<String, f64> = reader
+            .read_baselines()
+            .unwrap_or_default()
+            .into_iter()
+            .filter_map(|b| b.p95.map(|v| (b.probe, v)))
+            .collect();
+        let has_baselines = !baselines.is_empty();
+
+        if has_baselines {
             writeln!(
                 objective,
-                "| {} | {} | {} | {} | {} | {} | {} |",
-                s.probe,
-                s.count,
-                fmt_opt_f64(s.min),
-                fmt_opt_f64(s.avg),
-                fmt_opt_f64(s.max),
-                fmt_opt_f64(s.last),
-                unit,
+                "| probe | count | min | avg | max | last | p95 (30d) | unit |"
             )?;
+            writeln!(objective, "|---|---|---|---|---|---|---|---|")?;
+        } else {
+            writeln!(
+                objective,
+                "| probe | count | min | avg | max | last | unit |"
+            )?;
+            writeln!(objective, "|---|---|---|---|---|---|---|")?;
+        }
+        for s in &summaries {
+            let unit = s.unit.as_deref().unwrap_or("");
+            if has_baselines {
+                let p95 = baselines
+                    .get(&s.probe)
+                    .map(|v| fmt_f64_baseline(*v))
+                    .unwrap_or_else(|| "—".to_string());
+                writeln!(
+                    objective,
+                    "| {} | {} | {} | {} | {} | {} | {} | {} |",
+                    s.probe,
+                    s.count,
+                    fmt_opt_f64(s.min),
+                    fmt_opt_f64(s.avg),
+                    fmt_opt_f64(s.max),
+                    fmt_opt_f64(s.last),
+                    p95,
+                    unit,
+                )?;
+            } else {
+                writeln!(
+                    objective,
+                    "| {} | {} | {} | {} | {} | {} | {} |",
+                    s.probe,
+                    s.count,
+                    fmt_opt_f64(s.min),
+                    fmt_opt_f64(s.avg),
+                    fmt_opt_f64(s.max),
+                    fmt_opt_f64(s.last),
+                    unit,
+                )?;
+            }
         }
     }
 
@@ -321,6 +357,17 @@ fn fmt_opt_f64(v: Option<f64>) -> String {
             }
         }
         None => "—".into(),
+    }
+}
+
+/// Format a baseline f64 value for the p95 column.
+fn fmt_f64_baseline(v: f64) -> String {
+    if v.fract() == 0.0 && v.abs() < 1_000_000.0 {
+        format!("{v:.0}")
+    } else if v.abs() < 100.0 {
+        format!("{v:.2}")
+    } else {
+        format!("{v:.1}")
     }
 }
 

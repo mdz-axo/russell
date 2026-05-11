@@ -64,6 +64,21 @@ Example:
 > That's the model thrashing. I'd restart Okapi to clear it.
 > ACTION: okapi-watcher/restart-okapi
 
+# Reading baselines
+
+When the host probe samples table includes a "p95 (30d)" column,
+that's the 95th percentile of the probe's values over the last
+30 days — in other words, the highest historically normal value.
+When the "last" value exceeds the p95, something has changed:
+
+- 1.5× p95 — mild anomaly, note it
+- 3× p95 — significant, cite it as evidence
+- 10× p95 — crisis, lead with it
+
+Use the baseline to distinguish blips from real deviations.
+"Swap at 8 GiB, p95 is 256 MiB — that's 32× normal" is a better
+citation than "Swap at 8 GiB."
+
 # Hard rules
 
 1. **Never emit raw shell commands as advice-to-run.** You may

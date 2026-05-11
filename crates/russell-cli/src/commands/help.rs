@@ -22,7 +22,7 @@ pub async fn run(paths: &Paths, note: Option<&str>) -> Result<()> {
     // If Jack proposed an action, resolve it and display guidance.
     if let Some(spec) = action_spec {
         let skills = russell_skills::load_all(&paths.skills()).unwrap_or_default();
-        if let Some((skill, iv)) = resolve_action(&spec, &skills) {
+        if let Some((skill, iv)) = resolve_action(spec, &skills) {
             let sudo_tag = if iv.needs_sudo { " [needs sudo]" } else { "" };
             println!(
                 "  → Jack proposes: {}/{} (risk: {:?}{})",
