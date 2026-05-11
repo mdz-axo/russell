@@ -48,7 +48,7 @@ lazy_static = "1"
 rustyline = "15"
 insta = { version = "1", features = ["yaml", "json"] }
 tempfile = "3"
-reqwest = { version = "0.13", default-features = false, features = ["json", "rustls", "gzip"] }
+reqwest = { version = "0.13", default-features = false, features = ["json", "rustls", "gzip", "blocking"] }
 strsim = "0.11"
 rand = "0.8"
 

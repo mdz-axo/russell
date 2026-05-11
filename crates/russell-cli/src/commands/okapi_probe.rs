@@ -39,6 +39,7 @@ struct OkapiMetricsResponse {
 
 /// Result of the okapi-probe execution.
 #[derive(Debug)]
+#[allow(dead_code)]
 struct OkapiProbeResult {
     samples: Vec<OkapiSample>,
     metrics: OkapiMetricsResponse,
@@ -70,24 +71,30 @@ fn okapi_http_url() -> String {
     }
 }
 
-fn fetch_metrics(client: &reqwest::blocking::Client, base_url: &str) -> Result<OkapiMetricsResponse> {
+fn fetch_metrics(base_url: &str) -> Result<OkapiMetricsResponse> {
     let url = format!("{base_url}/api/metrics/json");
-    let resp = client
-        .get(&url)
-        .send()
-        .with_context(|| format!("fetching {url}"))?;
-
-    let status = resp.status();
-    let body = resp
-        .text()
-        .with_context(|| "reading metrics response")?;
-
-    if !status.is_success() {
-        anyhow::bail!("metrics endpoint returned {status}: {body}");
-    }
-
-    serde_json::from_str::<OkapiMetricsResponse>(&body)
-        .with_context(|| "parsing metrics JSON")
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .context("building async runtime")?;
+    rt.block_on(async {
+        let client = reqwest::Client::builder()
+            .timeout(std::time::Duration::from_secs(10))
+            .build()
+            .context("building HTTP client")?;
+        let resp = client
+            .get(&url)
+            .send()
+            .await
+            .with_context(|| format!("fetching {url}"))?;
+        let status = resp.status();
+        let body = resp.text().await.with_context(|| "reading metrics response")?;
+        if !status.is_success() {
+            anyhow::bail!("metrics endpoint returned {status}: {body}");
+        }
+        serde_json::from_str::<OkapiMetricsResponse>(&body)
+            .with_context(|| "parsing metrics JSON")
+    })
 }
 
 fn extract_samples(m: &OkapiMetricsResponse) -> Vec<OkapiSample> {
@@ -116,7 +123,7 @@ fn extract_samples(m: &OkapiMetricsResponse) -> Vec<OkapiSample> {
     samples
 }
 
-fn trigger_model_load(client: &reqwest::blocking::Client, base_url: &str, model: &str) -> Result<String> {
+fn trigger_model_load(base_url: &str, model: &str) -> Result<String> {
     let url = format!("{base_url}/api/generate");
     let body = serde_json::json!({
         "model": model,
@@ -124,31 +131,36 @@ fn trigger_model_load(client: &reqwest::blocking::Client, base_url: &str, model:
         "stream": false,
         "options": { "num_predict": 1 }
     });
+    let model = model.to_string();
 
-    let resp = client
-        .post(&url)
-        .json(&body)
-        .send()
-        .with_context(|| "triggering model load")?;
-
-    let status = resp.status();
-    let resp_body = resp.text().unwrap_or_default();
-
-    if status.is_success() {
-        Ok(format!("model load triggered for {model}"))
-    } else {
-        Ok(format!("model load failed ({status}): {resp_body}"))
-    }
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .context("building async runtime")?;
+    rt.block_on(async {
+        let client = reqwest::Client::builder()
+            .timeout(std::time::Duration::from_secs(10))
+            .build()
+            .context("building HTTP client")?;
+        let resp = client
+            .post(&url)
+            .json(&body)
+            .send()
+            .await
+            .with_context(|| "triggering model load")?;
+        let status = resp.status();
+        let resp_body = resp.text().await.unwrap_or_default();
+        if status.is_success() {
+            Ok(format!("model load triggered for {model}"))
+        } else {
+            Ok(format!("model load failed ({status}): {resp_body}"))
+        }
+    })
 }
 
 pub fn run(paths: &Paths, auto_apply: bool, default_model: &str) -> Result<()> {
     let started = std::time::Instant::now();
     let base_url = okapi_http_url();
-
-    let client = reqwest::blocking::Client::builder()
-        .timeout(std::time::Duration::from_secs(10))
-        .build()
-        .context("building HTTP client")?;
 
     let journal = JournalWriter::open(&paths.journal())
         .with_context(|| format!("opening journal {}", paths.journal().display()))?;
@@ -157,7 +169,7 @@ pub fn run(paths: &Paths, auto_apply: bool, default_model: &str) -> Result<()> {
     rules.load_from_dir(&paths.rules());
 
     // 1. Fetch metrics from Okapi.
-    let metrics = match fetch_metrics(&client, &base_url) {
+    let metrics = match fetch_metrics(&base_url) {
         Ok(m) => m,
         Err(e) => {
             let mut ev = Event::new("observe", Severity::Warn);
@@ -176,20 +188,20 @@ pub fn run(paths: &Paths, auto_apply: bool, default_model: &str) -> Result<()> {
     let now = russell_core::time::now_unix();
 
     for s in &samples {
-        journal.upsert_sample(now, Scope::Host, s.name, Some(s.value), None, s.unit)?;
+        journal.append_sample(now, Scope::Host, s.name, Some(s.value), None, Some(s.unit))?;
     }
 
     // 3. Evaluate rules and emit threshold events.
     let mut threshold_events: Vec<Event> = Vec::new();
     for s in &samples {
         let severity = rules.evaluate(s.name, s.value);
-        if severity > Severity::Info {
+        if severity != Severity::Info {
             let mut ev = Event::new("threshold_breach", severity);
             ev.tier = Some("okapi".into());
             ev.module = Some(format!("okapi/threshold/{}", s.name));
             ev.summary = Some(format!(
-                "{} = {:.1} {} raised {}",
-                s.name, s.value, s.unit, severity
+                "{} = {:.1} {} raised {severity:?}",
+                s.name, s.value, s.unit
             ));
             threshold_events.push(ev);
         }
@@ -205,7 +217,7 @@ pub fn run(paths: &Paths, auto_apply: bool, default_model: &str) -> Result<()> {
     if auto_apply {
         // Model not loaded? Trigger a load.
         if !metrics.model_loaded && !default_model.is_empty() {
-            match trigger_model_load(&client, &base_url, default_model) {
+            match trigger_model_load(&base_url, default_model) {
                 Ok(msg) => {
                     actions_taken.push(format!("model_load: {msg}"));
                 }
@@ -217,12 +229,19 @@ pub fn run(paths: &Paths, auto_apply: bool, default_model: &str) -> Result<()> {
 
         // Too many adapters? Unload them.
         if metrics.loaded_adapters > 4 {
-            let mut unloaded = 0u32;
-            if let Ok(resp) = client
-                .get(format!("{base_url}/api/adapters"))
-                .send()
-            {
-                if let Ok(body) = resp.text() {
+            let rt = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .context("building async runtime")?;
+            let unloaded = rt.block_on(async {
+                let client = reqwest::Client::builder()
+                    .timeout(std::time::Duration::from_secs(10))
+                    .build()
+                    .context("building HTTP client")?;
+                let resp = client.get(format!("{base_url}/api/adapters")).send().await;
+                let mut unloaded = 0u32;
+                if let Ok(resp) = resp {
+                    let body = resp.text().await.unwrap_or_default();
                     if let Ok(wrapper) = serde_json::from_str::<serde_json::Value>(&body) {
                         if let Some(adapters) = wrapper["adapters"].as_array() {
                             let model = metrics.model_name.as_deref().unwrap_or("");
@@ -232,22 +251,23 @@ pub fn run(paths: &Paths, auto_apply: bool, default_model: &str) -> Result<()> {
                                         "model": model,
                                         "name": name
                                     });
-                                    match client
+                                    if let Ok(r) = client
                                         .post(format!("{base_url}/api/adapters/unload"))
                                         .json(&unload_body)
                                         .send()
+                                        .await
                                     {
-                                        Ok(r) if r.status().is_success() => {
+                                        if r.status().is_success() {
                                             unloaded += 1;
                                         }
-                                        _ => {}
                                     }
                                 }
                             }
                         }
                     }
                 }
-            }
+                Ok::<u32, anyhow::Error>(unloaded)
+            })?;
             if unloaded > 0 {
                 actions_taken.push(format!("unloaded {unloaded} adapter(s)"));
             }

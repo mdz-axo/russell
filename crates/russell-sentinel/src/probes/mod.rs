@@ -8,6 +8,7 @@
 //! CTHA: `ctha.pipeline.sentinel_collect.duration_ms`, `items_out`
 
 pub mod connectors;
+pub mod disks;
 pub mod gpu;
 pub mod memory;
 pub mod process;
@@ -154,6 +155,22 @@ pub fn collect() -> Vec<Sample> {
     if let Some(v) = gpu::gpu_util_pct() {
         out.push(Sample {
             name: "gpu_util_pct".into(),
+            value_num: Some(v),
+            value_text: None,
+            unit: Some("%"),
+        });
+    }
+    if let Some(v) = disks::disk_io_pressure_some_pct() {
+        out.push(Sample {
+            name: "disk_io_pressure_some_pct".into(),
+            value_num: Some(v),
+            value_text: None,
+            unit: Some("%"),
+        });
+    }
+    if let Some(v) = disks::disk_io_pressure_full_pct() {
+        out.push(Sample {
+            name: "disk_io_pressure_full_pct".into(),
             value_num: Some(v),
             value_text: None,
             unit: Some("%"),

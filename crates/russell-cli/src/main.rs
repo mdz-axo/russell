@@ -60,6 +60,17 @@ enum Command {
     },
     /// Run the Sentinel once and append samples to the journal.
     SentinelOnce,
+    /// Probe the Okapi inference engine and record health metrics.
+    /// Use --auto-apply to automatically fix detected problems
+    /// (model load, adapter unload). Intended for systemd timer.
+    OkapiProbe {
+        /// Automatically apply safe management actions.
+        #[arg(long)]
+        auto_apply: bool,
+        /// Model to load if none is loaded (required with --auto-apply).
+        #[arg(long, default_value = "")]
+        default_model: String,
+    },
     /// Ask Jack for help — composes a SOAP bundle, consults the
     /// LLM (or offline fallback), writes evidence, prints the
     /// response.
@@ -126,6 +137,10 @@ async fn main() -> Result<()> {
             format,
         } => commands::digest::run(&paths, since_hours, &format),
         Command::SentinelOnce => commands::sentinel_once::run(&paths),
+        Command::OkapiProbe {
+            auto_apply,
+            default_model,
+        } => commands::okapi_probe::run(&paths, auto_apply, &default_model),
         Command::Jack { note } => commands::help::run(&paths, note.as_deref()).await,
         Command::Skill { cmd } => match cmd {
             SkillCmd::List => commands::skill::list(&paths),

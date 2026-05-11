@@ -1,0 +1,24 @@
+# SPDX-License-Identifier: MIT OR Apache-2.0
+# Run once per Okapi probe cycle. Installed to ~/.config/systemd/user/.
+
+[Unit]
+Description=Russell Okapi Probe — observe the inference engine
+Documentation=file://%h/Clones/russell/docs/specifications/MVP_SPEC.md
+OnFailure=russell-failure@%n.service
+
+[Service]
+Type=oneshot
+Nice=15
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=%h/.local/state/harness %h/.local/share/harness
+PrivateTmp=yes
+NoNewPrivileges=yes
+ExecStart=%h/.local/bin/russell okapi-probe --auto-apply --default-model nemotron-3-nano:4b
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target

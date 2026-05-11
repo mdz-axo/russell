@@ -120,6 +120,39 @@ pub fn parse_millidegrees_to_c(content: &str) -> Option<f64> {
     Some(mdeg as f64 / 1000.0)
 }
 
+/// Parse the "some" pressure average from `/proc/pressure/io`.
+///
+/// Format:
+/// ```text
+/// some avg10=0.00 avg60=0.00 avg300=0.14 total=38929564
+/// full avg10=0.00 avg60=0.00 avg300=0.13 total=22896661
+/// ```
+///
+/// Returns the `some avg10` as a percentage (0–100).
+pub fn parse_io_pressure_some(content: &str) -> Option<f64> {
+    content
+        .lines()
+        .find(|l| l.starts_with("some "))
+        .and_then(|l| parse_pressure_avg10(l))
+}
+
+/// Parse the "full" pressure average from `/proc/pressure/io`.
+///
+/// Returns the `full avg10` as a percentage (0–100).
+pub fn parse_io_pressure_full(content: &str) -> Option<f64> {
+    content
+        .lines()
+        .find(|l| l.starts_with("full "))
+        .and_then(|l| parse_pressure_avg10(l))
+}
+
+fn parse_pressure_avg10(line: &str) -> Option<f64> {
+    line.split_whitespace()
+        .find(|part| part.starts_with("avg10="))
+        .and_then(|part| part.strip_prefix("avg10="))
+        .and_then(|v| v.parse::<f64>().ok())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -256,5 +289,20 @@ mod tests {
     fn parse_millidegrees_to_c_handles_bad_input() {
         assert_eq!(parse_millidegrees_to_c(""), None);
         assert_eq!(parse_millidegrees_to_c("abc"), None);
+    }
+
+    #[test]
+    fn parse_io_pressure_some_extracts_avg10() {
+        let content = "some avg10=0.00 avg60=0.00 avg300=0.14 total=38929564\n\
+                       full avg10=1.23 avg60=0.87 avg300=0.13 total=22896661\n";
+        assert_eq!(parse_io_pressure_some(content), Some(0.0));
+        assert_eq!(parse_io_pressure_full(content), Some(1.23));
+    }
+
+    #[test]
+    fn parse_io_pressure_handles_bad_input() {
+        assert_eq!(parse_io_pressure_some(""), None);
+        assert_eq!(parse_io_pressure_some("garbage"), None);
+        assert_eq!(parse_io_pressure_full("full avg10=abc"), None);
     }
 }
