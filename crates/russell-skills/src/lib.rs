@@ -842,10 +842,10 @@ safety:
         assert_eq!(reset.id, "reset-gpu");
         assert!(matches!(reset.risk, RiskBand::Medium));
 
-        let ollama = skills.iter().find(|s| s.id == "ollama-watcher").unwrap();
-        assert_eq!(ollama.probes.len(), 2);
-        assert_eq!(ollama.interventions.len(), 1);
-        assert!(ollama.symptoms.contains(&"llm_slow".into()));
-        assert_eq!(ollama.interventions[0].id, "restart-ollama");
+        let okapi = skills.iter().find(|s| s.id == "okapi-watcher").unwrap();
+        assert_eq!(okapi.probes.len(), 2);
+        assert_eq!(okapi.interventions.len(), 1);
+        assert!(okapi.symptoms.contains(&"llm_slow".into()));
+        assert_eq!(okapi.interventions[0].id, "restart-okapi");
     }
 }

@@ -53,19 +53,19 @@ impl ChatHistory {
     }
 }
 
-/// An Ollama model entry from `/api/tags`.
+/// A model entry from Okapi's `/api/tags` (Ollama-compatible).
 #[derive(Debug, Clone, Deserialize)]
-struct OllamaModel {
+struct OkapiModel {
     name: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]
-struct OllamaTagsResponse {
-    models: Vec<OllamaModel>,
+struct OkapiTagsResponse {
+    models: Vec<OkapiModel>,
 }
 
-/// Fetch the list of available models from Ollama's `/api/tags`.
-async fn ollama_list_models(base_url: &str) -> Result<Vec<String>, String> {
+/// Fetch the list of available models from Okapi's `/api/tags`.
+async fn okapi_list_models(base_url: &str) -> Result<Vec<String>, String> {
     let tags_url = format!(
         "{}/api/tags",
         base_url.trim_end_matches("/v1").trim_end_matches('/')
@@ -78,11 +78,11 @@ async fn ollama_list_models(base_url: &str) -> Result<Vec<String>, String> {
         .get(&tags_url)
         .send()
         .await
-        .map_err(|e| format!("Ollama unreachable: {e}"))?;
+        .map_err(|e| format!("Okapi unreachable: {e}"))?;
     if !resp.status().is_success() {
-        return Err(format!("Ollama returned HTTP {}", resp.status()));
+        return Err(format!("Okapi returned HTTP {}", resp.status()));
     }
-    let body: OllamaTagsResponse = resp.json().await.map_err(|e| format!("parse error: {e}"))?;
+    let body: OkapiTagsResponse = resp.json().await.map_err(|e| format!("parse error: {e}"))?;
     Ok(body.models.into_iter().map(|m| m.name).collect())
 }
 
@@ -135,12 +135,12 @@ pub async fn run(paths: &Paths) -> Result<()> {
     let mut history = ChatHistory::new(session_id.clone());
     let mut editor = DefaultEditor::new().context("initialising readline")?;
 
-    // Resolve the default model from env, and fetch available models from Ollama.
+    // Resolve the default model from env, and fetch available models from Okapi.
     let base_url = std::env::var("RUSSELL_DOCTOR_BASE_URL")
-        .unwrap_or_else(|_| "http://127.0.0.1:11434/v1".into());
+        .unwrap_or_else(|_| "http://127.0.0.1:11435/v1".into());
     let mut current_model =
         std::env::var("RUSSELL_DOCTOR_MODEL").unwrap_or_else(|_| "nemotron-3-super:cloud".into());
-    let ollama_models: Vec<String> = ollama_list_models(&base_url).await.unwrap_or_default();
+    let okapi_models: Vec<String> = okapi_list_models(&base_url).await.unwrap_or_default();
 
     // Banner.
     println!();
@@ -185,7 +185,7 @@ pub async fn run(paths: &Paths) -> Result<()> {
                             println!("  /history      — show conversation history summary");
                             println!("  /skills       — list available skills");
                             println!("  /model        — show current model");
-                            println!("  /model list   — list available Ollama models");
+                            println!("  /model list   — list available Okapi models");
                             println!("  /model <name> — switch to a model (fuzzy match)");
                             println!();
                             continue;
@@ -233,8 +233,8 @@ pub async fn run(paths: &Paths) -> Result<()> {
                                 continue;
                             }
                             if other == "/model list" {
-                                println!("  Available models ({}):", ollama_models.len());
-                                for m in &ollama_models {
+                                println!("  Available models ({}):", okapi_models.len());
+                                for m in &okapi_models {
                                     let marker = if m == &current_model {
                                         " ← current"
                                     } else {
@@ -253,17 +253,17 @@ pub async fn run(paths: &Paths) -> Result<()> {
                                     continue;
                                 }
 
-                                // Hard-coded tag filters (Ollama convention:
+                                // Hard-coded tag filters (Okapi/Ollama convention:
                                 // tags can be ":cloud" or "30b-cloud" etc. —
                                 // "cloud" is always the suffix).
                                 if name == "cloud" || name == "local" {
                                     let filtered: Vec<&String> = if name == "cloud" {
-                                        ollama_models
+                                        okapi_models
                                             .iter()
                                             .filter(|m| m.ends_with("cloud"))
                                             .collect()
                                     } else {
-                                        ollama_models
+                                        okapi_models
                                             .iter()
                                             .filter(|m| !m.ends_with("cloud"))
                                             .collect()
@@ -310,7 +310,7 @@ pub async fn run(paths: &Paths) -> Result<()> {
                                     continue;
                                 }
 
-                                let matches = fuzzy_match_models(name, &ollama_models);
+                                let matches = fuzzy_match_models(name, &okapi_models);
                                 match matches.len() {
                                     0 => {
                                         println!(
@@ -409,7 +409,7 @@ pub async fn run(paths: &Paths) -> Result<()> {
 
                 // Call the LLM with an animated thinking spinner.
                 let cfg = russell_doctor::client::ClientConfig::from_env();
-                let response = call_ollama_with_spinner(&cfg, &current_model, &messages).await;
+                let response = call_okapi_with_spinner(&cfg, &current_model, &messages).await;
 
                 match response {
                     Ok(content) => {
@@ -591,9 +591,9 @@ const THINKING_EXPRESSIONS: &[&str] = &[
     "🔍 just checking on you",            // protective nurse (both Jacks)
 ];
 
-/// Call the LLM with an animated thinking spinner on stdout.
+/// Call the LLM via Okapi with an animated thinking spinner on stdout.
 /// The spinner is cleared the instant the response arrives.
-async fn call_ollama_with_spinner(
+async fn call_okapi_with_spinner(
     cfg: &russell_doctor::client::ClientConfig,
     model: &str,
     messages: &[serde_json::Value],
@@ -608,7 +608,7 @@ async fn call_ollama_with_spinner(
     let model = model.to_string();
     let messages = messages.to_vec();
     tokio::spawn(async move {
-        let result = call_ollama_direct(&cfg, &model, &messages).await;
+        let result = call_okapi_direct(&cfg, &model, &messages).await;
         let _ = tx.send(result);
     });
 
@@ -640,8 +640,8 @@ async fn call_ollama_with_spinner(
     }
 }
 
-/// Send messages to the Ollama chat API (no spinner — raw call).
-async fn call_ollama_direct(
+/// Send messages to the Okapi chat API (no spinner — raw call).
+async fn call_okapi_direct(
     cfg: &russell_doctor::client::ClientConfig,
     model: &str,
     messages: &[serde_json::Value],
@@ -649,7 +649,7 @@ async fn call_ollama_direct(
     let base_url = cfg
         .base_url
         .as_deref()
-        .unwrap_or("http://127.0.0.1:11434/v1");
+        .unwrap_or("http://127.0.0.1:11435/v1");
     let url = format!("{}/chat/completions", base_url.trim_end_matches('/'));
 
     let body = serde_json::json!({
@@ -712,7 +712,7 @@ fn journal_chat_turn(
         session_id,
         ts_unix,
         &ts,
-        "ollama",
+        "okapi",
         Some(model),
         Some(user_msg),
         user_msg.len() as i64,

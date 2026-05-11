@@ -165,7 +165,7 @@ pub fn compose(
 \
 (e.g. `RECOMMEND: gpu-doctor/probe-vram` for a probe or
 \
-`RECOMMEND: gpu-doctor/restart-ollama` for an intervention).
+`RECOMMEND: okapi-watcher/restart-okapi` for an intervention).
 \
 The operator may run `russell skill run <skill-id>/<id>` to execute it."
             )?;

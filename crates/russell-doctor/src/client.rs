@@ -14,9 +14,12 @@ use crate::error::Result;
 /// Backend selector, per `RUSSELL_DOCTOR_BACKEND`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Backend {
-    /// Local Ollama — the default backend.
-    /// OpenAI-compatible at `http://localhost:11434/v1`.
-    Ollama,
+    /// Local Okapi — the default backend.
+    /// OpenAI-compatible at `http://localhost:11435/v1`.
+    /// Okapi wraps llama.cpp with additional capabilities
+    /// (LoRA hot-swap, token probs, grammar constraints, metrics)
+    /// and shares Ollama's model store.
+    Okapi,
     /// OpenRouter (opt-in if `OPENROUTER_API_KEY` is set).
     OpenRouter,
     /// Mock for tests.
@@ -26,21 +29,23 @@ pub enum Backend {
 }
 
 impl Backend {
-    /// Parse from the environment. Default is Ollama.
-    /// Falls back to Offline if Ollama is not reachable and
+    /// Parse from the environment. Default is Okapi.
+    /// Falls back to Offline if Okapi is not reachable and
     /// the operator has not opted into OpenRouter.
     #[must_use]
     pub fn from_env() -> Self {
         match std::env::var("RUSSELL_DOCTOR_BACKEND").ok().as_deref() {
             Some("openrouter") => Self::OpenRouter,
-            Some("ollama") => Self::Ollama,
+            Some("okapi") => Self::Okapi,
+            // Legacy: accept "ollama" as alias for "okapi".
+            Some("ollama") => Self::Okapi,
             Some("mock") => Self::Mock,
             Some("offline") => Self::Offline,
             Some(other) => {
-                tracing::warn!(backend = other, "unknown backend; using ollama");
-                Self::Ollama
+                tracing::warn!(backend = other, "unknown backend; using okapi");
+                Self::Okapi
             }
-            None => Self::Ollama,
+            None => Self::Okapi,
         }
     }
 
@@ -49,7 +54,7 @@ impl Backend {
     pub fn label(self) -> &'static str {
         match self {
             Self::OpenRouter => "openrouter",
-            Self::Ollama => "ollama",
+            Self::Okapi => "okapi",
             Self::Mock => "mock",
             Self::Offline => "offline",
         }
@@ -115,7 +120,7 @@ pub struct ClientConfig {
 
 impl ClientConfig {
     /// Resolve from the environment, applying MVP defaults
-    /// (`nemotron-3-super:cloud`, 60s timeout, Ollama backend).
+    /// (`nemotron-3-super:cloud`, 60s timeout, Okapi backend).
     pub fn from_env() -> Self {
         let backend = Backend::from_env();
         let model = std::env::var("RUSSELL_DOCTOR_MODEL")

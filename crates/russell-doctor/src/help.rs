@@ -161,35 +161,35 @@ pub async fn run_help_with_config(
                 }
             }
         }
-        Backend::Ollama => {
-            // Ollama speaks the same OpenAI-compatible API at :11434/v1
-            let mut ollama_cfg = cfg.clone();
-            if ollama_cfg.base_url.is_none() {
-                ollama_cfg.base_url = Some("http://127.0.0.1:11434/v1".into());
+        Backend::Okapi => {
+            // Okapi speaks the same OpenAI-compatible API at :11435/v1
+            let mut okapi_cfg = cfg.clone();
+            if okapi_cfg.base_url.is_none() {
+                okapi_cfg.base_url = Some("http://127.0.0.1:11435/v1".into());
             }
-            if ollama_cfg.api_key.is_none() {
-                ollama_cfg.api_key = Some("ollama".into());
+            if okapi_cfg.api_key.is_none() {
+                okapi_cfg.api_key = Some("okapi".into());
             }
 
-            // Check if Ollama is reachable; if not, attempt to start it.
-            let base = ollama_cfg.base_url.clone().unwrap_or_default();
+            // Check if Okapi is reachable; if not, attempt to start it.
+            let base = okapi_cfg.base_url.clone().unwrap_or_default();
             let health_url = base
                 .trim_end_matches("/v1")
                 .trim_end_matches('/')
                 .to_string()
                 + "/api/tags";
-            if !ollama_health_check(&health_url).await {
-                info!("ollama not reachable — attempting auto-start");
-                ollama_start().await;
+            if !okapi_health_check(&health_url).await {
+                info!("okapi not reachable — attempting auto-start");
+                okapi_start().await;
             }
 
-            let client = openrouter::OpenRouterClient::new(&ollama_cfg)?;
+            let client = openrouter::OpenRouterClient::new(&okapi_cfg)?;
             match client.chat(&soap).await {
-                Ok(resp) => ("ollama", Some(resp), None, None),
+                Ok(resp) => ("okapi", Some(resp), None, None),
                 Err(e) => {
-                    warn!(error = %e, "ollama call failed — falling back");
+                    warn!(error = %e, "okapi call failed — falling back");
                     (
-                        "ollama",
+                        "okapi",
                         None,
                         Some(error_kind_of(&e)),
                         Some(SkipReason::OfflineFallback),
@@ -409,8 +409,8 @@ fn append_session_note(paths: &Paths, session_id: &str, note: Option<&str>, stat
     }
 }
 
-/// Check whether Ollama's API is reachable by hitting `/api/tags`.
-async fn ollama_health_check(health_url: &str) -> bool {
+/// Check whether Okapi's API is reachable by hitting `/api/tags`.
+async fn okapi_health_check(health_url: &str) -> bool {
     let Ok(client) = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(3))
         .build()
@@ -423,15 +423,15 @@ async fn ollama_health_check(health_url: &str) -> bool {
     }
 }
 
-/// Attempt to start Ollama via `systemctl --user start ollama`.
-async fn ollama_start() {
+/// Attempt to start Okapi via `systemctl --user start okapi`.
+async fn okapi_start() {
     let output = tokio::process::Command::new("systemctl")
-        .args(["--user", "start", "ollama"])
+        .args(["--user", "start", "okapi"])
         .output()
         .await;
     match output {
         Ok(o) if o.status.success() => {
-            info!("ollama started via systemctl --user");
+            info!("okapi started via systemctl --user");
             // Give it a moment to become ready.
             tokio::time::sleep(std::time::Duration::from_secs(3)).await;
         }
@@ -439,11 +439,11 @@ async fn ollama_start() {
             warn!(
                 stderr = %String::from_utf8_lossy(&o.stderr),
                 code = o.status.code(),
-                "systemctl --user start ollama returned non-zero"
+                "systemctl --user start okapi returned non-zero"
             );
         }
         Err(e) => {
-            warn!(error = %e, "failed to run systemctl --user start ollama");
+            warn!(error = %e, "failed to run systemctl --user start okapi");
         }
     }
 }

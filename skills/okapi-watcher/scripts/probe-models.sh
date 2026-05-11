@@ -1,12 +1,12 @@
 #!/bin/bash
 # SPDX-License-Identifier: MIT OR Apache-2.0
-# ollama-watcher: probe-ollama-models
+# okapi-watcher: probe-okapi-models
 # Lists loaded models with their sizes.
 # Prints one line per model: "<name> <size_gb>"
 
-OLLAMA_HOST="${OLLAMA_HOST:-http://127.0.0.1:11434}"
+OKAPI_HOST="${OKAPI_HOST:-http://127.0.0.1:11435}"
 
-response=$(curl -s --max-time 5 "${OLLAMA_HOST}/api/tags" 2>/dev/null)
+response=$(curl -s --max-time 5 "${OKAPI_HOST}/api/tags" 2>/dev/null)
 if [ $? -ne 0 ] || [ -z "$response" ]; then
     echo "unreachable"
     exit 1
