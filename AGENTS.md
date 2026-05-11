@@ -31,7 +31,7 @@ Russell is a single-host, single-operator harness that:
 - **reports** through a read-only CLI,
 - **watches himself** (proprioception — "did I run on time?"),
 - and when asked, **cries for help** via a local LLM
-  (Ollama by default, DeepSeek V4 Pro; OpenRouter opt-in).
+  (Okapi by default, DeepSeek V4 Pro; OpenRouter opt-in).
 
 He does *not* mutate host state (outside his own skill sandbox)
 or act on LLM output as shell commands. Those lanes are
