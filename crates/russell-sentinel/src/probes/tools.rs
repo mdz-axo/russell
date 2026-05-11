@@ -103,6 +103,23 @@ pub fn cpu_ticks(s: &ProcessStat) -> u64 {
     s.utime_ticks + s.stime_ticks
 }
 
+/// Parse a GPU utilisation percentage from the content of
+/// `/sys/class/drm/card*/device/gpu_busy_percent`.
+///
+/// The file contains a single integer (e.g. `42` meaning 42%).
+pub fn parse_gpu_util_pct(content: &str) -> Option<f64> {
+    content.trim().parse::<u64>().ok().map(|v| v as f64)
+}
+
+/// Convert a millidegree-Celsius value (from `hwmon` `temp1_input`)
+/// to degrees Celsius.
+///
+/// The file contains a raw integer in m°C (e.g. `49000` → 49.0 °C).
+pub fn parse_millidegrees_to_c(content: &str) -> Option<f64> {
+    let mdeg: i64 = content.trim().parse().ok()?;
+    Some(mdeg as f64 / 1000.0)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -212,5 +229,32 @@ mod tests {
             rss_pages: 0,
         };
         assert_eq!(cpu_ticks(&s), 150);
+    }
+
+    #[test]
+    fn parse_gpu_util_pct_parses_integer() {
+        assert_eq!(parse_gpu_util_pct("42"), Some(42.0));
+        assert_eq!(parse_gpu_util_pct("0"), Some(0.0));
+        assert_eq!(parse_gpu_util_pct("100\n"), Some(100.0));
+    }
+
+    #[test]
+    fn parse_gpu_util_pct_handles_bad_input() {
+        assert_eq!(parse_gpu_util_pct(""), None);
+        assert_eq!(parse_gpu_util_pct("abc"), None);
+        assert_eq!(parse_gpu_util_pct("-1"), None);
+    }
+
+    #[test]
+    fn parse_millidegrees_to_c_converts() {
+        assert_eq!(parse_millidegrees_to_c("49000"), Some(49.0));
+        assert_eq!(parse_millidegrees_to_c("0"), Some(0.0));
+        assert_eq!(parse_millidegrees_to_c("28000\n"), Some(28.0));
+    }
+
+    #[test]
+    fn parse_millidegrees_to_c_handles_bad_input() {
+        assert_eq!(parse_millidegrees_to_c(""), None);
+        assert_eq!(parse_millidegrees_to_c("abc"), None);
     }
 }

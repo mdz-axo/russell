@@ -8,6 +8,7 @@
 //! CTHA: `ctha.pipeline.sentinel_collect.duration_ms`, `items_out`
 
 pub mod connectors;
+pub mod gpu;
 pub mod memory;
 pub mod process;
 pub mod tools;
@@ -113,6 +114,46 @@ pub fn collect() -> Vec<Sample> {
     if let Some(v) = process::proc_top_mem_pct() {
         out.push(Sample {
             name: "proc_top_mem_pct".into(),
+            value_num: Some(v),
+            value_text: None,
+            unit: Some("%"),
+        });
+    }
+    if let Some(v) = gpu::gpu_vram_used_pct() {
+        out.push(Sample {
+            name: "gpu_vram_used_pct".into(),
+            value_num: Some(v),
+            value_text: None,
+            unit: Some("%"),
+        });
+    }
+    if let Some(v) = gpu::gpu_vram_used_mib() {
+        out.push(Sample {
+            name: "gpu_vram_used_mib".into(),
+            value_num: Some(v),
+            value_text: None,
+            unit: Some("MiB"),
+        });
+    }
+    if let Some(v) = gpu::gpu_vram_total_mib() {
+        out.push(Sample {
+            name: "gpu_vram_total_mib".into(),
+            value_num: Some(v),
+            value_text: None,
+            unit: Some("MiB"),
+        });
+    }
+    if let Some(v) = gpu::gpu_temp_c() {
+        out.push(Sample {
+            name: "gpu_temp_c".into(),
+            value_num: Some(v),
+            value_text: None,
+            unit: Some("°C"),
+        });
+    }
+    if let Some(v) = gpu::gpu_util_pct() {
+        out.push(Sample {
+            name: "gpu_util_pct".into(),
             value_num: Some(v),
             value_text: None,
             unit: Some("%"),
