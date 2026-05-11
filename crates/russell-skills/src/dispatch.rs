@@ -12,27 +12,19 @@
 //! the subprocess. Rollback pre-state capture is the caller's
 //! responsibility (dispatchers can't know what state to snapshot).
 
-#[cfg(test)]
-use std::path::Path;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use russell_core::Result;
-#[cfg(test)]
 use russell_core::event::{Event, Severity};
-#[cfg(test)]
 use russell_core::journal::JournalWriter;
-#[cfg(test)]
-use tracing::debug;
-#[cfg(test)]
-use tracing::warn;
+use tracing::{debug, warn};
 
 // Re-export RiskBand from the parent crate for convenience.
 pub use crate::RiskBand;
 
 /// Errors that can occur during risk checking.
 #[derive(Debug, Clone, thiserror::Error)]
-#[cfg(test)]
 pub enum RiskError {
     /// The intervention's risk exceeds the auto-execute cap.
     #[error("risk {:?} exceeds max_auto_risk {:?}", risk, max_allowed)]
@@ -92,7 +84,6 @@ pub enum RollbackStrategy {
 
 /// Outcome of a rollback-protected intervention.
 #[derive(Debug, Clone, PartialEq)]
-#[cfg(test)]
 pub struct RollbackOutcome {
     /// The forward (original) run outcome.
     pub forward: RunOutcome,
@@ -102,7 +93,6 @@ pub struct RollbackOutcome {
     pub rollback_applied: bool,
 }
 
-#[cfg(test)]
 impl RollbackOutcome {
     /// Whether the overall operation was successful (forward succeeded
     /// OR forward failed but rollback succeeded).
@@ -120,7 +110,6 @@ impl RollbackOutcome {
 
 /// Whether a dispatch is a probe (read-only) or intervention (mutating).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[cfg(test)]
 pub enum StepType {
     /// Read-only observation.
     Probe,
@@ -128,7 +117,6 @@ pub enum StepType {
     Intervention,
 }
 
-#[cfg(test)]
 impl StepType {
     fn to_string(self) -> &'static str {
         match self {
@@ -154,6 +142,10 @@ pub struct Dispatcher {
     /// Interventions above this cap are refused with [`RiskError::RiskTooHigh`].
     /// Default: `Low`.
     pub max_auto_risk: RiskBand,
+    /// Sudo password for interventions that need root privileges.
+    /// Consumed immediately via stdin; never stored after dispatch.
+    /// Set to `None` if no sudo interventions are expected.
+    pub sudo_password: Option<String>,
 }
 
 impl Dispatcher {
@@ -166,6 +158,7 @@ impl Dispatcher {
             probe_timeout: Duration::from_secs(30),
             intervention_timeout: Duration::from_secs(120),
             max_auto_risk: RiskBand::Low,
+            sudo_password: None,
         }
     }
 
@@ -177,7 +170,6 @@ impl Dispatcher {
     /// confirmation.
     ///
     /// Dry-run is always allowed regardless of risk (it doesn't mutate).
-    #[cfg(test)]
     pub fn check_risk(&self, risk: RiskBand, dry_run: bool) -> std::result::Result<(), RiskError> {
         if dry_run {
             return Ok(());
@@ -200,6 +192,9 @@ impl Dispatcher {
     ///
     /// `timeout_override` may override the default timeout. Pass `None`
     /// to use the default (30s).
+    ///
+    /// If the dispatcher has a `sudo_password` set, the command is
+    /// executed via `sudo -S` with the password piped to stdin.
     ///
     /// # Errors
     ///
@@ -238,18 +233,32 @@ impl Dispatcher {
             });
         }
 
-        let program = &cmd[0];
-        let args: &[String] = if cmd.len() > 1 { &cmd[1..] } else { &[] };
+        // Build the command — possibly with sudo wrapper.
+        let (program, args) = self.build_command(cmd);
 
-        let child = tokio::process::Command::new(program)
-            .args(args)
+        let mut child_cmd = tokio::process::Command::new(&program);
+        child_cmd
+            .args(&args)
             .current_dir(&self.skill_dir)
-            .stdin(std::process::Stdio::null())
+            .stdin(std::process::Stdio::piped())
             .stdout(std::process::Stdio::piped())
             .stderr(std::process::Stdio::piped())
-            .kill_on_drop(true)
+            .kill_on_drop(true);
+
+        let mut child = child_cmd
             .spawn()
             .map_err(|e| russell_core::CoreError::io(&self.skill_dir, e))?;
+
+        // Pipe sudo password if present.
+        if let Some(ref password) = self.sudo_password {
+            if let Some(mut stdin) = child.stdin.take() {
+                use tokio::io::AsyncWriteExt;
+                let mut pw_with_newline = password.clone();
+                pw_with_newline.push('\n');
+                let _ = stdin.write_all(pw_with_newline.as_bytes()).await;
+                drop(stdin);
+            }
+        }
 
         let output = tokio::time::timeout(timeout, child.wait_with_output()).await;
 
@@ -274,11 +283,31 @@ impl Dispatcher {
                     dry_run: false,
                     exit_code: None,
                     stdout: String::new(),
-                    stderr: format!("timed out after {:?}", timeout),
+                    stderr: format!("timed out after {timeout:?}"),
                     timed_out: true,
                     duration: started.elapsed(),
                 })
             }
+        }
+    }
+
+    /// Build the actual program + args, wrapping in `sudo -S` if needed.
+    fn build_command(&self, cmd: &[String]) -> (String, Vec<String>) {
+        if self.sudo_password.is_some() {
+            let mut args = vec!["-S".to_string(), "--".to_string()];
+            args.push(cmd[0].clone());
+            if cmd.len() > 1 {
+                args.extend_from_slice(&cmd[1..]);
+            }
+            ("sudo".to_string(), args)
+        } else {
+            let program = cmd[0].clone();
+            let args: Vec<String> = if cmd.len() > 1 {
+                cmd[1..].to_vec()
+            } else {
+                vec![]
+            };
+            (program, args)
         }
     }
 
@@ -300,9 +329,8 @@ impl Dispatcher {
     ///
     /// # Errors
     ///
-    /// Returns [`russell_core::CoreError`] on journal I/O failure
+///    Returns [`russell_core::CoreError`] on journal I/O failure
     /// or subprocess spawn failure.
-    #[cfg(test)]
     #[allow(clippy::too_many_arguments)]
     pub async fn run_and_journal(
         &self,
@@ -400,7 +428,6 @@ impl Dispatcher {
     /// Returns the rollback outcome on forward failure, or the forward
     /// outcome on success. `rollback_applied` in the outcome indicates
     /// whether rollback was triggered.
-    #[cfg(test)]
     #[allow(clippy::too_many_arguments)]
     pub async fn run_intervention_with_rollback<F>(
         &self,
@@ -517,7 +544,6 @@ impl Dispatcher {
 ///
 /// The dispatcher doesn't own manifests, so the caller resolves the
 /// strategy before calling `run_intervention_with_rollback`.
-#[cfg(test)]
 #[must_use]
 pub fn resolve_rollback_strategy(rollback: &crate::Rollback) -> RollbackStrategy {
     match rollback {
@@ -530,7 +556,6 @@ pub fn resolve_rollback_strategy(rollback: &crate::Rollback) -> RollbackStrategy
 }
 
 /// Write stdout, stderr, and event JSON to the evidence directory.
-#[cfg(test)]
 fn write_evidence(dir: &Path, outcome: &RunOutcome, event: &Event) -> Result<()> {
     std::fs::create_dir_all(dir).map_err(|e| russell_core::CoreError::io(dir, e))?;
 

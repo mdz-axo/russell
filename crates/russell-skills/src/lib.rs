@@ -226,6 +226,11 @@ pub struct Intervention {
     /// Timeout (e.g. "120s").
     #[serde(default = "timeout_default_intervention")]
     pub timeout: String,
+    /// Whether this intervention requires root privileges.
+    /// The operator will be prompted for their sudo password
+    /// when consenting to execution.
+    #[serde(default)]
+    pub needs_sudo: bool,
 }
 
 /// Rollback strategy for an intervention.
