@@ -74,28 +74,15 @@ fn okapi_http_url() -> String {
 
 fn fetch_metrics(base_url: &str) -> Result<OkapiMetricsResponse> {
     let url = format!("{base_url}/api/metrics/json");
-    let rt = tokio::runtime::Builder::new_current_thread()
-        .enable_all()
-        .build()
-        .context("building async runtime")?;
-    rt.block_on(async {
-        let client = reqwest::Client::builder()
-            .timeout(std::time::Duration::from_secs(10))
-            .build()
-            .context("building HTTP client")?;
-        let resp = client
-            .get(&url)
-            .send()
-            .await
-            .with_context(|| format!("fetching {url}"))?;
-        let status = resp.status();
-        let body = resp.text().await.with_context(|| "reading metrics response")?;
-        if !status.is_success() {
-            anyhow::bail!("metrics endpoint returned {status}: {body}");
-        }
-        serde_json::from_str::<OkapiMetricsResponse>(&body)
-            .with_context(|| "parsing metrics JSON")
-    })
+    let resp = reqwest::blocking::get(&url)
+        .with_context(|| format!("fetching {url}"))?;
+    let status = resp.status();
+    let body = resp.text().with_context(|| "reading metrics response")?;
+    if !status.is_success() {
+        anyhow::bail!("metrics endpoint returned {status}: {body}");
+    }
+    serde_json::from_str::<OkapiMetricsResponse>(&body)
+        .with_context(|| "parsing metrics JSON")
 }
 
 fn extract_samples(m: &OkapiMetricsResponse) -> Vec<OkapiSample> {
@@ -132,31 +119,22 @@ fn trigger_model_load(base_url: &str, model: &str) -> Result<String> {
         "stream": false,
         "options": { "num_predict": 1 }
     });
-    let model = model.to_string();
-
-    let rt = tokio::runtime::Builder::new_current_thread()
-        .enable_all()
+    let client = reqwest::blocking::Client::builder()
+        .timeout(std::time::Duration::from_secs(10))
         .build()
-        .context("building async runtime")?;
-    rt.block_on(async {
-        let client = reqwest::Client::builder()
-            .timeout(std::time::Duration::from_secs(10))
-            .build()
-            .context("building HTTP client")?;
-        let resp = client
-            .post(&url)
-            .json(&body)
-            .send()
-            .await
-            .with_context(|| "triggering model load")?;
-        let status = resp.status();
-        let resp_body = resp.text().await.unwrap_or_default();
-        if status.is_success() {
-            Ok(format!("model load triggered for {model}"))
-        } else {
-            Ok(format!("model load failed ({status}): {resp_body}"))
-        }
-    })
+        .context("building HTTP client")?;
+    let resp = client
+        .post(&url)
+        .json(&body)
+        .send()
+        .with_context(|| "triggering model load")?;
+    let status = resp.status();
+    let resp_body = resp.text().unwrap_or_default();
+    if status.is_success() {
+        Ok(format!("model load triggered for {model}"))
+    } else {
+        Ok(format!("model load failed ({status}): {resp_body}"))
+    }
 }
 
 pub fn run(paths: &Paths, auto_apply: bool, default_model: &str) -> Result<()> {
@@ -272,44 +250,35 @@ pub fn run(paths: &Paths, auto_apply: bool, default_model: &str) -> Result<()> {
 
         // Too many adapters? Unload them.
         if metrics.loaded_adapters > 4 {
-            let rt = tokio::runtime::Builder::new_current_thread()
-                .enable_all()
+            let client = reqwest::blocking::Client::builder()
+                .timeout(std::time::Duration::from_secs(10))
                 .build()
-                .context("building async runtime")?;
-            let unloaded = rt.block_on(async {
-                let client = reqwest::Client::builder()
-                    .timeout(std::time::Duration::from_secs(10))
-                    .build()
-                    .context("building HTTP client")?;
-                let resp = client.get(format!("{base_url}/api/adapters")).send().await;
-                let mut unloaded = 0u32;
-                if let Ok(resp) = resp {
-                    let body = resp.text().await.unwrap_or_default();
-                    if let Ok(wrapper) = serde_json::from_str::<serde_json::Value>(&body)
-                        && let Some(adapters) = wrapper["adapters"].as_array()
-                    {
-                            let model = metrics.model_name.as_deref().unwrap_or("");
-                            for adapter in adapters {
-                                if let Some(name) = adapter["name"].as_str() {
-                                    let unload_body = serde_json::json!({
-                                        "model": model,
-                                        "name": name
-                                    });
-                                    if let Ok(r) = client
-                                        .post(format!("{base_url}/api/adapters/unload"))
-                                        .json(&unload_body)
-                                        .send()
-                                        .await
-                                        && r.status().is_success()
-                                    {
-                                        unloaded += 1;
-                                    }
-                                }
+                .context("building HTTP client")?;
+            let mut unloaded = 0u32;
+            if let Ok(resp) = client.get(format!("{base_url}/api/adapters")).send() {
+                let body = resp.text().unwrap_or_default();
+                if let Ok(wrapper) = serde_json::from_str::<serde_json::Value>(&body)
+                    && let Some(adapters) = wrapper["adapters"].as_array()
+                {
+                    let model = metrics.model_name.as_deref().unwrap_or("");
+                    for adapter in adapters {
+                        if let Some(name) = adapter["name"].as_str() {
+                            let unload_body = serde_json::json!({
+                                "model": model,
+                                "name": name
+                            });
+                            if let Ok(r) = client
+                                .post(format!("{base_url}/api/adapters/unload"))
+                                .json(&unload_body)
+                                .send()
+                                && r.status().is_success()
+                            {
+                                unloaded += 1;
                             }
                         }
                     }
-                    Ok::<u32, anyhow::Error>(unloaded)
-            })?;
+                }
+            }
             if unloaded > 0 {
                 actions_taken.push(format!("unloaded {unloaded} adapter(s)"));
             }

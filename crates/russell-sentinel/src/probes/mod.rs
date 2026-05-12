@@ -65,62 +65,7 @@ pub fn collect() -> Vec<Sample> {
             unit: None,
         });
     }
-    if let Some(v) = process::proc_total_count() {
-        out.push(Sample {
-            name: "proc_total_count".into(),
-            value_num: Some(v),
-            value_text: None,
-            unit: Some("count"),
-        });
-    }
-    if let Some(v) = process::proc_zombie_count() {
-        out.push(Sample {
-            name: "proc_zombie_count".into(),
-            value_num: Some(v),
-            value_text: None,
-            unit: Some("count"),
-        });
-    }
-    if let Some(v) = process::proc_stuck_count() {
-        out.push(Sample {
-            name: "proc_stuck_count".into(),
-            value_num: Some(v),
-            value_text: None,
-            unit: Some("count"),
-        });
-    }
-    if let Some(v) = process::proc_running_count() {
-        out.push(Sample {
-            name: "proc_running_count".into(),
-            value_num: Some(v),
-            value_text: None,
-            unit: Some("count"),
-        });
-    }
-    if let Some(v) = process::proc_top_cpu_name() {
-        out.push(Sample {
-            name: "proc_top_cpu_name".into(),
-            value_num: None,
-            value_text: Some(v),
-            unit: None,
-        });
-    }
-    if let Some(v) = process::proc_top_mem_name() {
-        out.push(Sample {
-            name: "proc_top_mem_name".into(),
-            value_num: None,
-            value_text: Some(v),
-            unit: None,
-        });
-    }
-    if let Some(v) = process::proc_top_mem_pct() {
-        out.push(Sample {
-            name: "proc_top_mem_pct".into(),
-            value_num: Some(v),
-            value_text: None,
-            unit: Some("%"),
-        });
-    }
+    out.extend(process::process_samples());
     if let Some(v) = gpu::gpu_vram_used_pct() {
         out.push(Sample {
             name: "gpu_vram_used_pct".into(),
@@ -161,22 +106,7 @@ pub fn collect() -> Vec<Sample> {
             unit: Some("%"),
         });
     }
-    if let Some(v) = disks::disk_io_pressure_some_pct() {
-        out.push(Sample {
-            name: "disk_io_pressure_some_pct".into(),
-            value_num: Some(v),
-            value_text: None,
-            unit: Some("%"),
-        });
-    }
-    if let Some(v) = disks::disk_io_pressure_full_pct() {
-        out.push(Sample {
-            name: "disk_io_pressure_full_pct".into(),
-            value_num: Some(v),
-            value_text: None,
-            unit: Some("%"),
-        });
-    }
+    out.extend(disks::disk_io_pressure_samples());
     if let Some(v) = systemd::systemd_degraded() {
         out.push(Sample {
             name: "systemd_degraded".into(),

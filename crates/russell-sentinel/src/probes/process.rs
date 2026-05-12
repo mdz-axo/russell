@@ -111,6 +111,82 @@ pub fn proc_top_mem_pct() -> Option<f64> {
     Some((max_rss_kib as f64 / total_kib as f64) * 100.0)
 }
 
+/// Collect all process samples in a single `/proc` scan.
+/// This is the preferred entry point for the orchestrator.
+pub(crate) fn process_samples() -> Vec<super::Sample> {
+    let stats = collect_stats();
+    let mut out = Vec::new();
+
+    // Counts — single pass over stats.
+    let total = stats.len() as f64;
+    let zombies = stats.iter().filter(|s| s.state == 'Z').count() as f64;
+    let stuck = stats.iter().filter(|s| s.state == 'D').count() as f64;
+    let running = stats.iter().filter(|s| s.state == 'R').count() as f64;
+
+    out.push(super::Sample {
+        name: "proc_total_count".into(),
+        value_num: Some(total),
+        value_text: None,
+        unit: Some("count"),
+    });
+    out.push(super::Sample {
+        name: "proc_zombie_count".into(),
+        value_num: Some(zombies),
+        value_text: None,
+        unit: Some("count"),
+    });
+    out.push(super::Sample {
+        name: "proc_stuck_count".into(),
+        value_num: Some(stuck),
+        value_text: None,
+        unit: Some("count"),
+    });
+    out.push(super::Sample {
+        name: "proc_running_count".into(),
+        value_num: Some(running),
+        value_text: None,
+        unit: Some("count"),
+    });
+
+    // Top CPU consumer.
+    if let Some(s) = stats.iter().max_by_key(|s| tools::cpu_ticks(s)) {
+        out.push(super::Sample {
+            name: "proc_top_cpu_name".into(),
+            value_num: None,
+            value_text: Some(s.comm.clone()),
+            unit: None,
+        });
+    }
+
+    // Top memory consumer.
+    if let Some(s) = stats.iter().max_by_key(|s| s.rss_pages) {
+        out.push(super::Sample {
+            name: "proc_top_mem_name".into(),
+            value_num: None,
+            value_text: Some(s.comm.clone()),
+            unit: None,
+        });
+    }
+
+    // Top memory %.
+    if let Some(max_rss_pages) = stats.iter().map(|s| s.rss_pages).max()
+        && let Some(meminfo) = connectors::read_file_to_string("/proc/meminfo")
+        && let Some(total_kib) = tools::parse_meminfo_kib(&meminfo, "MemTotal")
+        && total_kib > 0
+    {
+        let max_rss_kib = max_rss_pages * 4;
+        let pct = (max_rss_kib as f64 / total_kib as f64) * 100.0;
+        out.push(super::Sample {
+            name: "proc_top_mem_pct".into(),
+            value_num: Some(pct),
+            value_text: None,
+            unit: Some("%"),
+        });
+    }
+
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -42,14 +42,16 @@ fn now_local() -> (u8, u8, time::Weekday) {
     let minute = (((secs_since_midnight % 3600) / 60) as u8).min(59);
 
     let days_since_epoch = total_secs / 86400;
-    let wday = match days_since_epoch % 7 {
+    // Unix epoch (1970-01-01) was a Thursday. Adjust so (days % 7) maps correctly.
+    let days = days_since_epoch + 4; // shift epoch-Thursday to Monday-indexed
+    let wday = match days % 7 {
+        0 => time::Weekday::Monday,
+        1 => time::Weekday::Tuesday,
+        2 => time::Weekday::Wednesday,
         3 => time::Weekday::Thursday,
         4 => time::Weekday::Friday,
         5 => time::Weekday::Saturday,
-        6 => time::Weekday::Sunday,
-        0 => time::Weekday::Monday,
-        1 => time::Weekday::Tuesday,
-        _ => time::Weekday::Wednesday,
+        _ => time::Weekday::Sunday,
     };
 
     (hour, minute, wday)

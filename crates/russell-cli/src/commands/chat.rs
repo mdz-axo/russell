@@ -183,27 +183,27 @@ pub async fn run(paths: &Paths) -> Result<()> {
 
                 // Consent handling — must come before special commands.
                 if let Some(ref pa) = pending_action {
-                    if trimmed == "/approve" {
+if trimmed == "/approve" {
                         execute_pending_action(
-                            &journal, paths, pa, None, &session_id, &current_model,
+                            &journal, paths, pa, &session_id, &current_model,
                         )
                         .await;
                         pending_action = None;
                         continue;
                     }
-                    if let Some(pw) = trimmed.strip_prefix("/approve ") {
-                        let pw = pw.trim();
-                        if pw.is_empty() {
-                            println!("  Usage: /approve [sudo-password]");
-                            println!("  Note: the password will be visible — clear your terminal history afterward.");
-                        } else {
-                            // Remove password from readline history.
-                            let _ = editor.history_mut().remove(editor.history().len().saturating_sub(1));
-                            execute_pending_action(
-                                &journal, paths, pa, Some(pw), &session_id, &current_model,
-                            )
-                            .await;
-                        }
+                    if let Some(_pw) = trimmed.strip_prefix("/approve ") {
+                        println!("  Sudo password on the command line is not supported.");
+                        println!("  Configure NOPASSWD sudo for this skill's commands instead.");
+                        println!("  Example: add to /etc/sudoers.d/russell:");
+                        println!("  <user> ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart okapi");
+                        pending_action = None;
+                        continue;
+                    }
+                    if let Some(_pw) = trimmed.strip_prefix("/approve ") {
+                        println!("  Sudo password on the command line is not supported.");
+                        println!("  Configure NOPASSWD sudo for this skill's commands instead.");
+                        println!("  Example: add to /etc/sudoers.d/russell:");
+                        println!("  <user> ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart okapi");
                         pending_action = None;
                         continue;
                     }
@@ -545,13 +545,11 @@ fn parse_action_from_response(response: &str, skills: &[Skill]) -> Option<Pendin
     })
 }
 
-/// Execute a pending intervention via the skill dispatcher. If a sudo
-/// password is provided, it is consumed immediately and never stored.
+/// Execute a pending intervention via the skill dispatcher.
 async fn execute_pending_action(
     journal: &JournalWriter,
     paths: &Paths,
     action: &PendingAction,
-    sudo_password: Option<&str>,
     session_id: &str,
     model: &str,
 ) {
@@ -565,8 +563,16 @@ async fn execute_pending_action(
 
     let mut dispatcher = Dispatcher::new(&skill_dir);
     dispatcher.intervention_timeout = intervention_timeout;
-    dispatcher.sudo_password = sudo_password.map(|s| s.to_string());
     dispatcher.dry_run = DryRun::Disabled;
+
+    // If this intervention needs sudo, the operator must have
+    // NOPASSWD sudo configured. We do not prompt for a password.
+    if action.needs_sudo {
+        println!(
+            "  → Note: {}/{} requires root. Ensure NOPASSWD sudo is configured.",
+            action.skill_id, action.intervention_id
+        );
+    }
 
     // Enforce risk cap — never auto-execute above system default.
     if let Err(e) = dispatcher.check_risk(action.risk, false) {

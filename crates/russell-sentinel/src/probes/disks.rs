@@ -27,6 +27,31 @@ pub fn disk_io_pressure_full_pct() -> Option<f64> {
     tools::parse_io_pressure_full(&content)
 }
 
+/// Return both I/O pressure probes in a single read.
+/// Avoids the double-read of the individual probe functions.
+pub(crate) fn disk_io_pressure_samples() -> Vec<super::Sample> {
+    let mut out = Vec::new();
+    if let Some(content) = connectors::read_file_to_string("/proc/pressure/io") {
+        if let Some(v) = tools::parse_io_pressure_some(&content) {
+            out.push(super::Sample {
+                name: "disk_io_pressure_some_pct".into(),
+                value_num: Some(v),
+                value_text: None,
+                unit: Some("%"),
+            });
+        }
+        if let Some(v) = tools::parse_io_pressure_full(&content) {
+            out.push(super::Sample {
+                name: "disk_io_pressure_full_pct".into(),
+                value_num: Some(v),
+                value_text: None,
+                unit: Some("%"),
+            });
+        }
+    }
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
