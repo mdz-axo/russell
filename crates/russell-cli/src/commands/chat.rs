@@ -195,7 +195,10 @@ pub async fn run(paths: &Paths) -> Result<()> {
                         let pw = pw.trim();
                         if pw.is_empty() {
                             println!("  Usage: /approve [sudo-password]");
+                            println!("  Note: the password will be visible — clear your terminal history afterward.");
                         } else {
+                            // Remove password from readline history.
+                            let _ = editor.history_mut().remove(editor.history().len().saturating_sub(1));
                             execute_pending_action(
                                 &journal, paths, pa, Some(pw), &session_id, &current_model,
                             )
@@ -562,9 +565,14 @@ async fn execute_pending_action(
 
     let mut dispatcher = Dispatcher::new(&skill_dir);
     dispatcher.intervention_timeout = intervention_timeout;
-    dispatcher.max_auto_risk = action.risk;
     dispatcher.sudo_password = sudo_password.map(|s| s.to_string());
     dispatcher.dry_run = DryRun::Disabled;
+
+    // Enforce risk cap — never auto-execute above system default.
+    if let Err(e) = dispatcher.check_risk(action.risk, false) {
+        println!("  → Refused: {e}");
+        return;
+    }
 
     let result = dispatcher
         .run_and_journal(
@@ -574,7 +582,7 @@ async fn execute_pending_action(
             &action.skill_id,
             &action.intervention_id,
             StepType::Intervention,
-            &format!("{:?}", action.risk).to_lowercase(),
+            action.risk.as_str(),
             Some(intervention_timeout),
         )
         .await;

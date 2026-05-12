@@ -128,7 +128,7 @@ impl StepType {
 
 /// A subprocess dispatcher. Constructed with the skills base directory
 /// (working directory for spawned processes).
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Dispatcher {
     /// Base skills directory (e.g. `~/.local/share/harness/skills/<id>/`).
     pub skill_dir: PathBuf,
@@ -146,6 +146,22 @@ pub struct Dispatcher {
     /// Consumed immediately via stdin; never stored after dispatch.
     /// Set to `None` if no sudo interventions are expected.
     pub sudo_password: Option<String>,
+}
+
+impl std::fmt::Debug for Dispatcher {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Dispatcher")
+            .field("skill_dir", &self.skill_dir)
+            .field("dry_run", &self.dry_run)
+            .field("probe_timeout", &self.probe_timeout)
+            .field("intervention_timeout", &self.intervention_timeout)
+            .field("max_auto_risk", &self.max_auto_risk)
+            .field(
+                "sudo_password",
+                &self.sudo_password.as_ref().map(|_| "***"),
+            )
+            .finish()
+    }
 }
 
 impl Dispatcher {
@@ -256,7 +272,9 @@ impl Dispatcher {
             use tokio::io::AsyncWriteExt;
             let mut pw_with_newline = password.clone();
             pw_with_newline.push('\n');
-            let _ = stdin.write_all(pw_with_newline.as_bytes()).await;
+            if let Err(e) = stdin.write_all(pw_with_newline.as_bytes()).await {
+                warn!(error = %e, "failed to write sudo password to stdin");
+            }
             drop(stdin);
         }
 
@@ -343,7 +361,26 @@ impl Dispatcher {
         risk_band: &str,
         timeout_override: Option<Duration>,
     ) -> Result<RunOutcome> {
-        let outcome = self.run(cmd, timeout_override).await?;
+        let outcome = match self.run(cmd, timeout_override).await {
+            Ok(o) => o,
+            Err(e) => {
+                // Spawn failure — journal a failure event with no run outcome.
+                let mut ev = Event::new("skill_intervention", Severity::Warn);
+                ev.tier = Some("skill".into());
+                ev.module = Some(format!("skill/{skill_id}/{step_id}"));
+                ev.dry_run = false;
+                ev.summary = Some(format!(
+                    "spawn failed: {e} :: skill/{skill_id}/{step_id}",
+                ));
+                ev.outputs.insert("risk".into(), risk_band.into());
+                ev.outputs
+                    .insert("step_type".into(), step_type.to_string().into());
+                if let Err(je) = journal.append(&ev) {
+                    tracing::warn!(error = %je, "failed to journal spawn failure");
+                }
+                return Err(e);
+            }
+        };
 
         let action = match step_type {
             StepType::Probe => "skill_probe",

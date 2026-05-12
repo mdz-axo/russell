@@ -104,6 +104,9 @@ pub fn proc_top_mem_pct() -> Option<f64> {
     let max_rss_pages = stats.iter().map(|s| s.rss_pages).max()?;
     let meminfo = connectors::read_file_to_string("/proc/meminfo")?;
     let total_kib = tools::parse_meminfo_kib(&meminfo, "MemTotal")?;
+    if total_kib == 0 {
+        return None;
+    }
     let max_rss_kib = max_rss_pages * 4;
     Some((max_rss_kib as f64 / total_kib as f64) * 100.0)
 }

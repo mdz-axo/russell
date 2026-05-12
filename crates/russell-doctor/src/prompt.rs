@@ -195,15 +195,14 @@ pub fn compose(
                     )?;
                 }
             }
-            writeln!(
+writeln!(
                 objective,
-                "\nWhen you recommend an action, use the format `RECOMMEND: <skill-id>/<id>`
-\
-(e.g. `RECOMMEND: gpu-doctor/probe-vram` for a probe or
-\
-`RECOMMEND: okapi-watcher/restart-okapi` for an intervention).
-\
-The operator may run `russell skill run <skill-id>/<id>` to execute it."
+                "\nWhen you identify an intervention and a skill is loaded, \
+                 propose it on the final line using:\n\n\
+                 ACTION: <skill-id>/<intervention-id>\n\n\
+                 (e.g. ACTION: okapi-watcher/restart-okapi). \
+                 Only propose interventions, not probes. \
+                 The operator must consent before execution."
             )?;
         }
 

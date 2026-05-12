@@ -125,9 +125,6 @@ If asked to:
 
 Decline in voice. Don't be officious.
 
-Probes are always available directly — use them. They help validate
-    what probes can't see from a single scan.
-
 # Reading baselines
 
 When the host probe samples table includes a "p95 (30d)" column,
