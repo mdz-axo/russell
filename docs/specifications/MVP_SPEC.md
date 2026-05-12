@@ -1,22 +1,21 @@
 ---
 title: "MVP Russell — the Minimal Viable Terrier"
 audience: [operators, developers, architects, contributors, agents]
-last_updated: 2026-05-06
+last_updated: 2026-05-11
 togaf_phase: "Requirements Management"
-version: "1.0.0"
+version: "1.1.0"
 status: "Active"
 ---
 
 # MVP Russell — the Minimal Viable Terrier
 
 <!-- TOGAF_DOMAIN: Requirements Management -->
-<!-- VERSION: 1.0.0 -->
+<!-- VERSION: 1.1.0 -->
 <!-- STATUS: Active -->
-<!-- LAST_UPDATED: 2026-05-06 -->
+<!-- LAST_UPDATED: 2026-05-11 -->
 
 This is the **pinned boundary** of MVP Russell. Anything outside
-this boundary is explicitly deferred; adding anything inside it
-requires updating this document.
+this boundary requires an ADR or a spec update to this document.
 
 The principle that pins it is JR-1 (see
 [`../architecture/PRINCIPLES_CATALOG.md`](../architecture/PRINCIPLES_CATALOG.md)):
@@ -26,18 +25,19 @@ The principle that pins it is JR-1 (see
 
 MVP Russell is a single Rust binary, `russell`, run by one user
 under user-scoped systemd on Ubuntu 25.10. He **observes** the
-host every five minutes via a small probe set, **remembers** what
-he saw in a SQLite journal, **reports** what he saw through four
-read-only CLI verbs, **watches himself** through one self-vital,
+host every five minutes via a broad probe set covering
+CPU, memory, processes, GPU, disks, and systemd, **remembers**
+what he saw in a SQLite journal, **reports** through CLI verbs,
+**watches himself** through five self-vitals (proprioception),
 and when asked he **cries for help** to a local LLM
-(Ollama by default, DeepSeek V4 Pro). He does not mutate host
-state, he does not run privileged operations, he does not dispatch
-interventions, and he does not load skills. He is small and he is
-fierce.
+(Ollama by default, DeepSeek V4 Pro). He **proposes**
+interventions via loaded skills, and with the operator's
+explicit consent, he **executes** them through the IDRS-gated
+skill dispatcher. He is small and he is fierce.
 
-## 2. The Six Verbs
+## 2. The Verbs
 
-The MVP CLI exposes exactly six verbs. No more.
+The MVP CLI exposes these verbs:
 
 | Verb | Risk | Role | Reach |
 |---|---|---|---|
@@ -45,152 +45,182 @@ The MVP CLI exposes exactly six verbs. No more.
 | `russell list` | none | Most-recent journal events | local sqlite |
 | `russell profile [--init]` | none | Show / initialise `profile.json` | local fs |
 | `russell digest [--since-hours N]` | none | Markdown summary of recent activity | local sqlite |
-| `russell sentinel-once` | none | Fire the Sentinel once and append samples | local fs |
+| `russell sentinel-once` | none | Fire the Sentinel once, append samples, evaluate rules | local fs |
 | `russell jack [--note "..."]` | none | Compose SOAP-shaped prompt and consult the LLM; print response | network *(opt-in)* |
-
-All six are read-only with respect to host state. The only thing
-any of them writes is Russell's own journal and evidence bundles
-under `~/.local/state/harness/`.
+| `russell chat` | none | Interactive multi-turn conversation with Jack, consent flow for interventions | network *(opt-in)* |
+| `russell skill list` | none | List loaded skills, probes, and interventions | local fs |
+| `russell skill run <id>` | varies | Execute a skill probe or intervention via the IDRS-gated dispatcher | local fs + process |
+| `russell okapi-probe` | none | Probe the Okapi inference engine metrics endpoint | network |
+| `russell proprio` | none | Run self-observation and append self-vital samples | local sqlite |
 
 ### 2.1 The `jack` verb — the "cry for help"
 
-Under JR-4, Russell must be able to escalate from day one.
+Under JR-4, Russell escalates from day one.
 
 1. Gather the last 24h of Sentinel samples + severity counts
-   + last 20 events.
-2. Compose a SOAP-shaped prompt
-   ([`../templates/soap-bundle.md`](../templates/soap-bundle.md))
-   where Subjective is the operator's `--note`, Objective is the
-   gathered evidence, and Assessment / Plan are left empty for
-   the LLM to fill.
-3. Submit via the copied `stack-llm` router
-   ([`../operations/REUSE_MANIFEST.md`](../operations/REUSE_MANIFEST.md))
-   to the configured backend (default: Ollama at
-   `http://127.0.0.1:11434/v1`, model `deepseekv4pro`).
-4. Write the full request / response / latency / model to
-   the `help_sessions` table and an evidence bundle at
-   `~/.local/state/harness/evidence/help/<session-id>/`.
-5. Print the model's response, plain text, to stdout.
+   + last 20 events + 30-day baselines.
+2. Compose a SOAP-shaped prompt where Subjective is the
+   operator's `--note`, Objective is the gathered evidence plus
+   baseline deviation data, and Assessment / Plan are left empty.
+3. Submit via the LLM router to the configured backend.
+4. Write the full request/response/latency/model to the
+   `help_sessions` table and an evidence bundle.
+5. Print the model's response.
 
-**Offline fallback.** If Ollama is unreachable (and the
-operator has not opted into OpenRouter) or the request fails,
-Jack still speaks: a rule-based summary of severity
-counts, most-recent events, and proprioception state is printed.
-Jack is never silent.
+If Jack proposes an intervention (`ACTION: <skill>/<id>`), the
+response is parsed and the operator is shown guidance on how to
+execute it via `russell chat` or `russell skill run`.
 
-**What `russell jack` does NOT do:**
+**Offline fallback.** If the LLM is unreachable, a rule-based
+summary of severity counts and most-recent events is printed.
 
-- Parse the LLM's output for commands to execute.
-- Mutate any file outside `~/.local/state/harness/`.
-- Invoke any privileged operation.
-- Retry on user's behalf; one call, one response, journaled.
+### 2.2 The `chat` verb — interactive consent flow
+
+`russell chat` is the canonical path for operator consent to
+interventions. Jack proposes actions; the operator types
+`/approve` or `/deny`. The skill dispatcher executes approved
+interventions with full IDRS journaling. Risk enforcement gates
+on `max_auto_risk` (default: Low). Sudo-requiring interventions
+require NOPASSWD configuration by the operator.
 
 ## 3. The Observation Loop
 
-A single 5-minute Sentinel cadence, driven by a user-scope
-systemd timer (`russell-sentinel.timer`) in the installed form.
-For MVP-dev, `russell sentinel-once` is the manual trigger.
+A single 5-minute Sentinel cadence, driven by systemd timer
+(`russell-sentinel.timer`). `russell sentinel-once` is the
+manual trigger for development.
 
-**Probe set (MVP).** Deliberately tiny. Grows in Phase 2.
+**Probe set (current).** The original 3-probe MVP set has grown
+to 21 probes across 6 categories.
 
-| Probe | Source | Unit |
-|---|---|---|
-| `mem_available_mib` | `/proc/meminfo` | MiB |
-| `swap_used_mib` | `/proc/meminfo` | MiB |
-| `loadavg_1m` | `/proc/loadavg` | — |
+| Category | Probes |
+|---|---|
+| Memory | `mem_available_mib`, `mem_used_mib`, `mem_total_mib`, `swap_used_mib`, `swap_total_mib` |
+| Load | `loadavg_1m` |
+| Processes | `proc_total_count`, `proc_zombie_count`, `proc_stuck_count`, `proc_running_count`, `proc_top_cpu_name` (text), `proc_top_mem_name` (text), `proc_top_mem_pct` |
+| GPU | `gpu_vram_used_pct`, `gpu_vram_used_mib`, `gpu_vram_total_mib`, `gpu_temp_c`, `gpu_util_pct` |
+| Disks | `disk_io_pressure_some_pct`, `disk_io_pressure_full_pct` |
+| Systemd | `systemd_degraded`, `systemd_user_failed_count`, `systemd_system_failed_count` |
+| Okapi (external) | `okapi_requests_active`, `okapi_errors_total`, `okapi_gpu_memory_used_pct`, etc. — via `russell okapi-probe` |
 
-**Self-vital (MVP).** One, per JR-5:
+**Rule evaluation.** All numeric probes are evaluated against
+the rule engine. Default rules ship in `rules.d/`. Operator
+overrides live in `~/.local/share/harness/rules.d/`. Breach
+events are written to the journal.
+
+**Self-vitals (proprioception).** Five active, per JR-5:
 
 | Self-vital | Source | Rule |
 |---|---|---|
-| `sentinel_last_run_age_s` | journal `MAX(ts)` on samples | Warn if > 450s (1.5× cadence); Alert if > 1800s |
+| `sentinel_last_run_age_s` | journal `MAX(ts)` | Warn > 450s, Alert > 1800s |
+| `journal_writer_stall_s` | write-append timing | Warn > 5s |
+| `llm_p95_latency_ms` | help_session latency | Warn > 2000ms |
+| `timer_drift_s` | cadence interval | Warn > target+20% |
+| `help_error_rate_pct` | failed LLM calls / total | Warn > 10% |
 
-## 4. Persistence Scope
+## 4. The Skill System
+
+Skills are YAML-manifested bundles of probes and interventions.
+They live under `~/.local/share/harness/skills/<id>/`.
+
+Each intervention declares a risk band (`none`/`low`/`medium`/`high`/`critical`),
+an `idempotent` flag, a rollback strategy, a timeout, and
+a `needs_sudo` flag. The dispatcher enforces IDRS:
+
+- **I — Idempotent.** Claimed; verified by the manifest author.
+- **D — Dry-run.** `DryRun::Enabled` produces the would-do record.
+- **R — Rollback.** Pre-state capture is the caller's responsibility;
+  automatic rollback on forward failure is supported by the dispatcher.
+- **S — Structured log.** Every dispatch writes a `harness.event.v1`
+  record and an evidence bundle.
+
+**Active skills:**
+- `okapi-watcher` — probes Okapi health, intervenes with `restart-okapi`
+  (risk: low, `systemctl --user restart okapi`)
+
+**Risk enforcement.** `max_auto_risk` defaults to `Low`. The consent
+flow blocks interventions above the cap with a refusal message.
+Dry-run always bypasses the cap (no mutation occurs).
+
+## 5. Persistence Scope
 
 Every byte Russell writes is named. Full catalog at
 [`PERSISTENCE_CATALOG.md`](PERSISTENCE_CATALOG.md).
 
 | Path | Owner | Schema | Retention |
 |---|---|---|---|
-| `~/.local/state/harness/journal.db` | `russell-core::journal` | `0001_init.sql` | unbounded (digest prunes later) |
-| `~/.local/state/harness/journal.db-{wal,shm}` | SQLite | — | ephemeral |
+| `~/.local/state/harness/journal.db` | `russell-core::journal` | `0001_init.sql` | unbounded |
+| `~/.local/state/harness/baselines.db` | baseline snapshot of journal | `0001_init.sql` | refreshed daily |
 | `~/.local/state/harness/profile.json` | `russell-core::profile` | `russell.profile.v1` | unbounded |
 | `~/.local/state/harness/evidence/help/<session-id>/` | `russell-doctor::help` | per-session JSON | 90 days |
-| `~/.local/state/harness/runs/<run-id>.json` | (reserved, unused in MVP) | per-run JSON | 90 days |
+| `~/.local/state/harness/evidence/skills/<skill>/<step>/` | `russell-skills::dispatch` | per-dispatch JSON | 90 days |
+| `~/.local/share/harness/skills/<id>/` | `russell-skills` | manifest + scripts | operator-owned |
+| `~/.local/share/harness/rules.d/*.toml` | `russell-core::rule` | TOML | operator-owned |
+| `~/.local/share/harness/memory/chats/<session-id>.jsonl` | `russell-cli::chat` | JSON lines | unbounded |
 | `~/.config/harness/russell.env` | operator | key=value | operator-owned |
 | `~/.config/harness/disable` | kill switch | empty file | operator-owned |
 
-`rm -rf ~/.local/state/harness/` is an always-safe full reset.
-`rm -rf ~/.config/harness/` is the operator's intentional reset
-of their own configuration. Neither produces orphans.
+## 6. Boundaries — what is deferred
 
-## 5. Boundaries — what is deferred beyond MVP/Phase 2/3
-
-Some items from the original MVP boundary are now implemented.
-Deferred items with their ADRs living under
-[`../adr/deferred/`](../adr/deferred/):
+These items remain deferred beyond the current build:
 
 - **No MCP server.** The `russell mcp` crate exists as a
-  placeholder; full MCP surface is deferred. (Deferred ADR-0003.)
-- **No privileged operations.** No PolKit helpers, no sudo.
-  (Deferred ADR-0005.)
-- **No remote skill registry.** (Deferred part of ADR-0007.)
-- **No tiered Tier I / II / III cadences.** One Sentinel
-  cadence; the tier engines land later.
+  placeholder; full MCP surface is deferred. (ADR-0003.)
+- **No PolKit helpers.** Sudo for interventions uses NOPASSWD
+  configuration by the operator. No PolKit integration. (ADR-0005.)
+- **No remote skill registry.** Skills are local to the machine.
+  (ADR-0007.)
+- **No tiered Tier I / II / III cadences.** One Sentinel cadence.
 - **No chaos probe.** Deferred.
+- **No corrective proprioception arcs.** Detection-only (Phase 2A).
+  Corrective arcs are deferred.
+- **No full MCP surface.** `russell-mcp` crate exists, surface deferred.
 
-### Items now implemented (formerly deferred)
+## 7. Known Limitations
 
-- **Skill dispatcher.** `russell-skills` crate with manifest
-  parser, subprocess dispatcher, CLI verbs. ADR-0007 deferral
-  lifted per ADR-0023.
-- **Rules engine.** Per-probe TOML rules with operator overrides
-  in `rules.d/*.toml`. `RuleSet` in `russell-core`, wired into
-  `sentinel-once`.
-- **EWMA baselines.** 30-day rolling p50/p95/p99.
-  `compute_baselines()` + `upsert_baseline()` + daily refresh.
-- **Self-vitals.** 5 active: `sentinel_last_run_age_s`,
-  `journal_writer_stall_s`, `llm_p95_latency_ms`,
-  `timer_drift_s`, `help_error_rate_pct`. Plus
-  `AutoimmuneGuard`.
-- **Proprioception reflex arcs.** Detection-only arcs implemented
-  (Phase 2A). Corrective arcs remain deferred.
+- **GPU path is hardcoded to `card1`.** On machines where the
+  dGPU is at a different DRM card index, GPU probes return `None`.
+- **No root-filesystem usage probe.** Requires `statvfs` (libc/nix
+  dependency) which is deferred to avoid `unsafe` in the sentinel crate.
+- **No NVMe SMART probe.** NVMe health files under sysfs require
+  root on this kernel/driver combination.
+- **Sudo requires NOPASSWD.** The consent flow does not prompt for
+  a password. Operators configure `sudoers.d/` entries for each
+  skill's commands.
+- **Process scan is full /proc sweep.** On machines with >10,000
+  processes, the 5-minute scan may be noticeable. Acceptable for
+  the single-workstation target.
+- **Baselines lack freshness guard.** `read_baselines()` does not
+  check `updated_ts`; if baseline computation stops, Jack cites
+  stale baselines.
 
-## 6. Success Criteria
+## 8. Success Criteria
 
 MVP is **complete** when all three of these are empirically true:
 
 1. **Stability:** Russell runs unattended on the observed
-   Framework 16 / HX 370 / Ubuntu 25.10 machine
-   ([`MACHINE_PROFILE.md`](../../MACHINE_PROFILE.md)) for **20
+   Framework 16 / HX 370 / Ubuntu 25.10 machine for **20
    consecutive days** with zero unexplained gaps in the journal.
-   Gaps exceeding 2× the cadence that are bracketed by a
-   plausible suspend/resume window (evidenced by corresponding
-   systemd boot/wake records) are not "mystery gaps." See
-   [ADR-0018](../adr/0018-close-phase-1c.md).
 2. **Tests:** `cargo fmt --check`, `cargo clippy --workspace
    --all-targets -- -D warnings`, and `cargo test --workspace`
    all pass on every commit.
 3. **Help channel proof:** At least **5 successful
-   `russell jack` LLM round-trips** and demonstrated
-   offline-fallback resilience are journaled during the soak
-   window, and at least one was triggered in a real moment of
-   operator uncertainty about the machine's state. See
-   [ADR-0018](../adr/0018-close-phase-1c.md).
+   `russell jack` LLM round-trips** with demonstrated
+   offline-fallback resilience, and at least one was triggered
+   in a real moment of operator uncertainty.
 
-When all three are met, MVP is closed and Phase 2 opens. Not
-before.
+## 9. Status and Next Step
 
-## 7. Status and Next Step
+Phase 1 (MVP Doctor) is **complete**. Phase 2 (observation
+expanded) is **in progress** with process, GPU, disk, and
+systemd probes active. Phase 3 (skills and dispatch) is
+**active** with the IDRS-gated dispatcher, consent flow, and
+the `okapi-watcher` skill operational. The next priorities are
+packaging, install automation, and the 20-day soak.
 
-Phase 1 (MVP Doctor) is **complete** as of 2026-05-09.
-Phase 1b (install artifacts) and Phase 1c (20-day soak)
-are complete. Phase 2 (observation sharpened) and Phase 3
-(skills and dispatch) are in progress. See
-[`../status/CONSOLIDATED-STATUS.md`](../status/CONSOLIDATED-STATUS.md)
+See [`../status/CONSOLIDATED-STATUS.md`](../status/CONSOLIDATED-STATUS.md)
 for current state.
 
-## 8. References
+## 10. References
 
 - [`../architecture/PRINCIPLES_CATALOG.md`](../architecture/PRINCIPLES_CATALOG.md) — JR-1 through JR-7.
 - [`../architecture/overview.md`](../architecture/overview.md) — system shape.

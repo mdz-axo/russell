@@ -117,6 +117,13 @@ addition to this table.
 | **Chat REPL** | Interactive readline REPL with Jack's nurse persona. **Active.** `russell chat` — multi-turn conversation with token budgeting. |
 | **VSM layers** | Ops (Sentinel), Coordination (timers), Control (Nurse), Intelligence (Bootstrap + LLM), Policy (the human). |
 | **"First, do no harm"** | The refusal posture: observe > recommend > act. |
+| **Consent gate** | The `/approve` / `/deny` mechanism in `russell chat`. Jack proposes; the operator decides; the dispatcher executes. |
+| **ACTION syntax** | `ACTION: <skill>/<intervention>` — the format Jack uses to propose an intervention. Parsed by both `russell jack` and `russell chat`. |
+| **Process probes** | 7 probes scanning `/proc`, `/proc/[pid]/stat`: total count, zombie/stuck/running counts, top CPU and memory process names, and top memory % of system. |
+| **GPU probes** | 5 probes reading sysfs (`/sys/class/drm/card*/device/`): VRAM usage %, VRAM MiB, temperature °C, GPU utilization %. Targets the discrete GPU (hardcoded `card1`). |
+| **Disk probes** | 2 probes from `/proc/pressure/io`: I/O pressure "some" and "full" avg10 as percentages. |
+| **Systemd probes** | 3 probes via `systemctl` subprocess: degraded state (bool), failed user units count, failed system units count. |
+| **Baseline deviation** | The "p95 (30d)" column in Jack's SOAP Objective table — the 95th percentile of each probe's historical values. Jack interprets: 1.5× p95 = mild anomaly, 3× = significant, 10× = crisis. |
 
 ## 6. The IDRS Contract (restated)
 

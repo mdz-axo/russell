@@ -1,23 +1,23 @@
 ---
 title: "ADR-0023: Lift ADR-0007 Deferral — Phase 3 Skills and Dispatch"
 audience: [developers, architects]
-last_updated: 2026-05-09
+last_updated: 2026-05-11
 togaf_phase: "H — Change Management"
-version: "1.0.0"
-status: "Accepted"
+version: "1.1.0"
+status: "Implemented"
 ---
 
 <!-- TOGAF_DOMAIN: Change Management -->
-<!-- VERSION: 1.0.0 -->
-<!-- STATUS: Accepted -->
-<!-- LAST_UPDATED: 2026-05-09 -->
+<!-- VERSION: 1.1.0 -->
+<!-- STATUS: Implemented -->
+<!-- LAST_UPDATED: 2026-05-11 -->
 
 # ADR-0023: Lift ADR-0007 Deferral — Phase 3 Skills and Dispatch
 
-- **Status:** Accepted
-- **Date:** 2026-05-09
+- **Status:** Implemented
+- **Date:** 2026-05-09 (accepted); 2026-05-11 (implemented)
 - **Deciders:** Project operator
-- **Tags:** `skills`, `manifest`, `dispatcher`, `phase-3`
+- **Tags:** `skills`, `manifest`, `dispatcher`, `phase-3`, `implemented`
 
 ## Context
 
@@ -150,3 +150,43 @@ Lift ADR-0007's deferral. Implement Phase 3 in three increments:
 - [JR-2](../architecture/PRINCIPLES_CATALOG.md) — Observe > Recommend > Act
 - [IDRS](../standards/safety.md) — the mutation contract
 - [`MVP_SPEC.md`](../specifications/MVP_SPEC.md) §5 — what MVP does NOT do (now updated)
+
+## Implementation Notes (2026-05-11)
+
+Phase 3 has been implemented with the following deviations from
+the original plan:
+
+### Phase 3A — delivered as planned
+
+Manifest parser, subprocess dispatcher, `russell skill list`,
+`russell skill run` all operational. Dispatcher unwired from
+`#[cfg(test)]` and production-ready with IDRS journaling.
+
+### Phase 3B — shipped `okapi-watcher` instead of `gpu-doctor`
+
+`rocm-smi` was unavailable on the target machine (Framework 16
+with RX 7700S). The `gpu-doctor` fixture exists in tests but
+the first production skill is `okapi-watcher` (probes + `restart-okapi`
+intervention at risk:low). A `needs_sudo: bool` field was added to
+intervention manifests.
+
+### Phase 3C — evolved into ACTION/consent flow rather than simple suggestion
+
+Instead of the ADR's model (Jack says "run `russell skill run gpu-doctor/assess`"),
+the implementation has:
+
+- Jack proposes interventions via `ACTION: <skill>/<intervention>` syntax
+- The Jack persona teaches this format; the prompt's Objective section reinforces it
+- `russell jack` parses ACTION: lines from responses, displays guidance
+- `russell chat` supports `/approve` and `/deny` for operator consent
+- The dispatcher enforces `check_risk()` before execution (system cap: Low)
+- Sudo-requiring interventions use NOPASSWD configuration (no password prompt)
+
+### Additional items beyond the ADR
+
+- Risk band enforcement via `check_risk()` with `max_auto_risk` (default: Low)
+- `RiskBand::as_str()` for journal-friendly formatting
+- Sudo support in the dispatcher (`sudo -S` with piped password)
+- Manual `Debug` impl on `Dispatcher` that redacts `sudo_password`
+- `RollbackStrategy` resolution for `run_intervention_with_rollback`
+- Journaling of failed spawns (failure events written before error propagation)

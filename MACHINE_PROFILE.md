@@ -1,6 +1,7 @@
 # Machine Profile — "The Patient"
 
-Observed 2026-04-17 on `mdz-axolotl-Laptop-16`.
+Observed 2026-05-11 on `mdz-axolotl-Laptop-16`.
+Updated: 2026-05-11 (GPU probe coverage, DRM mappings, VRAM sizes).
 This is the source-of-truth for every recommendation in
 [PLAN.md](PLAN.md). Re-run the probes in §7 when anything
 material changes.
@@ -46,15 +47,21 @@ optional until software catches up.
 
 ## 3. Graphics
 
-Two AMD GPUs are present simultaneously:
+Two AMD GPUs present simultaneously, both accessed by Russell's
+GPU probes at `/sys/class/drm/card*/device/`.
 
-| Slot | PCI ID | Device | Role |
-|---|---|---|---|
-| `c4:00.0` | Navi 33 | **Radeon RX 7700S** (dGPU in Framework expansion bay) — `gfx1102` | Heavy inference / compute |
-| `c5:00.0` | Strix | **Radeon 890M** (Ryzen AI 9 iGPU) | Display, light compute |
+| Slot | DRM | PCI ID | Device | VRAM | Role |
+|---|---|---|---|---|---|
+| `c4:00.0` | `card1` | `0x1002:0x7480` Navi 33 | **Radeon RX 7700S** (dGPU) — `gfx1102` | ~8 GiB | Heavy inference / compute |
+| `c5:00.0` | `card2` | `0x1002:0x150e` Strix | **Radeon 890M** (iGPU) | ~512 MiB | Display, light compute |
 
+- **Russell targets `card1`** (the dGPU) for GPU probes. The
+  path is hardcoded (`/sys/class/drm/card1/device/`). On
+  machines with a different DRM topology, GPU probes return
+  `None`.
 - ROCm installed: **7.2.0** under `/opt/rocm-7.2.0` + `/opt/rocm`
-- `rocm-smi` 4.0.0 / `rocm-smi-lib` 7.8.0 present
+- `rocm-smi` is **not currently installed** on this machine;
+  GPU probes use sysfs directly (no subprocess).
 - **Known hazard:** ROCm 7.2.0 has an open regression that
   causes VRAM over-allocation / OOM with Ollama on Navi 3x /
   Strix iGPUs (upstream issue [ROCm #5902]). See §10 of
@@ -159,3 +166,33 @@ snap list ; flatpak list ; apt list --upgradable 2>/dev/null | head
 All of the above are read-only. They are the first thing the
 **Intake** module of Russell runs. Output is stored as the
 "patient chart" referenced by every subsequent hygiene task.
+
+## 8. Russell Probe Coverage
+
+As of 2026-05-11, Russell's Sentinel collects the following
+probes from this machine every 5 minutes:
+
+| Probe | Typical value | Notes |
+|---|---|---|
+| `mem_available_mib` | ~90,000 MiB | 91 GiB installed, 3.2 GiB swap used at baseline |
+| `swap_used_mib` | ~3,200 MiB | — |
+| `loadavg_1m` | 0.4–2.0 | 12-core × 2-thread; load < 24 is fine |
+| `proc_total_count` | ~400–500 | — |
+| `proc_zombie_count` | 0 | Zombies indicate orphaned children |
+| `proc_stuck_count` | 0 | D-state indicates I/O hang |
+| `proc_running_count` | 1–8 | — |
+| `proc_top_cpu_name` | varies | Text probe |
+| `proc_top_mem_name` | varies | Text probe |
+| `proc_top_mem_pct` | 5–25% | Typically ollama or Firefox |
+| `gpu_vram_used_pct` | 98% | RX 7700S VRAM heavily used by Ollama |
+| `gpu_temp_c` | 28–50°C | dGPU temperature |
+| `gpu_util_pct` | 0–100% | Spikey; averages low |
+| `disk_io_pressure_some_pct` | 0–5% | Low on NVMe |
+| `disk_io_pressure_full_pct` | 0–2% | Near-zero on NVMe |
+| `systemd_degraded` | 0 or 1 | Bool: 1 = degraded |
+| `systemd_user_failed_count` | 0 | — |
+| `systemd_system_failed_count` | 0 | — |
+
+Okapi probes (via `russell okapi-probe` timer, separate 5-min cadence)
+cover tokens_generated, requests_active, errors_total, GPU
+memory from within the inference container, and adapter counts.

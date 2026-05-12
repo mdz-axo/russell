@@ -1,33 +1,31 @@
 ---
 title: "Russell Consolidated Status"
 audience: [operators, developers, contributors, architects, agents]
-last_updated: 2026-05-09
+last_updated: 2026-05-11
 togaf_phase: "G — Governance"
-version: "2.0.0"
+version: "2.1.0"
 status: "Active"
 ---
 
 # Russell Consolidated Status
 
 <!-- TOGAF_DOMAIN: Governance -->
-<!-- VERSION: 2.0.0 -->
+<!-- VERSION: 2.1.0 -->
 <!-- STATUS: Active -->
-<!-- LAST_UPDATED: 2026-05-09 -->
+<!-- LAST_UPDATED: 2026-05-11 -->
 
 **Single source of truth for "where are we?"** Updated at the end
 of every meaningful development session.
 
 ## 1. Headline
 
-- **Phase 0 (skeleton, read-only observation) — COMPLETE** as of
-  2026-04-18.
-- **Phase 1 (MVP Doctor — `russell jack`) — IMPLEMENTED + verified against real LLM backends (Ollama / OpenRouter).**
-- **Phase 1b (install artifacts + systemd units) — SHIPPED + installed on the observed machine.** 5-min timer firing; 50 tests green.
-- **Phase 1c (20-day unattended soak) — CLOSED.** Day 20 (2026-05-06): 2 062 cycles, ~99.95% reliability. Closed per [ADR-0018](../adr/0018-close-phase-1c.md). Findings F-1 through F-9 recorded in [`SOAK_FINDINGS.md`](SOAK_FINDINGS.md); F-7 (JR-5 self-vital) and F-2 (SOAP samples) carry into Phase 2.
-- **Phase 2 (observation sharpened) — OPEN.** Self-vital, rule engine, EWMA baselines, Markdown memory layer. Spec pinned at [`../specifications/MVP_SPEC.md`](../specifications/MVP_SPEC.md).
-- **Architecture pivoted to JR-1 austerity** on 2026-04-18.
-  Seven ADRs deferred to `adr/deferred/`; two architecture docs
-  archived.
+- **Phase 0 (skeleton, read-only observation) — COMPLETE** as of 2026-04-18.
+- **Phase 1 (MVP Doctor — `russell jack`) — COMPLETE.**
+- **Phase 1b (install artifacts + systemd units) — SHIPPED + installed.**
+- **Phase 1c (20-day unattended soak) — CLOSED.**
+- **Phase 2 (observation sharpened) — ACTIVE.** Self-vitals (5), rule engine, EWMA baselines, process probes (7), GPU probes (5), disk probes (2), systemd probes (3). Baseline deviation integrated into Jack's SOAP objective.
+- **Phase 3 (skills and dispatch) — ACTIVE.** IDRS-gated skill dispatcher wired for production. `okapi-watcher` skill operational with `restart-okapi` intervention. Consent flow in `russell chat` (`/approve`, `/deny`). `ACTION:` proposal syntax parsed by both `russell jack` and `russell chat`.
+- **Architecture:** JR-1 austerity maintained throughout. Seven ADRs deferred.
 
 ## 2. What exists today
 
@@ -44,20 +42,23 @@ of every meaningful development session.
 
 ### Code
 
-- Rust workspace with 7 crates (3 active, 4 stubs per JR-6
-  scaffold-for-later discipline).
+- Rust workspace with 7 crates (6 active, 1 stub —
+  `russell-mcp` is a placeholder per ADR-0003).
 - `russell-core` implements paths, event schema, profile,
   journal (SQLite + WAL + migrations), telemetry, time.
-- `russell-sentinel` implements three `/proc`-based probes.
+- `russell-sentinel` implements 21 probes across 6 categories:
+  memory (4), swap (1), load (1), processes (7), GPU (5),
+  disks (2), systemd (3). Plus Okapi probes via separate timer.
 - `russell-proprio` implements the JR-5 self-vital plus 4 Phase-2A
   vitals: `sentinel_last_run_age_s`, `journal_writer_stall_s`,
   `llm_p95_latency_ms`, `timer_drift_s`, `help_error_rate_pct`.
   Includes `AutoimmuneGuard` (process-wide mutex for future meta-Doctor).
   Detects degraded internal state (slow LLM, journal stall, timer drift)
   before the operator notices. All vitals are read-only; no mutation.
-- `russell-cli` implements six verbs: `status`,
-  `list`, `profile [--init]`, `digest`, `sentinel-once`,
-  `jack`.
+- `russell-cli` implements ten verbs: `status`, `list`,
+  `profile [--init]`, `digest`, `sentinel-once`, `jack`,
+  `chat`, `skill list`, `skill run <id>`, `okapi-probe`,
+  `proprio`.
 - 109 tests passing (37 core + 15 doctor + 17 proprio + 8 sentinel + 4 CLI + 28 skills).
 - `cargo fmt --check` ✅, `cargo clippy -- -D warnings` ✅,
   `cargo test` ✅.
