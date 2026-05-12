@@ -56,9 +56,7 @@ pub(crate) fn disk_io_pressure_samples() -> Vec<super::Sample> {
 ///
 /// Uses `df -B1 --output=size,used /` via the subprocess connector.
 pub fn disk_root_used_pct() -> Option<f64> {
-    let output = connectors::run_command_stdout_always(&[
-        "df", "-B1", "--output=size,used", "/",
-    ])?;
+    let output = connectors::run_command_stdout_always(&["df", "-B1", "--output=size,used", "/"])?;
     let (total, used) = tools::parse_df_output(&output)?;
     if total == 0 {
         return None;

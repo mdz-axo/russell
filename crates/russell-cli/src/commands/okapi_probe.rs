@@ -31,6 +31,7 @@ use serde::Deserialize;
 
 /// Okapi metrics from `/api/metrics/json`.
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct OkapiMetricsResponse {
     tokens_generated_total: i64,
     prompt_tokens_evaluated_total: i64,
@@ -233,7 +234,7 @@ pub fn run(paths: &Paths, auto_apply: bool, default_model: &str) -> Result<()> {
             }
             journal.append(&ev)?;
         }
-    } else if metrics.model_loaded && schedules.len() > 0 {
+    } else if metrics.model_loaded && !schedules.is_empty() {
         // No schedule is active but a model is loaded and schedules exist.
         // This is informational — the model may have been loaded manually.
         let mut ev = Event::new("observe", Severity::Info);

@@ -242,6 +242,13 @@ impl RuleSet {
     pub fn len(&self) -> usize {
         self.rules.len()
     }
+
+    /// Returns `true` if no rules are loaded.
+    #[cfg(test)]
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.rules.is_empty()
+    }
 }
 
 /// Built-in default rules shipped with Russell.
@@ -261,7 +268,7 @@ fn default_rules() -> Vec<Rule> {
             alert_above: None,
             crit_above: None,
         },
-Rule {
+        Rule {
             probe: "swap_used_mib".into(),
             description: Some("Swap usage".into()),
             unit: Some("MiB".into()),

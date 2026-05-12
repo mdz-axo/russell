@@ -35,18 +35,12 @@ pub fn summarise(reader: &JournalReader, note: Option<&str>) -> Result<String> {
     )?;
 
     match verdict(&counts) {
-        Verdict::Clean => {
-            writeln!(
-                out,
-                "Nothing notable. Machine looks fine from where I'm sitting."
-            )?
-        }
-        Verdict::Soft => {
-            writeln!(out, "Some warnings worth a look; nothing urgent.")?
-        }
-        Verdict::Hard => {
-            writeln!(out, "Alerts in the window. Check the evidence.")?
-        }
+        Verdict::Clean => writeln!(
+            out,
+            "Nothing notable. Machine looks fine from where I'm sitting."
+        )?,
+        Verdict::Soft => writeln!(out, "Some warnings worth a look; nothing urgent.")?,
+        Verdict::Hard => writeln!(out, "Alerts in the window. Check the evidence.")?,
     }
 
     if !rows.is_empty() {
@@ -75,7 +69,7 @@ pub fn summarise(reader: &JournalReader, note: Option<&str>) -> Result<String> {
          OPENROUTER_API_KEY in `~/.config/harness/russell.env` if you want \
          the remote fallback. Call me back when the phone's working."
     )?;
-Ok(out)
+    Ok(out)
 }
 
 #[derive(Debug, Clone, Copy)]

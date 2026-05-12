@@ -9,13 +9,20 @@ use serde::Deserialize;
 /// Schema tag for versioned schedule files.
 pub const SCHEDULE_SCHEMA: &str = "russell.schedule.v1";
 
+/// A single schedule entry mapping a model to a time window.
 #[derive(Debug, Clone, Deserialize)]
 pub struct Schedule {
+    /// LLM model identifier (e.g. `"deepseek-v4-pro"`).
     pub model: String,
+    /// Start time in `HH:MM` 24-hour format.
     pub start: String,
+    /// End time in `HH:MM` 24-hour format.
     pub end: String,
+    /// Days of the week this schedule is active (e.g. `["Mon", "Fri"]`).
+    /// Empty means every day.
     #[serde(default)]
     pub days: Vec<String>,
+    /// Optional adapter overrides active during this window.
     #[serde(default)]
     pub adapters: Vec<String>,
 }
@@ -28,6 +35,10 @@ struct SchedulesFile {
     schedule: Vec<Schedule>,
 }
 
+/// A collection of time-based model schedules.
+///
+/// Loaded from `~/.config/harness/schedules.toml`. If the file is
+/// missing or malformed, the set is empty (no schedule override).
 #[derive(Debug, Clone, Default)]
 pub struct ScheduleSet {
     entries: Vec<Schedule>,
@@ -87,12 +98,17 @@ fn day_matches(wday: time::Weekday, days: &[String]) -> bool {
 }
 
 impl ScheduleSet {
+    /// Create an empty schedule set (no time-based overrides).
     pub fn new() -> Self {
         Self {
             entries: Vec::new(),
         }
     }
 
+    /// Load schedules from a TOML file at `path`.
+    ///
+    /// Returns an empty set if the file is missing, malformed, or
+    /// carries an unrecognized schema tag.
     pub fn load(path: &std::path::Path) -> Self {
         let content = match std::fs::read_to_string(path) {
             Ok(c) => c,
@@ -115,6 +131,7 @@ impl ScheduleSet {
         }
     }
 
+    /// Return the schedule entry active at the current local time, if any.
     pub fn active_now(&self) -> Option<&Schedule> {
         let (now_h, now_m, now_wday) = now_local();
 
@@ -141,8 +158,14 @@ impl ScheduleSet {
         None
     }
 
+    /// Number of schedule entries.
     pub fn len(&self) -> usize {
         self.entries.len()
+    }
+
+    /// Returns `true` if there are no schedule entries.
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
     }
 }
 

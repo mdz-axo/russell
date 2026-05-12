@@ -8,7 +8,7 @@ use russell_core::paths::Paths;
 pub fn run(paths: &Paths) -> Result<()> {
     let journal = JournalWriter::open(&paths.journal())
         .with_context(|| format!("opening journal {}", paths.journal().display()))?;
-    let reader = JournalReader::new(&paths.journal());
+    let reader = JournalReader::new(paths.journal());
 
     let result = russell_proprio::run_once(&journal, &reader).context("running proprioception")?;
 
