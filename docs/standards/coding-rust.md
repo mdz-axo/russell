@@ -99,7 +99,7 @@ are separate crates. Cross-crate dependencies are a DAG rooted at
 - Fields use snake_case and match the journal event schema
   (`harness.event.v1`). No ad-hoc keys.
 - Levels: `error` for user-visible failure, `warn` for a
-  condition we intend to act on, `info` for state
+  condition Russell intends to act on, `info` for state
   transitions, `debug` for developer-only detail, `trace`
   off in release builds.
 

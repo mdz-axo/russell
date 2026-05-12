@@ -1,3 +1,12 @@
+---
+title: "Container Runtime — Architecture & Configuration"
+audience: [operators, developers]
+last_updated: 2026-05-07
+togaf_phase: "D — Technology Architecture"
+version: "1.0.0"
+status: "Active"
+---
+
 # Container Runtime — Architecture & Configuration
 
 > Last updated: 2026-05-07

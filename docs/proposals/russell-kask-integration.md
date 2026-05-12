@@ -1,3 +1,12 @@
+---
+title: "Proposal: Russell as Kask's Local System Agent"
+audience: [architects, developers]
+last_updated: 2026-05-06
+togaf_phase: "A — Architecture Vision"
+version: "1.0.0"
+status: "Proposed"
+---
+
 # Proposal: Russell as Kask's Local System Agent
 
 **Date:** 2026-05-06

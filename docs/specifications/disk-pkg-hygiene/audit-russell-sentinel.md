@@ -2,6 +2,7 @@
 title: "Crate Audit: russell-sentinel"
 audience: [developers, agents]
 last_updated: 2026-05-06
+togaf_phase: "C — Information Systems"
 status: "Completed — refactoring landed per ADR-0019"
 ---
 

@@ -1,18 +1,18 @@
 ---
 title: "Documentation Standards"
 audience: [contributors, developers, architects]
-last_updated: 2026-04-18
+last_updated: 2026-05-12
 togaf_phase: "Preliminary — Governance"
-version: "1.0.0"
+version: "1.1.0"
 status: "Active"
 ---
 
 # Russell Documentation Standards
 
 <!-- TOGAF_DOMAIN: Cross-cutting — Governance -->
-<!-- VERSION: 1.0.0 -->
+<!-- VERSION: 1.1.0 -->
 <!-- STATUS: Active -->
-<!-- LAST_UPDATED: 2026-04-18 -->
+<!-- LAST_UPDATED: 2026-05-12 -->
 
 This standard defines the **minimum enforceable process** for keeping
 Russell's documentation corpus small, high-signal, and aligned with
@@ -30,7 +30,7 @@ When claims conflict, precedence is:
    vocabulary.
 2. [`docs/README.md`](../README.md) — portal and critical set.
 3. [`docs/status/CONSOLIDATED-STATUS.md`](../status/CONSOLIDATED-STATUS.md)
-   — where we actually are.
+   — current state.
 4. [`docs/specifications/MVP_SPEC.md`](../specifications/MVP_SPEC.md)
    — the pinned MVP boundary.
 5. [`docs/architecture/PRINCIPLES_CATALOG.md`](../architecture/PRINCIPLES_CATALOG.md).
@@ -206,7 +206,66 @@ Plus an HTML block for CI tooling:
 <!-- LAST_UPDATED: YYYY-MM-DD -->
 ```
 
-## 11. TOGAF Integration
+## 11. Documentation Tiers
+
+Russell's documentation sorts into seven tiers. Each tier has a
+different audience, purpose, and style expectation.
+
+| Tier | Location | Purpose | Style |
+|---|---|---|---|
+| **Orientation** | `README.md`, `AGENTS.md`, `CONTRIBUTING.md` | First-touch docs for humans and agents | Terse, link-heavy, imperative |
+| **Design** | `cybernetic-health-harness.md`, `MACHINE_PROFILE.md` | Canonical background; vocabulary source | Discursive, research-grade |
+| **Architecture** | `docs/architecture/` | How the locked decisions fit together | Diagrams + prose; one topic per file |
+| **Specifications** | `docs/specifications/` | Contract-level description of boundary and behaviour | Formal, RFC 2119 keywords, traceable |
+| **Standards** | `docs/standards/` | Rules that PR reviews enforce | Checklists, numbered clauses |
+| **ADRs** | `docs/adr/NNNN-slug.md` | Immutable records of locked decisions | ADR template format only |
+| **rustdoc** | In the source | API reference | Follow Rust API Guidelines |
+
+When adding a document, name its tier. A document that tries to
+serve multiple tiers serves none effectively.
+
+## 12. Markov Conventions
+
+- One H1 per file; it matches the file's topic.
+- ATX-style headers (`#`), not setext.
+- Fence code blocks with the language tag.
+- Lines wrap at ~72 columns for prose, looser for tables. Never
+  break a URL across lines.
+- Relative links inside the repo; absolute links for upstream.
+- Paths mentioned in prose are wrapped in backticks:
+  `~/.local/state/harness/journal.db`.
+- Paths that exist in the repo are hyperlinks on first mention
+  per section.
+
+## 13. Cross-Linking Conventions
+
+- From orientation → standards: link to the whole standard, not
+  a clause, unless the clause is stable.
+- From standards → ADRs: link by ADR number, not slug, so
+  renames do not break references (the path still matters, but
+  the number is the canonical handle).
+- From ADRs → `cybernetic-health-harness.md`: cite the section
+  number (§X.Y).
+
+## 14. Tables
+
+- Use Markdown tables only when comparing ≥3 attributes across
+  ≥3 rows. Otherwise a bulleted list is clearer.
+- Left-align text; right-align numerics.
+- Header row gets the pipe pattern `|---|`, not `|:---:|`, unless
+  alignment is semantically meaningful.
+
+## 15. Terminology Discipline
+
+- Use the binding vocabulary from AGENTS.md §5 exactly. Do not
+  invent synonyms.
+- When introducing a new term, add it to the AGENTS.md table in
+  the same PR.
+- Abbreviations: expand on first use per file, then use the short
+  form. `SOAP`, `IDRS`, `EWMA`, `VSM`, `MCP` are exempt once the
+  reader has reached `AGENTS.md` §5.
+
+## 16. TOGAF Integration
 
 Russell uses a minimal TOGAF mapping; the full matrix lives at
 [`docs/architecture/TOGAF_TRACEABILITY_MATRIX.md`](../architecture/TOGAF_TRACEABILITY_MATRIX.md).
@@ -223,7 +282,7 @@ Every document carries one `togaf_phase` tag. Valid values:
 - `H` — Change Management. ADRs.
 - `Requirements Management` — cross-cutting specifications.
 
-## 12. Verification Commands
+## 17. Verification Commands
 
 ```sh
 # All active docs (excluding archive).
@@ -244,7 +303,7 @@ for f in $(find docs -name '*.md' -not -path 'docs/archive/*'); do
 done
 ```
 
-## 13. References
+## 18. References
 
 - The Open Group. (2022). *TOGAF Standard, 10th Edition*.
 - Procida, D. (2021). *Diátaxis: A systematic approach to technical

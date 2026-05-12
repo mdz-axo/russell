@@ -1,7 +1,7 @@
 ---
 title: "Russell Consolidated Status"
 audience: [operators, developers, contributors, architects, agents]
-last_updated: 2026-05-11
+last_updated: 2026-05-12
 togaf_phase: "G — Governance"
 version: "2.1.0"
 status: "Active"
@@ -12,15 +12,15 @@ status: "Active"
 <!-- TOGAF_DOMAIN: Governance -->
 <!-- VERSION: 2.1.0 -->
 <!-- STATUS: Active -->
-<!-- LAST_UPDATED: 2026-05-11 -->
+<!-- LAST_UPDATED: 2026-05-12 -->
 
-**Single source of truth for "where are we?"** Updated at the end
+**Single source of truth for "where is the project?"** Updated at the end
 of every meaningful development session.
 
 ## 1. Headline
 
 - **Phase 0 (skeleton, read-only observation) — COMPLETE** as of 2026-04-18.
-- **Phase 1 (MVP Doctor — `russell jack`) — COMPLETE.**
+- **Phase 1 (MVP Nurse — `russell jack`) — COMPLETE.**
 - **Phase 1b (install artifacts + systemd units) — SHIPPED + installed.**
 - **Phase 1c (20-day unattended soak) — CLOSED.**
 - **Phase 2 (observation sharpened) — ACTIVE.** Self-vitals (5), rule engine, EWMA baselines, process probes (7), GPU probes (5), disk probes (2), systemd probes (3). Baseline deviation integrated into Jack's SOAP objective.
@@ -37,8 +37,8 @@ of every meaningful development session.
 - Persistence catalog (`PERSISTENCE_CATALOG.md`).
 - Reuse manifest (`REUSE_MANIFEST.md`).
 - TOGAF traceability matrix.
-- 10 active ADRs + 7 deferred.
-- 3 templates (ADR, skill manifest, SOAP bundle).
+- 16 active ADRs + 8 deferred.
+- 5 templates (ADR, skill manifest, SOAP bundle, daily log, review entry).
 
 ### Code
 
@@ -60,7 +60,7 @@ of every meaningful development session.
   `profile [--init]`, `digest`, `sentinel-once`, `jack`,
   `chat`, `skill list`, `skill run <id>`, `okapi-probe`,
   `proprio`.
-- 109 tests passing (37 core + 15 doctor + 17 proprio + 8 sentinel + 4 CLI + 28 skills).
+- 141 tests passing (37 core + 15 doctor + 17 proprio + 8 sentinel + 4 CLI + 28 skills + additional integration tests).
 - `cargo fmt --check` ✅, `cargo clippy -- -D warnings` ✅,
   `cargo test` ✅.
 

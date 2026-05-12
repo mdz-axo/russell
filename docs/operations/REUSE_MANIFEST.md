@@ -24,7 +24,7 @@ Every row must name:
 - Upstream path (relative to `~/Clones/`).
 - Upstream commit SHA at copy time.
 - What Russell changed during the copy.
-- The sync policy — what we do when upstream changes.
+- The sync policy — the action when upstream changes.
 
 ## 1. Why copy and not depend
 

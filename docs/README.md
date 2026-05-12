@@ -28,7 +28,7 @@ not belong in the corpus (yet).
 | [`specifications/`](specifications/) | MVP boundary, persistence catalog, integration refs | Requirements | All |
 | [`standards/`](standards/) | Documentation, coding, commits, safety, ADR, writing excellence | Preliminary | Contributors |
 | [`operations/`](operations/) | Reuse manifest, operator runbooks | D / G | Developers, Operators |
-| [`status/`](status/) | Where we actually are | G | All |
+| [`status/`](status/) | Current consolidated state | G | All |
 | [`templates/`](templates/) | Copy-when-authoring scaffolds | — | Contributors |
 | [`archive/`](archive/) | Superseded content, with provenance | Repository | Reference |
 
@@ -94,7 +94,7 @@ may exist but must not contradict these.
 ### 2.6 Status
 
 - [`status/CONSOLIDATED-STATUS.md`](status/CONSOLIDATED-STATUS.md)
-  — where we are.
+  — current state.
 - [`status/SOAK_FINDINGS.md`](status/SOAK_FINDINGS.md)
   — observational backlog during Phase 1c.
 
@@ -177,10 +177,10 @@ They live under [`adr/deferred/`](adr/deferred/):
 
 | Bucket | Count |
 |---|---|---|
-| Active authoritative docs | 69 |
+| Active authoritative docs | 72 |
 | Active ADRs | 16 |
 | Deferred ADRs | 8 |
-| Archived docs | 4 |
+| Archived docs | 6 |
 | Templates | 5 |
 
 _Verify with `find docs -type f -name '*.md' -not -path 'docs/archive/*' | wc -l`; current as of `last_updated`._

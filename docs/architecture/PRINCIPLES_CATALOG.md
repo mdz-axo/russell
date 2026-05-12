@@ -57,13 +57,13 @@ supersedes this catalog.
 **Statement.** *Though she be but little, she is fierce.* Russell
 is austere by default. Every feature must earn its place against
 the cost it adds to boot time, binary size, cognitive load, and
-attack surface. We prefer **one small, resilient loop that always
+attack surface. Russell prefers **one small, resilient loop that always
 runs** over five clever loops that sometimes do. When in doubt,
 cut.
 
 **Rationale.** A Jack Russell terrier is a 12-inch dog that runs
 all day, catches rats, never gets bored, never needs a team. The
-wrong response to "we need more" is usually "we need less,
+wrong response to "we need more" is usually "less,
 better." The design document
 ([`cybernetic-health-harness.md`](../../cybernetic-health-harness.md))
 describes a rich system; this principle says implementation
@@ -168,7 +168,7 @@ waiting to happen. Copy-with-provenance gives us:
 - Russell can be built offline.
 - Upstream bug fixes are a deliberate port, not a surprise.
 
-**Consequence.** Cost: we maintain a sync manifest and
+**Consequence.** Cost: the operator maintains a sync manifest and
 periodically rebase copies against upstream. Buy: Russell stays
 small, self-contained, and always-builds.
 

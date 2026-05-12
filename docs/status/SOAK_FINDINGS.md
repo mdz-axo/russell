@@ -1,7 +1,7 @@
 ---
 title: "Soak Findings — Phase 1c backlog"
 audience: [developers, architects, operators, contributors]
-last_updated: 2026-05-06
+last_updated: 2026-05-12
 togaf_phase: "G — Governance"
 version: "1.1.0"
 status: "Active"
@@ -10,18 +10,18 @@ status: "Active"
 <!-- TOGAF_DOMAIN: Governance -->
 <!-- VERSION: 1.1.0 -->
 <!-- STATUS: Active -->
-<!-- LAST_UPDATED: 2026-05-06 -->
+<!-- LAST_UPDATED: 2026-05-12 -->
 
 # Soak Findings
 
 This file is the **Phase-1c backlog**. During the 30-day
 unattended soak defined in
 [`../specifications/MVP_SPEC.md`](../specifications/MVP_SPEC.md) §6,
-we **observe and record** — we do not patch. Items land here when
-we notice them, and Phase 2 triages them.
+Russell **observes and records** — no patches are applied. Items land
+here when detected, and Phase 2 triages them.
 
 Touching the running system invalidates the soak. If a finding is
-genuinely unsafe (data loss, crash loop, security), we end the soak
+genuinely unsafe (data loss, crash loop, security), the soak ends
 deliberately via a superseding ADR; otherwise the soak continues.
 
 ## Soak timeline
@@ -77,6 +77,15 @@ Confirmed healthy as of 2026-05-06:
   5 clean offline fallbacks, all dated 2026-04-18 or
   2026-04-21. No new `russell jack` invocations since day 4
   (see F-9).
+
+## Residual "we" usage note
+
+The findings below are written from the soak operator's perspective
+(first-person observational journal). This departs from Writing
+Excellence's third-person standard, but preserves the operator's
+authentic record of the soak as it was conducted. Reviewers: do
+not "fix" these to third person — they are historical observation,
+not project documentation.
 
 ## Findings
 
