@@ -81,13 +81,14 @@ mod tests {
         if !std::path::Path::new(GPU_DEVICE).exists() {
             return;
         }
-        let pct = gpu_vram_used_pct();
-        assert!(pct.is_some());
-        let v = pct.unwrap();
-        assert!(
-            (0.0..=100.0).contains(&v),
-            "vram pct should be 0-100, got {v}"
-        );
+        // The device node may exist (e.g. iGPU) without exposing
+        // mem_info_vram_used — in that case the probe returns None.
+        if let Some(v) = gpu_vram_used_pct() {
+            assert!(
+                (0.0..=100.0).contains(&v),
+                "vram pct should be 0-100, got {v}"
+            );
+        }
     }
 
     #[test]
