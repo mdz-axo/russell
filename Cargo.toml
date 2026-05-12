@@ -18,7 +18,7 @@ version = "0.2.0"
 edition = "2024"
 rust-version = "1.94"
 license = "MIT OR Apache-2.0"
-repository = "https://example.invalid/russell"
+repository = "https://github.com/Replicant-Partners/russell"
 authors = ["Russell contributors"]
 
 [workspace.dependencies]
