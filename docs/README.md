@@ -103,7 +103,7 @@ may exist but must not contradict these.
 - [`adr/0016-doctor-and-llm-router.md`](adr/0016-doctor-and-llm-router.md)
 - [`adr/0017-reuse-over-dependency.md`](adr/0017-reuse-over-dependency.md)
 - [`adr/0018-close-phase-1c.md`](adr/0018-close-phase-1c.md)
-- [`adr/0019-probe-cadence-and-ctha.md`](adr/0019-probe-cadence-and-ctha.md)
+- [`adr/0019-probe-cadence-and-okh.md`](adr/0019-probe-cadence-and-okh.md)
 - [`adr/0020-threshold-gated-llm-escalation.md`](adr/0020-threshold-gated-llm-escalation.md)
 - [`adr/0021-proprioception-phase2-reflex-arcs.md`](adr/0021-proprioception-phase2-reflex-arcs.md)
 - [`adr/0022-markdown-memory-layer.md`](adr/0022-markdown-memory-layer.md)

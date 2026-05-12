@@ -5,7 +5,7 @@
 //! lives in its own module; this module is the pipeline stage that
 //! iterates them.
 //!
-//! CTHA: `ctha.pipeline.sentinel_collect.duration_ms`, `items_out`
+//! OKH: `okh.pipeline.sentinel_collect.duration_ms`, `items_out`
 
 pub mod connectors;
 pub mod disks;
@@ -32,11 +32,11 @@ pub struct Sample {
 /// Collect one sample per probe. Returns only probes that
 /// produced a value on this invocation.
 ///
-/// CTHA: `ctha.pipeline.sentinel_collect`
+/// OKH: `okh.pipeline.sentinel_collect`
 #[tracing::instrument(
     level = "debug",
     fields(
-        ctha.pipeline.sentinel_collect.items_out,
+        okh.pipeline.sentinel_collect.items_out,
     )
 )]
 pub fn collect() -> Vec<Sample> {
@@ -136,7 +136,7 @@ pub fn collect() -> Vec<Sample> {
         });
     }
 
-    tracing::Span::current().record("ctha.pipeline.sentinel_collect.items_out", out.len());
+    tracing::Span::current().record("okh.pipeline.sentinel_collect.items_out", out.len());
     out
 }
 

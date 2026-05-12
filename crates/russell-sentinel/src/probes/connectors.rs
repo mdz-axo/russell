@@ -3,7 +3,7 @@
 //!
 //! Every function in this module performs a side effect (filesystem
 //! read, subprocess invocation, syscall). No transformation logic
-//! lives here. Each connector is instrumented with a CTHA span.
+//! lives here. Each connector is instrumented with a OKH span.
 //!
 //! See `docs/specifications/audit-crate.md` Layer 3 for the
 //! instrumentation discipline.
@@ -12,29 +12,29 @@ use std::fs;
 
 /// Read a file to string. Returns `None` on any I/O error.
 ///
-/// CTHA: `ctha.connector.fs.target=<path>`, `ctha.connector.fs.success`
+/// OKH: `okh.connector.fs.target=<path>`, `okh.connector.fs.success`
 #[tracing::instrument(
     level = "trace",
     fields(
-        ctha.connector.fs.target = path,
-        ctha.connector.fs.success,
+        okh.connector.fs.target = path,
+        okh.connector.fs.success,
     )
 )]
 pub fn read_file_to_string(path: &str) -> Option<String> {
     let result = fs::read_to_string(path).ok();
-    tracing::Span::current().record("ctha.connector.fs.success", result.is_some());
+    tracing::Span::current().record("okh.connector.fs.success", result.is_some());
     result
 }
 
 /// List numeric PID entries in `/proc`. Returns `None` if `/proc`
 /// is unreadable.
 ///
-/// CTHA: `ctha.connector.fs.target=/proc`, `ctha.connector.fs.success`
+/// OKH: `okh.connector.fs.target=/proc`, `okh.connector.fs.success`
 #[tracing::instrument(
     level = "trace",
     fields(
-        ctha.connector.fs.target = "/proc",
-        ctha.connector.fs.success,
+        okh.connector.fs.target = "/proc",
+        okh.connector.fs.success,
     )
 )]
 pub fn list_proc_pids() -> Option<Vec<u32>> {
@@ -49,7 +49,7 @@ pub fn list_proc_pids() -> Option<Vec<u32>> {
             pids.push(pid);
         }
     }
-    tracing::Span::current().record("ctha.connector.fs.success", true);
+    tracing::Span::current().record("okh.connector.fs.success", true);
     Some(pids)
 }
 
@@ -59,15 +59,15 @@ pub fn list_proc_pids() -> Option<Vec<u32>> {
 #[tracing::instrument(
     level = "trace",
     fields(
-        ctha.connector.fs.target = tracing::field::Empty,
-        ctha.connector.fs.success,
+        okh.connector.fs.target = tracing::field::Empty,
+        okh.connector.fs.success,
     )
 )]
 pub fn read_proc_stat(pid: u32) -> Option<String> {
     let path = format!("/proc/{pid}/stat");
-    tracing::Span::current().record("ctha.connector.fs.target", path.as_str());
+    tracing::Span::current().record("okh.connector.fs.target", path.as_str());
     let result = fs::read_to_string(&path).ok();
-    tracing::Span::current().record("ctha.connector.fs.success", result.is_some());
+    tracing::Span::current().record("okh.connector.fs.success", result.is_some());
     result
 }
 
@@ -78,22 +78,22 @@ pub fn read_proc_stat(pid: u32) -> Option<String> {
 /// the exit code IS the signal. For commands that should
 /// succeed, use `run_command_stdout_always` but check stderr.
 ///
-/// CTHA: `ctha.connector.cmd.target=<program>`, `ctha.connector.cmd.success`
+/// OKH: `okh.connector.cmd.target=<program>`, `okh.connector.cmd.success`
 #[tracing::instrument(
     level = "trace",
     fields(
-        ctha.connector.cmd.target = tracing::field::Empty,
-        ctha.connector.cmd.success,
+        okh.connector.cmd.target = tracing::field::Empty,
+        okh.connector.cmd.success,
     )
 )]
 pub fn run_command_stdout_always(cmd: &[&str]) -> Option<String> {
     let program = cmd.first()?;
-    tracing::Span::current().record("ctha.connector.cmd.target", *program);
+    tracing::Span::current().record("okh.connector.cmd.target", *program);
     let output = std::process::Command::new(program)
         .args(&cmd[1..])
         .stdin(std::process::Stdio::null())
         .output()
         .ok()?;
-    tracing::Span::current().record("ctha.connector.cmd.success", output.status.success());
+    tracing::Span::current().record("okh.connector.cmd.success", output.status.success());
     Some(String::from_utf8_lossy(&output.stdout).into_owned())
 }

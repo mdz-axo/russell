@@ -1,7 +1,7 @@
 # /audit-crate
 
 Audit a crate for tool/connector separation, parameterization, and
-CTHA instrumentation readiness.
+OKH instrumentation readiness.
 
 ## Usage
 
@@ -46,7 +46,7 @@ Exceptions (not defects):
 - Type system constraints (enum variants that define the domain model)
 - Validation rules that ARE the tool's purpose
 
-### Layer 3: CTHA Instrumentation (Cybernetic Health / Nervous System)
+### Layer 3: OKH Instrumentation (Cybernetic Health / Nervous System)
 
 The insight: separating tools from connectors identifies the exact boundaries
 where sensors belong. Every tool/connector boundary is a measurement point.
@@ -71,19 +71,19 @@ For the **orchestrator** (`main.rs` or equivalent), identify stage-level signals
 #### Sensor placement rules:
 
 1. **At tool boundaries**: instrument the function entry/exit with a tracing span
-   that captures input size and output size. Use `ctha.tool.<module>.<function>` field prefix.
+   that captures input size and output size. Use `okh.tool.<module>.<function>` field prefix.
 2. **At connector boundaries**: instrument with spans that capture latency,
-   success/failure, and retry count. Use `ctha.connector.<module>.<target>` field prefix.
+   success/failure, and retry count. Use `okh.connector.<module>.<target>` field prefix.
 3. **At stage transitions**: emit an event when a pipeline stage completes with
    the stage duration, items processed, and success count.
-   Use `ctha.pipeline.<stage_name>` field prefix.
-4. **Error classification**: every error should carry a `ctha.error.class` field
+   Use `okh.pipeline.<stage_name>` field prefix.
+4. **Error classification**: every error should carry a `okh.error.class` field
    that categorizes it (timeout, parse_failure, model_refusal, io_error, validation_failure).
 
-#### Naming convention for CTHA fields:
+#### Naming convention for OKH fields:
 
 ```
-ctha.<layer>.<module>.<signal> = <value>
+okh.<layer>.<module>.<signal> = <value>
 
 Layers: tool, connector, pipeline
 Signals: duration_ms, items_in, items_out, success, error_class,
@@ -103,7 +103,7 @@ Produce a structured report:
 - Clean (connector): N
 - Conflated: N
 - Parameterization issues: N
-- CTHA sensors needed: N
+- OKH sensors needed: N
 
 ### Layer 1: Separation Issues
 
@@ -117,12 +117,12 @@ Produce a structured report:
 |------|----------------|-----------|----------|
 | ... | ... | ... | high/medium/low |
 
-### Layer 3: CTHA Instrumentation Plan
+### Layer 3: OKH Instrumentation Plan
 
 | Location | Type | Sensor | Fields | Priority |
 |----------|------|--------|--------|----------|
-| ocr_extract::extract_page_images | tool | span | ctha.tool.ocr_extract.duration_ms, items_out | high |
-| ocr::transcribe_images | connector | span | ctha.connector.ocr.latency_ms, success, retries | high |
+| ocr_extract::extract_page_images | tool | span | okh.tool.ocr_extract.duration_ms, items_out | high |
+| ocr::transcribe_images | connector | span | okh.connector.ocr.latency_ms, success, retries | high |
 | ... | ... | ... | ... | ... |
 
 ### Recommended Refactoring Order
@@ -144,5 +144,5 @@ Severity/Priority guide:
 - The tool does not know where data goes. The connector does not know how data was formed.
 - Either can be replaced, composed, or exposed through any surface independently.
 - Every tool/connector boundary is a sensor placement point.
-- CTHA fields use the prefix `ctha.<layer>.<module>.<signal>`.
-- Error classification is mandatory — every failure carries `ctha.error.class`.
+- OKH fields use the prefix `okh.<layer>.<module>.<signal>`.
+- Error classification is mandatory — every failure carries `okh.error.class`.

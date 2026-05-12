@@ -1,6 +1,6 @@
 ---
 name: pragmatic-cybernetics
-description: Pragmatic cybernetics skill grounded in Norbert Wiener's foundational work (1948), the Macy Conferences (1946–1953), Ashby's Law of Requisite Variety (1956), Beer's Viable System Model (1972), second-order cybernetics (von Foerster, Maturana, Varela), and Argyris's double-loop learning. Extends classical cybernetics into the modern AI agent ecosystem — covering OODA/MAPE-K agent control loops, multi-agent coordination, self-healing resilience patterns, skill trust lifecycle governance, CTHA telemetric architecture, and agent observability as cybernetic feedback. Provides tools and perspectives for analyzing feedback loops, variety engineering, homeostatic regulation, algedonic signals, observer-system coupling, and recursive viability in software systems. Primary use cases: adversarial review of test harnesses (System 3* audit), trust dynamics analysis, self-healing architecture design, agentic system governance, CTHA instrumentation, and cybernetic evaluation of monitoring and control systems. Includes the 20-point Cybernetic Audit Checklist for systematic adversarial review.
+description: Pragmatic cybernetics skill grounded in Norbert Wiener's foundational work (1948), the Macy Conferences (1946–1953), Ashby's Law of Requisite Variety (1956), Beer's Viable System Model (1972), second-order cybernetics (von Foerster, Maturana, Varela), and Argyris's double-loop learning. Extends classical cybernetics into the modern AI agent ecosystem — covering OODA/MAPE-K agent control loops, multi-agent coordination, self-healing resilience patterns, skill trust lifecycle governance, OKH telemetric architecture, and agent observability as cybernetic feedback. Provides tools and perspectives for analyzing feedback loops, variety engineering, homeostatic regulation, algedonic signals, observer-system coupling, and recursive viability in software systems. Primary use cases: adversarial review of test harnesses (System 3* audit), trust dynamics analysis, self-healing architecture design, agentic system governance, OKH instrumentation, and cybernetic evaluation of monitoring and control systems. Includes the 20-point Cybernetic Audit Checklist for systematic adversarial review.
 license: MIT
 metadata:
   skill-author: Pragmatic Cybernetics Contributors
@@ -22,7 +22,7 @@ metadata:
     - self-healing
     - agent-observability
     - skill-trust-governance
-    - ctha-telemetry
+    - okh-telemetry
     - multi-agent-coordination
   sources:
     - "Wiener, N. (1948). Cybernetics: Or Control and Communication in the Animal and the Machine. MIT Press."
@@ -118,8 +118,8 @@ What is the task?
 │   └── → references/agentic-systems.md
 ├── Evaluating skill trust, progressive disclosure, governance?
 │   └── → references/skill-governance.md
-└── CTHA instrumentation, agent observability, health metrics?
-    └── → references/ctha-observability.md
+└── OKH instrumentation, agent observability, health metrics?
+    └── → references/okh-observability.md
 ```
 
 ## Linked Reference Files
@@ -131,4 +131,4 @@ What is the task?
 | `references/audit-checklist.md` | Running the full 20-point adversarial audit | All 20 checklist items with probing questions and red flags: Requisite Variety, Good Regulator, Algedonic Signals, Feedback Closure, Variety Attenuation/Amplification, Observer Coupling, Recursion, Ultrastability, Autopoiesis, Homeostasis, Double-Loop Learning, S3* Integrity, Dishonesty Detection, Agent Progress, Cognitive Readiness, Skill Trust Boundary, Coordination Anti-Oscillation, Context Window, Recursive Monitoring Independence |
 | `references/agentic-systems.md` | Analyzing agent loops, diagnosing agent pathologies, designing self-healing or multi-agent coordination | OODA/MAPE-K agent loops, VSM-to-agent-architecture mapping, cognitive maneuverability, agentic pathologies table, self-healing closed loop, Erlang/OTP patterns, three-tier escalation, anti-oscillation, stuck detection, durable execution, monitoring independence |
 | `references/skill-governance.md` | Evaluating skill trust tiers, progressive disclosure design, supply-chain security | Four-tier trust model (T1–T4), progressive disclosure as variety attenuation, trust escalation gates (G1–G4), Slovic asymmetry in demotion, supply-chain attacks as variety injection, RBAC as variety engineering |
-| `references/ctha-observability.md` | Instrumenting CTHA spans, designing agent health metrics, building observability for agent fleets | CTHA namespace-to-VSM mapping, observation→control loop diagram, OpenTelemetry GenAI conventions, agent health metrics (cognitive readiness, progress rate, reasoning quality), distributed tracing across agents, fleet-level attenuation, AI-enhanced dashboards as amplification, agents-monitoring-agents, observability signals quick reference |
+| `references/okh-observability.md` | Instrumenting OKH spans, designing agent health metrics, building observability for agent fleets | OKH namespace-to-VSM mapping, observation→control loop diagram, OpenTelemetry GenAI conventions, agent health metrics (cognitive readiness, progress rate, reasoning quality), distributed tracing across agents, fleet-level attenuation, AI-enhanced dashboards as amplification, agents-monitoring-agents, observability signals quick reference |

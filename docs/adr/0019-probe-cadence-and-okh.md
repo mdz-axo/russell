@@ -1,5 +1,5 @@
 ---
-title: "ADR-0019: Probe Cadence Separation and CTHA Instrumentation"
+title: "ADR-0019: Probe Cadence Separation and OKH Instrumentation"
 audience: [developers, architects]
 last_updated: 2026-05-06
 togaf_phase: "D — Technology Architecture"
@@ -12,12 +12,12 @@ status: "Accepted"
 <!-- STATUS: Accepted -->
 <!-- LAST_UPDATED: 2026-05-06 -->
 
-# ADR-0019: Separate probe cadences and adopt CTHA instrumentation at tool/connector boundaries
+# ADR-0019: Separate probe cadences and adopt OKH instrumentation at tool/connector boundaries
 
 - **Status:** Accepted
 - **Date:** 2026-05-06
 - **Deciders:** Project operator
-- **Tags:** `sentinel`, `cadence`, `ctha`, `observability`, `probes`
+- **Tags:** `sentinel`, `cadence`, `okh`, `observability`, `probes`
 
 ## Context
 
@@ -36,12 +36,12 @@ Simultaneously, the Kask platform's `audit-crate.md` methodology
 (updated to three layers) identifies that **every tool/connector
 boundary is a sensor placement point**. Russell already has
 proprioception (ADR-0015), but it operates at the macro level
-("did Sentinel run on time?"). The CTHA discipline adds micro-level
+("did Sentinel run on time?"). The OKH discipline adds micro-level
 instrumentation: how long did each probe take? Did the apt
 subprocess timeout? How many bytes did the journal write?
 
 These two concerns are coupled: cadence separation creates new
-pipeline stages, and each stage boundary is a CTHA measurement
+pipeline stages, and each stage boundary is a OKH measurement
 point.
 
 ## Decision
@@ -77,14 +77,14 @@ same binary, different flag, separate timer unit. Benefits:
 - Operator can `systemctl --user disable russell-sentinel-extended.timer`
   without affecting core health monitoring
 
-### Part 2: CTHA Instrumentation at Tool/Connector Boundaries
+### Part 2: OKH Instrumentation at Tool/Connector Boundaries
 
-Russell adopts the Kask CTHA naming convention for `tracing` spans
+Russell adopts the Kask OKH naming convention for `tracing` spans
 and fields. Every tool/connector boundary emits structured telemetry:
 
 **Naming convention:**
 ```
-ctha.<layer>.<module>.<signal>
+okh.<layer>.<module>.<signal>
 ```
 
 **Layers:** `tool`, `connector`, `pipeline`
@@ -92,26 +92,26 @@ ctha.<layer>.<module>.<signal>
 **Placement rules:**
 
 1. **Tool boundaries** — `tracing::instrument` on pure transform
-   functions. Fields: `ctha.tool.<module>.duration_ms`,
-   `ctha.tool.<module>.items_out`.
+   functions. Fields: `okh.tool.<module>.duration_ms`,
+   `okh.tool.<module>.items_out`.
 
 2. **Connector boundaries** — `tracing::instrument` on I/O
-   functions. Fields: `ctha.connector.<module>.latency_ms`,
-   `ctha.connector.<module>.success`,
-   `ctha.connector.<module>.error_class`.
+   functions. Fields: `okh.connector.<module>.latency_ms`,
+   `okh.connector.<module>.success`,
+   `okh.connector.<module>.error_class`.
 
 3. **Pipeline stages** — `tracing::info_span!` around each
-   collection phase. Fields: `ctha.pipeline.<stage>.duration_ms`,
-   `ctha.pipeline.<stage>.items_out`.
+   collection phase. Fields: `okh.pipeline.<stage>.duration_ms`,
+   `okh.pipeline.<stage>.items_out`.
 
-**Error classification** — every error carries `ctha.error.class`:
+**Error classification** — every error carries `okh.error.class`:
 `timeout`, `parse_failure`, `io_error`, `permission_denied`,
 `not_found`, `rate_limited`.
 
 **Relationship to proprioception (ADR-0015):**
-CTHA instrumentation is the *mechanism* by which proprioception
+OKH instrumentation is the *mechanism* by which proprioception
 observes Russell's internals. The existing `sentinel_last_run_age_s`
-self-vital is a pipeline-level CTHA signal. Phase 2 adds
+self-vital is a pipeline-level OKH signal. Phase 2 adds
 connector-level and tool-level signals that the meta-Sentinel can
 aggregate.
 
@@ -147,7 +147,7 @@ fn mem_available_mib() -> Option<f64> {
   degradation at the probe level (not just "did the cycle complete?").
 - Tool functions are independently unit-testable without filesystem
   or subprocess access.
-- CTHA fields flow through the existing `tracing` subscriber to
+- OKH fields flow through the existing `tracing` subscriber to
   stderr (Phase 0) and will flow to journald (Phase 2+).
 - The pattern is consistent with Kask platform conventions, enabling
   future integration.
@@ -165,7 +165,7 @@ fn mem_available_mib() -> Option<f64> {
 
 - The `--extended` flag is additive; existing `russell sentinel-once`
   behaviour is unchanged without the flag.
-- CTHA field names are structured metadata in tracing spans; they
+- OKH field names are structured metadata in tracing spans; they
   don't affect journal `samples` table schema.
 
 ## Alternatives considered
@@ -181,17 +181,17 @@ unpredictable; harder to reason about failure modes.
 
 Maximum isolation but violates JR-1 (one binary). Rejected.
 
-### Skip CTHA, keep ad-hoc tracing
+### Skip OKH, keep ad-hoc tracing
 
 The existing `tracing::debug!` calls are unstructured. Without
-CTHA naming, proprioception cannot programmatically detect "the
+OKH naming, proprioception cannot programmatically detect "the
 apt connector is timing out 80% of the time." Rejected: the
 whole point of proprioception is structured self-observation.
 
-### Defer CTHA to Phase 3
+### Defer OKH to Phase 3
 
 Possible, but the refactoring to tool/connector separation is
-happening now anyway. Adding CTHA spans at the same time is
+happening now anyway. Adding OKH spans at the same time is
 marginal effort. Rejected: do it once, do it right.
 
 ## Implementation notes
@@ -200,34 +200,34 @@ marginal effort. Rejected: do it once, do it right.
    - Extract `probes/connectors.rs` and `probes/tools.rs` from
      existing `probes.rs`
    - Add `probes/mod.rs` orchestrator
-   - Add CTHA spans to connector and tool functions
+   - Add OKH spans to connector and tool functions
    - Add `probes/disk.rs` (new, already decomposed)
    - Add `probes/packages.rs` (new, already decomposed)
    - Add `--extended` flag to CLI
    - Add `russell-sentinel-extended.timer` to packaging
 
-2. **CTHA span example:**
+2. **OKH span example:**
    ```rust
    #[tracing::instrument(fields(
-       ctha.connector.proc.target = "/proc/meminfo",
-       ctha.connector.proc.success,
+       okh.connector.proc.target = "/proc/meminfo",
+       okh.connector.proc.success,
    ))]
    fn read_proc_meminfo() -> Option<String> {
        let result = std::fs::read_to_string("/proc/meminfo").ok();
        tracing::Span::current()
-           .record("ctha.connector.proc.success", result.is_some());
+           .record("okh.connector.proc.success", result.is_some());
        result
    }
    ```
 
-3. **No new crate dependencies** for CTHA. The `tracing` crate
+3. **No new crate dependencies** for OKH. The `tracing` crate
    (already in workspace) provides all needed primitives.
 
 4. **Proprioception integration:** The meta-Sentinel can query
-   CTHA signals by subscribing to the tracing layer. In Phase 2,
-   a `tracing::Layer` implementation aggregates CTHA fields into
+   OKH signals by subscribing to the tracing layer. In Phase 2,
+   a `tracing::Layer` implementation aggregates OKH fields into
    the `samples` table with `scope='self'`. This is the bridge
-   between ADR-0015 (proprioception) and CTHA.
+   between ADR-0015 (proprioception) and OKH.
 
 ## References
 

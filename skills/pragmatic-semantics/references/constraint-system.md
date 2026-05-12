@@ -101,5 +101,5 @@ flowchart TD
 | **Memory/Retrieval** | `VectorSimilarity`, `SemanticRecall`, `SkillExtraction`, `SeedKnowledge` |
 | **Encoding Pipeline** | `Structure`, `Print` |
 | **External** | `Delegation`, `Import`, `ActualizerOutput`, `DtrustModule` |
-| **System** | `DiffMutation`, `BlackboardPublish`, `CthaEvidence`, `AsExperience` |
+| **System** | `DiffMutation`, `BlackboardPublish`, `OkhEvidence`, `AsExperience` |
 | **Special** | `Test`, `Custom(String)` |

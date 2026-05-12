@@ -1,36 +1,36 @@
-# CTHA and Agent Observability
+# OKH and Agent Observability
 
-> CTHA (Cybernetic Telemetric Homeostatic Architecture) mapped to VSM, OpenTelemetry GenAI conventions, agent health metrics, and agent observability as cybernetic feedback.
+> OKH (Open Kask Health) mapped to VSM, OpenTelemetry GenAI conventions, agent health metrics, and agent observability as cybernetic feedback.
 
 ---
 
-## CTHA — Cybernetic Telemetric Homeostatic Architecture
+## OKH — Open Kask Health
 
 ### Overview
 
-CTHA is the **nervous system** of the Kask platform — a structured telemetry architecture using OpenTelemetry spans in the `ctha.*` namespace. It implements Beer's VSM nervous system in code: every significant operation emits structured signals that flow through cybernetic channels to enable self-regulation.
+OKH is the **nervous system** of the Kask platform — a structured telemetry architecture using OpenTelemetry spans in the `okh.*` namespace. It implements Beer's VSM nervous system in code: every significant operation emits structured signals that flow through cybernetic channels to enable self-regulation.
 
-### CTHA Mapped to VSM Nervous System
+### OKH Mapped to VSM Nervous System
 
-Beer's VSM defines specific information channels between systems. CTHA implements these as structured span namespaces:
+Beer's VSM defines specific information channels between systems. OKH implements these as structured span namespaces:
 
-| CTHA Namespace | VSM Channel | Cybernetic Function | Signal Type |
+| OKH Namespace | VSM Channel | Cybernetic Function | Signal Type |
 |---------------|-------------|--------------------|----|
-| `ctha.connector.*` | S1 → S3 (afferent) | Sensor signals — external I/O observation | Latency, success/failure, payload characteristics |
-| `ctha.pipeline.*` | S1 internal | Operational flow — S1 activity within processing stages | Stage duration, throughput, queue depth |
-| `ctha.tool.*` | S3* → S1 | Governance signals — tool invocation as audit event | Tool selection, permission check, execution result |
-| `ctha.llm.*` | S4 function | Intelligence routing — model selection, fallback, provider choice | Model ID, token usage, routing decision rationale |
-| `ctha.error.class` | Algedonic channel | Pain classification — error severity and type for escalation routing | Error category, severity, blast radius |
+| `okh.connector.*` | S1 → S3 (afferent) | Sensor signals — external I/O observation | Latency, success/failure, payload characteristics |
+| `okh.pipeline.*` | S1 internal | Operational flow — S1 activity within processing stages | Stage duration, throughput, queue depth |
+| `okh.tool.*` | S3* → S1 | Governance signals — tool invocation as audit event | Tool selection, permission check, execution result |
+| `okh.llm.*` | S4 function | Intelligence routing — model selection, fallback, provider choice | Model ID, token usage, routing decision rationale |
+| `okh.error.class` | Algedonic channel | Pain classification — error severity and type for escalation routing | Error category, severity, blast radius |
 
-### CTHA Observation → Control Loop
+### OKH Observation → Control Loop
 
 ```mermaid
 graph LR
     subgraph "Emission (S1 Operations)"
-        E1[ctha.connector.* spans]
-        E2[ctha.pipeline.* spans]
-        E3[ctha.tool.* spans]
-        E4[ctha.llm.* spans]
+        E1[okh.connector.* spans]
+        E2[okh.pipeline.* spans]
+        E3[okh.tool.* spans]
+        E4[okh.llm.* spans]
     end
 
     subgraph "Collection (S3 Monitoring)"
@@ -75,7 +75,7 @@ graph LR
 
 ### OpenTelemetry GenAI Semantic Conventions
 
-CTHA aligns with the emerging OpenTelemetry GenAI semantic conventions — standardized cybernetic instrumentation for AI systems:
+OKH aligns with the emerging OpenTelemetry GenAI semantic conventions — standardized cybernetic instrumentation for AI systems:
 
 - `gen_ai.system` — identifies the LLM provider (S4 intelligence source)
 - `gen_ai.request.model` — specific model selected (routing decision)
@@ -86,7 +86,7 @@ These conventions provide a **shared vocabulary** for cybernetic instrumentation
 
 ### Agent Health Metrics Beyond Liveness
 
-Traditional liveness checks (is the process alive?) are necessary but radically insufficient for agents. CTHA must instrument:
+Traditional liveness checks (is the process alive?) are necessary but radically insufficient for agents. OKH must instrument:
 
 | Metric Category | What It Measures | Cybernetic Analog |
 |----------------|-----------------|-------------------|
@@ -98,12 +98,12 @@ Traditional liveness checks (is the process alive?) are necessary but radically 
 
 ### Monitoring the Monitor
 
-CTHA must itself be observable — this is a **second-order requirement**:
+OKH must itself be observable — this is a **second-order requirement**:
 
-- CTHA's own collector health must be monitored by an independent path
+- OKH's own collector health must be monitored by an independent path
 - Telemetry pipeline failures must not silently degrade observability
 - The monitoring system's resource consumption must be bounded and separate from operational resources
-- If CTHA goes silent, that silence itself must be detectable (watchdog pattern)
+- If OKH goes silent, that silence itself must be detectable (watchdog pattern)
 
 This is the recursive challenge of second-order cybernetics: **who watches the watchers?** The answer is structural: the monitoring path must be architecturally independent from the operational path it observes.
 

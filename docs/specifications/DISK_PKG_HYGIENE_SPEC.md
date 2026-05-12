@@ -56,7 +56,7 @@ In this domain:
 Before implementation begins:
 
 1. **MVP must be closed** (20-day soak, per `MVP_SPEC.md` §6).
-2. ~~**ADR for cadence separation** (Task 6, Question 1) must be decided.~~ **Done** — [ADR-0019](../adr/0019-probe-cadence-and-ctha.md).
+2. ~~**ADR for cadence separation** (Task 6, Question 1) must be decided.~~ **Done** — [ADR-0019](../adr/0019-probe-cadence-and-okh.md).
 3. **`nix` crate** must be added to `russell-sentinel/Cargo.toml` for `statvfs`.
 4. **`Sample` type** should be evaluated for promotion from `russell-sentinel` to `russell-core` (it's a domain type used across crate boundaries via the `ProviderHealth` trait).
 

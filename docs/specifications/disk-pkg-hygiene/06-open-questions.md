@@ -255,7 +255,7 @@ operator burden.
 
 | Question | ADR needed? | Blocking Phase 2? |
 |---|---|---|
-| 1. Cadence separation | Yes — **decided** ([ADR-0019](../../adr/0019-probe-cadence-and-ctha.md)) | ~~Yes~~ Resolved |
+| 1. Cadence separation | Yes — **decided** ([ADR-0019](../../adr/0019-probe-cadence-and-okh.md)) | ~~Yes~~ Resolved |
 | 2. Mutation boundary | No (follows existing JR-2 posture) | No |
 | 3. GitHub rate limiting | No (implementation detail) | No |
 | 4. Provider discovery | No (auto-detect is simplest) | No |
@@ -264,4 +264,4 @@ operator burden.
 | 7. Threshold calibration | No (absolute thresholds are default) | No |
 | 8. Provenance ownership | No (operator-maintained is default) | No |
 
-**Question 1 has been resolved by [ADR-0019](../../adr/0019-probe-cadence-and-ctha.md).** No remaining ADR blockers for Phase 2 implementation.
+**Question 1 has been resolved by [ADR-0019](../../adr/0019-probe-cadence-and-okh.md).** No remaining ADR blockers for Phase 2 implementation.

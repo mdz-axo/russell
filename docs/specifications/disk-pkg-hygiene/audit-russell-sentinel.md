@@ -14,7 +14,7 @@ status: "Completed — refactoring landed per ADR-0019"
 - Clean (connector): 0
 - Conflated: 2
 - Parameterization issues: 3
-- CTHA sensors needed: 7
+- OKH sensors needed: 7
 
 ---
 
@@ -59,22 +59,22 @@ This makes the tool layer untestable without a real `/proc` filesystem.
 
 ---
 
-## Layer 3: CTHA Instrumentation Plan
+## Layer 3: OKH Instrumentation Plan
 
 | Location | Type | Sensor | Fields | Priority |
 |----------|------|--------|--------|----------|
-| `read_proc_meminfo()` (to be extracted) | connector | span | `ctha.connector.proc.target="/proc/meminfo"`, `ctha.connector.proc.success` | high |
-| `read_proc_loadavg()` (to be extracted) | connector | span | `ctha.connector.proc.target="/proc/loadavg"`, `ctha.connector.proc.success` | high |
-| `parse_meminfo_kib()` (to be extracted) | tool | span | `ctha.tool.memory.items_out` (count of parsed keys) | low |
+| `read_proc_meminfo()` (to be extracted) | connector | span | `okh.connector.proc.target="/proc/meminfo"`, `okh.connector.proc.success` | high |
+| `read_proc_loadavg()` (to be extracted) | connector | span | `okh.connector.proc.target="/proc/loadavg"`, `okh.connector.proc.success` | high |
+| `parse_meminfo_kib()` (to be extracted) | tool | span | `okh.tool.memory.items_out` (count of parsed keys) | low |
 | `kib_to_mib()` (to be extracted) | tool | — | No span needed (trivial arithmetic) | — |
-| `collect()` | pipeline | span | `ctha.pipeline.sentinel_collect.duration_ms`, `ctha.pipeline.sentinel_collect.items_out` | high |
-| `run_once()` | pipeline | span | `ctha.pipeline.sentinel_run.duration_ms`, `ctha.pipeline.sentinel_run.samples_written` | high |
-| `writer.append_sample()` (in loop) | connector | span | `ctha.connector.journal.success`, `ctha.connector.journal.error_class` | medium |
+| `collect()` | pipeline | span | `okh.pipeline.sentinel_collect.duration_ms`, `okh.pipeline.sentinel_collect.items_out` | high |
+| `run_once()` | pipeline | span | `okh.pipeline.sentinel_run.duration_ms`, `okh.pipeline.sentinel_run.samples_written` | high |
+| `writer.append_sample()` (in loop) | connector | span | `okh.connector.journal.success`, `okh.connector.journal.error_class` | medium |
 
 ### Sensor Rationale
 
 - **Pipeline spans** (`collect`, `run_once`) — these are the signals proprioception already needs. `sentinel_last_run_age_s` is derived from the pipeline completion timestamp. Adding duration gives richer self-observation.
-- **Connector spans** (`read_proc_*`, `append_sample`) — if `/proc` becomes unavailable (container, namespace issue) or the journal write fails (disk full, WAL stuck), CTHA detects it at the boundary where it happens.
+- **Connector spans** (`read_proc_*`, `append_sample`) — if `/proc` becomes unavailable (container, namespace issue) or the journal write fails (disk full, WAL stuck), OKH detects it at the boundary where it happens.
 - **Tool spans** — mostly unnecessary for trivial arithmetic. Only add spans to tools that process variable-size input (e.g., parsing a full meminfo file, parsing apt stdout with hundreds of lines).
 
 ---
@@ -83,7 +83,7 @@ This makes the tool layer untestable without a real `/proc` filesystem.
 
 1. **Extract connectors** — Create `probes/connectors.rs`:
    - `read_file_to_string(path: &str) -> Option<String>` — generic proc/sys file reader
-   - Instrument with `ctha.connector.proc.*` span
+   - Instrument with `okh.connector.proc.*` span
 
 2. **Extract tools** — Create `probes/tools.rs`:
    - `parse_meminfo_kib(content: &str, key: &str) -> Option<u64>` — pure parser
@@ -123,7 +123,7 @@ crates/russell-sentinel/src/
 ```
 
 Each file is cleanly one thing:
-- `connectors.rs` — all side effects, all CTHA connector spans
+- `connectors.rs` — all side effects, all OKH connector spans
 - `tools.rs` — all pure logic, unit-testable with canned strings
 - `memory.rs` / `disk.rs` / `packages.rs` — thin composition glue
-- `mod.rs` — pipeline orchestration with CTHA pipeline spans
+- `mod.rs` — pipeline orchestration with OKH pipeline spans

@@ -32,7 +32,7 @@ Deferred ADRs live under
 | [0016](0016-doctor-and-llm-router.md) | MVP Doctor — local-first Ollama, OpenRouter opt-in |
 | [0017](0017-reuse-over-dependency.md) | Reuse over dependency — copy-with-provenance |
 | [0018](0018-close-phase-1c.md) | Close Phase 1c — 20-day soak sufficient |
-| [0019](0019-probe-cadence-and-ctha.md) | Probe cadence separation + CTHA instrumentation |
+| [0019](0019-probe-cadence-and-okh.md) | Probe cadence separation + OKH instrumentation |
 | [0020](0020-threshold-gated-llm-escalation.md) | Threshold-gated LLM escalation |
 | [0021](0021-proprioception-phase2-reflex-arcs.md) | Proprioception Phase 2 — reflex arcs and self-vitals |
 | [0022](0022-markdown-memory-layer.md) | Markdown memory layer — derived exports for human legibility |

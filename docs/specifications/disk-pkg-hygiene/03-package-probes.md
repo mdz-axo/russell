@@ -14,7 +14,7 @@ status: "Draft"
 1. **Infallible.** Every probe returns `Option<f64>`. Provider not installed = `None`. Command timeout = `None`. Parse failure = `None`.
 2. **No mutation.** Observe only (JR-2).
 3. **Subprocess timeout.** Every `Command` invocation has a 5-second timeout. On timeout, return `None`.
-4. **Longer cadence.** These probes do NOT run on the 5-minute Sentinel cycle. They run hourly via `russell sentinel-once --extended` and a separate systemd timer ([ADR-0019](../../adr/0019-probe-cadence-and-ctha.md)).
+4. **Longer cadence.** These probes do NOT run on the 5-minute Sentinel cycle. They run hourly via `russell sentinel-once --extended` and a separate systemd timer ([ADR-0019](../../adr/0019-probe-cadence-and-okh.md)).
 5. **Provider auto-detection.** Each adapter checks `is_available()` before observation. Missing providers are silently skipped.
 
 ## Tool/Connector Decomposition
