@@ -183,11 +183,9 @@ pub async fn run(paths: &Paths) -> Result<()> {
 
                 // Consent handling — must come before special commands.
                 if let Some(ref pa) = pending_action {
-if trimmed == "/approve" {
-                        execute_pending_action(
-                            &journal, paths, pa, &session_id, &current_model,
-                        )
-                        .await;
+                    if trimmed == "/approve" {
+                        execute_pending_action(&journal, paths, pa, &session_id, &current_model)
+                            .await;
                         pending_action = None;
                         continue;
                     }
@@ -603,9 +601,7 @@ async fn execute_pending_action(
             } else {
                 println!(
                     "  → {}/{} exited with code {:?}.",
-                    action.skill_id,
-                    action.intervention_id,
-                    outcome.exit_code
+                    action.skill_id, action.intervention_id, outcome.exit_code
                 );
                 if !outcome.stderr.is_empty() {
                     println!("  stderr: {}", outcome.stderr.trim());

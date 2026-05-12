@@ -74,38 +74,64 @@ fn okapi_http_url() -> String {
 
 fn fetch_metrics(base_url: &str) -> Result<OkapiMetricsResponse> {
     let url = format!("{base_url}/api/metrics/json");
-    let resp = reqwest::blocking::get(&url)
-        .with_context(|| format!("fetching {url}"))?;
+    let resp = reqwest::blocking::get(&url).with_context(|| format!("fetching {url}"))?;
     let status = resp.status();
     let body = resp.text().with_context(|| "reading metrics response")?;
     if !status.is_success() {
         anyhow::bail!("metrics endpoint returned {status}: {body}");
     }
-    serde_json::from_str::<OkapiMetricsResponse>(&body)
-        .with_context(|| "parsing metrics JSON")
+    serde_json::from_str::<OkapiMetricsResponse>(&body).with_context(|| "parsing metrics JSON")
 }
 
 fn extract_samples(m: &OkapiMetricsResponse) -> Vec<OkapiSample> {
     let mut samples = Vec::new();
 
-    samples.push(OkapiSample::new("okapi_model_loaded", if m.model_loaded { 1.0 } else { 0.0 }, "bool"));
+    samples.push(OkapiSample::new(
+        "okapi_model_loaded",
+        if m.model_loaded { 1.0 } else { 0.0 },
+        "bool",
+    ));
 
     if let Some(tps) = m.tokens_per_second {
         samples.push(OkapiSample::new("okapi_tokens_per_sec", tps, "t/s"));
     }
 
-    samples.push(OkapiSample::new("okapi_goroutine_count", m.go_goroutines as f64, "count"));
-    samples.push(OkapiSample::new("okapi_uptime_hours", m.uptime_seconds / 3600.0, "hours"));
-    samples.push(OkapiSample::new("okapi_requests_active", m.requests_active as f64, "count"));
-    samples.push(OkapiSample::new("okapi_errors_total", m.errors_total as f64, "count"));
-    samples.push(OkapiSample::new("okapi_adapter_count", m.loaded_adapters as f64, "count"));
+    samples.push(OkapiSample::new(
+        "okapi_goroutine_count",
+        m.go_goroutines as f64,
+        "count",
+    ));
+    samples.push(OkapiSample::new(
+        "okapi_uptime_hours",
+        m.uptime_seconds / 3600.0,
+        "hours",
+    ));
+    samples.push(OkapiSample::new(
+        "okapi_requests_active",
+        m.requests_active as f64,
+        "count",
+    ));
+    samples.push(OkapiSample::new(
+        "okapi_errors_total",
+        m.errors_total as f64,
+        "count",
+    ));
+    samples.push(OkapiSample::new(
+        "okapi_adapter_count",
+        m.loaded_adapters as f64,
+        "count",
+    ));
 
     if let (Some(used), Some(total)) = (m.gpu_memory_used_bytes, m.gpu_memory_total_bytes)
         && total > 0
     {
-            let pct = (used as f64 / total as f64) * 100.0;
-            samples.push(OkapiSample::new("okapi_gpu_memory_used_pct", pct, "%"));
-            samples.push(OkapiSample::new("okapi_gpu_memory_used_mib", used as f64 / 1_048_576.0, "MiB"));
+        let pct = (used as f64 / total as f64) * 100.0;
+        samples.push(OkapiSample::new("okapi_gpu_memory_used_pct", pct, "%"));
+        samples.push(OkapiSample::new(
+            "okapi_gpu_memory_used_mib",
+            used as f64 / 1_048_576.0,
+            "MiB",
+        ));
     }
 
     samples

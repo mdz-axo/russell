@@ -94,9 +94,6 @@ pub fn run_command_stdout_always(cmd: &[&str]) -> Option<String> {
         .stdin(std::process::Stdio::null())
         .output()
         .ok()?;
-    tracing::Span::current().record(
-        "ctha.connector.cmd.success",
-        output.status.success(),
-    );
+    tracing::Span::current().record("ctha.connector.cmd.success", output.status.success());
     Some(String::from_utf8_lossy(&output.stdout).into_owned())
 }

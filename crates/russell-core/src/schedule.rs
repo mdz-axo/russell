@@ -61,7 +61,9 @@ fn parse_time(s: &str) -> Option<(u8, u8)> {
     let mut parts = s.splitn(2, ':');
     let h: u8 = parts.next()?.parse().ok()?;
     let m: u8 = parts.next()?.parse().ok()?;
-    if h > 23 || m > 59 { return None; }
+    if h > 23 || m > 59 {
+        return None;
+    }
     Some((h, m))
 }
 
@@ -77,13 +79,19 @@ fn day_matches(wday: time::Weekday, days: &[String]) -> bool {
             "Sun" => wday == time::Weekday::Sunday,
             _ => continue,
         };
-        if m { return true; }
+        if m {
+            return true;
+        }
     }
     false
 }
 
 impl ScheduleSet {
-    pub fn new() -> Self { Self { entries: Vec::new() } }
+    pub fn new() -> Self {
+        Self {
+            entries: Vec::new(),
+        }
+    }
 
     pub fn load(path: &std::path::Path) -> Self {
         let content = match std::fs::read_to_string(path) {
@@ -92,12 +100,19 @@ impl ScheduleSet {
         };
         let file: SchedulesFile = match toml::from_str(&content) {
             Ok(f) => f,
-            Err(e) => { tracing::warn!(error=%e, "malformed schedule"); return Self::new(); }
+            Err(e) => {
+                tracing::warn!(error=%e, "malformed schedule");
+                return Self::new();
+            }
         };
-        if let Some(ref s) = file.schema && s != SCHEDULE_SCHEMA {
+        if let Some(ref s) = file.schema
+            && s != SCHEDULE_SCHEMA
+        {
             return Self::new();
         }
-        Self { entries: file.schedule }
+        Self {
+            entries: file.schedule,
+        }
     }
 
     pub fn active_now(&self) -> Option<&Schedule> {
@@ -115,14 +130,20 @@ impl ScheduleSet {
             } else {
                 now >= start || now < end
             };
-            if !in_window { continue; }
-            if !entry.days.is_empty() && !day_matches(now_wday, &entry.days) { continue; }
+            if !in_window {
+                continue;
+            }
+            if !entry.days.is_empty() && !day_matches(now_wday, &entry.days) {
+                continue;
+            }
             return Some(entry);
         }
         None
     }
 
-    pub fn len(&self) -> usize { self.entries.len() }
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
 }
 
 #[cfg(test)]
@@ -131,8 +152,8 @@ mod tests {
 
     #[test]
     fn parse_works() {
-        assert_eq!(parse_time("08:00"), Some((8,0)));
-        assert_eq!(parse_time("23:59"), Some((23,59)));
+        assert_eq!(parse_time("08:00"), Some((8, 0)));
+        assert_eq!(parse_time("23:59"), Some((23, 59)));
         assert_eq!(parse_time("24:00"), None);
         assert_eq!(parse_time(""), None);
     }
@@ -141,7 +162,10 @@ mod tests {
     fn day_checks() {
         assert!(day_matches(time::Weekday::Monday, &["Mon".into()]));
         assert!(!day_matches(time::Weekday::Tuesday, &["Mon".into()]));
-        assert!(day_matches(time::Weekday::Friday, &["Mon".into(),"Fri".into()]));
+        assert!(day_matches(
+            time::Weekday::Friday,
+            &["Mon".into(), "Fri".into()]
+        ));
     }
 
     #[test]

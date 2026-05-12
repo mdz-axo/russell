@@ -13,9 +13,7 @@ use super::connectors;
 /// degraded/maintenance/unknown states, `0.0` for running/starting,
 /// `None` if systemd is unreachable.
 pub fn systemd_degraded() -> Option<f64> {
-    let output = connectors::run_command_stdout_always(&[
-        "systemctl", "is-system-running",
-    ])?;
+    let output = connectors::run_command_stdout_always(&["systemctl", "is-system-running"])?;
     let state = output.trim();
     // "running" and "starting" are normal. "degraded", "maintenance",
     // and "unknown" are problematic.
@@ -32,7 +30,11 @@ pub fn systemd_degraded() -> Option<f64> {
 /// unreachable.
 pub fn systemd_user_failed_count() -> Option<f64> {
     let output = connectors::run_command_stdout_always(&[
-        "systemctl", "--user", "list-units", "--failed", "--no-legend",
+        "systemctl",
+        "--user",
+        "list-units",
+        "--failed",
+        "--no-legend",
     ])?;
     let count = output.trim().lines().count();
     Some(count as f64)
@@ -41,7 +43,10 @@ pub fn systemd_user_failed_count() -> Option<f64> {
 /// Probe: count of failed system units.
 pub fn systemd_system_failed_count() -> Option<f64> {
     let output = connectors::run_command_stdout_always(&[
-        "systemctl", "list-units", "--failed", "--no-legend",
+        "systemctl",
+        "list-units",
+        "--failed",
+        "--no-legend",
     ])?;
     let count = output.trim().lines().count();
     Some(count as f64)

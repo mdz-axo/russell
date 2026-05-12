@@ -249,6 +249,9 @@ mod tests {
         let pct = proc_top_mem_pct();
         assert!(pct.is_some());
         let v = pct.unwrap();
-        assert!((0.0..=100.0).contains(&v), "memory pct should be 0-100, got {v}");
+        assert!(
+            (0.0..=100.0).contains(&v),
+            "memory pct should be 0-100, got {v}"
+        );
     }
 }

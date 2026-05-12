@@ -56,8 +56,7 @@ pub fn gpu_temp_c() -> Option<f64> {
 ///
 /// Reads `gpu_busy_percent` from the GPU device node.
 pub fn gpu_util_pct() -> Option<f64> {
-    let content =
-        connectors::read_file_to_string(&format!("{GPU_DEVICE}/gpu_busy_percent"))?;
+    let content = connectors::read_file_to_string(&format!("{GPU_DEVICE}/gpu_busy_percent"))?;
     tools::parse_gpu_util_pct(&content)
 }
 
@@ -85,7 +84,10 @@ mod tests {
         let pct = gpu_vram_used_pct();
         assert!(pct.is_some());
         let v = pct.unwrap();
-        assert!((0.0..=100.0).contains(&v), "vram pct should be 0-100, got {v}");
+        assert!(
+            (0.0..=100.0).contains(&v),
+            "vram pct should be 0-100, got {v}"
+        );
     }
 
     #[test]
@@ -96,7 +98,10 @@ mod tests {
         let temp = gpu_temp_c();
         if let Some(t) = temp {
             // Temperature should be between 0 and 125°C.
-            assert!((0.0..=125.0).contains(&t), "temp should be 0-125°C, got {t}");
+            assert!(
+                (0.0..=125.0).contains(&t),
+                "temp should be 0-125°C, got {t}"
+            );
         }
     }
 
@@ -107,7 +112,10 @@ mod tests {
         }
         let util = gpu_util_pct();
         if let Some(u) = util {
-            assert!((0.0..=100.0).contains(&u), "util pct should be 0-100, got {u}");
+            assert!(
+                (0.0..=100.0).contains(&u),
+                "util pct should be 0-100, got {u}"
+            );
         }
     }
 }

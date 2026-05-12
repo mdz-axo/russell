@@ -195,7 +195,7 @@ pub fn compose(
                     )?;
                 }
             }
-writeln!(
+            writeln!(
                 objective,
                 "\nWhen you identify an intervention and a skill is loaded, \
                  propose it on the final line using:\n\n\

@@ -156,10 +156,7 @@ impl std::fmt::Debug for Dispatcher {
             .field("probe_timeout", &self.probe_timeout)
             .field("intervention_timeout", &self.intervention_timeout)
             .field("max_auto_risk", &self.max_auto_risk)
-            .field(
-                "sudo_password",
-                &self.sudo_password.as_ref().map(|_| "***"),
-            )
+            .field("sudo_password", &self.sudo_password.as_ref().map(|_| "***"))
             .finish()
     }
 }
@@ -347,7 +344,7 @@ impl Dispatcher {
     ///
     /// # Errors
     ///
-///    Returns [`russell_core::CoreError`] on journal I/O failure
+    ///    Returns [`russell_core::CoreError`] on journal I/O failure
     /// or subprocess spawn failure.
     #[allow(clippy::too_many_arguments)]
     pub async fn run_and_journal(
@@ -369,9 +366,7 @@ impl Dispatcher {
                 ev.tier = Some("skill".into());
                 ev.module = Some(format!("skill/{skill_id}/{step_id}"));
                 ev.dry_run = false;
-                ev.summary = Some(format!(
-                    "spawn failed: {e} :: skill/{skill_id}/{step_id}",
-                ));
+                ev.summary = Some(format!("spawn failed: {e} :: skill/{skill_id}/{step_id}",));
                 ev.outputs.insert("risk".into(), risk_band.into());
                 ev.outputs
                     .insert("step_type".into(), step_type.to_string().into());

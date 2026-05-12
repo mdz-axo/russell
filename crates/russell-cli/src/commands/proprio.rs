@@ -10,15 +10,11 @@ pub fn run(paths: &Paths) -> Result<()> {
         .with_context(|| format!("opening journal {}", paths.journal().display()))?;
     let reader = JournalReader::new(&paths.journal());
 
-    let result = russell_proprio::run_once(&journal, &reader)
-        .context("running proprioception")?;
+    let result = russell_proprio::run_once(&journal, &reader).context("running proprioception")?;
 
     println!("Proprioception results:");
     if let Some(age) = result.age_s {
-        println!(
-            "  sentinel_last_run_age_s:  {age}s ({:?})",
-            result.severity
-        );
+        println!("  sentinel_last_run_age_s:  {age}s ({:?})", result.severity);
     } else {
         println!("  sentinel_last_run_age_s:  (no host samples yet)");
     }

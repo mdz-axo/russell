@@ -69,7 +69,10 @@ fn split_action_line(response: &str) -> (&str, Option<&str>) {
         let spec = action.trim().strip_prefix("ACTION:").map(|s| s.trim());
         (body.trim_end(), spec)
     } else if trimmed.starts_with("ACTION:") {
-        ("(action proposed without explanation)", Some(trimmed.strip_prefix("ACTION:").unwrap().trim()))
+        (
+            "(action proposed without explanation)",
+            Some(trimmed.strip_prefix("ACTION:").unwrap().trim()),
+        )
     } else {
         (trimmed, None)
     }
