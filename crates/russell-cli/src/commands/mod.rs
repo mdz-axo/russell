@@ -7,6 +7,7 @@ pub mod help;
 pub mod list;
 pub mod okapi_probe;
 pub mod profile;
+pub mod proprio;
 pub mod sentinel_once;
 pub mod skill;
 pub mod status;

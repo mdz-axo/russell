@@ -3,7 +3,6 @@
 
 [Unit]
 Description=Russell weekly digest timer
-Documentation=file://%h/Clones/russell/docs/specifications/MVP_SPEC.md
 
 [Timer]
 OnCalendar=Sun 09:00

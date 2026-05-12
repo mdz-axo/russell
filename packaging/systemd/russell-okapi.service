@@ -3,7 +3,6 @@
 
 [Unit]
 Description=Russell Okapi Probe — observe the inference engine
-Documentation=file://%h/Clones/russell/docs/specifications/MVP_SPEC.md
 OnFailure=russell-failure@%n.service
 
 [Service]
@@ -16,7 +15,8 @@ ProtectHome=read-only
 ReadWritePaths=%h/.local/state/harness %h/.local/share/harness
 PrivateTmp=yes
 NoNewPrivileges=yes
-ExecStart=%h/.local/bin/russell okapi-probe --auto-apply --default-model nemotron-3-nano:4b
+EnvironmentFile=%h/.config/harness/russell.env
+ExecStart=%h/.local/bin/russell okapi-probe --auto-apply ${RUSSELL_OKAPI_DEFAULT_MODEL:+--default-model $RUSSELL_OKAPI_DEFAULT_MODEL}
 StandardOutput=journal
 StandardError=journal
 

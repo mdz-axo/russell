@@ -3,7 +3,6 @@
 
 [Unit]
 Description=Russell weekly digest
-Documentation=file://%h/Clones/russell/docs/specifications/MVP_SPEC.md
 OnFailure=russell-failure@%n.service
 
 [Service]

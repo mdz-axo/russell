@@ -74,9 +74,9 @@ pub fn read_proc_stat(pid: u32) -> Option<String> {
 /// Run a command and capture its stdout regardless of exit code.
 /// Returns `None` only if the command fails to start.
 ///
-/// Unlike [`run_command_stdout`], this does not require success.
 /// Use for commands like `systemctl is-system-running` where
-/// the exit code IS the signal.
+/// the exit code IS the signal. For commands that should
+/// succeed, use `run_command_stdout_always` but check stderr.
 ///
 /// CTHA: `ctha.connector.cmd.target=<program>`, `ctha.connector.cmd.success`
 #[tracing::instrument(

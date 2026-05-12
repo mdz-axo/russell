@@ -3,7 +3,6 @@
 
 [Unit]
 Description=Russell Sentinel — 5-minute cadence
-Documentation=file://%h/Clones/russell/docs/specifications/MVP_SPEC.md
 
 [Timer]
 OnBootSec=2min

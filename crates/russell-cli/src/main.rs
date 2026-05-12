@@ -89,6 +89,9 @@ enum Command {
     /// Each turn sends the latest journal state to the LLM,
     /// maintaining conversation context across turns.
     Chat,
+    /// Run Russell's self-observation (proprioception) and
+    /// append self-vital samples to the journal.
+    Proprio,
 }
 
 #[derive(Subcommand, Debug)]
@@ -147,5 +150,6 @@ async fn main() -> Result<()> {
             SkillCmd::Run { id, dry_run } => commands::skill::run(&paths, &id, dry_run).await,
         },
         Command::Chat => commands::chat::run(&paths).await,
+        Command::Proprio => commands::proprio::run(&paths),
     }
 }

@@ -3,7 +3,6 @@
 
 [Unit]
 Description=Russell Okapi Probe — 5-minute cadence
-Documentation=file://%h/Clones/russell/docs/specifications/MVP_SPEC.md
 
 [Timer]
 OnBootSec=4min30s
