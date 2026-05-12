@@ -1,9 +1,24 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
-//! Shared trait + types for Russell's Doctor clients.
+//! The Nurse's outbound port — [`LlmClient`] trait defining the
+//! contract for LLM communication.
 //!
-//! Russell does **not** use the `stack-llm` trait. We define a
-//! minimal local trait so the client surface matches MVP needs:
-//! single round-trip, no streaming, no tool-calling.
+//! Russell does **not** use the `stack-llm` trait. This is a
+//! minimal local trait matching MVP needs: single round-trip,
+//! no streaming, no tool-calling. It follows the hexagonal
+//! ports-and-adapters pattern: [`LlmClient`] is the outbound port;
+//! [`openrouter::OpenRouterClient`] is the driven adapter (shared
+//! by Okapi and OpenRouter backends).
+//!
+//! ## Backend enum
+//!
+//! - [`Backend::Okapi`] — local inference via Okapi (port 11435).
+//!   The default backend. Russell auto-starts Okapi via
+//!   `systemctl --user start okapi` if unreachable.
+//! - [`Backend::OpenRouter`] — remote inference via OpenRouter API
+//!   (opt-in, requires `OPENROUTER_API_KEY`).
+//! - [`Backend::Mock`] — deterministic test client.
+//! - [`Backend::Offline`] — rule-based fallback; never calls
+//!   the network. Jack is never silent, even offline.
 
 use std::future::Future;
 
@@ -169,7 +184,14 @@ pub struct LlmResponse {
     pub latency_ms: u64,
 }
 
-/// The client surface — single method, one round-trip.
+/// The Nurse's outbound port — single method, one round-trip.
+///
+/// This is the hexagon's boundary. The Nurse (application service
+/// in `help.rs`) calls [`chat`](LlmClient::chat); the driven
+/// adapters ([`OpenRouterClient`](crate::openrouter::OpenRouterClient),
+/// [`MockClient`](crate::mock::MockClient)) implement it.
+/// Adapters differ by base URL and API key, but the port is
+/// the same — write once, validate once.
 pub trait LlmClient: Send + Sync {
     /// Send the SOAP prompt and return the model's response.
     fn chat(&self, prompt: &SoapPrompt) -> impl Future<Output = Result<LlmResponse>> + Send;

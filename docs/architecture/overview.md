@@ -37,7 +37,7 @@ flowchart TB
 
   subgraph INTEL [Intelligence]
     BOOT[Bootstrap]
-    LLM[Local LLM via Ollama]
+    LLM[Local LLM via Okapi]
   end
 
   subgraph CONTROL [Control]
@@ -94,7 +94,7 @@ a corresponding ADR and a corresponding area of the code:
 | VSM layer | Locked decision | Code home |
 |---|---|---|
 | Policy | [ADR-0005](../adr/deferred/0005-privileged-operations.md), [safety.md](../standards/safety.md) | `russell-cli` confirm flow, kill switches |
-| Intelligence | [ADR-0008](../adr/0008-llm-triage-never-emits-shell.md) | `russell-doctor::llm`, `russell-doctor::bootstrap` |
+| Intelligence | [ADR-0008](../adr/0008-llm-triage-never-emits-shell.md) | `russell-doctor::openrouter`, `russell-core::profile` |
 | Control | [ADR-0007](../adr/deferred/0007-yaml-manifest-subprocess-skill-model.md), [ADR-0015](../adr/0015-proprioception-self-health.md) | `russell-doctor`, `russell-proprio` (MVP self-vital) |
 | Coordination | [ADR-0009](../adr/deferred/0009-tokio-runtime.md) + systemd timers | Unit files under `units/`; timers are OS-level |
 | Operations | [ADR-0004](../adr/0004-sqlite-journal.md), [ADR-0006](../adr/0006-profile-abstraction.md) | `russell-sentinel`, `russell-skills` |

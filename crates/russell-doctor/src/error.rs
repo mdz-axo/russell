@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
-//! Doctor error type.
+//! Nurse error type.
 
 use std::path::PathBuf;
 
-/// Doctor result alias.
+/// Nurse result alias.
 pub type Result<T> = std::result::Result<T, DoctorError>;
 
-/// Errors produced by the Doctor.
+/// Errors produced by the Nurse.
 #[derive(Debug, thiserror::Error)]
 pub enum DoctorError {
     /// An I/O failure on a known path.

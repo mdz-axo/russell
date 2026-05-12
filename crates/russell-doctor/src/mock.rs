@@ -25,9 +25,10 @@ impl MockClient {
     pub fn jack_default() -> Self {
         Self::new(
             "Mock Jack here. I can't actually call the model, but I can \
-             confirm your wiring works: the Doctor composed a SOAP bundle \
-             and round-tripped to a client. Set OPENROUTER_API_KEY and try \
-             again for the real thing.",
+             confirm your wiring works: the Nurse composed a SOAP bundle \
+             and round-tripped to a client. Set OPENROUTER_API_KEY for the \
+             remote backend or ensure Okapi is running (port 11435) and \
+             try again for the real thing.",
         )
     }
 }

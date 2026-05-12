@@ -1,5 +1,19 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
-//! The `run_help` orchestrator — the one public entry point.
+//! The Nurse's application service — the `run_help` orchestrator.
+//!
+//! Flow: SOAP composition → LLM call (via the outbound port) →
+//! offline fallback if unreachable → journal persistence →
+//! response printed to the operator.
+//!
+//! Key vocabulary (per AGENTS.md §5):
+//! - **Nurse**: the subsystem that consults the LLM. Jack watches,
+//!   notices, checks in — he does not "diagnose" or prescribe.
+//! - **SOAP bundle**: Subjective / Objective / Assessment / Plan
+//!   evidence layout.
+//! - **IDRS**: every mutation (evidence writes, journal rows) is
+//!   Idempotent / Dry-runnable / Rollback-able / Structured-logged.
+//!
+//! The CLI (`russell jack`) is the only caller.
 
 use std::path::PathBuf;
 
@@ -69,15 +83,16 @@ pub struct HelpSession {
     pub evidence_ref: String,
 }
 
-/// Run the help flow end to end: compose, call (or fall back), journal, print-ready.
+/// Run the Nurse flow end to end: compose SOAP, call LLM (or fall
+/// back), journal the session, return a print-ready response.
 ///
 /// `paths` and `writer` come from the CLI. The CLI is the only caller.
 ///
 /// # Errors
 ///
 /// Returns `DoctorError` if the filesystem write or journal write fails.
-/// Provider errors are *caught* — the fallback handles them and the
-/// function returns success with `fell_back = true`.
+/// Provider errors are *caught* — the fallback handles them and
+/// the function returns success with `skip_reason` set.
 pub async fn run_help(
     paths: &Paths,
     writer: &JournalWriter,

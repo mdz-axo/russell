@@ -43,7 +43,7 @@ The audit-crate.md discipline applied to the full data flow:
 │ read_dir(cache_path)    Command::new("pip")                     │
 │ read_provenance_toml()  github_releases_api()                   │
 │ JournalWriter::append_sample()                                  │
-│ Ollama / OpenRouter HTTP POST (Doctor → LLM)                    │
+│ Okapi / OpenRouter HTTP POST (Nurse → LLM)                      │
 │ MCP tool response (Russell → Kask)                              │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -110,7 +110,7 @@ russell digest --since-hours 24
 russell jack --note "disk seems full"
   → JournalReader::query_samples(last_24h)  [connector: read from journal]
   → compose_soap_objective(samples, events) [tool: form the SOAP bundle]
-  → LLM POST (Ollama or OpenRouter)     [connector: transfer to LLM]
+  → LLM POST (Okapi or OpenRouter)       [connector: transfer to LLM]
   → print response                          [connector: transfer to operator]
   → JournalWriter::append_help_session()    [connector: persist evidence]
 ```
@@ -136,7 +136,7 @@ sequenceDiagram
     participant Journal as journal.db
     participant Digest as russell digest
     participant Doctor as russell jack
-    participant LLM as Ollama (DeepSeek V4 Pro)
+    participant LLM as Okapi
 
     Timer->>Sentinel: 5-min tick
     Sentinel->>DiskProbes: collect()

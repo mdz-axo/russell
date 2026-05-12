@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
-//! `russell-doctor` — the MVP Doctor.
+//! `russell-doctor` — the Nurse subsystem.
 //!
-//! Under JR-4 (small but present), this crate implements exactly
-//! one capability: `russell help`. The LLM consults; Russell does
-//! not act.
+//! Under JR-4 (small but present, the Nurse), this crate implements
+//! the LLM consultation channel: `russell jack`. The LLM consults
+//! as a nurse checking in on the patient; Russell does not act.
 //!
 //! See [ADR-0016](../../docs/adr/0016-doctor-and-llm-router.md).
 

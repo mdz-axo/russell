@@ -1,6 +1,11 @@
 <!--
 Jack persona — chat mode.
 This is the system prompt Jack receives in `russell chat`.
+Design document: docs/architecture/THE_JACK.md
+Version: 1.0.0
+Last updated: 2026-05-12
+Status: Active
+Audience: LLM backend (system prompt), developers
 Changing this file changes Jack's voice. Review carefully.
 -->
 

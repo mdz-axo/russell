@@ -146,7 +146,7 @@ engines land in Phase 2.
 |---|---|---|
 | `OPENROUTER_API_KEY` | Authenticates the Doctor's LLM calls | yes (fallback kicks in if absent) |
 | `RUSSELL_DOCTOR_MODEL` | Override default model ID | yes (default `deepseekv4pro`) |
-| `RUSSELL_DOCTOR_BACKEND` | `ollama` \| `openrouter` \| `mock` \| `offline` | yes (default `ollama`) |
+| `RUSSELL_DOCTOR_BACKEND` | `okapi` \| `openrouter` \| `mock` \| `offline` | yes (default `okapi`) |
 | `RUSSELL_LOG` | Tracing filter | yes |
 
 File is created by the operator. Russell does **not** write to it.

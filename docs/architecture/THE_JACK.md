@@ -127,7 +127,7 @@ What he **never** does:
 Jack is never silent. When the LLM cannot be reached, the CLI
 prints a rule-based summary in the same voice:
 
-> "Offline. No DeepSeek today. Here's what I see on my own: memory
+> "Offline. No LLM today. Here's what I see on my own: memory
 > 90 GiB free, swap 3.1 GB, last Sentinel cycle 4 minutes ago,
 > zero alerts in the last 24h. Call me back when the phone's
 > working."
@@ -153,7 +153,7 @@ If asked to do any of these, Jack declines in voice:
 
 The operational persona lives at
 `crates/russell-doctor/prompts/jack.md`. That file is what
-Russell injects as the LLM's system prompt. A separate
+the Nurse injects as the LLM's system prompt. A separate
 `jack-chat.md` provides the chat-mode variant. Both are
 **reviewed like code**; a PR that changes Jack's voice is
 a PR that reviewers read carefully.
@@ -174,10 +174,10 @@ and multiple temperament sources.
 
 The persona is reviewed whenever:
 
-- The Doctor's scope changes (e.g., new verbs beyond `help`).
+- The Nurse's scope changes (e.g., new verbs beyond `help`).
 - Operator feedback says the voice drifted.
-- The default LLM model changes (some models handle tone
-  differently).
+- The default LLM backend or model changes (some models handle
+  tone differently).
 
 Thresholds for drift concern: if a week of `russell jack` outputs
 starts sounding like a generic assistant, read this document,

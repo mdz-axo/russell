@@ -24,9 +24,9 @@ not belong in the corpus (yet).
 | Section | Contents | TOGAF Phase | Audience |
 |---|---|---|---|
 | [`architecture/`](architecture/) | System architecture & principles | A / Preliminary | All |
-| [`architecture/adr/`](adr/) | Architecture Decision Records (13 active, 7 deferred) | H | Developers |
-| [`specifications/`](specifications/) | MVP boundary, persistence catalog | Requirements | All |
-| [`standards/`](standards/) | Documentation, coding, commits, safety, ADR process | Preliminary | Contributors |
+| [`architecture/adr/`](adr/) | Architecture Decision Records (16 active, 8 deferred) | H | Developers |
+| [`specifications/`](specifications/) | MVP boundary, persistence catalog, integration refs | Requirements | All |
+| [`standards/`](standards/) | Documentation, coding, commits, safety, ADR, writing excellence | Preliminary | Contributors |
 | [`operations/`](operations/) | Reuse manifest, operator runbooks | D / G | Developers, Operators |
 | [`status/`](status/) | Where we actually are | G | All |
 | [`templates/`](templates/) | Copy-when-authoring scaffolds | — | Contributors |
@@ -64,11 +64,19 @@ may exist but must not contradict these.
   the pinned MVP boundary. **Read before adding a feature.**
 - [`specifications/PERSISTENCE_CATALOG.md`](specifications/PERSISTENCE_CATALOG.md)
   — every byte Russell writes, named.
+- [`specifications/DISK_PKG_HYGIENE_SPEC.md`](specifications/DISK_PKG_HYGIENE_SPEC.md)
+  — disk and package hygiene specification.
+- [`../docs/OKAPI_REFERENCE.md`](../docs/OKAPI_REFERENCE.md)
+  — Okapi inference engine integration reference.
 
 ### 2.4 Standards
 
 - [`standards/DOCUMENTATION_STANDARDS.md`](standards/DOCUMENTATION_STANDARDS.md)
   — this file's rules-of-the-road.
+- [`standards/WRITING_EXCELLENCE.md`](standards/WRITING_EXCELLENCE.md)
+  — voice, style, and discipline protocol.
+- [`standards/TOGAF_LITE_FOR_OPEN_SOURCE.md`](standards/TOGAF_LITE_FOR_OPEN_SOURCE.md)
+  — the documentation architecture pattern.
 - [`standards/coding-rust.md`](standards/coding-rust.md) — Rust
   conventions.
 - [`standards/commits.md`](standards/commits.md) —
@@ -168,11 +176,11 @@ They live under [`adr/deferred/`](adr/deferred/):
 ## 4. Current Counts
 
 | Bucket | Count |
-|---|---|
-| Active authoritative docs | 67 |
+|---|---|---|
+| Active authoritative docs | 69 |
 | Active ADRs | 16 |
 | Deferred ADRs | 8 |
-| Archived docs | 3 |
+| Archived docs | 4 |
 | Templates | 5 |
 
 _Verify with `find docs -type f -name '*.md' -not -path 'docs/archive/*' | wc -l`; current as of `last_updated`._

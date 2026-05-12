@@ -1,11 +1,21 @@
+---
+title: "Writing Excellence Protocol"
+audience: [contributors, developers, agents]
+last_updated: 2026-05-09
+togaf_phase: "Preliminary — Framework and Principles"
+version: "0.11.0"
+status: "Active"
+---
+
 # Writing Excellence Protocol
 
-**Version:** 0.11.0
-**Last-Updated:** 2026-05-09
-**Status:** Active
+<!-- TOGAF_DOMAIN: Cross-cutting -->
+<!-- VERSION: 0.11.0 -->
+<!-- STATUS: Active -->
+<!-- LAST_UPDATED: 2026-05-09 -->
+
 **Audience:** All contributors authoring documentation; AI agents generating or editing prose
 **TOGAF Phase:** Preliminary — Framework and Principles
-**Domain:** Cross-cutting
 
 ---
 

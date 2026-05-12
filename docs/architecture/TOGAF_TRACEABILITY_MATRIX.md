@@ -1,7 +1,7 @@
 ---
 title: "TOGAF Traceability Matrix"
 audience: [architects, developers, contributors]
-last_updated: 2026-04-18
+last_updated: 2026-05-12
 togaf_phase: "Cross-cutting — Architecture Governance"
 version: "1.0.0"
 status: "Active"
@@ -12,7 +12,7 @@ status: "Active"
 <!-- TOGAF_DOMAIN: Cross-cutting — Architecture Governance -->
 <!-- VERSION: 1.0.0 -->
 <!-- STATUS: Active -->
-<!-- LAST_UPDATED: 2026-04-18 -->
+<!-- LAST_UPDATED: 2026-05-12 -->
 
 This matrix maps Russell's **small** documentation corpus onto
 TOGAF ADM phases. Russell does not have 40 architecture
@@ -45,7 +45,7 @@ flowchart LR
 <!-- DIAGRAM_ALIGNMENT
 id: DIAG-TRACE-ADM-001
 type: flowchart
-verified_date: 2026-04-18
+verified_date: 2026-05-12
 verified_against: docs/README.md §2
 reference_sources: The Open Group (2022) TOGAF §5
 status: VERIFIED
@@ -58,14 +58,14 @@ is not a business concern.
 
 | TOGAF Phase | Russell Documents | Notes |
 |---|---|---|
-| **Preliminary** — Principles, Standards | [`PRINCIPLES_CATALOG.md`](PRINCIPLES_CATALOG.md), [`../standards/*.md`](../standards/) | JR-1 … JR-7 live here |
-| **Phase A** — Architecture Vision | [`../../cybernetic-health-harness.md`](../../cybernetic-health-harness.md), [`PRINCIPLES_CATALOG.md`](PRINCIPLES_CATALOG.md), [`overview.md`](overview.md) | The full vision and the current shape |
+| **Preliminary** — Principles, Standards | [`PRINCIPLES_CATALOG.md`](PRINCIPLES_CATALOG.md), [`../standards/*.md`](../standards/) | JR-1 … JR-7 live here; includes DOCUMENTATION_STANDARDS, CODING_RUST, COMMITS, ADR, SAFETY, WRITING_EXCELLENCE |
+| **Phase A** — Architecture Vision | [`../../cybernetic-health-harness.md`](../../cybernetic-health-harness.md), [`PRINCIPLES_CATALOG.md`](PRINCIPLES_CATALOG.md), [`overview.md`](overview.md), [`THE_JACK.md`](THE_JACK.md) | The full vision, current shape, and persona design |
 | **Phase B** — Business Architecture | *(skipped)* | Single-operator tool; no business concern |
 | **Phase C** — IS (Data + Application) | [`../specifications/PERSISTENCE_CATALOG.md`](../specifications/PERSISTENCE_CATALOG.md), [`overview.md`](overview.md) | What is persisted and how the crates fit |
 | **Phase D** — Technology | [`../adr/0009-tokio-runtime.md`](../adr/deferred/0009-tokio-runtime.md) *(deferred)*, [`../adr/0010-observability-stack.md`](../adr/deferred/0010-observability-stack.md) *(deferred)*, [`../operations/REUSE_MANIFEST.md`](../operations/REUSE_MANIFEST.md) | Tech choices + copy register |
 | **Phase E/F** — Migration | [`../../cybernetic-health-harness.md` §20](../../cybernetic-health-harness.md), [`../status/CONSOLIDATED-STATUS.md`](../status/CONSOLIDATED-STATUS.md) | Roadmap and where we are |
 | **Phase G** — Governance | [`../status/CONSOLIDATED-STATUS.md`](../status/CONSOLIDATED-STATUS.md), [`../standards/safety.md`](../standards/safety.md), [`../../AGENTS.md`](../../AGENTS.md) | The "don't break the patient" discipline |
-| **Phase H** — Change Management | [`../adr/`](../adr/) (ADRs 0001, 0002, 0004, 0006, 0008, 0011, 0013, 0015, 0016, 0017 active; 7 others deferred) | Locked decisions |
+| **Phase H** — Change Management | [`../adr/`](../adr/) (ADRs 0001, 0002, 0004, 0006, 0008, 0011, 0013, 0015, 0016, 0017, 0018, 0019, 0020, 0021, 0022, 0023 active; 8 others deferred) | Locked decisions |
 | **Requirements Mgmt** | [`../specifications/MVP_SPEC.md`](../specifications/MVP_SPEC.md), [`../specifications/PERSISTENCE_CATALOG.md`](../specifications/PERSISTENCE_CATALOG.md) | The pinned boundary |
 
 ## 3. Principle → Phase Anchoring

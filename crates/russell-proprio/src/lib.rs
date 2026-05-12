@@ -60,7 +60,12 @@ pub trait TimerSource {
     fn read_last_trigger_us(&self) -> std::result::Result<Option<u64>, String>;
 }
 
-/// Production [`TimerSource`] that queries systemd via `systemctl`.
+/// The production [`TimerSource`] — queries systemd via `systemctl`.
+///
+/// This is a driven adapter for the [`TimerSource`] port. The
+/// port is a pure trait; this adapter shells out to `systemctl
+/// --user show russell-sentinel.timer --property=LastTriggerUSec`
+/// for the production implementation.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct SystemdTimerSource;
 

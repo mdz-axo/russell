@@ -1,9 +1,9 @@
 ---
-title: "Documentation Voice & Register (Legacy)"
-audience: [contributors]
-last_updated: 2026-04-18
+title: "Documentation Voice & Register"
+audience: [contributors, developers]
+last_updated: 2026-05-12
 togaf_phase: "Preliminary"
-version: "1.0.0"
+version: "1.1.0"
 status: "Active"
 ---
 
@@ -13,8 +13,8 @@ status: "Active"
 <!-- LAST_UPDATED: 2026-04-18 -->
 
 <!--
-audience: anyone touching Markdown, Mermaid, or rustdoc in Russell
-last-reviewed: 2026-04-17
+audience: contributors, developers
+last-reviewed: 2026-05-12
 -->
 
 # Documentation standard
@@ -37,10 +37,10 @@ mind.
 
 ## 2. Voice and tone
 
-- **Second person for the reader, first person plural for the
-  project.** "You must …"; "We chose …".
+- **Second person for the reader, third person for the
+  project.** "You must …"; "Russell chose …".
 - **Imperative mood for standards.** "Use `tracing-journald`.",
-  not "We prefer `tracing-journald`."
+  not "Russell prefers `tracing-journald`."
 - **No apologies, no hedging in standards.** A rule either exists
   or it does not.
 - **Cite sources.** When a decision rests on upstream

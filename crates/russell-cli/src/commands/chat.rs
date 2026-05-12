@@ -1,13 +1,28 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
-//! `russell chat` — interactive conversation with Jack.
+//! `russell chat` — interactive conversation with Jack, the Nurse.
 //!
-//! Launches a readline REPL. Each turn composes a fresh SOAP
+//! ## Chat REPL
+//!
+//! Launches a readline REPL where each turn composes a fresh SOAP
 //! bundle with the current journal state, appends it to the
 //! conversation history, and sends the full context to the LLM.
-//! Jack responds in his chat persona, with full awareness of
-//! the conversation history.
+//! Jack responds in his chat persona (see
+//! `crates/russell-doctor/prompts/jack-chat.md`), with full
+//! awareness of the conversation history.
 //!
-//! The chat history is persisted to
+//! ## Consent gate
+//!
+//! Jack may propose interventions using the `ACTION:` syntax
+//! (`ACTION: <skill-id>/<intervention-id>`). The operator
+//! consents via `/approve` or `/deny`. Approved interventions
+//! are dispatched through the IDRS-gated skill dispatcher.
+//! Risk enforcement caps the maximum auto-risk to `Low` by
+//! default; sudo-requiring interventions require NOPASSWD
+//! configuration by the operator.
+//!
+//! ## Persistence
+//!
+//! Chat history persists to
 //! `~/.local/state/harness/memory/chats/<session-id>.jsonl`.
 //!
 //! Type `/exit`, `/quit`, or Ctrl-D to end the session.

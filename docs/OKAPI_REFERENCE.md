@@ -1,3 +1,12 @@
+---
+title: "Okapi Reference"
+audience: [operators, developers, contributors]
+last_updated: 2026-05-12
+togaf_phase: "D — Technology Architecture"
+version: "1.0.0"
+status: "Active"
+---
+
 # Okapi Reference — For Russell
 
 Okapi is Russell's **primary local inference engine**. It is a fork of Ollama that wraps llama.cpp with additional capabilities, Rust performance optimizations, and HuggingFace integrations.

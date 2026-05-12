@@ -30,7 +30,7 @@ CPU, memory, processes, GPU, disks, and systemd, **remembers**
 what he saw in a SQLite journal, **reports** through CLI verbs,
 **watches himself** through five self-vitals (proprioception),
 and when asked he **cries for help** to a local LLM
-(Ollama by default, DeepSeek V4 Pro). He **proposes**
+(Okapi by default). He **proposes**
 interventions via loaded skills, and with the operator's
 explicit consent, he **executes** them through the IDRS-gated
 skill dispatcher. He is small and he is fierce.

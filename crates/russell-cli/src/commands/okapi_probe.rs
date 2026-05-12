@@ -1,12 +1,25 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 //! `russell okapi-probe` — probe the Okapi inference engine once.
 //!
-//! Calls Okapi's JSON metrics endpoint, extracts inference health
-//! probes, writes them as samples to the journal, evaluates threshold
-//! rules, and optionally auto-applies safe management actions.
+//! This probe lives in the Sentinel layer (Observation Loop).
+//! It calls Okapi's JSON metrics endpoint, extracts inference
+//! health probes, writes them as samples to the journal, evaluates
+//! threshold rules from `rules.d/*.toml`, and optionally
+//! auto-applies safe management actions.
+//!
+//! ## IDRS contract for auto-applied actions:
+//!
+//! - **I — Idempotent.** Triggering a model load or unloading
+//!   adapters is idempotent (repeating either is a no-op).
+//! - **D — Dry-run.** The `--auto-apply` flag gates execution;
+//!   without it, only observation occurs.
+//! - **R — Rollback.** Model-load actions have no destructive
+//!   effect; adapter unload is the rollback form for overload.
+//! - **S — Structured log.** Every auto-action writes a journal
+//!   event with outcome, latency, and evidence.
 //!
 //! Run on a systemd timer (every 5 min, offset from sentinel-once)
-//! for autonomous Okapi supervision.
+//! for autonomous Okapi supervision via `russell-okapi.timer`.
 
 use anyhow::{Context, Result};
 use russell_core::RuleSet;

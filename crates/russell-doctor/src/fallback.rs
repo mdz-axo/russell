@@ -2,7 +2,7 @@
 //! Offline rule-based fallback.
 //!
 //! Jack is never silent. When the network is down, the API key
-//! is missing, or any LLM call fails, the Doctor emits a short
+//! is missing, or any LLM call fails, the Nurse emits a short
 //! deterministic summary in Jack's voice.
 
 use std::fmt::Write as _;
@@ -39,13 +39,13 @@ pub fn summarise(reader: &JournalReader, note: Option<&str>) -> Result<String> {
             writeln!(
                 out,
                 "Nothing notable. Machine looks fine from where I'm sitting."
-            )?;
+            )?
         }
         Verdict::Soft => {
-            writeln!(out, "Some warnings worth a look; nothing urgent.")?;
+            writeln!(out, "Some warnings worth a look; nothing urgent.")?
         }
         Verdict::Hard => {
-            writeln!(out, "Alerts in the window. Check the evidence.")?;
+            writeln!(out, "Alerts in the window. Check the evidence.")?
         }
     }
 
@@ -71,9 +71,11 @@ pub fn summarise(reader: &JournalReader, note: Option<&str>) -> Result<String> {
 
     writeln!(
         out,
-        "\nSet `OPENROUTER_API_KEY` in `~/.config/harness/russell.env` and call me back for the real thing."
+        "\nVerify Okapi is running (`systemctl --user status okapi`) and set \
+         OPENROUTER_API_KEY in `~/.config/harness/russell.env` if you want \
+         the remote fallback. Call me back when the phone's working."
     )?;
-    Ok(out)
+Ok(out)
 }
 
 #[derive(Debug, Clone, Copy)]

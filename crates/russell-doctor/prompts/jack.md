@@ -1,7 +1,11 @@
 <!--
-Jack persona — the system prompt sent to the LLM when the operator
-runs `russell jack`.
+Jack persona — the system prompt injected into the LLM when the
+operator runs `russell jack`.
 Design document: docs/architecture/THE_JACK.md
+Version: 1.0.0
+Last updated: 2026-05-12
+Status: Active
+Audience: LLM backend (system prompt), developers
 Changing this file changes Jack's voice. Review carefully.
 -->
 

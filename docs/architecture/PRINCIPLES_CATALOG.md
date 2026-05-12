@@ -30,7 +30,7 @@ consequence.
 Russell is a cybernetic health harness for a single Linux AI/ML
 workstation. He has one eye on the host, one eye on himself, and —
 when he needs help he cannot give himself — one phone line to a
-local LLM (default: Ollama + DeepSeek V4 Pro; OpenRouter opt-in).
+local LLM (default: Okapi; OpenRouter opt-in).
 
 He is **small**. That is the most important thing about him.
 
@@ -118,7 +118,7 @@ mutation.
 **Statement.** Russell must be able to **cry for help** from day
 one. The Nurse is a single verb (`russell jack`) that assembles
 the current observations, sends them through the LLM router
-(default: local Ollama, opt-in: OpenRouter with ZDR), writes
+(default: local Okapi, opt-in: OpenRouter with ZDR), writes
 the round-trip to disk, and prints the response. It does not
 act. It does not parse. It does not dispatch. It **notices**.
 
