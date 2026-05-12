@@ -153,6 +153,22 @@ fn parse_pressure_avg10(line: &str) -> Option<f64> {
         .and_then(|v| v.parse::<f64>().ok())
 }
 
+/// Parse the "some" pressure average from `/proc/pressure/memory`.
+pub fn parse_memory_pressure_some(content: &str) -> Option<f64> {
+    content
+        .lines()
+        .find(|l| l.starts_with("some "))
+        .and_then(parse_pressure_avg10)
+}
+
+/// Parse the "full" pressure average from `/proc/pressure/memory`.
+pub fn parse_memory_pressure_full(content: &str) -> Option<f64> {
+    content
+        .lines()
+        .find(|l| l.starts_with("full "))
+        .and_then(parse_pressure_avg10)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
