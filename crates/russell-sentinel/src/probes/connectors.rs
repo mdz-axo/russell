@@ -71,12 +71,12 @@ pub fn read_proc_stat(pid: u32) -> Option<String> {
     result
 }
 
-/// Run a command and capture its stdout. Returns `None` if the
-/// command fails to start or exits non-zero.
+/// Run a command and capture its stdout regardless of exit code.
+/// Returns `None` only if the command fails to start.
 ///
-/// Used for controlled, deterministic probe commands (e.g.
-/// `systemctl is-system-running`). Never used with LLM-generated
-/// input.
+/// Unlike [`run_command_stdout`], this does not require success.
+/// Use for commands like `systemctl is-system-running` where
+/// the exit code IS the signal.
 ///
 /// CTHA: `ctha.connector.cmd.target=<program>`, `ctha.connector.cmd.success`
 #[tracing::instrument(
@@ -86,7 +86,7 @@ pub fn read_proc_stat(pid: u32) -> Option<String> {
         ctha.connector.cmd.success,
     )
 )]
-pub fn run_command_stdout(cmd: &[&str]) -> Option<String> {
+pub fn run_command_stdout_always(cmd: &[&str]) -> Option<String> {
     let program = cmd.first()?;
     tracing::Span::current().record("ctha.connector.cmd.target", *program);
     let output = std::process::Command::new(program)
@@ -98,9 +98,5 @@ pub fn run_command_stdout(cmd: &[&str]) -> Option<String> {
         "ctha.connector.cmd.success",
         output.status.success(),
     );
-    if output.status.success() {
-        Some(String::from_utf8_lossy(&output.stdout).into_owned())
-    } else {
-        None
-    }
+    Some(String::from_utf8_lossy(&output.stdout).into_owned())
 }

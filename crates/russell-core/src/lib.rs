@@ -28,6 +28,7 @@ pub mod journal;
 pub mod paths;
 pub mod profile;
 pub mod rule;
+pub mod schedule;
 pub mod telemetry;
 pub mod time;
 

@@ -13,6 +13,7 @@ use russell_core::RuleSet;
 use russell_core::event::{Event, Scope, Severity};
 use russell_core::journal::JournalWriter;
 use russell_core::paths::Paths;
+use russell_core::schedule::ScheduleSet;
 use serde::Deserialize;
 
 /// Okapi metrics from `/api/metrics/json`.
@@ -182,6 +183,48 @@ pub fn run(paths: &Paths, auto_apply: bool, default_model: &str) -> Result<()> {
             return Ok(());
         }
     };
+
+    // 1.5 Schedule check — is there a model scheduled for this time window?
+    let schedules_path = paths.rules().parent().unwrap().join("schedules.toml");
+    let schedules = ScheduleSet::load(&schedules_path);
+    let schedule_active = schedules.active_now();
+
+    if let Some(sched) = schedule_active {
+        let current_model = metrics.model_name.as_deref();
+        if current_model != Some(sched.model.as_str()) {
+            let mut ev = Event::new("observe", Severity::Info);
+            ev.tier = Some("okapi".into());
+            ev.module = Some("okapi/schedule".into());
+            ev.summary = Some(format!(
+                "schedule active: {} — currently loaded: {}",
+                sched.model,
+                current_model.unwrap_or("none"),
+            ));
+            if auto_apply {
+                let result = trigger_model_load(&base_url, &sched.model);
+                let msg = match result {
+                    Ok(msg) => msg,
+                    Err(e) => format!("failed: {e}"),
+                };
+                ev.summary = Some(format!("{} — {}", ev.summary.as_ref().unwrap(), msg));
+            } else {
+                ev.summary = Some(format!(
+                    "{} — would trigger load{}",
+                    ev.summary.as_ref().unwrap(),
+                    if auto_apply { "" } else { " (dry-run)" },
+                ));
+            }
+            journal.append(&ev)?;
+        }
+    } else if metrics.model_loaded && schedules.len() > 0 {
+        // No schedule is active but a model is loaded and schedules exist.
+        // This is informational — the model may have been loaded manually.
+        let mut ev = Event::new("observe", Severity::Info);
+        ev.tier = Some("okapi".into());
+        ev.module = Some("okapi/schedule".into());
+        ev.summary = Some("no schedule active, model loaded outside schedule window".into());
+        journal.append(&ev)?;
+    }
 
     // 2. Extract probe samples.
     let samples = extract_samples(&metrics);
