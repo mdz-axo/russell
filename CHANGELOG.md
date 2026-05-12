@@ -1,5 +1,23 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+- **GitHub Actions CI workflow** (`ci.yml`): enforces `cargo fmt --check`,
+  `cargo clippy -D warnings`, `cargo test --workspace`, and `cargo deny check`
+  on every push/PR to `main`.
+
+### Fixed
+- `cargo clippy -D warnings` now passes: added `is_empty()` methods to
+  `ScheduleSet` and `RuleSet`, added rustdoc to `Schedule` and `ScheduleSet`
+  public items, suppressed dead-code warning on deserialization-only struct
+  `OkapiMetricsResponse`, replaced `len() > 0` with `!is_empty()`,
+  removed needless borrow in `proprio.rs`.
+- `cargo fmt --check` now passes: fixed formatting in `rule/mod.rs`,
+  `fallback.rs`, `disks.rs`, `network.rs`.
+- Workspace `Cargo.toml` repository URL corrected from placeholder to
+  `https://github.com/Replicant-Partners/russell`.
+
 ## [0.2.0] — 2026-05-11
 
 ### Added
