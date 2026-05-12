@@ -11,3 +11,7 @@ Cargo.lock.bak
 .env.*
 !.env.example
 !.env.template
+
+# Archive — git history is canonical per TOGAF-Lite;
+# docs/archive/ is a local convenience copy only.
+docs/archive/

@@ -108,10 +108,12 @@ portal or is archived. There are no orphans.
 
 ### 5.1 When a document is superseded
 
-1. Move it to [`docs/archive/`](../archive/).
-2. Add a one-line provenance entry to
-   [`docs/archive/README.md`](../archive/README.md) citing the
-   superseding document and date.
+1. Delete the file from the repository. Git history is the
+   canonical archive — recover via `git log --diff-filter=D`
+   and `git show <sha>:<path>`.
+2. Optionally copy to the local `docs/archive/` directory for
+   quick reference. This directory is gitignored per §8 of
+   [`TOGAF_LITE_FOR_OPEN_SOURCE.md`](TOGAF_LITE_FOR_OPEN_SOURCE.md).
 3. Search the repo for references to the old path and update
    them (or remove them if they were stale).
 
@@ -224,7 +226,7 @@ different audience, purpose, and style expectation.
 When adding a document, name its tier. A document that tries to
 serve multiple tiers serves none effectively.
 
-## 12. Markov Conventions
+## 12. Markdown Conventions
 
 - One H1 per file; it matches the file's topic.
 - ATX-style headers (`#`), not setext.
