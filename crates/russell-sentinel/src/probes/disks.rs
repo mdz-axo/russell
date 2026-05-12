@@ -52,6 +52,34 @@ pub(crate) fn disk_io_pressure_samples() -> Vec<super::Sample> {
     out
 }
 
+/// Probe: root filesystem usage as a percentage.
+///
+/// Uses `df -B1 --output=size,used /` via the subprocess connector.
+pub fn disk_root_used_pct() -> Option<f64> {
+    let output = connectors::run_command_stdout_always(&[
+        "df", "-B1", "--output=size,used", "/",
+    ])?;
+    let (total, used) = tools::parse_df_output(&output)?;
+    if total == 0 {
+        return None;
+    }
+    Some((used as f64 / total as f64) * 100.0)
+}
+
+/// Single-sample wrapper for the orchestrator.
+pub(crate) fn disk_root_used_pct_sample() -> Vec<super::Sample> {
+    let mut out = Vec::new();
+    if let Some(v) = disk_root_used_pct() {
+        out.push(super::Sample {
+            name: "disk_root_used_pct".into(),
+            value_num: Some(v),
+            value_text: None,
+            unit: Some("%"),
+        });
+    }
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

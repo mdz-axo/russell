@@ -169,6 +169,41 @@ pub fn parse_memory_pressure_full(content: &str) -> Option<f64> {
         .and_then(parse_pressure_avg10)
 }
 
+/// Parse a specific key from `/proc/net/sockstat` or `/proc/net/sockstat6`.
+/// Format: `TCP: inuse 39 orphan 0 tw 0 alloc 107 mem 686`
+///
+/// Returns the first numeric value after the label (e.g. `inuse`).
+pub fn parse_sockstat(content: &str, key: &str) -> Option<f64> {
+    for line in content.lines() {
+        if let Some(rest) = line.strip_prefix(key) {
+            let rest = rest.trim_start_matches(':').trim();
+            let mut parts = rest.split_whitespace();
+            parts.next()?; // skip the label (e.g. "inuse")
+            return parts.next()?.parse::<u64>().ok().map(|v| v as f64);
+        }
+    }
+    None
+}
+
+/// Parse `df -B1 --output=size,used /` output.
+///
+/// Returns `(total_bytes, used_bytes)` or `None` on parse failure.
+///
+/// Expected format:
+/// ```text
+///      1B-blocks        Used
+///   4000787030016 966485950464
+/// ```
+pub fn parse_df_output(content: &str) -> Option<(u64, u64)> {
+    let mut lines = content.trim().lines();
+    lines.next()?; // skip header
+    let data = lines.next()?;
+    let mut parts = data.split_whitespace();
+    let total: u64 = parts.next()?.parse().ok()?;
+    let used: u64 = parts.next()?.parse().ok()?;
+    Some((total, used))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

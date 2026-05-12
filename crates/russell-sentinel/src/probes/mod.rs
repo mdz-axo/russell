@@ -11,6 +11,7 @@ pub mod connectors;
 pub mod disks;
 pub mod gpu;
 pub mod memory;
+pub mod network;
 pub mod process;
 pub mod systemd;
 pub mod tools;
@@ -65,6 +66,8 @@ pub fn collect() -> Vec<Sample> {
             unit: None,
         });
     }
+    out.extend(memory::mem_pressure_samples());
+    out.extend(network::net_samples());
     out.extend(process::process_samples());
     if let Some(v) = gpu::gpu_vram_used_pct() {
         out.push(Sample {
@@ -107,6 +110,7 @@ pub fn collect() -> Vec<Sample> {
         });
     }
     out.extend(disks::disk_io_pressure_samples());
+    out.extend(disks::disk_root_used_pct_sample());
     if let Some(v) = systemd::systemd_degraded() {
         out.push(Sample {
             name: "systemd_degraded".into(),

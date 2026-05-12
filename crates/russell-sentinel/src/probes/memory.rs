@@ -36,3 +36,27 @@ pub fn load_avg_1m() -> Option<f64> {
     let raw = connectors::read_file_to_string("/proc/loadavg")?;
     tools::parse_loadavg_1m(&raw)
 }
+
+/// Return both memory pressure probes in a single read.
+pub(crate) fn mem_pressure_samples() -> Vec<super::Sample> {
+    let mut out = Vec::new();
+    if let Some(content) = connectors::read_file_to_string("/proc/pressure/memory") {
+        if let Some(v) = tools::parse_memory_pressure_some(&content) {
+            out.push(super::Sample {
+                name: "mem_pressure_some_pct".into(),
+                value_num: Some(v),
+                value_text: None,
+                unit: Some("%"),
+            });
+        }
+        if let Some(v) = tools::parse_memory_pressure_full(&content) {
+            out.push(super::Sample {
+                name: "mem_pressure_full_pct".into(),
+                value_num: Some(v),
+                value_text: None,
+                unit: Some("%"),
+            });
+        }
+    }
+    out
+}

@@ -261,16 +261,38 @@ fn default_rules() -> Vec<Rule> {
             alert_above: None,
             crit_above: None,
         },
-        Rule {
+Rule {
             probe: "swap_used_mib".into(),
-            description: Some("Swap space in use".into()),
+            description: Some("Swap usage".into()),
             unit: Some("MiB".into()),
             warn_below: None,
             alert_below: None,
             crit_below: None,
-            warn_above: Some(4096.0),
-            alert_above: Some(8192.0),
-            crit_above: Some(16384.0),
+            warn_above: Some(7168.0),
+            alert_above: Some(7680.0),
+            crit_above: Some(7936.0),
+        },
+        Rule {
+            probe: "mem_pressure_some_pct".into(),
+            description: Some("Memory pressure — some tasks stalled".into()),
+            unit: Some("%".into()),
+            warn_below: None,
+            alert_below: None,
+            crit_below: None,
+            warn_above: Some(10.0),
+            alert_above: Some(30.0),
+            crit_above: Some(50.0),
+        },
+        Rule {
+            probe: "mem_pressure_full_pct".into(),
+            description: Some("Memory pressure — all tasks stalled".into()),
+            unit: Some("%".into()),
+            warn_below: None,
+            alert_below: None,
+            crit_below: None,
+            warn_above: Some(5.0),
+            alert_above: Some(15.0),
+            crit_above: Some(30.0),
         },
         Rule {
             probe: "loadavg_1m".into(),
@@ -405,6 +427,17 @@ fn default_rules() -> Vec<Rule> {
             crit_above: Some(50.0),
         },
         Rule {
+            probe: "disk_root_used_pct".into(),
+            description: Some("Root filesystem usage".into()),
+            unit: Some("%".into()),
+            warn_below: None,
+            alert_below: None,
+            crit_below: None,
+            warn_above: Some(80.0),
+            alert_above: Some(90.0),
+            crit_above: Some(95.0),
+        },
+        Rule {
             probe: "disk_io_pressure_full_pct".into(),
             description: Some("I/O pressure — all tasks stalled".into()),
             unit: Some("%".into()),
@@ -447,6 +480,28 @@ fn default_rules() -> Vec<Rule> {
             warn_above: Some(1.0),
             alert_above: Some(3.0),
             crit_above: Some(5.0),
+        },
+        Rule {
+            probe: "net_tcp_connections".into(),
+            description: Some("TCP IPv4 sockets in use".into()),
+            unit: Some("count".into()),
+            warn_below: None,
+            alert_below: None,
+            crit_below: None,
+            warn_above: Some(1000.0),
+            alert_above: Some(5000.0),
+            crit_above: Some(10000.0),
+        },
+        Rule {
+            probe: "net_tcp6_connections".into(),
+            description: Some("TCP IPv6 sockets in use".into()),
+            unit: Some("count".into()),
+            warn_below: None,
+            alert_below: None,
+            crit_below: None,
+            warn_above: Some(500.0),
+            alert_above: Some(2000.0),
+            crit_above: Some(5000.0),
         },
         // Okapi inference engine probes.
         Rule {
@@ -549,11 +604,12 @@ mod tests {
     #[test]
     fn defaults_swap_warn_above() {
         let rs = RuleSet::with_defaults();
+        // Rule: warn_above=7168.0, alert_above=7680.0, crit_above=7936.0
         assert_eq!(rs.evaluate("swap_used_mib", 0.0), Severity::Info);
         assert_eq!(rs.evaluate("swap_used_mib", 4095.0), Severity::Info);
-        assert_eq!(rs.evaluate("swap_used_mib", 4096.0), Severity::Warn);
-        assert_eq!(rs.evaluate("swap_used_mib", 10000.0), Severity::Alert);
-        assert_eq!(rs.evaluate("swap_used_mib", 20000.0), Severity::Crit);
+        assert_eq!(rs.evaluate("swap_used_mib", 7168.0), Severity::Warn);
+        assert_eq!(rs.evaluate("swap_used_mib", 7680.0), Severity::Alert);
+        assert_eq!(rs.evaluate("swap_used_mib", 7936.0), Severity::Crit);
     }
 
     #[test]
