@@ -46,9 +46,10 @@ of every meaningful development session.
   `russell-mcp` is a placeholder per ADR-0003).
 - `russell-core` implements paths, event schema, profile,
   journal (SQLite + WAL + migrations), telemetry, time.
-- `russell-sentinel` implements 21 probes across 6 categories:
-  memory (4), swap (1), load (1), processes (7), GPU (5),
-  disks (2), systemd (3). Plus Okapi probes via separate timer.
+- `russell-sentinel` implements 25 probes across 7 categories:
+  memory (3), swap (1), load (1), processes (7), GPU (5),
+  disks (3), network (2), systemd (3). Plus Okapi probes via
+  separate timer.
 - `russell-proprio` implements the JR-5 self-vital plus 4 Phase-2A
   vitals: `sentinel_last_run_age_s`, `journal_writer_stall_s`,
   `llm_p95_latency_ms`, `timer_drift_s`, `help_error_rate_pct`.

@@ -174,23 +174,28 @@ probes from this machine every 5 minutes:
 
 | Probe | Typical value | Notes |
 |---|---|---|
-| `mem_available_mib` | ~90,000 MiB | 91 GiB installed, 3.2 GiB swap used at baseline |
-| `swap_used_mib` | ~3,200 MiB | — |
-| `loadavg_1m` | 0.4–2.0 | 12-core × 2-thread; load < 24 is fine |
-| `proc_total_count` | ~400–500 | — |
-| `proc_zombie_count` | 0 | Zombies indicate orphaned children |
-| `proc_stuck_count` | 0 | D-state indicates I/O hang |
+| `mem_available_mib` | ~77,000 MiB | 91 GiB installed |
+| `mem_pressure_some_pct` | 0% | Near-zero on this machine |
+| `mem_pressure_full_pct` | 0% | — |
+| `swap_used_mib` | ~3,500 MiB | 8 GiB swap configured |
+| `loadavg_1m` | 0.4–2.0 | 12-core × 2-thread |
+| `proc_total_count` | ~600 | Above 500 warn threshold |
+| `proc_zombie_count` | 5 | Persistent Snap orphans |
+| `proc_stuck_count` | 0 | D-state would indicate I/O hang |
 | `proc_running_count` | 1–8 | — |
 | `proc_top_cpu_name` | varies | Text probe |
 | `proc_top_mem_name` | varies | Text probe |
-| `proc_top_mem_pct` | 5–25% | Typically ollama or Firefox |
-| `gpu_vram_used_pct` | 98% | RX 7700S VRAM heavily used by Ollama |
-| `gpu_temp_c` | 28–50°C | dGPU temperature |
-| `gpu_util_pct` | 0–100% | Spikey; averages low |
-| `disk_io_pressure_some_pct` | 0–5% | Low on NVMe |
-| `disk_io_pressure_full_pct` | 0–2% | Near-zero on NVMe |
-| `systemd_degraded` | 0 or 1 | Bool: 1 = degraded |
-| `systemd_user_failed_count` | 0 | — |
+| `proc_top_mem_pct` | 1–14% | — |
+| `gpu_vram_used_pct` | 55–86% | RX 7700S VRAM varies with LLM load |
+| `gpu_temp_c` | 28–34°C | — |
+| `gpu_util_pct` | 0–90% | Spikey |
+| `disk_root_used_pct` | 26% | 885G / 3.6T root fs |
+| `disk_io_pressure_some_pct` | 0–1% | Low on NVMe |
+| `disk_io_pressure_full_pct` | 0% | — |
+| `net_tcp_connections` | ~39 | IPv4 sockets in use |
+| `net_tcp6_connections` | ~2 | IPv6 sockets in use |
+| `systemd_degraded` | 0 | Bool: 1 = degraded |
+| `systemd_user_failed_count` | 5 | Persistent Snap scope failures |
 | `systemd_system_failed_count` | 0 | — |
 
 Okapi probes (via `russell okapi-probe` timer, separate 5-min cadence)

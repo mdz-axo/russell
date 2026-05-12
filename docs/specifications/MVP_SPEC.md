@@ -90,15 +90,17 @@ A single 5-minute Sentinel cadence, driven by systemd timer
 manual trigger for development.
 
 **Probe set (current).** The original 3-probe MVP set has grown
-to 21 probes across 6 categories.
+to 25 probes across 7 categories.
 
 | Category | Probes |
 |---|---|
-| Memory | `mem_available_mib`, `mem_used_mib`, `mem_total_mib`, `swap_used_mib`, `swap_total_mib` |
+| Memory | `mem_available_mib`, `mem_pressure_some_pct`, `mem_pressure_full_pct` |
+| Swap | `swap_used_mib` |
 | Load | `loadavg_1m` |
 | Processes | `proc_total_count`, `proc_zombie_count`, `proc_stuck_count`, `proc_running_count`, `proc_top_cpu_name` (text), `proc_top_mem_name` (text), `proc_top_mem_pct` |
 | GPU | `gpu_vram_used_pct`, `gpu_vram_used_mib`, `gpu_vram_total_mib`, `gpu_temp_c`, `gpu_util_pct` |
-| Disks | `disk_io_pressure_some_pct`, `disk_io_pressure_full_pct` |
+| Disks | `disk_root_used_pct`, `disk_io_pressure_some_pct`, `disk_io_pressure_full_pct` |
+| Network | `net_tcp_connections`, `net_tcp6_connections` |
 | Systemd | `systemd_degraded`, `systemd_user_failed_count`, `systemd_system_failed_count` |
 | Okapi (external) | `okapi_requests_active`, `okapi_errors_total`, `okapi_gpu_memory_used_pct`, etc. — via `russell okapi-probe` |
 
@@ -192,6 +194,9 @@ These items remain deferred beyond the current build:
 - **Baselines lack freshness guard.** `read_baselines()` does not
   check `updated_ts`; if baseline computation stops, Jack cites
   stale baselines.
+- **`df` subprocess required for disk usage.** The `disk_root_used_pct`
+  probe spawns `df` as a controlled subprocess. The binary must
+  be in `$PATH`.
 
 ## 8. Success Criteria
 
