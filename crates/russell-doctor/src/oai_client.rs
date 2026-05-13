@@ -267,38 +267,78 @@ pub async fn resolve_and_correct_model(
     let base_url = cfg.base_url.as_deref().unwrap_or(crate::health::DEFAULT_BASE_URL);
     let resolved = resolve_model_name(base_url, &cfg.model, &http).await;
 
-    if resolved != cfg.model {
-        tracing::info!(
-            candidate = %cfg.model,
-            resolved = %resolved,
-            "correcting model name in env file"
-        );
-        if let Some(env_path) = russell_core::env::find_env_file(config_harness_dir) {
-            match russell_core::env::correct_env_var(
-                &env_path,
-                "RUSSELL_DOCTOR_MODEL",
-                &cfg.model,
-                &resolved,
-            ) {
-                Ok(true) => {
-                    tracing::info!(
-                        path = %env_path.display(),
-                        old = %cfg.model,
-                        new = %resolved,
-                        "env file corrected"
-                    );
-                }
-                Ok(false) => {
-                    tracing::warn!("model name differs but no matching line found in env file to correct");
-                }
-                Err(e) => {
-                    tracing::warn!(error = %e, "failed to correct env file");
-                }
+    if resolved == cfg.model {
+        return resolved;
+    }
+
+    // Correct the env file and process environment.
+    let env_path = russell_core::env::find_env_file(config_harness_dir);
+    let Some(env_path) = env_path else {
+        return resolved;
+    };
+
+    let text = match std::fs::read_to_string(&env_path) {
+        Ok(t) => t,
+        Err(e) => {
+            tracing::warn!(error = %e, path = %env_path.display(), "can't read env file for correction");
+            return resolved;
+        }
+    };
+
+    let mut found = false;
+    let mut updated = String::with_capacity(text.len() + 32);
+    for raw in text.lines() {
+        let line = raw.trim();
+        if line.is_empty() || line.starts_with('#') {
+            updated.push_str(raw);
+            updated.push('\n');
+            continue;
+        }
+        let Some((k, v)) = line.split_once('=') else {
+            updated.push_str(raw);
+            updated.push('\n');
+            continue;
+        };
+        let value = strip_optional_quotes(v.trim());
+        if k.trim() == "RUSSELL_DOCTOR_MODEL" && value == cfg.model && !found {
+            updated.push_str(&format!("RUSSELL_DOCTOR_MODEL={resolved}\n"));
+            found = true;
+            continue;
+        }
+        updated.push_str(raw);
+        updated.push('\n');
+    }
+
+    if found {
+        if let Err(e) = std::fs::write(&env_path, &updated) {
+            tracing::warn!(error = %e, path = %env_path.display(), "failed to write corrected env file");
+        } else {
+            tracing::info!(
+                path = %env_path.display(),
+                old = %cfg.model,
+                new = %resolved,
+                "env file corrected"
+            );
+            #[allow(unsafe_code)]
+            unsafe {
+                std::env::set_var("RUSSELL_DOCTOR_MODEL", &resolved);
             }
         }
     }
 
     resolved
+}
+
+fn strip_optional_quotes(s: &str) -> &str {
+    let bytes = s.as_bytes();
+    if bytes.len() >= 2
+        && ((bytes[0] == b'"' && bytes[bytes.len() - 1] == b'"')
+            || (bytes[0] == b'\'' && bytes[bytes.len() - 1] == b'\''))
+    {
+        &s[1..s.len() - 1]
+    } else {
+        s
+    }
 }
 
 /// Convert a [`reqwest::Error`] into [`DoctorError::Http`].
