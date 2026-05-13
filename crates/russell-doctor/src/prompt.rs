@@ -195,16 +195,20 @@ pub fn compose(
                     )?;
                 }
             }
-            writeln!(
-                objective,
-                "\nWhen you identify an intervention and a skill is loaded, \
-                 propose it on the final line using:\n\n\
-                 ACTION: <skill-id>/<intervention-id>\n\n\
-                 (e.g. ACTION: okapi-watcher/restart-okapi). \
-                 Prefer probes first to gather evidence, then propose interventions. \
-                 Probes execute immediately without consent. \
-                 The operator must consent before interventions execute."
-            )?;
+                writeln!(
+                    objective,
+                    "\nWhen you identify a next step and a skill is loaded, \
+                     propose it on the final line using ACTION syntax:\n\n\
+                     For probes (read-only, auto-execute): \
+                     ACTION: <skill-id>/<probe-id>\n\
+                     (e.g. ACTION: okapi-watcher/probe-health)\n\n\
+                     For interventions (mutations, require consent): \
+                     ACTION: <skill-id>/<intervention-id>\n\
+                     (e.g. ACTION: okapi-watcher/restart-okapi)\n\n\
+                     Prefer probes first to gather evidence. \
+                     Probes run immediately. Interventions wait for the \
+                     operator to say 'ok'."
+                )?;
         }
 
         if !knowledge_only.is_empty() {

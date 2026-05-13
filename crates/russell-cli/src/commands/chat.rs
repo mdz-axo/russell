@@ -59,6 +59,17 @@ struct PendingAction {
     is_probe: bool,
 }
 
+/// Result of parsing an ACTION: line from Jack's response.
+enum ActionParse {
+    /// No ACTION: line present — normal conversation.
+    NoAction,
+    /// ACTION: line parsed successfully into an executable action.
+    Found(PendingAction),
+    /// ACTION: line was present but couldn't be parsed.
+    /// The String is a diagnostic message for the operator.
+    Malformed(String),
+}
+
 /// Returns true if the input looks like natural-language consent
 /// ("ok", "yes", "do it", "go ahead", "sure", "yep", etc.).
 fn is_affirmative(input: &str) -> bool {
@@ -254,6 +265,11 @@ pub async fn run(paths: &Paths) -> Result<()> {
                         || trimmed == "nope"
                         || trimmed == "cancel"
                         || trimmed == "nah"
+                        || trimmed == "not now"
+                        || trimmed == "later"
+                        || trimmed == "hang on"
+                        || trimmed == "wait"
+                        || trimmed == "hold on"
                     {
                         println!("  Denied. Action not executed.");
                         pending_action = None;
@@ -261,7 +277,7 @@ pub async fn run(paths: &Paths) -> Result<()> {
                     }
                     // Any other input clears the pending action and
                     // falls through to normal chat processing.
-                    println!("  Action no longer pending. Treating as conversation.");
+                    println!("  → Action proposal cleared. Reply to continue the conversation.");
                     pending_action = None;
                 }
 
@@ -527,30 +543,36 @@ pub async fn run(paths: &Paths) -> Result<()> {
                         journal_chat_turn(&journal, &session_id, &current_model, trimmed, &content);
 
                         // Check for ACTION: proposal.
-                        if let Some(pa) = parse_action_from_response(&content, &skills) {
-                            if pa.is_probe {
-                                // Probes are read-only — auto-execute immediately.
-                                println!(
-                                    "  → Running probe: {}/{}…",
-                                    pa.skill_id, pa.intervention_id
-                                );
-                                execute_pending_action(
-                                    &journal,
-                                    paths,
-                                    &pa,
-                                    &session_id,
-                                    &current_model,
-                                )
-                                .await;
-                            } else {
-                                let sudo_tag = if pa.needs_sudo { " [needs sudo]" } else { "" };
-                                println!(
-                                    "  → Jack proposes: {}/{} (risk: {:?}{}).",
-                                    pa.skill_id, pa.intervention_id, pa.risk, sudo_tag
-                                );
-                                println!("  → Say 'ok' to approve, or 'no' to refuse.");
-                                pending_action = Some(pa);
+                        match parse_action_from_response(&content, &skills) {
+                            ActionParse::Found(pa) => {
+                                if pa.is_probe {
+                                    // Probes are read-only — auto-execute immediately.
+                                    println!(
+                                        "  → Running probe: {}/{}…",
+                                        pa.skill_id, pa.intervention_id
+                                    );
+                                    execute_pending_action(
+                                        &journal,
+                                        paths,
+                                        &pa,
+                                        &session_id,
+                                        &current_model,
+                                    )
+                                    .await;
+                                } else {
+                                    let sudo_tag = if pa.needs_sudo { " [needs sudo]" } else { "" };
+                                    println!(
+                                        "  → Jack proposes: {}/{} (risk: {:?}{}).",
+                                        pa.skill_id, pa.intervention_id, pa.risk, sudo_tag
+                                    );
+                                    println!("  → Say 'ok' to approve, or 'no' to refuse.");
+                                    pending_action = Some(pa);
+                                }
                             }
+                            ActionParse::Malformed(msg) => {
+                                println!("  → {msg}");
+                            }
+                            ActionParse::NoAction => { /* normal, no action proposed */ }
                         }
                     }
                     Err(e) => {
@@ -583,24 +605,53 @@ pub async fn run(paths: &Paths) -> Result<()> {
 }
 
 /// Parse an `ACTION: <skill-id>/<probe-or-intervention-id>` line from
-/// Jack's response. Resolves against probes first (risk: none,
-/// auto-executes), then interventions (requires consent).
-fn parse_action_from_response(response: &str, skills: &[Skill]) -> Option<PendingAction> {
-    let action_line = response
-        .lines()
-        .rev()
-        .find(|line| line.trim().starts_with("ACTION:"))?;
+/// Jack's response. Returns `NoAction` if no ACTION: line is present,
+/// `Malformed` with a diagnostic if parsing fails (so the operator can
+/// see what went wrong), or `Found` with the parsed action.
+fn parse_action_from_response(response: &str, skills: &[Skill]) -> ActionParse {
+    let action_line = match response.lines().rev().find(|line| line.trim().starts_with("ACTION:")) {
+        Some(line) => line,
+        None => return ActionParse::NoAction,
+    };
 
-    let spec = action_line.trim().strip_prefix("ACTION:")?.trim();
-    let (skill_id, action_id) = spec.split_once('/')?;
-    let skill_id = skill_id.trim();
-    let action_id = action_id.trim();
+    let raw = action_line.trim();
+    let spec = match raw.strip_prefix("ACTION:") {
+        Some(s) => s.trim(),
+        None => {
+            return ActionParse::Malformed(format!(
+                "Jack proposed an action but the parser couldn't strip the ACTION: prefix. Raw line: `{raw}`"
+            ));
+        }
+    };
 
-    let skill = skills.iter().find(|s| s.id == skill_id)?;
+    let (skill_id, action_id) = match spec.split_once('/') {
+        Some(pair) => (pair.0.trim(), pair.1.trim()),
+        None => {
+            return ActionParse::Malformed(format!(
+                "'ACTION: {spec}' — missing `/` separator between skill and action ID. Use ACTION: <skill>/<action>."
+            ));
+        }
+    };
+
+    if skill_id.is_empty() || action_id.is_empty() {
+        return ActionParse::Malformed(format!(
+            "'ACTION: {spec}' — skill ID or action ID is empty."
+        ));
+    }
+
+    let skill = match skills.iter().find(|s| s.id == skill_id) {
+        Some(s) => s,
+        None => {
+            let loaded: Vec<&str> = skills.iter().map(|s| s.id.as_str()).collect();
+            return ActionParse::Malformed(format!(
+                "'{skill_id}' is not a loaded skill. Loaded skills: {loaded:?}"
+            ));
+        }
+    };
 
     // Check probes first — they're read-only and auto-execute.
     if let Some(probe) = skill.probes.iter().find(|p| p.id == action_id) {
-        return Some(PendingAction {
+        return ActionParse::Found(PendingAction {
             skill_id: skill_id.to_string(),
             intervention_id: action_id.to_string(),
             risk: russell_skills::RiskBand::None,
@@ -612,17 +663,24 @@ fn parse_action_from_response(response: &str, skills: &[Skill]) -> Option<Pendin
     }
 
     // Then check interventions — require consent.
-    let iv = skill.interventions.iter().find(|i| i.id == action_id)?;
-
-    Some(PendingAction {
-        skill_id: skill_id.to_string(),
-        intervention_id: action_id.to_string(),
-        risk: iv.risk,
-        needs_sudo: iv.needs_sudo,
-        cmd: iv.cmd.clone(),
-        max_auto_risk: skill.safety.max_auto_risk,
-        is_probe: false,
-    })
+    match skill.interventions.iter().find(|i| i.id == action_id) {
+        Some(iv) => ActionParse::Found(PendingAction {
+            skill_id: skill_id.to_string(),
+            intervention_id: action_id.to_string(),
+            risk: iv.risk,
+            needs_sudo: iv.needs_sudo,
+            cmd: iv.cmd.clone(),
+            max_auto_risk: skill.safety.max_auto_risk,
+            is_probe: false,
+        }),
+        None => {
+            let probes: Vec<&str> = skill.probes.iter().map(|p| p.id.as_str()).collect();
+            let ivs: Vec<&str> = skill.interventions.iter().map(|i| i.id.as_str()).collect();
+            ActionParse::Malformed(format!(
+                "'{action_id}' is not a known action in skill '{skill_id}'. Available probes: {probes:?}, interventions: {ivs:?}"
+            ))
+        }
+    }
 }
 
 /// Execute a pending action (probe or intervention) via the skill dispatcher.
@@ -935,7 +993,7 @@ async fn call_okapi_direct(
         "model": model,
         "messages": messages,
         "temperature": 0.7,
-        "max_tokens": 1024,
+        "max_tokens": 2048,
     });
 
     let client = reqwest::Client::builder()
