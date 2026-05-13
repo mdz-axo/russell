@@ -200,8 +200,8 @@ fn sync_registry_from_skills(registry: &mut RegistryCache, skills: &[Skill]) {
 /// Heuristic: bundled skills match a known set shipped with Russell.
 fn is_bundled_skill(id: &str) -> bool {
     matches!(id, "okapi-watcher" | "web-search" | "skill-discovery"
-        | "skill-workshop" | "skill-maintenance" | "pragmatic-cybernetics"
-        | "pragmatic-semantics" | "ubuntu-jack")
+        | "skill-workshop" | "skill-maintenance" | "scenario-tester"
+        | "pragmatic-cybernetics" | "pragmatic-semantics" | "ubuntu-jack")
 }
 
 /// Load a KNOWLEDGE.md file from the installed skills directory.

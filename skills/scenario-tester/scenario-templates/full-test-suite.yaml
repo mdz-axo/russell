@@ -1,0 +1,51 @@
+# russell-chat-latency.yaml — multi-turn chat responsiveness test.
+id: russell-chat-latency
+target: russell
+description: "Measure chat REPL multi-turn responsiveness"
+turns: 5
+prompts:
+  - "what is the current load average"
+  - "how many processes are running"
+  - "is there any GPU activity"
+  - "what is the disk usage"
+  - "summarize the machine health briefly"
+measurements:
+  - response_time_s
+  - response_chars
+thresholds:
+  avg_response_s: { max: 15 }
+  error_rate_pct: { max: 10 }
+precondition: "Russell journal has recent samples"
+cleanup: "none"
+---
+# russell-sentinel-cadence.yaml — probe collection regularity test.
+id: russell-sentinel-cadence
+target: russell
+description: "Verify sentinel probe collection cadence and journal integrity"
+cycles: 10
+sleep_between: 0.5
+measurements:
+  - samples_per_cycle
+  - successful_cycles
+  - journal_null_probes
+thresholds:
+  samples_per_cycle_min: { min: 10 }
+  successful_cycles_pct: { min: 100 }
+  journal_null_probes: { max: 0 }
+precondition: "Russell journal accessible"
+cleanup: "none"
+---
+# kask-tool-completion.yaml — Kask MCP tool round-trip test.
+id: kask-tool-completion
+target: kask
+description: "Dispatch a known MCP tool and measure round-trip time"
+tool: "russell/host_snapshot"
+timeout_s: 30
+measurements:
+  - roundtrip_ms
+  - result_size_bytes
+thresholds:
+  roundtrip_max_ms: { max: 5000 }
+  result_min_bytes: { min: 100 }
+precondition: "Kask gateway running, arsenal-mcp-russell tool available"
+cleanup: "none"

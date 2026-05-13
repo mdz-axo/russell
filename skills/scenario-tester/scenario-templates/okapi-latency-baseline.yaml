@@ -1,0 +1,22 @@
+# SPDX-License-Identifier: MIT
+# Example scenario templates for the scenario-tester skill.
+# Each file defines one repeatable test scenario.
+
+# okapi-latency-baseline.yaml — single-prompt latency measurement for Okapi.
+id: okapi-latency-baseline
+target: okapi
+description: "Measure single-prompt latency for one model"
+model: "nemotron3-super:cloud"
+iterations: 10
+concurrent: 1
+prompt: "Explain the relationship between memory pressure and OOM killer activation in 3 sentences."
+measurements:
+  - ttft_ms
+  - total_latency_ms
+  - tokens_per_second
+thresholds:
+  ttft_p95_ms: { max: 5000 }
+  total_latency_p95_ms: { max: 15000 }
+  tokens_per_second_p50: { min: 8 }
+precondition: "model loaded in Okapi, idle GPU"
+cleanup: "none"

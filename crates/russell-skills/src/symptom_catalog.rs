@@ -82,4 +82,13 @@ pub const SYMPTOMS: &[&str] = &[
     "skill_rollback_unresolvable",
     "skill_dependency_missing",
     "skill_hardware_incompatible",
+    // Scenario testing (scenario-tester skill — test agentic AI systems)
+    "agent_latency_spike",
+    "agent_throughput_degraded",
+    "agent_model_loading_failure",
+    "agent_error_rate_elevated",
+    "agent_baseline_regression",
+    "agent_test_scenario_failed",
+    "agent_concurrent_load_timeout",
+    "agent_resource_exhaustion_under_load",
 ];

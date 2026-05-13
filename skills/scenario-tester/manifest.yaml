@@ -1,0 +1,66 @@
+# SPDX-License-Identifier: MIT
+# scenario-tester — design, run, and evaluate test scenarios for agentic AI systems.
+#
+# A knowledge + actionable skill: KNOWLEDGE.md teaches Jack scenario design
+# patterns, probe scripts execute test scenarios against Okapi, Kask (via MCP),
+# and Russell itself. Results are captured as journaled samples with baselines.
+#
+# Two-phase workflow:
+#   Phase A — design dynamic user scenarios and test stories
+#   Phase B — convert scenarios into evaluation scripts, run, observe, report
+#
+# Install: copy this directory to ~/.local/share/harness/skills/scenario-tester/
+
+id: scenario-tester
+version: 1.0.0
+authored: 2026-05-13
+min_harness_version: 0.1.0
+
+symptoms:
+  - agent_latency_spike
+  - agent_throughput_degraded
+  - agent_model_loading_failure
+  - agent_error_rate_elevated
+  - agent_baseline_regression
+  - agent_test_scenario_failed
+  - agent_concurrent_load_timeout
+  - agent_resource_exhaustion_under_load
+
+applies_when:
+  - os_family: linux
+
+probes:
+  - id: probe-scenario-run-okapi
+    cmd: ["bash", "./scripts/scenario-run-okapi.sh"]
+    capture: stdout
+    timeout: 60s
+
+  - id: probe-scenario-run-chat
+    cmd: ["bash", "./scripts/scenario-run-chat.sh"]
+    capture: stdout
+    timeout: 120s
+
+  - id: probe-scenario-run-sentinel
+    cmd: ["bash", "./scripts/scenario-run-sentinel.sh"]
+    capture: stdout
+    timeout: 30s
+
+  - id: probe-scenario-evaluate
+    cmd: ["bash", "./scripts/scenario-evaluate.sh"]
+    capture: stdout
+    timeout: 30s
+
+  - id: probe-scenario-report
+    cmd: ["bash", "./scripts/scenario-report.sh"]
+    capture: stdout
+    timeout: 15s
+
+interventions: []
+
+safety:
+  max_auto_risk: none
+
+references:
+  - docs/adr/0011-testing-strategy.md
+  - docs/proposals/russell-kask-integration.md
+  - skills/scenario-tester/scenario-templates/

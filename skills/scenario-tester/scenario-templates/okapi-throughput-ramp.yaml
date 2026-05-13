@@ -1,0 +1,20 @@
+# okapi-throughput-ramp.yaml — concurrent load ramp for Okapi.
+id: okapi-throughput-ramp
+target: okapi
+description: "Ramp concurrent requests and measure throughput degradation"
+model: "nemotron3-super:cloud"
+concurrency_start: 1
+concurrency_step: 2
+concurrency_max: 8
+iterations_per_level: 5
+prompt: "What is the difference between LRU and ARC page replacement?"
+measurements:
+  - throughput_rps
+  - latency_p95_ms
+  - error_rate_pct
+thresholds:
+  throughput_at_max: { min: 2.0 }  # rps at max concurrency
+  p95_degradation_pct: { max: 100 }  # P95 at max vs P95 at 1x
+  error_rate_pct: { max: 5 }
+precondition: "model loaded, no other load on Okapi"
+cleanup: "none"
