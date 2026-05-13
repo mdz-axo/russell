@@ -274,6 +274,7 @@ async fn dispatch_backend(
 
 /// Write evidence artefacts, journal the event, and insert the
 /// help-session row. Returns the final `HelpOutcome`.
+#[allow(clippy::too_many_arguments)]
 fn persist_session(
     paths: &Paths,
     writer: &JournalWriter,

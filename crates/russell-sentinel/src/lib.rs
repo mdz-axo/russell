@@ -179,6 +179,6 @@ mod tests {
             ev.outputs.get("probe").and_then(|v| v.as_str()),
             Some("loadavg_1m")
         );
-        assert!(ev.outputs.get("unit").is_none());
+        assert!(!ev.outputs.contains_key("unit"));
     }
 }
