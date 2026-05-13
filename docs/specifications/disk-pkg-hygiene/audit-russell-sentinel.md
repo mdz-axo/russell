@@ -2,9 +2,20 @@
 title: "Crate Audit: russell-sentinel"
 audience: [developers, agents]
 last_updated: 2026-05-06
-togaf_phase: "C — Information Systems"
-status: "Completed — refactoring landed per ADR-0019"
+togaf_phase: "C"
+version: "1.0.0"
+status: "Active"
 ---
+
+<!-- TOGAF_DOMAIN: Technology -->
+<!-- VERSION: 1.0.0 -->
+<!-- STATUS: Active -->
+<!-- LAST_UPDATED: 2026-05-06 -->
+
+<!-- TOGAF_DOMAIN: Technology -->
+<!-- VERSION: 1.0.0 -->
+<!-- STATUS: Active -->
+<!-- LAST_UPDATED: 2026-05-06 -->
 
 # Crate Audit: russell-sentinel
 

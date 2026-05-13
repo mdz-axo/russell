@@ -165,6 +165,15 @@ sequenceDiagram
     Doctor-->>Doctor: print response to stdout
 ```
 
+<!-- DIAGRAM_ALIGNMENT
+id: DIAG-DISKPKG-002
+type: sequenceDiagram
+verified_date: 2026-05-13
+verified_against: DISK_PKG_HYGIENE_SPEC.md §7 (implementation order); ADR-0019 (probe cadence)
+reference_sources: 02-disk-probes.md; 03-package-probes.md; russell-sentinel/src/probes/
+status: VERIFIED
+-->
+
 ---
 
 ## Phase 2 Rules Integration

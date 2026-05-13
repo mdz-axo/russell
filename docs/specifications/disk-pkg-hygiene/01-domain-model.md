@@ -199,6 +199,24 @@ erDiagram
     InstalledArtifact ||--o{ InstalledArtifact : "shadowedBy"
 ```
 
+<!-- DIAGRAM_ALIGNMENT
+id: DIAG-DISKPKG-001
+type: erDiagram
+verified_date: 2026-05-13
+verified_against: DISK_PKG_HYGIENE_SPEC.md §2 (entity classes); PRINCIPLES_CATALOG.md JR-1 (austerity)
+reference_sources: 00-semantic-decomposition.md (root causes); PERSISTENCE_CATALOG.md (journal schema)
+status: VERIFIED
+-->
+
+<!-- DIAGRAM_ALIGNMENT
+id: DIAG-DISKPKG-001
+type: erDiagram
+verified_date: 2026-05-13
+verified_against: DISK_PKG_HYGIENE_SPEC.md §2 (entity classes); PRINCIPLES_CATALOG.md JR-1 (austerity)
+reference_sources: 00-semantic-decomposition.md (root causes); PERSISTENCE_CATALOG.md (journal schema)
+status: VERIFIED
+-->
+
 ---
 
 ## 4. Cardinality Notes

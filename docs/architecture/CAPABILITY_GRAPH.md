@@ -1,4 +1,16 @@
-# Cross-Repository Capability → Port → Adapter → Contract Graph
+---
+title: "Cross-Repository Capability → Port → Adapter → Contract Graph"
+audience: [architects, developers, agents]
+last_updated: 2026-05-13
+togaf_phase: "Preliminary"
+version: "1.0.0"
+status: "Active"
+---
+
+<!-- TOGAF_DOMAIN: Cross-cutting -->
+<!-- VERSION: 1.0.0 -->
+<!-- STATUS: Active -->
+<!-- LAST_UPDATED: 2026-05-13 -->
 
 <!-- DIAGRAM_ALIGNMENT
 id: DIAG-CAPABILITY-001
@@ -8,6 +20,8 @@ verified_against: russell/crates/*, kask/stack/crates/*, kask/arsenal/crates/*, 
 reference_sources: AGENTS.md (all three repos), PRINCIPLES_CATALOG.md, ADR-T18
 status: VERIFIED
 -->
+
+# Cross-Repository Capability → Port → Adapter → Contract Graph
 
 ## 1. Russell Capability Graph
 

@@ -1,4 +1,16 @@
-# Documentation Excellence Validation Rubric
+---
+title: "Documentation Excellence Validation Rubric"
+audience: [architects, developers, agents]
+last_updated: 2026-05-13
+togaf_phase: "Preliminary"
+version: "1.0.0"
+status: "Active"
+---
+
+<!-- TOGAF_DOMAIN: Cross-cutting -->
+<!-- VERSION: 1.0.0 -->
+<!-- STATUS: Active -->
+<!-- LAST_UPDATED: 2026-05-13 -->
 
 <!-- DIAGRAM_ALIGNMENT
 id: DIAG-RUBRIC-001
@@ -8,6 +20,8 @@ verified_against: TOGAF_LITE_FOR_OPEN_SOURCE.md, WRITING_EXCELLENCE.md, DOCUMENT
 reference_sources: All three governing standards
 status: VERIFIED
 -->
+
+# Documentation Excellence Validation Rubric
 
 ## 1. TOGAF-Lite Structural Conformance (RDF Triples)
 
