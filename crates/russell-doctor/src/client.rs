@@ -80,6 +80,10 @@ impl EscalateMin {
     }
 }
 
+/// Russell's default model. Shared across all code paths (`russell jack`,
+/// `russell chat`). Russell owns its model config; Okapi is just the router.
+pub const DEFAULT_MODEL: &str = "nemotron3-super:cloud";
+
 #[derive(Debug, Clone)]
 pub struct ClientConfig {
     pub backend: Backend,
@@ -93,7 +97,10 @@ pub struct ClientConfig {
 impl ClientConfig {
     pub fn from_env() -> Self {
         let backend = Backend::from_env();
-        let model = std::env::var("RUSSELL_DOCTOR_MODEL").unwrap_or_else(|_| String::new());
+        let model = std::env::var("RUSSELL_DOCTOR_MODEL")
+            .ok()
+            .filter(|s| !s.is_empty())
+            .unwrap_or_else(|| DEFAULT_MODEL.to_string());
         let base_url = std::env::var("RUSSELL_DOCTOR_BASE_URL").ok();
         let api_key = std::env::var("RUSSELL_DOCTOR_API_KEY").ok();
         Self {

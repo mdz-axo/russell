@@ -128,26 +128,8 @@ async fn okapi_list_models(base_url: &str) -> Result<Vec<String>, String> {
     Ok(body.models.into_iter().map(|m| m.name).collect())
 }
 
-/// Known non-chat model name patterns (rerankers, embedders, etc.).
-/// Models matching any of these substrings are excluded from
-/// auto-selection (but still available via explicit `/model` switch).
-const NON_CHAT_PATTERNS: &[&str] = &["reranker", "rerank", "embed", "embedding"];
-
-/// Returns true if the model name does NOT match any known
-/// non-chat pattern (reranker, embedder, etc.).
-fn is_chat_model(name: &str) -> bool {
-    let lower = name.to_lowercase();
-    !NON_CHAT_PATTERNS.iter().any(|p| lower.contains(p))
-}
-
-/// Russell's default model. Russell owns its model config; Okapi is
-/// just the router. This must match `RUSSELL_DOCTOR_MODEL` in `.env`.
-const DEFAULT_MODEL: &str = "nemotron3-super:cloud";
-
-/// Filter `models` to those that look like chat models.
-fn filter_chat_models(models: &[String]) -> Vec<&str> {
-    models.iter().filter(|m| is_chat_model(m)).map(|m| m.as_str()).collect()
-}
+/// Re-export from russell-doctor for local use.
+const DEFAULT_MODEL: &str = russell_doctor::client::DEFAULT_MODEL;
 
 /// Find top fuzzy matches for `needle` in `models`.
 ///
@@ -176,6 +158,30 @@ fn fuzzy_match_models<'a>(needle: &str, models: &'a [String]) -> Vec<&'a str> {
 
     scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
     scored.into_iter().map(|(name, _)| name).collect()
+}
+
+/// Prompt the operator to pick from a numbered list of models.
+/// Returns `Some(zero-based-index)` on valid selection, `None` on cancel.
+fn prompt_model_selection(
+    editor: &mut DefaultEditor,
+    history_entry: &str,
+    count: usize,
+) -> Option<usize> {
+    println!("  Type a number to select, or 'cancel'.");
+    let _ = editor.add_history_entry(history_entry);
+    let sel_line = editor.readline("select → ").ok()?;
+    let sel = sel_line.trim();
+    if sel == "cancel" || sel == "/model cancel" {
+        println!("  Cancelled.");
+        return None;
+    }
+    match sel.trim_start_matches("/model ").trim().parse::<usize>() {
+        Ok(idx) if idx >= 1 && idx <= count => Some(idx - 1),
+        _ => {
+            println!("  Invalid selection. Cancelled.");
+            None
+        }
+    }
 }
 
 /// Run the chat REPL.
@@ -393,85 +399,42 @@ pub async fn run(paths: &Paths) -> Result<()> {
                                     okapi_models = okapi_list_models(&base_url).await.unwrap_or_default();
                                     okapi_models_fetched = true;
                                 }
-                                // If the name is typed exactly (no fuzzy needed),
-                                // just switch directly — even if Okapi is unreachable.
-                                if okapi_models.contains(&name.to_string()) || okapi_models.is_empty() {
-                                    if okapi_models.is_empty() {
-                                        // Okapi unreachable; trust the operator.
-                                        current_model = name.to_string();
-                                        println!("  Switched to model: {current_model} (unverified — Okapi unreachable)");
-                                        println!();
-                                        continue;
-                                    }
-                                }
-                                if false {
-                                    // dead arm — original empty-check was here
-                                    println!("  Current model: {current_model}");
+                                // If Okapi is unreachable, trust the operator's input directly.
+                                if okapi_models.is_empty() {
+                                    current_model = name.to_string();
+                                    println!("  Switched to model: {current_model} (unverified — Okapi unreachable)");
                                     println!();
                                     continue;
                                 }
-
-                                // Hard-coded tag filters (Okapi/Ollama convention).
+                                // Tag filters: `/model cloud` or `/model local`.
                                 if name == "cloud" || name == "local" {
-                                    let filtered: Vec<&String> = if name == "cloud" {
-                                        okapi_models
-                                            .iter()
-                                            .filter(|m| m.ends_with("cloud"))
-                                            .collect()
-                                    } else {
-                                        okapi_models
-                                            .iter()
-                                            .filter(|m| !m.ends_with("cloud"))
-                                            .collect()
-                                    };
+                                    let filtered: Vec<&String> = okapi_models
+                                        .iter()
+                                        .filter(|m| {
+                                            if name == "cloud" { m.ends_with("cloud") } else { !m.ends_with("cloud") }
+                                        })
+                                        .collect();
                                     if filtered.is_empty() {
                                         println!("  No {name} models found.");
                                     } else {
                                         println!("  {name} models ({}):", filtered.len());
                                         for (i, m) in filtered.iter().enumerate() {
-                                            let marker = if *m == &current_model {
-                                                " ← current"
-                                            } else {
-                                                ""
-                                            };
+                                            let marker = if *m == &current_model { " ← current" } else { "" };
                                             println!("    {}. {m}{marker}", i + 1);
                                         }
-                                        println!(
-                                            "  Type /model <number> to select, or /model cancel."
-                                        );
-                                        editor.add_history_entry(trimmed)?;
-                                        if let Ok(sel_line) = editor.readline("select → ") {
-                                            let sel = sel_line.trim();
-                                            if sel == "cancel" || sel == "/model cancel" {
-                                                println!("  Cancelled.");
-                                            } else if let Ok(idx) = sel
-                                                .trim_start_matches("/model ")
-                                                .trim()
-                                                .parse::<usize>()
-                                            {
-                                                if idx >= 1 && idx <= filtered.len() {
-                                                    current_model = filtered[idx - 1].clone();
-                                                    println!(
-                                                        "  Switched to model: {current_model}"
-                                                    );
-                                                } else {
-                                                    println!("  Invalid number. Cancelled.");
-                                                }
-                                            } else {
-                                                println!("  Unrecognised. Cancelled.");
-                                            }
+                                        if let Some(selected) = prompt_model_selection(&mut editor, trimmed, filtered.len()) {
+                                            current_model = filtered[selected].clone();
+                                            println!("  Switched to model: {current_model}");
                                         }
                                     }
                                     println!();
                                     continue;
                                 }
-
+                                // Fuzzy match against Okapi's model list.
                                 let matches = fuzzy_match_models(name, &okapi_models);
                                 match matches.len() {
                                     0 => {
-                                        println!(
-                                            "  No model found matching \"{name}\". Try /model list."
-                                        );
+                                        println!("  No model found matching \"{name}\". Try /model list.");
                                     }
                                     1 => {
                                         current_model = matches[0].to_string();
@@ -480,38 +443,12 @@ pub async fn run(paths: &Paths) -> Result<()> {
                                     n => {
                                         println!("  Multiple models match \"{name}\":");
                                         for (i, m) in matches.iter().enumerate() {
-                                            let marker = if *m == current_model {
-                                                " ← current"
-                                            } else {
-                                                ""
-                                            };
+                                            let marker = if *m == current_model { " ← current" } else { "" };
                                             println!("    {}. {m}{marker}", i + 1);
                                         }
-                                        println!(
-                                            "  Type /model <number> to select, or /model cancel."
-                                        );
-                                        // Read one more line for the selection.
-                                        editor.add_history_entry(trimmed)?;
-                                        if let Ok(sel_line) = editor.readline("select → ") {
-                                            let sel = sel_line.trim();
-                                            if sel == "cancel" || sel == "/model cancel" {
-                                                println!("  Cancelled.");
-                                            } else if let Ok(idx) = sel
-                                                .trim_start_matches("/model ")
-                                                .trim()
-                                                .parse::<usize>()
-                                            {
-                                                if idx >= 1 && idx <= n {
-                                                    current_model = matches[idx - 1].to_string();
-                                                    println!(
-                                                        "  Switched to model: {current_model}"
-                                                    );
-                                                } else {
-                                                    println!("  Invalid number. Cancelled.");
-                                                }
-                                            } else {
-                                                println!("  Unrecognised. Cancelled.");
-                                            }
+                                        if let Some(selected) = prompt_model_selection(&mut editor, trimmed, n) {
+                                            current_model = matches[selected].to_string();
+                                            println!("  Switched to model: {current_model}");
                                         }
                                     }
                                 }
