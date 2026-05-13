@@ -40,12 +40,9 @@ pub enum Backend {
 
 impl Backend {
     /// Parse from the environment. Default is Okapi.
-    /// Falls back to Offline if Okapi is not reachable and
-    /// the operator has not opted into OpenRouter.
     #[must_use]
     pub fn from_env() -> Self {
         match std::env::var("RUSSELL_DOCTOR_BACKEND").ok().as_deref() {
-            Some("openrouter") => Self::OpenRouter,
             Some("okapi") => Self::Okapi,
             // Legacy: accept "ollama" as alias for "okapi".
             Some("ollama") => Self::Okapi,
@@ -63,7 +60,6 @@ impl Backend {
     #[must_use]
     pub fn label(self) -> &'static str {
         match self {
-            Self::OpenRouter => "openrouter",
             Self::Okapi => "okapi",
             Self::Mock => "mock",
             Self::Offline => "offline",
@@ -130,13 +126,13 @@ pub struct ClientConfig {
 
 impl ClientConfig {
     /// Resolve from the environment, applying MVP defaults
-    /// (`nemotron-3-super:cloud`, 60s timeout, Okapi backend).
+    /// (Okapi backend, 60s timeout, model from env or auto-detect).
     pub fn from_env() -> Self {
         let backend = Backend::from_env();
         let model = std::env::var("RUSSELL_DOCTOR_MODEL")
-            .unwrap_or_else(|_| "nemotron-3-super:cloud".into());
+            .unwrap_or_else(|_| String::new());
         let base_url = std::env::var("RUSSELL_DOCTOR_BASE_URL").ok();
-        let api_key = std::env::var("OPENROUTER_API_KEY").ok();
+        let api_key = std::env::var("RUSSELL_DOCTOR_API_KEY").ok();
         Self {
             backend,
             model,
@@ -183,7 +179,7 @@ pub struct LlmResponse {
 ///
 /// This is the hexagon's boundary. The Nurse (application service
 /// in `help.rs`) calls [`chat`](LlmClient::chat); the driven
-/// adapters ([`OpenRouterClient`](crate::openrouter::OpenRouterClient),
+/// adapters ([`OkapiClient`](crate::oai_client::OkapiClient),
 /// [`MockClient`](crate::mock::MockClient)) implement it.
 /// Adapters differ by base URL and API key, but the port is
 /// the same — write once, validate once.

@@ -28,7 +28,7 @@ use russell_core::paths::Paths;
 
 use crate::client::{Backend, ClientConfig, LlmClient, SoapPrompt};
 use crate::error::{DoctorError, Result};
-use crate::{fallback, mock, openrouter, prompt};
+use crate::{fallback, mock, oai_client, prompt};
 
 /// Why the LLM was not called.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -154,21 +154,6 @@ async fn dispatch_backend(
 
     // Attempt the configured backend. Any failure → fall back to offline.
     let (backend_label, maybe_response, error_kind, skip_reason) = match cfg.backend {
-        Backend::OpenRouter => {
-            let client = openrouter::OpenRouterClient::new(cfg)?;
-            match client.chat(soap).await {
-                Ok(resp) => ("openrouter", Some(resp), None, None),
-                Err(e) => {
-                    warn!(error = %e, "openrouter call failed — falling back");
-                    (
-                        "openrouter",
-                        None,
-                        Some(error_kind_of(&e)),
-                        Some(SkipReason::OfflineFallback),
-                    )
-                }
-            }
-        }
         Backend::Okapi => {
             let mut okapi_cfg = cfg.clone();
             if okapi_cfg.base_url.is_none() {
@@ -188,7 +173,7 @@ async fn dispatch_backend(
                 okapi_start().await;
             }
 
-            let client = openrouter::OpenRouterClient::new(&okapi_cfg)?;
+            let client = oai_client::OkapiClient::new(&okapi_cfg)?;
             match client.chat(soap).await {
                 Ok(resp) => ("okapi", Some(resp), None, None),
                 Err(e) => {
@@ -545,7 +530,6 @@ fn error_kind_of(e: &DoctorError) -> String {
         DoctorError::Authentication(_) => "auth".into(),
         DoctorError::ModelNotFound(_) => "model_not_found".into(),
         DoctorError::RateLimited { .. } => "rate_limited".into(),
-        DoctorError::ZdrRoutingFailed(_) => "zdr_failed".into(),
         DoctorError::Config(_) => "config".into(),
         DoctorError::BadResponse(_) => "bad_response".into(),
         DoctorError::Fmt(_) => "fmt".into(),

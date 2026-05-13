@@ -55,10 +55,6 @@ pub enum DoctorError {
         retry_after_seconds: Option<u64>,
     },
 
-    /// ZDR requirement could not be satisfied by any available provider.
-    #[error("ZDR routing failed: {0}")]
-    ZdrRoutingFailed(String),
-
     /// The operator's env file is missing required keys for the
     /// configured backend, and the fallback path refused.
     #[error("configuration error: {0}")]

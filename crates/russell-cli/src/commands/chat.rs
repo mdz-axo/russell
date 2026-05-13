@@ -40,7 +40,7 @@ use russell_core::paths::Paths;
 use russell_doctor::action::{self, ResolvedAction};
 use russell_doctor::client::LlmClient;
 use russell_doctor::client::SoapPrompt;
-use russell_doctor::openrouter::OpenRouterClient;
+use russell_doctor::oai_client::OkapiClient;
 use russell_skills::Skill;
 use rustyline::DefaultEditor;
 use rustyline::error::ReadlineError;
@@ -213,9 +213,17 @@ pub async fn run(paths: &Paths) -> Result<()> {
     // Resolve the default model from env, and fetch available models from Okapi.
     let base_url = std::env::var("RUSSELL_DOCTOR_BASE_URL")
         .unwrap_or_else(|_| "http://127.0.0.1:11435/v1".into());
-    let mut current_model =
-        std::env::var("RUSSELL_DOCTOR_MODEL").unwrap_or_else(|_| "nemotron-3-super:cloud".into());
+    let mut current_model = std::env::var("RUSSELL_DOCTOR_MODEL").unwrap_or_default();
     let okapi_models: Vec<String> = okapi_list_models(&base_url).await.unwrap_or_default();
+
+    // Auto-select a model if none configured.
+    if current_model.is_empty() {
+        if let Some(first) = okapi_models.first() {
+            current_model = first.clone();
+        } else {
+            current_model = "default".into();
+        }
+    }
 
     // Banner.
     println!();
@@ -976,7 +984,7 @@ async fn call_okapi_with_spinner(
 /// Send chat messages through the [`LlmClient`] port.
 ///
 /// Flattens the multi-message array into a [`SoapPrompt`] and calls
-/// [`OpenRouterClient::chat`]. This replaces the old `call_okapi_direct`
+/// [`OkapiClient::chat`]. This replaces the old `call_okapi_direct`
 /// which bypassed the hexagonal port with raw `reqwest` calls.
 async fn call_llm_via_port(
     cfg: &russell_doctor::client::ClientConfig,
@@ -1008,8 +1016,15 @@ async fn call_llm_via_port(
 
     let mut chat_cfg = cfg.clone();
     chat_cfg.model = model.to_string();
+    // Ensure we always point at Okapi.
+    if chat_cfg.base_url.is_none() {
+        chat_cfg.base_url = Some("http://127.0.0.1:11435/v1".into());
+    }
+    if chat_cfg.api_key.is_none() {
+        chat_cfg.api_key = Some("okapi".into());
+    }
 
-    let client = OpenRouterClient::new(&chat_cfg).map_err(|e| format!("client error: {e}"))?;
+    let client = OkapiClient::new(&chat_cfg).map_err(|e| format!("client error: {e}"))?;
 
     let resp = client.chat(&soap).await.map_err(|e| format!("{e}"))?;
 

@@ -65,9 +65,8 @@ pub fn summarise(reader: &JournalReader, note: Option<&str>) -> Result<String> {
 
     writeln!(
         out,
-        "\nVerify Okapi is running (`systemctl --user status okapi`) and set \
-         OPENROUTER_API_KEY in `~/.config/harness/russell.env` if you want \
-         the remote fallback. Call me back when the phone's working."
+        "\nVerify Okapi is running (`systemctl --user status okapi`). \
+         Call me back when the phone's working."
     )?;
     Ok(out)
 }
