@@ -6,16 +6,13 @@
 //! minimal local trait matching MVP needs: single round-trip,
 //! no streaming, no tool-calling. It follows the hexagonal
 //! ports-and-adapters pattern: [`LlmClient`] is the outbound port;
-//! [`openrouter::OpenRouterClient`] is the driven adapter (shared
-//! by Okapi and OpenRouter backends).
+//! [`oai_client::OkapiClient`] is the driven adapter.
 //!
 //! ## Backend enum
 //!
 //! - [`Backend::Okapi`] — local inference via Okapi (port 11435).
 //!   The default backend. Russell auto-starts Okapi via
 //!   `systemctl --user start okapi` if unreachable.
-//! - [`Backend::OpenRouter`] — remote inference via OpenRouter API
-//!   (opt-in, requires `OPENROUTER_API_KEY`).
 //! - [`Backend::Mock`] — deterministic test client.
 //! - [`Backend::Offline`] — rule-based fallback; never calls
 //!   the network. Jack is never silent, even offline.
@@ -35,8 +32,6 @@ pub enum Backend {
     /// (LoRA hot-swap, token probs, grammar constraints, metrics)
     /// and shares Ollama's model store.
     Okapi,
-    /// OpenRouter (opt-in if `OPENROUTER_API_KEY` is set).
-    OpenRouter,
     /// Mock for tests.
     Mock,
     /// Offline rule-based fallback — never calls the network.

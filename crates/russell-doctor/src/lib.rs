@@ -17,7 +17,7 @@ pub mod error;
 pub mod fallback;
 pub mod help;
 pub mod mock;
-pub mod openrouter;
+pub mod oai_client;
 pub mod prompt;
 
 pub use client::{Backend, ClientConfig, EscalateMin, LlmClient, LlmResponse, SoapPrompt};

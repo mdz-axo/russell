@@ -8,13 +8,12 @@
 //   - Uses DoctorError, not stack_types::LlmError
 //   - Uses SoapPrompt / LlmResponse, not stack_types wire types
 //   - No streaming, no tool-calling, no structured-output
-//   - Enforces ZDR via provider preferences on every request
 //   - Single round-trip, no retry
 //   - Normalises DeepSeek / Kimi reasoning_details content fallback
 // Sync policy: review on upstream bug fix; pull fixes, not features.
 // See docs/operations/REUSE_MANIFEST.md row 1.
 
-//! OpenRouter / OpenAI-compatible backend.
+//! OpenAI-compatible backend targeting Okapi (local inference).
 //!
 //! Implements a single round-trip POST to `/chat/completions`.
 //! No streaming, no retry, no tool-calling — see
@@ -28,18 +27,16 @@ use tracing::{debug, warn};
 use crate::client::{ClientConfig, LlmClient, LlmResponse, SoapPrompt};
 use crate::error::{DoctorError, Result};
 
-/// OpenAI-compatible backend targeting OpenRouter by default.
+/// OpenAI-compatible LLM client. Targets Okapi at localhost:11435.
 #[derive(Debug, Clone)]
-pub struct OpenRouterClient {
+pub struct OkapiClient {
     base_url: String,
     model: String,
     api_key: Option<String>,
     http: reqwest::Client,
-    referer: String,
-    title: String,
 }
 
-impl OpenRouterClient {
+impl OkapiClient {
     /// Construct from a resolved [`ClientConfig`].
     ///
     /// # Errors
@@ -48,7 +45,7 @@ impl OpenRouterClient {
         let base_url = cfg
             .base_url
             .clone()
-            .unwrap_or_else(|| "https://openrouter.ai/api/v1".into());
+            .unwrap_or_else(|| "http://127.0.0.1:11435/v1".into());
         let http = reqwest::Client::builder()
             .timeout(cfg.timeout)
             .user_agent(concat!("russell/", env!("CARGO_PKG_VERSION")))
@@ -59,8 +56,6 @@ impl OpenRouterClient {
             model: cfg.model.clone(),
             api_key: cfg.api_key.clone(),
             http,
-            referer: "https://russell.local/".into(),
-            title: "Russell".into(),
         })
     }
 
@@ -69,7 +64,7 @@ impl OpenRouterClient {
     }
 }
 
-impl LlmClient for OpenRouterClient {
+impl LlmClient for OkapiClient {
     async fn chat(&self, prompt: &SoapPrompt) -> Result<LlmResponse> {
         let body = json!({
             "model": self.model,
@@ -78,14 +73,6 @@ impl LlmClient for OpenRouterClient {
                 { "role": "user",   "content": prompt.rendered },
             ],
             "temperature": 0.2,
-            // Per-request ZDR enforcement — see OpenRouter docs
-            // `guides/features/zdr`. Requests that cannot be
-            // routed to a ZDR endpoint fail rather than fall back
-            // to a retaining provider.
-            "provider": {
-                "zdr": true,
-                "data_collection": "deny"
-            }
         });
 
         let url = self.endpoint();
@@ -94,8 +81,6 @@ impl LlmClient for OpenRouterClient {
             .http
             .post(&url)
             .header("Content-Type", "application/json")
-            .header("HTTP-Referer", &self.referer)
-            .header("X-Title", &self.title)
             .json(&body);
         if let Some(k) = &self.api_key {
             req = req.bearer_auth(k);
@@ -133,7 +118,7 @@ impl LlmClient for OpenRouterClient {
             prompt_tokens = ?parsed.prompt_tokens,
             completion_tokens = ?parsed.completion_tokens,
             latency_ms,
-            "OpenRouter chat completion OK"
+            "Okapi chat completion OK"
         );
 
         Ok(LlmResponse {
@@ -166,11 +151,6 @@ fn map_http_status_error(
     retry_after: Option<u64>,
     url: &str,
 ) -> DoctorError {
-    // OpenRouter surfaces ZDR routing failures with a specific body pattern
-    // we recognise so the operator knows *why* the call failed.
-    if status == 403 && body.to_ascii_lowercase().contains("zero data retention") {
-        return DoctorError::ZdrRoutingFailed(body);
-    }
     match status {
         401 => DoctorError::Authentication(body),
         402 | 403 => DoctorError::Http {
@@ -323,20 +303,9 @@ mod tests {
             404,
             "no such model".into(),
             None,
-            "https://openrouter.ai/api/v1/chat/completions",
+            "http://127.0.0.1:11435/v1/chat/completions",
         );
         assert!(matches!(err, DoctorError::ModelNotFound(_)));
-    }
-
-    #[test]
-    fn maps_zdr_failure() {
-        let err = map_http_status_error(
-            403,
-            "Zero data retention required but no ZDR provider available".into(),
-            None,
-            "",
-        );
-        assert!(matches!(err, DoctorError::ZdrRoutingFailed(_)));
     }
 
     #[test]
