@@ -38,11 +38,11 @@ seam for the richer triage loop when ADR-0007 lifts.
 
 **v2 revision (2026-05-09).** The original ADR made OpenRouter the
 default backend. Operator preference and the machine's local-first
-posture flipped this: **Ollama is the default**, OpenRouter is
-opt-in. The default model is `deepseekv4pro`. Russell now checks
-for Ollama at `help` time and attempts to start it if it's not
-running. OpenRouter remains available, and its ZDR enforcement is
-preserved unchanged when used.
+posture flipped this: **Okapi is the default**, OpenRouter is
+opt-in. The default model is `nemotron3-super:cloud`. Russell now
+checks for Okapi at `help` time and attempts to start it if it's
+not running. OpenRouter remains available, and its ZDR enforcement
+is preserved unchanged when used.
 
 ## Decision
 
@@ -204,11 +204,11 @@ the wire path.
 ### Negative / accepted costs
 
 - Jack cannot follow up on his own answers. One-shot only.
-- Ollama must be installed and the model (`deepseekv4pro`) must
-  be pulled before the first `russell jack`. Russell does not
-  manage model downloads — the operator does.
-- Auto-start (`systemctl --user start ollama`) assumes the
-  operator has set up a user-scoped systemd unit for Ollama.
+- Okapi must be running and the model (`nemotron3-super:cloud`)
+  must be available before the first `russell jack`. Russell does
+  not manage model downloads — the operator does.
+- Auto-start (`systemctl --user start okapi`) assumes the
+  operator has set up a user-scoped systemd unit for Okapi.
   If they haven't, the auto-start is a harmless no-op and the
   fallback kicks in.
 - No cost-control / rate-limit awareness in MVP.
