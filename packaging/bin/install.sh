@@ -72,15 +72,10 @@ chmod +x "$HOME/.local/share/harness/skills/ollama-watcher/scripts/"*.sh 2>/dev/
 if [ ! -f "$HOME/.config/harness/russell.env" ]; then
   # Prefer the repo .env if it's populated (convenience during dev).
   # Otherwise seed from the template.
-  if [ -f "$REPO/.env" ] && grep -qE '^OPENROUTER_API_KEY=.+$' "$REPO/.env"; then
-    say "Seeding ~/.config/harness/russell.env from repo .env (real keys)"
-    cp "$REPO/.env" "$HOME/.config/harness/russell.env"
-    chmod 0600 "$HOME/.config/harness/russell.env"
-  elif [ -f "$REPO/.env.example" ]; then
+  if [ -f "$REPO/.env.example" ]; then
     say "Seeding ~/.config/harness/russell.env from .env.example (template)"
     cp "$REPO/.env.example" "$HOME/.config/harness/russell.env"
     chmod 0600 "$HOME/.config/harness/russell.env"
-    say "Defaults: Ollama + deepseekv4pro. Set RUSSELL_DOCTOR_BACKEND=openrouter + OPENROUTER_API_KEY if you want the cloud path."
   fi
 fi
 

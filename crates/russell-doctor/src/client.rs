@@ -1,21 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
-//! The Nurse's outbound port — [`LlmClient`] trait defining the
-//! contract for LLM communication.
-//!
-//! Russell does **not** use the `stack-llm` trait. This is a
-//! minimal local trait matching MVP needs: single round-trip,
-//! no streaming, no tool-calling. It follows the hexagonal
-//! ports-and-adapters pattern: [`LlmClient`] is the outbound port;
-//! [`oai_client::OkapiClient`] is the driven adapter.
-//!
-//! ## Backend enum
-//!
-//! - [`Backend::Okapi`] — local inference via Okapi (port 11435).
-//!   The default backend. Russell auto-starts Okapi via
-//!   `systemctl --user start okapi` if unreachable.
-//! - [`Backend::Mock`] — deterministic test client.
-//! - [`Backend::Offline`] — rule-based fallback; never calls
-//!   the network. Jack is never silent, even offline.
+//! LLM client trait and backend config. Okapi-only.
+#![allow(missing_docs)]
 
 use std::future::Future;
 
@@ -23,18 +8,13 @@ use serde::{Deserialize, Serialize};
 
 use crate::error::Result;
 
-/// Backend selector, per `RUSSELL_DOCTOR_BACKEND`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Backend {
-    /// Local Okapi — the default backend.
-    /// OpenAI-compatible at `http://localhost:11435/v1`.
-    /// Okapi wraps llama.cpp with additional capabilities
-    /// (LoRA hot-swap, token probs, grammar constraints, metrics)
-    /// and shares Ollama's model store.
+    /// Local Okapi at `http://localhost:11435/v1`.
     Okapi,
-    /// Mock for tests.
+    /// Deterministic test client.
     Mock,
-    /// Offline rule-based fallback — never calls the network.
+    /// Rule-based fallback; no network.
     Offline,
 }
 
@@ -67,22 +47,16 @@ impl Backend {
     }
 }
 
-/// Minimum severity to trigger LLM escalation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum EscalateMin {
-    /// Escalate only when crit > 0.
     Crit,
-    /// Escalate when crit > 0 OR alert > 0 (default).
     #[default]
     Alert,
-    /// Escalate when crit > 0 OR alert > 0 OR warn > 0.
     Warn,
-    /// Always escalate (available via `RUSSELL_ESCALATE_MIN=always`; primarily for integration testing).
     Always,
 }
 
 impl EscalateMin {
-    /// Parse from `RUSSELL_ESCALATE_MIN` env var.
     pub fn from_env() -> Self {
         match std::env::var("RUSSELL_ESCALATE_MIN").ok().as_deref() {
             Some("crit") => Self::Crit,
@@ -96,7 +70,6 @@ impl EscalateMin {
         }
     }
 
-    /// Returns `true` if the given severity counts meet the threshold.
     pub fn satisfied_by(self, counts: &russell_core::journal::SeverityCounts) -> bool {
         match self {
             Self::Always => true,
@@ -107,26 +80,17 @@ impl EscalateMin {
     }
 }
 
-/// Configuration resolved at call time from env + defaults.
 #[derive(Debug, Clone)]
 pub struct ClientConfig {
-    /// Backend to use.
     pub backend: Backend,
-    /// Model identifier (e.g. `"deepseekv4pro"`).
     pub model: String,
-    /// Base URL; `None` = backend's default.
     pub base_url: Option<String>,
-    /// Bearer token; `None` = backend does not require one.
     pub api_key: Option<String>,
-    /// Request timeout.
     pub timeout: std::time::Duration,
-    /// Minimum severity for LLM escalation.
     pub escalate_min: EscalateMin,
 }
 
 impl ClientConfig {
-    /// Resolve from the environment, applying MVP defaults
-    /// (Okapi backend, 60s timeout, model from env or auto-detect).
     pub fn from_env() -> Self {
         let backend = Backend::from_env();
         let model = std::env::var("RUSSELL_DOCTOR_MODEL")
@@ -144,46 +108,23 @@ impl ClientConfig {
     }
 }
 
-/// A SOAP-shaped prompt given to the LLM client.
-///
-/// See the template at
-/// [`docs/templates/soap-bundle.md`](../../../docs/templates/soap-bundle.md).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SoapPrompt {
-    /// The system prompt (Jack's persona).
     pub system: String,
-    /// Subjective — operator note.
     pub subjective: String,
-    /// Objective — gathered evidence rendered as Markdown.
     pub objective: String,
-    /// The full rendered SOAP text as one user message.
     pub rendered: String,
 }
 
-/// The model's response plus a minimum of metadata.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LlmResponse {
-    /// The response text — what the operator sees.
     pub content: String,
-    /// Optional model identifier echoed by the provider.
     pub model: Option<String>,
-    /// Prompt tokens, if reported.
     pub prompt_tokens: Option<u32>,
-    /// Completion tokens, if reported.
     pub completion_tokens: Option<u32>,
-    /// Round-trip latency.
     pub latency_ms: u64,
 }
 
-/// The Nurse's outbound port — single method, one round-trip.
-///
-/// This is the hexagon's boundary. The Nurse (application service
-/// in `help.rs`) calls [`chat`](LlmClient::chat); the driven
-/// adapters ([`OkapiClient`](crate::oai_client::OkapiClient),
-/// [`MockClient`](crate::mock::MockClient)) implement it.
-/// Adapters differ by base URL and API key, but the port is
-/// the same — write once, validate once.
 pub trait LlmClient: Send + Sync {
-    /// Send the SOAP prompt and return the model's response.
     fn chat(&self, prompt: &SoapPrompt) -> impl Future<Output = Result<LlmResponse>> + Send;
 }

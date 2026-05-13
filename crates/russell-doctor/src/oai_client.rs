@@ -1,23 +1,8 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
-//
-// Reference-copied patterns from:
-//   slate/stack/crates/stack-llm/src/openai.rs
-//   slate/stack/crates/stack-llm/src/wire.rs
-// Upstream commit (slate): 67a13834d8af4efa8c330ce10ef1031bf2cdeee2
-// Russell changes:
-//   - Uses DoctorError, not stack_types::LlmError
-//   - Uses SoapPrompt / LlmResponse, not stack_types wire types
-//   - No streaming, no tool-calling, no structured-output
-//   - Single round-trip, no retry
-//   - Normalises DeepSeek / Kimi reasoning_details content fallback
-// Sync policy: review on upstream bug fix; pull fixes, not features.
-// See docs/operations/REUSE_MANIFEST.md row 1.
-
-//! OpenAI-compatible backend targeting Okapi (local inference).
+//! OpenAI-compatible client targeting Okapi (local inference).
 //!
-//! Implements a single round-trip POST to `/chat/completions`.
-//! No streaming, no retry, no tool-calling — see
-//! [ADR-0016](../../docs/adr/0016-doctor-and-llm-router.md).
+//! Single round-trip POST to `/chat/completions`. No streaming,
+//! no retry, no tool-calling.
 
 use std::time::Instant;
 
@@ -131,10 +116,7 @@ impl LlmClient for OkapiClient {
     }
 }
 
-// --- wire-format helpers (pattern from stack-llm/src/wire.rs) ----------------
-
-/// Convert a [`reqwest::Error`] into [`DoctorError::Http`] preserving
-/// structured metadata. Called at every `.send().await` / `.text().await`.
+/// Convert a [`reqwest::Error`] into [`DoctorError::Http`].
 fn map_reqwest_error(context: &str, e: &reqwest::Error) -> DoctorError {
     DoctorError::Http {
         message: format!("{context}: {e}"),
@@ -176,8 +158,6 @@ fn parse_retry_after(value: &str) -> Option<u64> {
     value.trim().parse::<u64>().ok()
 }
 
-// --- response parsing --------------------------------------------------------
-
 #[derive(Debug)]
 struct ParsedCompletion {
     content: String,
@@ -197,10 +177,8 @@ fn parse_completion(body: &str) -> Result<ParsedCompletion> {
         .get("message")
         .ok_or_else(|| DoctorError::BadResponse("no message in choice".into()))?;
 
-    // Content-normalisation, pattern from stack-llm/src/wire.rs:
-    // some models (DeepSeek, Kimi K2.5, GLM-5) emit reasoning in
-    // `reasoning_details[].text` or `reasoning_content` rather than
-    // `content`. Promote those when `content` is null/missing.
+    // Some models emit reasoning in `reasoning_details` or
+    // `reasoning_content` instead of `content`. Promote when needed.
     let content = match msg.get("content") {
         Some(serde_json::Value::String(s)) if !s.is_empty() => s.clone(),
         _ => {

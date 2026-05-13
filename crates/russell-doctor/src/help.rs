@@ -1,19 +1,5 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
-//! The Nurse's application service — the `run_help` orchestrator.
-//!
-//! Flow: SOAP composition → LLM call (via the outbound port) →
-//! offline fallback if unreachable → journal persistence →
-//! response printed to the operator.
-//!
-//! Key vocabulary (per AGENTS.md §5):
-//! - **Nurse**: the subsystem that consults the LLM. Jack watches,
-//!   notices, checks in — he does not "diagnose" or prescribe.
-//! - **SOAP bundle**: Subjective / Objective / Assessment / Plan
-//!   evidence layout.
-//! - **IDRS**: every mutation (evidence writes, journal rows) is
-//!   Idempotent / Dry-runnable / Rollback-able / Structured-logged.
-//!
-//! The CLI (`russell jack`) is the only caller.
+//! `run_help` orchestrator: SOAP → LLM → fallback → journal.
 
 use std::path::PathBuf;
 

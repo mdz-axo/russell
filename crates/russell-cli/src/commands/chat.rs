@@ -1,37 +1,5 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
-//! `russell chat` — interactive conversation with Jack, the Nurse.
-//!
-//! ## Chat REPL
-//!
-//! Launches a readline REPL where each turn composes a fresh SOAP
-//! bundle with the current journal state, appends it to the
-//! conversation history, and sends the full context to the LLM.
-//! Jack responds in his chat persona (see
-//! `crates/russell-doctor/prompts/jack-chat.md`), with full
-//! awareness of the conversation history.
-//!
-//! ## Consent gate
-//!
-//! Jack may propose actions using the `ACTION:` syntax
-//! (`ACTION: <skill-id>/<probe-or-intervention-id>`).
-//!
-//! - **Probes** (read-only, risk: none) auto-execute immediately
-//!   when Jack proposes them — no consent needed.
-//! - **Interventions** (mutations) require operator consent.
-//!   The operator can say `/approve`, or natural-language
-//!   affirmatives like "ok", "yes", "do it", "go ahead".
-//!   `/deny`, "no", "nope", "cancel" refuse the action.
-//!
-//! Risk enforcement caps the maximum auto-risk to `Low` by
-//! default; sudo-requiring interventions require NOPASSWD
-//! configuration by the operator.
-//!
-//! ## Persistence
-//!
-//! Chat history persists to
-//! `~/.local/state/harness/memory/chats/<session-id>.jsonl`.
-//!
-//! Type `/exit`, `/quit`, or Ctrl-D to end the session.
+//! `russell chat` — interactive REPL with Jack via Okapi.
 
 use anyhow::{Context, Result};
 use rand::seq::SliceRandom;
