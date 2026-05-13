@@ -7,12 +7,25 @@
 # - Cadence regularity (timestamps sequential)
 set -euo pipefail
 
-RUSSELL="${RUSSELL_BIN:-russell}"
+RUSSELL="${RUSSELL_BIN:-}"
+if [ -z "$RUSSELL" ]; then
+    if [ -x "$HOME/.local/bin/russell" ]; then
+        RUSSELL="$HOME/.local/bin/russell"
+    elif [ -x "./target/release/russell" ]; then
+        RUSSELL="./target/release/russell"
+    else
+        RUSSELL="russell"
+    fi
+fi
 CYCLES="${SCENARIO_CYCLES:-3}"
 SLEEP="${SCENARIO_SLEEP:-0.2}"
 
 ts=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-JOURNAL="$HOME/.local/share/harness/journal/russell.db"
+JOURNAL="$HOME/.local/state/harness/journal.db"
+# Fallback: some installs use the XDG share directory instead.
+if [ ! -f "$JOURNAL" ] && [ -f "$HOME/.local/share/harness/journal/russell.db" ]; then
+    JOURNAL="$HOME/.local/share/harness/journal/russell.db"
+fi
 
 probe_count=0
 successful_cycles=0

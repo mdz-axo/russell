@@ -38,6 +38,7 @@ Deferred ADRs live under
 | [0021](0021-proprioception-phase2-reflex-arcs.md) | Proprioception Phase 2 — reflex arcs and self-vitals |
 | [0022](0022-markdown-memory-layer.md) | Markdown memory layer — derived exports for human legibility |
 | [0023](0023-lift-adr-0007-phase3-skills.md) | Lift ADR-0007 deferral — Phase 3 Skills and Dispatch |
+| [0024](0024-skill-registry-workshop-lifecycle.md) | Skill registry, workshop, and lifecycle — discovery-to-retirement pipeline |
 
 To author a new ADR, see
 [`../standards/adr.md`](../standards/adr.md) and

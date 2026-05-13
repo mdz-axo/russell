@@ -5,7 +5,16 @@
 # Uses RUSSELL_DOCTOR_BACKEND=offline for deterministic testing or okapi for live.
 set -euo pipefail
 
-RUSSELL="${RUSSELL_BIN:-russell}"
+RUSSELL="${RUSSELL_BIN:-}"
+if [ -z "$RUSSELL" ]; then
+    if [ -x "$HOME/.local/bin/russell" ]; then
+        RUSSELL="$HOME/.local/bin/russell"
+    elif [ -x "./target/release/russell" ]; then
+        RUSSELL="./target/release/russell"
+    else
+        RUSSELL="russell"
+    fi
+fi
 TURNS="${SCENARIO_TURNS:-3}"
 TEST_PROMPT="${SCENARIO_PROMPT:-what is the current load average}"
 BACKEND="${RUSSELL_DOCTOR_BACKEND:-offline}"

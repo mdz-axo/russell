@@ -6,7 +6,10 @@
 # Detects regressions: value > baseline * threshold_factor.
 set -euo pipefail
 
-JOURNAL="$HOME/.local/share/harness/journal/russell.db"
+JOURNAL="$HOME/.local/state/harness/journal.db"
+if [ ! -f "$JOURNAL" ] && [ -f "$HOME/.local/share/harness/journal/russell.db" ]; then
+    JOURNAL="$HOME/.local/share/harness/journal/russell.db"
+fi
 BASELINE_DAYS="${BASELINE_DAYS:-7}"
 THRESHOLD_FACTOR="${THRESHOLD_FACTOR:-2.0}"
 ts=$(date -u +%Y-%m-%dT%H:%M:%SZ)

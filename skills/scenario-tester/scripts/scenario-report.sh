@@ -4,7 +4,10 @@
 # Produces a compact Markdown summary suitable for memory/test-reports/.
 set -euo pipefail
 
-JOURNAL="$HOME/.local/share/harness/journal/russell.db"
+JOURNAL="$HOME/.local/state/harness/journal.db"
+if [ ! -f "$JOURNAL" ] && [ -f "$HOME/.local/share/harness/journal/russell.db" ]; then
+    JOURNAL="$HOME/.local/share/harness/journal/russell.db"
+fi
 ts=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 today=$(date +%Y-%m-%d)
 

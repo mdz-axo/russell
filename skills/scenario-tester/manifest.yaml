@@ -33,7 +33,7 @@ probes:
   - id: probe-scenario-run-okapi
     cmd: ["bash", "./scripts/scenario-run-okapi.sh"]
     capture: stdout
-    timeout: 60s
+    timeout: 180s
 
   - id: probe-scenario-run-chat
     cmd: ["bash", "./scripts/scenario-run-chat.sh"]

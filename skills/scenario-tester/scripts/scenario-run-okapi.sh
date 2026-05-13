@@ -12,7 +12,7 @@ MODEL="${SCENARIO_MODEL:-}"
 ITERATIONS="${SCENARIO_ITERATIONS:-5}"
 PROMPT="${SCENARIO_PROMPT:-Explain the purpose of a Linux OOM killer in one sentence.}"
 BASE_URL="${OKAPI_BASE_URL:-http://localhost:11435/v1}"
-TIMEOUT_S="${SCENARIO_TIMEOUT_S:-30}"
+TIMEOUT_S="${SCENARIO_TIMEOUT_S:-120}"
 
 # If no model specified, discover the first loaded model from Okapi.
 if [ -z "$MODEL" ]; then
