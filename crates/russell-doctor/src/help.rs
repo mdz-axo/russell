@@ -453,8 +453,6 @@ fn append_session_note(paths: &Paths, session_id: &str, note: Option<&str>, stat
     }
 }
 
-
-
 /// Short tag for the `error_kind` column.
 fn error_kind_of(e: &DoctorError) -> String {
     match e {

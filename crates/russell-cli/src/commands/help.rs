@@ -12,11 +12,7 @@ pub async fn run(paths: &Paths, note: Option<&str>) -> Result<()> {
 
     // Resolve and correct the model name before the help flow starts.
     let cfg = russell_doctor::client::ClientConfig::from_env();
-    let resolved = russell_doctor::oai_client::resolve_and_correct_model(
-        &cfg,
-        &paths.config,
-    )
-    .await;
+    let resolved = russell_doctor::oai_client::resolve_and_correct_model(&cfg, &paths.config).await;
     if resolved != cfg.model {
         println!(
             "  Corrected: model \"{}\" → \"{}\" (env file updated)",

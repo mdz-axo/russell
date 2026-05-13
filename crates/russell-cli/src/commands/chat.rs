@@ -97,7 +97,7 @@ impl ChatHistory {
 
 /// Prompt the operator to pick from a numbered list of models.
 /// Returns `Some(zero-based-index)` on valid selection, `None` on cancel.
-
+///
 /// Fetch the list of available models from Okapi's `/api/tags`.
 async fn okapi_list_models(base_url: &str) -> Result<Vec<String>, String> {
     let tags_url = format!(
@@ -116,8 +116,7 @@ async fn okapi_list_models(base_url: &str) -> Result<Vec<String>, String> {
     if !resp.status().is_success() {
         return Err(format!("Okapi returned HTTP {}", resp.status()));
     }
-    let body: serde_json::Value =
-        resp.json().await.map_err(|e| format!("parse error: {e}"))?;
+    let body: serde_json::Value = resp.json().await.map_err(|e| format!("parse error: {e}"))?;
     Ok(body["models"]
         .as_array()
         .into_iter()
@@ -173,16 +172,16 @@ pub async fn run(paths: &Paths) -> Result<()> {
     // RUSSELL_DOCTOR_MODEL from env (loaded from russell.env or shell)
     // or falls back to the compiled-in DEFAULT_MODEL.
     let client_cfg = russell_doctor::client::ClientConfig::from_env();
-    let base_url = client_cfg.base_url.clone().unwrap_or_else(|| "http://127.0.0.1:11435/v1".into());
+    let base_url = client_cfg
+        .base_url
+        .clone()
+        .unwrap_or_else(|| "http://127.0.0.1:11435/v1".into());
 
     // Resolve the configured model name against Okapi's actual model
     // list. If the name is misspelled or stale, this corrects it
     // (both in the env file and process environment).
-    let resolved = russell_doctor::oai_client::resolve_and_correct_model(
-        &client_cfg,
-        &paths.config,
-    )
-    .await;
+    let resolved =
+        russell_doctor::oai_client::resolve_and_correct_model(&client_cfg, &paths.config).await;
     if resolved != client_cfg.model {
         println!(
             "  Corrected: model \"{}\" → \"{}\" (env file updated)",
@@ -340,7 +339,8 @@ pub async fn run(paths: &Paths) -> Result<()> {
                             if other == "/model list" {
                                 // Lazy-fetch Okapi models on first use.
                                 if !okapi_models_fetched {
-                                    okapi_models = okapi_list_models(&base_url).await.unwrap_or_default();
+                                    okapi_models =
+                                        okapi_list_models(&base_url).await.unwrap_or_default();
                                     okapi_models_fetched = true;
                                 }
                                 println!("  Available models ({}):", okapi_models.len());
@@ -364,13 +364,16 @@ pub async fn run(paths: &Paths) -> Result<()> {
                                 }
                                 // Lazy-fetch Okapi models for switching.
                                 if !okapi_models_fetched {
-                                    okapi_models = okapi_list_models(&base_url).await.unwrap_or_default();
+                                    okapi_models =
+                                        okapi_list_models(&base_url).await.unwrap_or_default();
                                     okapi_models_fetched = true;
                                 }
                                 // If Okapi is unreachable, trust the operator's input directly.
                                 if okapi_models.is_empty() {
                                     current_model = name.to_string();
-                                    println!("  Switched to model: {current_model} (unverified — Okapi unreachable)");
+                                    println!(
+                                        "  Switched to model: {current_model} (unverified — Okapi unreachable)"
+                                    );
                                     println!();
                                     continue;
                                 }
@@ -379,7 +382,11 @@ pub async fn run(paths: &Paths) -> Result<()> {
                                     let filtered: Vec<&String> = okapi_models
                                         .iter()
                                         .filter(|m| {
-                                            if name == "cloud" { m.ends_with("cloud") } else { !m.ends_with("cloud") }
+                                            if name == "cloud" {
+                                                m.ends_with("cloud")
+                                            } else {
+                                                !m.ends_with("cloud")
+                                            }
                                         })
                                         .collect();
                                     if filtered.is_empty() {
@@ -387,10 +394,18 @@ pub async fn run(paths: &Paths) -> Result<()> {
                                     } else {
                                         println!("  {name} models ({}):", filtered.len());
                                         for (i, m) in filtered.iter().enumerate() {
-                                            let marker = if *m == &current_model { " ← current" } else { "" };
+                                            let marker = if *m == &current_model {
+                                                " ← current"
+                                            } else {
+                                                ""
+                                            };
                                             println!("    {}. {m}{marker}", i + 1);
                                         }
-                                        if let Some(selected) = prompt_model_selection(&mut editor, trimmed, filtered.len()) {
+                                        if let Some(selected) = prompt_model_selection(
+                                            &mut editor,
+                                            trimmed,
+                                            filtered.len(),
+                                        ) {
                                             current_model = filtered[selected].clone();
                                             println!("  Switched to model: {current_model}");
                                         }
@@ -410,11 +425,10 @@ pub async fn run(paths: &Paths) -> Result<()> {
                                         continue;
                                     }
                                 };
-                                let resolved =
-                                    russell_doctor::oai_client::resolve_model_name(
-                                        &base_url, name, &http,
-                                    )
-                                    .await;
+                                let resolved = russell_doctor::oai_client::resolve_model_name(
+                                    &base_url, name, &http,
+                                )
+                                .await;
                                 if resolved == name {
                                     println!(
                                         "  No model found matching \"{name}\". Try /model list."
@@ -957,12 +971,17 @@ async fn call_llm_via_port(
     }
 
     // Shared health pipeline: verify Okapi is reachable, auto-start if needed.
-    let base = chat_cfg.base_url.as_deref().unwrap_or(russell_doctor::health::DEFAULT_BASE_URL);
+    let base = chat_cfg
+        .base_url
+        .as_deref()
+        .unwrap_or(russell_doctor::health::DEFAULT_BASE_URL);
     if !russell_doctor::health::ensure_ready(base).await {
         return Err("can't reach Okapi (tried auto-start)".into());
     }
 
-    let client = OkapiClient::new(&chat_cfg).await.map_err(|e| format!("client error: {e}"))?;
+    let client = OkapiClient::new(&chat_cfg)
+        .await
+        .map_err(|e| format!("client error: {e}"))?;
 
     let resp = client.chat(&soap).await.map_err(|e| format!("{e}"))?;
 

@@ -163,11 +163,7 @@ impl LlmClient for OkapiClient {
 /// to Okapi's chat-completions endpoint must go through this function
 /// (via [`OkapiClient::new`], [`resolve_and_correct_model`], or direct
 /// call for model-listing UIs).
-pub async fn resolve_model_name(
-    base_url: &str,
-    candidate: &str,
-    http: &reqwest::Client,
-) -> String {
+pub async fn resolve_model_name(base_url: &str, candidate: &str, http: &reqwest::Client) -> String {
     let tags_url = format!(
         "{}/api/tags",
         base_url.trim_end_matches("/v1").trim_end_matches('/')
@@ -218,8 +214,7 @@ pub async fn resolve_model_name(
         .iter()
         .map(|m| {
             let name_lower = m.to_lowercase();
-            let name_clean: String =
-                name_lower.chars().filter(|c| c.is_alphanumeric()).collect();
+            let name_clean: String = name_lower.chars().filter(|c| c.is_alphanumeric()).collect();
             let score = strsim::jaro_winkler(&candidate_clean, &name_clean);
             (m.as_str(), score)
         })
@@ -227,16 +222,16 @@ pub async fn resolve_model_name(
 
     scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
 
-    if let Some((best_name, score)) = scored.first() {
-        if *score >= 0.80 {
-            debug!(
-                candidate = %candidate,
-                resolved = %best_name,
-                score = %score,
-                "fuzzy model resolution"
-            );
-            return best_name.to_string();
-        }
+    if let Some((best_name, score)) = scored.first()
+        && *score >= 0.80
+    {
+        debug!(
+            candidate = %candidate,
+            resolved = %best_name,
+            score = %score,
+            "fuzzy model resolution"
+        );
+        return best_name.to_string();
     }
 
     warn!(
@@ -269,7 +264,10 @@ pub async fn resolve_and_correct_model(
         Ok(c) => c,
         Err(_) => return cfg.model.clone(),
     };
-    let base_url = cfg.base_url.as_deref().unwrap_or(crate::health::DEFAULT_BASE_URL);
+    let base_url = cfg
+        .base_url
+        .as_deref()
+        .unwrap_or(crate::health::DEFAULT_BASE_URL);
     let resolved = resolve_model_name(base_url, &cfg.model, &http).await;
 
     if resolved == cfg.model {
