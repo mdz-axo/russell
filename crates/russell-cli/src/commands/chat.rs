@@ -38,6 +38,9 @@ use rand::seq::SliceRandom;
 use russell_core::journal::{HelpSessionInput, HelpSessionStatus, JournalReader, JournalWriter};
 use russell_core::paths::Paths;
 use russell_doctor::action::{self, ResolvedAction};
+use russell_doctor::client::LlmClient;
+use russell_doctor::client::SoapPrompt;
+use russell_doctor::openrouter::OpenRouterClient;
 use russell_skills::Skill;
 use rustyline::DefaultEditor;
 use rustyline::error::ReadlineError;
@@ -907,6 +910,7 @@ const THINKING_EXPRESSIONS: &[&str] = &[
 ];
 
 /// Call the LLM via Okapi with an animated thinking spinner on stdout.
+/// Routes through the [`LlmClient`] port rather than raw HTTP.
 async fn call_okapi_with_spinner(
     cfg: &russell_doctor::client::ClientConfig,
     model: &str,
@@ -922,7 +926,7 @@ async fn call_okapi_with_spinner(
     let model = model.to_string();
     let messages = messages.to_vec();
     tokio::spawn(async move {
-        let result = call_okapi_direct(&cfg, &model, &messages).await;
+        let result = call_llm_via_port(&cfg, &model, &messages).await;
         let _ = tx.send(result);
     });
 
@@ -954,54 +958,49 @@ async fn call_okapi_with_spinner(
     }
 }
 
-/// Send messages to the Okapi chat API (no spinner — raw call).
-async fn call_okapi_direct(
+/// Send chat messages through the [`LlmClient`] port.
+///
+/// Flattens the multi-message array into a [`SoapPrompt`] and calls
+/// [`OpenRouterClient::chat`]. This replaces the old `call_okapi_direct`
+/// which bypassed the hexagonal port with raw `reqwest` calls.
+async fn call_llm_via_port(
     cfg: &russell_doctor::client::ClientConfig,
     model: &str,
     messages: &[serde_json::Value],
 ) -> std::result::Result<String, String> {
-    let base_url = cfg
-        .base_url
-        .as_deref()
-        .unwrap_or("http://127.0.0.1:11435/v1");
-    let url = format!("{}/chat/completions", base_url.trim_end_matches('/'));
-
-    let body = serde_json::json!({
-        "model": model,
-        "messages": messages,
-        "temperature": 0.7,
-        "max_tokens": 2048,
-    });
-
-    let client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(60))
-        .build()
-        .map_err(|e| format!("HTTP client: {e}"))?;
-
-    let mut req = client.post(&url).json(&body);
-    if let Some(ref key) = cfg.api_key {
-        req = req.bearer_auth(key);
-    }
-
-    let resp = req
-        .send()
-        .await
-        .map_err(|e| format!("request failed: {e}"))?;
-
-    if !resp.status().is_success() {
-        let status = resp.status();
-        let text = resp.text().await.unwrap_or_default();
-        return Err(format!("HTTP {status}: {text}"));
-    }
-
-    let json: serde_json::Value = resp.json().await.map_err(|e| format!("parse error: {e}"))?;
-
-    let content = json["choices"][0]["message"]["content"]
-        .as_str()
-        .unwrap_or("(no response)")
+    let system = messages.iter()
+        .find(|m| m["role"] == "system")
+        .and_then(|m| m["content"].as_str())
+        .unwrap_or("")
         .to_string();
 
-    Ok(content)
+    // Flatten conversation into a rendered Markdown block.
+    let mut rendered = String::new();
+    for msg in messages.iter().filter(|m| m["role"] != "system") {
+        let role = msg["role"].as_str().unwrap_or("unknown");
+        let content = msg["content"].as_str().unwrap_or("");
+        let label = if role == "user" { "User" } else { "Jack" };
+        rendered.push_str(&format!("**{label}:** {content}\n\n"));
+    }
+
+    let soap = SoapPrompt {
+        system,
+        subjective: String::new(),
+        objective: String::new(),
+        rendered: rendered.trim_end().to_string(),
+    };
+
+    let mut chat_cfg = cfg.clone();
+    chat_cfg.model = model.to_string();
+
+    let client = OpenRouterClient::new(&chat_cfg)
+        .map_err(|e| format!("client error: {e}"))?;
+
+    let resp = client.chat(&soap)
+        .await
+        .map_err(|e| format!("{e}"))?;
+
+    Ok(resp.content)
 }
 
 /// Persist the conversation history to disk.
