@@ -17,6 +17,7 @@ use russell_skills::registry::{LifecycleStatus, RegistryCache, RegistryEntry, Sa
 use rustyline::DefaultEditor;
 use rustyline::error::ReadlineError;
 use std::fmt::Write as _;
+use std::time::{SystemTime, UNIX_EPOCH};
 use tracing::warn;
 
 /// Run the interactive skill workshop REPL.
@@ -48,6 +49,7 @@ pub async fn run(paths: &Paths) -> Result<()> {
            adapt <name>    modify an existing skill\n\
            check           audit all installed skills\n\
            prune <name>    deprecate or retire a stale skill\n\
+           install <name>  copy a skill from discovered to installed\n\
            /quit           exit the workshop\n\
          \n\
          Or just describe what you need and Jack will help.\n"
@@ -59,11 +61,11 @@ pub async fn run(paths: &Paths) -> Result<()> {
     );
 
     let mut rl = DefaultEditor::new().context("initializing readline")?;
-    let _ = rl.load_history("/dev/null"); // no persistent workshop history
+    let _ = rl.load_history("/dev/null");
 
-    // Load workshop knowledge
-    let workshop_knowledge = load_knowledge("skill-workshop");
-    let maintenance_knowledge = load_knowledge("skill-maintenance");
+    // Load workshop knowledge from the installed skills directory.
+    let workshop_knowledge = load_knowledge(&skills_dir, "skill-workshop");
+    let maintenance_knowledge = load_knowledge(&skills_dir, "skill-maintenance");
 
     loop {
         let line = match rl.readline("workshop> ") {
@@ -74,57 +76,30 @@ pub async fn run(paths: &Paths) -> Result<()> {
                 break;
             }
         };
-        let input = line.trim();
+        let input = line.trim().to_string();
         if input.is_empty() {
             continue;
         }
 
-        let _ = rl.add_history_entry(input);
+        let _ = rl.add_history_entry(&input);
 
-        match input {
-            "/quit" | "/exit" => break,
-            "help" => print_help(),
-            "/list" => print_skill_list(&registry),
-            "/gaps" => print_coverage_gaps(&registry),
-            _ if input.starts_with("/lookup ") => {
-                let symptom = input.strip_prefix("/lookup ").unwrap_or("");
-                print_lookup(&registry, symptom);
+        let mut quit = false;
+        if handle_builtin(&input, &mut registry, &skills_dir, &skills, &workshop_knowledge, &maintenance_knowledge, &client_cfg, &fallback_model, &mut quit).await {
+            if quit {
+                break;
             }
-            _ if input.starts_with("search ") => {
-                let query = input.strip_prefix("search ").unwrap_or("");
-                println!("Searching for: {query}");
-                println!("(Remote search via MCP bridge — this is where the web-search skill connects.)");
-                println!("For now, searching the local registry cache...");
-                let lower = query.to_lowercase();
-                for (id, entry) in &registry.skills {
-                    if id.contains(&lower)
-                        || entry.symptoms.iter().any(|s| s.contains(&lower))
-                    {
-                        println!("  {id} ({}) — {} {}", entry.version, entry.status.as_str(), entry.symptoms.join(", "));
-                    }
-                }
-            }
-            _ if input.starts_with("evaluate ") => {
-                let name = input.strip_prefix("evaluate ").unwrap_or("");
-                print_evaluate(&registry, &skills_dir, name);
-            }
-            _ if input.starts_with("check") || input == "/check" => {
-                print_check(&registry);
-            }
-            _ => {
-                // Delegate to Jack via LLM for free-form workshop interaction.
-                let _ = jack_workshop_turn(
-                    input,
-                    &workshop_knowledge,
-                    &maintenance_knowledge,
-                    &skills,
-                    &registry,
-                    &client_cfg,
-                    &fallback_model,
-                )
-                .await;
-            }
+            continue;
         }
+
+        // Delegate to Jack via LLM for free-form workshop interaction.
+        let _ = jack_workshop_turn(
+            &input,
+            &workshop_knowledge,
+            &maintenance_knowledge,
+            &skills,
+            &client_cfg,
+        )
+        .await;
     }
 
     // Save registry on exit.
@@ -136,17 +111,78 @@ pub async fn run(paths: &Paths) -> Result<()> {
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
+async fn handle_builtin(
+    input: &str,
+    registry: &mut RegistryCache,
+    skills_dir: &std::path::Path,
+    skills: &[Skill],
+    workshop_knowledge: &str,
+    maintenance_knowledge: &str,
+    client_cfg: &russell_doctor::client::ClientConfig,
+    fallback_model: &str,
+    quit: &mut bool,
+) -> bool {
+    match input {
+        "/quit" | "/exit" => { *quit = true; true }
+        "help" => { print_help(); true }
+        "/list" => { print_skill_list(registry); true }
+        "/gaps" => { print_coverage_gaps(registry); true }
+        _ if input.starts_with("/lookup ") => {
+            print_lookup(registry, input.strip_prefix("/lookup ").unwrap_or(""));
+            true
+        }
+        _ if input.starts_with("search ") => {
+            let query = input.strip_prefix("search ").unwrap_or("");
+            print_search(registry, query);
+            true
+        }
+        _ if input.starts_with("evaluate ") => {
+            let name = input.strip_prefix("evaluate ").unwrap_or("");
+            print_evaluate(registry, skills_dir, name);
+            true
+        }
+        _ if input == "check" || input == "/check" => {
+            print_check(registry);
+            true
+        }
+        _ if input.starts_with("prune ") => {
+            let name = input.strip_prefix("prune ").unwrap_or("");
+            do_prune(registry, name);
+            true
+        }
+        _ if input.starts_with("install ") => {
+            let name = input.strip_prefix("install ").unwrap_or("");
+            do_install(registry, skills_dir, name);
+            true
+        }
+        _ if input.starts_with("build ") => {
+            let name = input.strip_prefix("build ").unwrap_or("");
+            do_build(registry, skills_dir, name, workshop_knowledge, maintenance_knowledge, skills, client_cfg, fallback_model).await;
+            true
+        }
+        _ => false,
+    }
+}
+
 /// Sync registry cache from currently installed skills.
 fn sync_registry_from_skills(registry: &mut RegistryCache, skills: &[Skill]) {
     for skill in skills {
         if !registry.skills.contains_key(&skill.id) {
+            // Determine source: bundled skills ship with the repo, workshop/manual are user-created.
+            let source = if is_bundled_skill(&skill.id) {
+                SkillSource::Bundled
+            } else {
+                // Check if it was created via workshop (has a KNOWLEDGE.md in the skills dir).
+                SkillSource::Manual
+            };
             registry.upsert(
                 &skill.id,
                 RegistryEntry {
                     status: LifecycleStatus::Active,
                     version: skill.version.clone(),
                     symptoms: skill.symptoms.clone(),
-                    source: SkillSource::Bundled,
+                    source,
                     installed: skill.authored.clone(),
                     last_evaluated: None,
                     valid_until: None,
@@ -161,9 +197,16 @@ fn sync_registry_from_skills(registry: &mut RegistryCache, skills: &[Skill]) {
     }
 }
 
-/// Load a KNOWLEDGE.md file from a skill directory.
-fn load_knowledge(skill_name: &str) -> String {
-    let path = std::path::PathBuf::from("skills").join(skill_name).join("KNOWLEDGE.md");
+/// Heuristic: bundled skills match a known set shipped with Russell.
+fn is_bundled_skill(id: &str) -> bool {
+    matches!(id, "okapi-watcher" | "web-search" | "skill-discovery"
+        | "skill-workshop" | "skill-maintenance" | "pragmatic-cybernetics"
+        | "pragmatic-semantics" | "ubuntu-jack")
+}
+
+/// Load a KNOWLEDGE.md file from the installed skills directory.
+fn load_knowledge(skills_dir: &std::path::Path, skill_name: &str) -> String {
+    let path = skills_dir.join(skill_name).join("KNOWLEDGE.md");
     std::fs::read_to_string(&path).unwrap_or_else(|_| String::new())
 }
 
@@ -182,10 +225,41 @@ fn print_help() {
            adapt <name>    modify an existing skill\n\
            check           audit all installed skills\n\
            prune <name>    deprecate or retire a stale skill\n\
+           install <name>  copy a skill from discovered to installed\n\
            /quit           exit the workshop\n\
          \n\
          Or just describe what you need and Jack will help.\n"
     );
+}
+
+fn print_search(registry: &RegistryCache, query: &str) {
+    println!("Searching for: {query}");
+    println!("(Remote search via MCP bridge — the web-search skill connects Brave Search / Firecrawl here.)");
+    println!("Local registry cache matches:");
+    let lower = query.to_lowercase();
+    let mut found = false;
+    for (id, entry) in &registry.skills {
+        if id.contains(&lower)
+            || entry.symptoms.iter().any(|s| s.contains(&lower))
+        {
+            println!("  {id} ({}, {}) — {}",
+                entry.version, entry.status.as_str(), entry.symptoms.join(", "));
+            found = true;
+        }
+    }
+    if !found {
+        println!("  (no local cache matches — try a web search via Jack)");
+    }
+}
+
+fn format_source(source: &SkillSource) -> &'static str {
+    match source {
+        SkillSource::Bundled => "bundled",
+        SkillSource::Workshop => "workshop",
+        SkillSource::Manual => "manual",
+        SkillSource::Registry { .. } => "registry",
+        SkillSource::Remote { .. } => "remote",
+    }
 }
 
 fn print_skill_list(registry: &RegistryCache) {
@@ -247,7 +321,7 @@ fn print_evaluate(registry: &RegistryCache, skills_dir: &std::path::Path, name: 
         println!("  Version:  {}", entry.version);
         println!("  Status:   {}", entry.status.as_str());
         println!("  Symptoms: {}", entry.symptoms.join(", "));
-        println!("  Source:   {:?}", entry.source);
+        println!("  Source:   {}", format_source(&entry.source));
         println!("  Installed: {}", entry.installed);
         if let Some(ref le) = entry.last_evaluated {
             println!("  Last evaluated: {le}");
@@ -262,17 +336,34 @@ fn print_evaluate(registry: &RegistryCache, skills_dir: &std::path::Path, name: 
         println!("Skill '{name}' not found in registry cache.");
     }
 
-    // Try to read the manifest and scan it.
-    let skill_path = skills_dir.join(name);
-    let manifest_path = skill_path.join("manifest.yaml");
-    if manifest_path.exists()
-        && let Ok(content) = std::fs::read_to_string(&manifest_path)
+    // Scan manifest.yaml.
+    scan_file(skills_dir, name, "manifest.yaml", "manifest");
+
+    // Scan KNOWLEDGE.md.
+    scan_file(skills_dir, name, "KNOWLEDGE.md", "KNOWLEDGE.md");
+
+    // Check for scripts directory.
+    let scripts_path = skills_dir.join(name).join("scripts");
+    if scripts_path.is_dir()
+        && let Ok(entries) = std::fs::read_dir(&scripts_path)
     {
+        let count = entries.filter_map(|e| e.ok()).count();
+        println!("  scripts/: {} files", count);
+    }
+}
+
+/// Scan a single file with the safety scanner.
+fn scan_file(skills_dir: &std::path::Path, name: &str, filename: &str, label: &str) {
+    let path = skills_dir.join(name).join(filename);
+    if !path.exists() {
+        return;
+    }
+    if let Ok(content) = std::fs::read_to_string(&path) {
         let scan = SafetyScan::scan(&content);
-        println!("\n  Safety scan:");
         if scan.findings.is_empty() {
-            println!("    ✓ No findings.");
+            println!("  {label}: ✓ clean");
         } else {
+            println!("  {label}:");
             for f in &scan.findings {
                 let severity = match f.severity {
                     russell_skills::registry::ScanSeverity::Info => "INFO",
@@ -281,20 +372,170 @@ fn print_evaluate(registry: &RegistryCache, skills_dir: &std::path::Path, name: 
                 };
                 println!("    [{severity}] {id}: {desc}", id = f.rule_id, desc = f.description);
             }
+            if scan.has_blocks() {
+                println!("    ⛔ Blocking findings — review before installing.");
+            }
         }
-        if scan.has_blocks() {
-            println!("    ⛔ Skill has blocking findings — review before installing.");
+    }
+}
+
+/// Prune a skill: move from active/stale to deprecated.
+fn do_prune(registry: &mut RegistryCache, name: &str) {
+    if let Some(entry) = registry.skills.get_mut(name) {
+        if entry.status == LifecycleStatus::Deprecated || entry.status == LifecycleStatus::Retired {
+            println!("{name} is already {}.", entry.status.as_str());
+            return;
         }
+        let reason = entry.deprecation_reason.clone().unwrap_or_else(|| "operator requested".into());
+        println!("Deprecating {name} (v{}): {}", entry.version, reason);
+        println!("  Status: {} → deprecated", entry.status.as_str());
+        println!("  Files remain on disk. Skill will no longer be loaded.");
+        entry.status = LifecycleStatus::Deprecated;
+        entry.deprecation_reason = Some(reason);
+        if entry.superseded_by.is_none() {
+            entry.superseded_by = Some("operator".into());
+        }
+        println!("  Done. To retire (delete files), remove from {}",
+            std::env::var("HOME").map(|h| format!("{h}/.local/share/harness/skills/{name}/")).unwrap_or_default());
+    } else {
+        println!("Skill '{name}' not found in registry.");
+    }
+}
+
+/// Install a discovered/evaluated skill: copy to the skills directory.
+fn do_install(registry: &mut RegistryCache, skills_dir: &std::path::Path, name: &str) {
+    let source = skills_dir.join(name);
+    if !source.exists() || !source.join("manifest.yaml").exists() {
+        if let Some(entry) = registry.skills.get(name)
+            && (entry.status == LifecycleStatus::Discovered || entry.status == LifecycleStatus::Evaluated)
+        {
+            println!("{name} is {}. Use 'fetch <url>' to download it, then 'install {name}'.",
+                entry.status.as_str());
+            return;
+        }
+        println!("Skill '{name}' not found as a directory. Use 'build {name}' to create it first.");
+        return;
     }
 
-    // Check for KNOWLEDGE.md.
-    let knowledge_path = skill_path.join("KNOWLEDGE.md");
-    if knowledge_path.exists() {
-        let len = std::fs::metadata(&knowledge_path)
-            .map(|m| m.len())
-            .unwrap_or(0);
-        println!("  KNOWLEDGE.md: {} bytes", len);
+    if let Some(entry) = registry.skills.get_mut(name) {
+        if entry.status.is_loadable() {
+            println!("{name} is already installed ({}).", entry.status.as_str());
+            return;
+        }
+        println!("Installing {name} (v{})...", entry.version);
+        entry.status = LifecycleStatus::Installed;
+        entry.installed = chrono_now();
+        entry.last_evaluated = Some(chrono_now());
+        println!("  Status: → installed");
+        println!("  Skill will be available on next load.");
+        println!("  Run: russell skill list  to verify.");
+    } else {
+        // Discovered from remote — create entry from disk.
+        if let Ok(manifest) = std::fs::read_to_string(source.join("manifest.yaml")) {
+            // Quick parse for id/version.
+            let id = name.to_string();
+            let version = extract_yaml_field(&manifest, "version").unwrap_or_else(|| "0.1.0".into());
+            let symptoms = extract_yaml_list(&manifest, "symptoms");
+            registry.upsert(&id, RegistryEntry {
+                status: LifecycleStatus::Installed,
+                version,
+                symptoms,
+                source: SkillSource::Manual,
+                installed: chrono_now(),
+                last_evaluated: Some(chrono_now()),
+                valid_until: None,
+                coverage_score: None,
+                superseded_by: None,
+                deprecation_reason: None,
+                probe_runs: 0,
+                recent_probe_failures: 0,
+            });
+            println!("{name} installed and registered.");
+        } else {
+            println!("Cannot read manifest for {name}.");
+        }
     }
+}
+
+/// Extract a scalar YAML field from a manifest string.
+fn extract_yaml_field(manifest: &str, key: &str) -> Option<String> {
+    for line in manifest.lines() {
+        if let Some(rest) = line.trim().strip_prefix(&format!("{key}:")) {
+            return Some(rest.trim().to_string());
+        }
+    }
+    None
+}
+
+/// Extract a YAML list from a manifest string (simple line-based parser).
+fn extract_yaml_list(manifest: &str, key: &str) -> Vec<String> {
+    let mut items = Vec::new();
+    let mut in_section = false;
+    for line in manifest.lines() {
+        if line.trim_start().starts_with(&format!("{key}:")) {
+            in_section = true;
+            continue;
+        }
+        if in_section {
+            if let Some(item) = line.trim().strip_prefix("- ") {
+                items.push(item.trim().to_string());
+            } else if line.trim().starts_with(|c: char| c.is_alphabetic()) {
+                break; // Next top-level key
+            }
+        }
+    }
+    items
+}
+
+/// Build a new skill interactively via Jack.
+/// Build a new skill interactively via Jack.
+#[allow(clippy::too_many_arguments)]
+async fn do_build(
+    registry: &mut RegistryCache,
+    _skills_dir: &std::path::Path,
+    name: &str,
+    workshop_knowledge: &str,
+    maintenance_knowledge: &str,
+    skills: &[Skill],
+    client_cfg: &russell_doctor::client::ClientConfig,
+    _fallback_model: &str,
+) {
+    if registry.skills.contains_key(name) {
+        println!("Skill '{name}' already exists. Use 'adapt {name}' to modify it.");
+        return;
+    }
+
+    println!("Building new skill: {name}");
+    println!("Jack will help compose a manifest and probe scripts.");
+    println!("Describe what you need the skill to do, or just start typing.\n");
+
+    // Start interactive build session via Jack.
+    let build_prompt = format!(
+        "The operator wants to build a new skill called '{name}'. \
+         Guide them through manifest composition, probe script writing, \
+         and safety scanning. Start by asking what symptom(s) this skill \
+         should address from the catalog. Be concise."
+    );
+    let _ = jack_workshop_turn(&build_prompt, workshop_knowledge, maintenance_knowledge, skills, client_cfg).await;
+
+    // Register as discovered in the cache.
+    registry.upsert(name, RegistryEntry {
+        status: LifecycleStatus::Discovered,
+        version: "0.1.0".into(),
+        symptoms: vec![],
+        source: SkillSource::Workshop,
+        installed: chrono_now(),
+        last_evaluated: None,
+        valid_until: None,
+        coverage_score: None,
+        superseded_by: None,
+        deprecation_reason: None,
+        probe_runs: 0,
+        recent_probe_failures: 0,
+    });
+    println!();
+    println!("Skill '{name}' registered as 'discovered'.");
+    println!("Continue describing it to Jack, then use 'install {name}' when ready.");
 }
 
 fn print_check(registry: &RegistryCache) {
@@ -330,14 +571,33 @@ fn print_check(registry: &RegistryCache) {
     print_coverage_gaps(registry);
 }
 
-/// Get current date as ISO 8601 string.
+/// Get current date as ISO 8601 string using real system time.
 fn chrono_now() -> String {
-    // Avoid adding a chrono dependency — use a simple approximation.
-    // In production, this should use the system time.
-    std::env::var("RUSSELL_NOW_DATE").unwrap_or_else(|_| {
-        // Fallback: use a fixed date for deterministic testing.
+    if let Ok(dur) = SystemTime::now().duration_since(UNIX_EPOCH) {
+        let secs = dur.as_secs();
+        // Convert Unix timestamp to YYYY-MM-DD (UTC).
+        let days_since_epoch = secs / 86400;
+        // Days since 1970-01-01. Compute year/month/day.
+        let (y, m, d) = civil_from_days(days_since_epoch as i64 + 719_468); // 719_468 = days from 0000-01-01 to 1970-01-01
+        format!("{y:04}-{m:02}-{d:02}")
+    } else {
         "2026-05-13".to_string()
-    })
+    }
+}
+
+/// Convert days since 0000-03-01 to civil date (algorithm from Howard Hinnant).
+fn civil_from_days(z: i64) -> (i64, i64, i64) {
+    let z = z - 719_468; // shift epoch to 1970-01-01
+    let era = if z >= 0 { z } else { z - 146096 } / 146_097;
+    let doe = (z - era * 146_097) as u64;
+    let yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
+    let y = yoe as i64 + era * 400;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let d = doy - (153 * mp + 2) / 5 + 1;
+    let m = if mp < 10 { mp + 3 } else { mp - 9 };
+    let y = if m <= 2 { y + 1 } else { y };
+    (y, m as i64, d as i64)
 }
 
 /// Rough days between two ISO 8601 date strings.
@@ -361,9 +621,7 @@ async fn jack_workshop_turn(
     workshop_knowledge: &str,
     maintenance_knowledge: &str,
     skills: &[Skill],
-    _registry: &RegistryCache,
     client_cfg: &russell_doctor::client::ClientConfig,
-    _fallback_model: &str,
 ) -> Result<()> {
     let mut system = String::new();
     system.push_str("You are Jack, in the skill workshop.\n\n");

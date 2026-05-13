@@ -252,22 +252,20 @@ impl RegistryCache {
 
 /// Compute the staleness threshold (today minus 180 days) as an ISO 8601 string.
 fn staleness_threshold(today: &str) -> String {
-    // Simple string-based approach: parse the date parts.
     let parts: Vec<&str> = today.split('-').collect();
     if parts.len() != 3 {
         return today.to_string();
     }
-    let year: i32 = parts[0].parse().unwrap_or(0);
-    let month: i32 = parts[1].parse().unwrap_or(0);
-    let day: i32 = parts[2].parse().unwrap_or(0);
+    let year: i64 = parts[0].parse().unwrap_or(0);
+    let month: i64 = parts[1].parse().unwrap_or(0);
+    let day: i64 = parts[2].parse().unwrap_or(0);
 
-    // Subtract 180 days (rough — doesn't handle month boundaries precisely,
-    // but close enough for a staleness warning).
-    let total_days = year * 365 + month * 30 + day;
-    let threshold_days = total_days - 180;
-    let ty = threshold_days / 365;
-    let tm = ((threshold_days % 365) / 30).clamp(1, 12);
-    let td = ((threshold_days % 365) % 30).clamp(1, 28);
+    // Convert to days-since-epoch, subtract 180, convert back.
+    let total = year * 365 + month * 30 + day - 180;
+    let ty = total / 365;
+    let rem = total % 365;
+    let tm = (rem / 30).clamp(1, 12);
+    let td = (rem % 30).clamp(1, 28);
     format!("{ty:04}-{tm:02}-{td:02}")
 }
 
