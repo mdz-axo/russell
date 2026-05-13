@@ -119,7 +119,7 @@ addition to this table.
 | **"First, do no harm"** | The refusal posture: observe > recommend > act. |
 | **Consent gate** | The consent mechanism in `russell chat`. Probes (risk: none) auto-execute when Jack proposes them. Interventions require operator consent — `/approve`, or natural-language ("ok", "yes", "do it", "go ahead"). `/deny`, "no", "nope", "cancel" refuse. |
 | **ACTION syntax** | `ACTION: <skill>/<probe-or-intervention>` — the format Jack uses to run probes or propose interventions. Parsed and executed by both `russell jack` and `russell chat`. Probes fire immediately; interventions await consent. |
-| **Process probes** | 7 probes scanning `/proc`, `/proc/[pid]/stat`: total count, zombie/stuck/running counts, top CPU and memory process names, and top memory % of system. |
+| **Process probes** | 5 probes scanning `/proc`, `/proc/[pid]/stat`: total count, zombie/stuck/running counts, and top memory % of system. |
 | **GPU probes** | 5 probes reading sysfs (`/sys/class/drm/card*/device/`): VRAM usage %, VRAM MiB, temperature °C, GPU utilization %. Targets the discrete GPU (hardcoded `card1`). |
 | **Disk probes** | 2 probes from `/proc/pressure/io`: I/O pressure "some" and "full" avg10 as percentages. |
 | **Systemd probes** | 3 probes via `systemctl` subprocess: degraded state (bool), failed user units count, failed system units count. |

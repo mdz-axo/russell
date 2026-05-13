@@ -207,7 +207,7 @@ pub async fn resolve_model_name(
     }
 
     // Fuzzy match: strip non-alphanumeric chars before scoring
-    // so "nemotron3super" matches "nemotron3-super:cloud".
+    // so "nemotron3supercloud" matches "nemotron-3-super:cloud".
     let candidate_lower = candidate.to_lowercase();
     let candidate_clean: String = candidate_lower
         .chars()

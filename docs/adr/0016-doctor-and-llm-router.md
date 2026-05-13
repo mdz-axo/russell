@@ -39,7 +39,7 @@ seam for the richer triage loop when ADR-0007 lifts.
 **v2 revision (2026-05-09).** The original ADR made OpenRouter the
 default backend. Operator preference and the machine's local-first
 posture flipped this: **Okapi is the default**, OpenRouter is
-opt-in. The default model is `nemotron3-super:cloud`. Russell now
+opt-in. The default model is `nemotron-3-super:cloud`. Russell now
 checks for Okapi at `help` time and attempts to start it if it's
 not running. OpenRouter remains available, and its ZDR enforcement
 is preserved unchanged when used.
@@ -80,7 +80,7 @@ Configuration flows from `~/.config/harness/russell.env` (see
 
 ```
 RUSSELL_DOCTOR_BACKEND=okapi            # okapi | openrouter | mock | offline
-RUSSELL_DOCTOR_MODEL=nemotron3-super:cloud  # default model
+RUSSELL_DOCTOR_MODEL=nemotron-3-super:cloud  # default model
 OPENROUTER_API_KEY=sk-or-...           # only required for openrouter backend
 ```
 
@@ -99,7 +99,7 @@ The Okapi backend:
 
 - **Base URL:** `http://127.0.0.1:11435/v1` (Okapi's
   OpenAI-compatible endpoint, overridable).
-- **Default model:** `nemotron3-super:cloud`.
+- **Default model:** `nemotron-3-super:cloud`.
 - **Timeout:** 60 seconds. One attempt. No retry.
 - **Auto-start.** Before sending the prompt, Russell checks
   whether Okapi is reachable via a quick GET to `/api/tags`
@@ -118,7 +118,7 @@ as in ADR-0016 v1.0.0:
 
 - **Base URL:** `https://openrouter.ai/api/v1` (overridable).
 - **Default model:** whatever `RUSSELL_DOCTOR_MODEL` says, or
-  `nemotron3-super:cloud`.
+  `nemotron-3-super:cloud`.
 - **Timeout:** 60 seconds. One attempt. No retry.
 - **Provider preferences sent in every request:**
 
@@ -204,7 +204,7 @@ the wire path.
 ### Negative / accepted costs
 
 - Jack cannot follow up on his own answers. One-shot only.
-- Okapi must be running and the model (`nemotron3-super:cloud`)
+- Okapi must be running and the model (`nemotron-3-super:cloud`)
   must be available before the first `russell jack`. Russell does
   not manage model downloads — the operator does.
 - Auto-start (`systemctl --user start okapi`) assumes the
