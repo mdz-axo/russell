@@ -34,7 +34,7 @@ pub async fn run(paths: &Paths, note: Option<&str>) -> Result<()> {
                     "  → Jack proposes: {}/{} (risk: {:?}{})",
                     skill.id, iv.id, iv.risk, sudo_tag,
                 );
-                println!("  → To approve: russell chat   (then say 'ok')");
+                println!("  → Switch to `russell chat` and I'll run it — just say 'ok' when I ask.");
                 println!();
             }
             None => {}

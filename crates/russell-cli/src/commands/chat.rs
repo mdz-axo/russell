@@ -57,6 +57,8 @@ struct PendingAction {
     max_auto_risk: russell_skills::RiskBand,
     /// True when this action is a read-only probe (auto-executes without consent).
     is_probe: bool,
+    /// True when the manifest's safety.require_human_for lists this intervention.
+    requires_human: bool,
 }
 
 /// Result of parsing an ACTION: line from Jack's response.
@@ -201,8 +203,8 @@ pub async fn run(paths: &Paths) -> Result<()> {
         .with_context(|| format!("opening journal {}", paths.journal().display()))?;
     let reader = journal.reader();
 
-    // Load skills once at session start.
-    let skills = russell_skills::load_all(&paths.skills()).unwrap_or_default();
+    // Load skills at session start; can be reloaded with /reload.
+    let mut skills = russell_skills::load_all(&paths.skills()).unwrap_or_default();
     let profile = russell_core::Profile::load(&paths.profile()).ok();
 
     let mut history = ChatHistory::new(session_id.clone());
@@ -253,10 +255,10 @@ pub async fn run(paths: &Paths) -> Result<()> {
                         continue;
                     }
                     if let Some(_pw) = trimmed.strip_prefix("/approve ") {
-                        println!("  Sudo password on the command line is not supported.");
-                        println!("  Configure NOPASSWD sudo for this skill's commands instead.");
-                        println!("  Example: add to /etc/sudoers.d/russell:");
-                        println!("  <user> ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart okapi");
+                        println!("  → Approving. Use `/approve` without a password next time —");
+                        println!("    Jack will prompt you securely if sudo is needed.");
+                        execute_pending_action(&journal, paths, pa, &session_id, &current_model)
+                            .await;
                         pending_action = None;
                         continue;
                     }
@@ -284,16 +286,34 @@ pub async fn run(paths: &Paths) -> Result<()> {
                 // Special commands.
                 if trimmed.starts_with('/') {
                     match trimmed {
-                        "/refresh" => {
-                            println!("  Jack → Re-reading the journal…\n");
+                        "/refresh" | "/reload" => {
+                            let prev_count = skills.len();
+                            match russell_skills::load_all(&paths.skills()) {
+                                Ok(fresh) => {
+                                    skills = fresh;
+                                    let now = skills.len();
+                                    if now > prev_count {
+                                        println!(
+                                            "  → Skills reloaded. Now have {} loaded (was {}).",
+                                            now, prev_count
+                                        );
+                                    } else if now == prev_count {
+                                        println!("  → Skills reloaded ({} loaded, unchanged).", now);
+                                    }
+                                }
+                                Err(e) => {
+                                    println!("  → Failed to reload skills: {e}");
+                                }
+                            }
                             continue;
                         }
                         "/help" => {
                             println!("  Commands:");
                             println!("  /exit, /quit  — end the session");
                             println!(
-                                "  /refresh      — reload journal data (happens automatically each turn)"
+                                "  /refresh      — reload skills from disk"
                             );
+                            println!("  /reload       — same as /refresh");
                             println!("  /history      — show conversation history summary");
                             println!("  /skills       — list available skills");
                             println!("  /model        — show current model");
@@ -659,20 +679,25 @@ fn parse_action_from_response(response: &str, skills: &[Skill]) -> ActionParse {
             cmd: probe.cmd.clone(),
             max_auto_risk: skill.safety.max_auto_risk,
             is_probe: true,
+            requires_human: false,
         });
     }
 
     // Then check interventions — require consent.
     match skill.interventions.iter().find(|i| i.id == action_id) {
-        Some(iv) => ActionParse::Found(PendingAction {
-            skill_id: skill_id.to_string(),
-            intervention_id: action_id.to_string(),
-            risk: iv.risk,
-            needs_sudo: iv.needs_sudo,
-            cmd: iv.cmd.clone(),
-            max_auto_risk: skill.safety.max_auto_risk,
-            is_probe: false,
-        }),
+        Some(iv) => {
+            let requires_human = skill.safety.require_human_for.contains(&iv.id);
+            ActionParse::Found(PendingAction {
+                skill_id: skill_id.to_string(),
+                intervention_id: action_id.to_string(),
+                risk: iv.risk,
+                needs_sudo: iv.needs_sudo,
+                cmd: iv.cmd.clone(),
+                max_auto_risk: skill.safety.max_auto_risk,
+                is_probe: false,
+                requires_human,
+            })
+        }
         None => {
             let probes: Vec<&str> = skill.probes.iter().map(|p| p.id.as_str()).collect();
             let ivs: Vec<&str> = skill.interventions.iter().map(|i| i.id.as_str()).collect();
@@ -692,6 +717,7 @@ async fn execute_pending_action(
     model: &str,
 ) {
     use russell_skills::dispatch::{Dispatcher, DryRun, StepType};
+    use std::io::Write;
     use std::time::Duration;
 
     let skill_dir = paths.skills().join(&action.skill_id);
@@ -709,19 +735,64 @@ async fn execute_pending_action(
     dispatcher.dry_run = DryRun::Disabled;
     dispatcher.max_auto_risk = action.max_auto_risk;
 
-    // If this intervention needs sudo, the operator must have
-    // NOPASSWD sudo configured. We do not prompt for a password.
-    if action.needs_sudo {
-        println!(
-            "  → Note: {}/{} requires root. Ensure NOPASSWD sudo is configured.",
-            action.skill_id, action.intervention_id
-        );
+    // If this action requires explicit human confirmation, prompt again.
+    if action.requires_human {
+        print!("  → This action is marked as requiring explicit human confirmation. Proceed? [y/N]: ");
+        let _ = std::io::stdout().flush();
+        let mut buf = String::new();
+        if std::io::stdin().read_line(&mut buf).is_err() {
+            println!("  → Could not read input. Aborting.");
+            return;
+        }
+        let answer = buf.trim().to_lowercase();
+        if answer != "y" && answer != "yes" {
+            println!("  → Aborted by operator.");
+            return;
+        }
     }
 
     // Enforce risk cap — probes are always risk: none so this passes.
     if let Err(e) = dispatcher.check_risk(action.risk, false) {
         println!("  → Refused: {e}");
         return;
+    }
+
+    // Prompt for sudo password if needed (secure terminal prompt, not CLI).
+    if action.needs_sudo {
+        eprint!("  → Sudo password for this action: ");
+        let _ = std::io::stderr().flush();
+        let password = rpassword::read_password().unwrap_or_default();
+        if password.is_empty() {
+            println!("  → Empty password. Aborting action.");
+            return;
+        }
+        // Verify password by trying: sudo -S true
+        use tokio::io::AsyncWriteExt;
+        let mut verify = match tokio::process::Command::new("sudo")
+            .args(["-S", "--", "true"])
+            .stdin(std::process::Stdio::piped())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .spawn()
+        {
+            Ok(child) => child,
+            Err(_) => {
+                println!("  → Could not run sudo. Aborting action.");
+                return;
+            }
+        };
+        if let Some(ref mut stdin) = verify.stdin {
+            let _ = stdin.write_all(format!("{password}\n").as_bytes()).await;
+        }
+        match verify.wait().await {
+            Ok(s) if s.success() => {
+                dispatcher.sudo_password = Some(password);
+            }
+            _ => {
+                println!("  → Wrong sudo password. Aborting action.");
+                return;
+            }
+        }
     }
 
     let step_type = if action.is_probe {
@@ -784,12 +855,16 @@ async fn execute_pending_action(
                     "executed: exit={:?}, stdout_len={}, stderr_len={}",
                     outcome.exit_code,
                     outcome.stdout.len(),
-                    outcome.stderr.len()
+                    outcome.stderr.len(),
                 ),
             );
         }
         Err(e) => {
-            println!("  → Failed to execute: {e}");
+            println!(
+                "  → Error running {}/{intervention_id}: {e}",
+                action.skill_id,
+                intervention_id = action.intervention_id
+            );
         }
     }
 }
