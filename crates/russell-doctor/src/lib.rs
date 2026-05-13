@@ -11,6 +11,7 @@
 #![deny(rust_2018_idioms)]
 #![warn(missing_docs)]
 
+pub mod action;
 pub mod client;
 pub mod error;
 pub mod fallback;

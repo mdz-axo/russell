@@ -5,16 +5,26 @@
 //! lives in its own module; this module is the pipeline stage that
 //! iterates them.
 //!
+//! Probes are registered in [`ProbeRegistry`] via zero-sized types
+//! implementing [`ProbeDescriptor`]. The old `collect()` function
+//! (which manually constructed each sample) is replaced by
+//! `ProbeRegistry::collect_all()`.
+//!
 //! OKH: `okh.pipeline.sentinel_collect.duration_ms`, `items_out`
 
 pub mod connectors;
+pub mod descriptor;
 pub mod disks;
 pub mod gpu;
 pub mod memory;
 pub mod network;
 pub mod process;
+pub mod registry;
 pub mod systemd;
 pub mod tools;
+
+pub use descriptor::ProbeDescriptor;
+pub use registry::ProbeRegistry;
 
 /// One sample emitted by a probe.
 #[derive(Debug, Clone)]
@@ -32,6 +42,9 @@ pub struct Sample {
 /// Collect one sample per probe. Returns only probes that
 /// produced a value on this invocation.
 ///
+/// Delegates to [`ProbeRegistry::collect_all`] which iterates
+/// all registered numeric probes plus text probes.
+///
 /// OKH: `okh.pipeline.sentinel_collect`
 #[tracing::instrument(
     level = "debug",
@@ -40,104 +53,23 @@ pub struct Sample {
     )
 )]
 pub fn collect() -> Vec<Sample> {
-    let mut out = Vec::new();
+    ProbeRegistry::with_defaults().collect_all()
+}
 
-    if let Some(v) = memory::mem_available_mib() {
-        out.push(Sample {
-            name: "mem_available_mib".into(),
-            value_num: Some(v),
-            value_text: None,
-            unit: Some("MiB"),
-        });
-    }
-    if let Some(v) = memory::swap_used_mib() {
-        out.push(Sample {
-            name: "swap_used_mib".into(),
-            value_num: Some(v),
-            value_text: None,
-            unit: Some("MiB"),
-        });
-    }
-    if let Some(v) = memory::load_avg_1m() {
-        out.push(Sample {
-            name: "loadavg_1m".into(),
-            value_num: Some(v),
-            value_text: None,
-            unit: None,
-        });
-    }
-    out.extend(memory::mem_pressure_samples());
-    out.extend(network::net_samples());
-    out.extend(process::process_samples());
-    if let Some(v) = gpu::gpu_vram_used_pct() {
-        out.push(Sample {
-            name: "gpu_vram_used_pct".into(),
-            value_num: Some(v),
-            value_text: None,
-            unit: Some("%"),
-        });
-    }
-    if let Some(v) = gpu::gpu_vram_used_mib() {
-        out.push(Sample {
-            name: "gpu_vram_used_mib".into(),
-            value_num: Some(v),
-            value_text: None,
-            unit: Some("MiB"),
-        });
-    }
-    if let Some(v) = gpu::gpu_vram_total_mib() {
-        out.push(Sample {
-            name: "gpu_vram_total_mib".into(),
-            value_num: Some(v),
-            value_text: None,
-            unit: Some("MiB"),
-        });
-    }
-    if let Some(v) = gpu::gpu_temp_c() {
-        out.push(Sample {
-            name: "gpu_temp_c".into(),
-            value_num: Some(v),
-            value_text: None,
-            unit: Some("°C"),
-        });
-    }
-    if let Some(v) = gpu::gpu_util_pct() {
-        out.push(Sample {
-            name: "gpu_util_pct".into(),
-            value_num: Some(v),
-            value_text: None,
-            unit: Some("%"),
-        });
-    }
-    out.extend(disks::disk_io_pressure_samples());
-    out.extend(disks::disk_root_used_pct_sample());
-    if let Some(v) = systemd::systemd_degraded() {
-        out.push(Sample {
-            name: "systemd_degraded".into(),
-            value_num: Some(v),
-            value_text: None,
-            unit: Some("bool"),
-        });
-    }
-    if let Some(v) = systemd::systemd_user_failed_count() {
-        out.push(Sample {
-            name: "systemd_user_failed_count".into(),
-            value_num: Some(v),
-            value_text: None,
-            unit: Some("count"),
-        });
-    }
-    if let Some(v) = systemd::systemd_system_failed_count() {
-        out.push(Sample {
-            name: "systemd_system_failed_count".into(),
-            value_num: Some(v),
-            value_text: None,
-            unit: Some("count"),
-        });
-    }
+/// Lazy-initialised singleton — the registry is built once and
+/// reused across Sentinel cycles.
+static REGISTRY: std::sync::LazyLock<ProbeRegistry> =
+    std::sync::LazyLock::new(ProbeRegistry::with_defaults);
 
-    tracing::Span::current().record("okh.pipeline.sentinel_collect.items_out", out.len());
-    out
+/// Collect samples using the cached registry (avoids rebuild per cycle).
+#[tracing::instrument(
+    level = "debug",
+    fields(
+        okh.pipeline.sentinel_collect.items_out,
+    )
+)]
+pub fn collect_cached() -> Vec<Sample> {
+    REGISTRY.collect_all()
 }
 
 #[cfg(test)]

@@ -37,6 +37,7 @@ use anyhow::{Context, Result};
 use rand::seq::SliceRandom;
 use russell_core::journal::{HelpSessionInput, HelpSessionStatus, JournalReader, JournalWriter};
 use russell_core::paths::Paths;
+use russell_doctor::action::{self, ResolvedAction};
 use russell_skills::Skill;
 use rustyline::DefaultEditor;
 use rustyline::error::ReadlineError;
@@ -47,29 +48,10 @@ use tokio::sync::oneshot;
 use tracing::{info, warn};
 
 /// A pending action (probe or intervention) awaiting operator consent.
+/// Derived from [`ResolvedAction`] with UI-specific fields.
 #[derive(Debug, Clone)]
 struct PendingAction {
-    skill_id: String,
-    intervention_id: String,
-    risk: russell_skills::RiskBand,
-    needs_sudo: bool,
-    cmd: Vec<String>,
-    max_auto_risk: russell_skills::RiskBand,
-    /// True when this action is a read-only probe (auto-executes without consent).
-    is_probe: bool,
-    /// True when the manifest's safety.require_human_for lists this intervention.
-    requires_human: bool,
-}
-
-/// Result of parsing an ACTION: line from Jack's response.
-enum ActionParse {
-    /// No ACTION: line present — normal conversation.
-    NoAction,
-    /// ACTION: line parsed successfully into an executable action.
-    Found(PendingAction),
-    /// ACTION: line was present but couldn't be parsed.
-    /// The String is a diagnostic message for the operator.
-    Malformed(String),
+    action: ResolvedAction,
 }
 
 /// Returns true if the input looks like natural-language consent
@@ -100,12 +82,19 @@ fn is_affirmative(input: &str) -> bool {
     )
 }
 
+/// Returns true if the input is a refusal.
+fn is_refusal(input: &str) -> bool {
+    let lower = input.trim();
+    matches!(
+        lower,
+        "/deny" | "no" | "nope" | "cancel" | "nah" | "not now" | "later" | "hang on" | "wait" | "hold on"
+    )
+}
+
 /// One turn in the conversation.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct Turn {
-    /// "user" or "assistant".
     role: String,
-    /// The message content.
     content: String,
 }
 
@@ -113,9 +102,7 @@ struct Turn {
 /// separate and fixed).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct ChatHistory {
-    /// Session ULID.
     session_id: String,
-    /// Ordered list of turns.
     turns: Vec<Turn>,
 }
 
@@ -262,17 +249,7 @@ pub async fn run(paths: &Paths) -> Result<()> {
                         pending_action = None;
                         continue;
                     }
-                    if trimmed == "/deny"
-                        || trimmed == "no"
-                        || trimmed == "nope"
-                        || trimmed == "cancel"
-                        || trimmed == "nah"
-                        || trimmed == "not now"
-                        || trimmed == "later"
-                        || trimmed == "hang on"
-                        || trimmed == "wait"
-                        || trimmed == "hold on"
-                    {
+                    if is_refusal(trimmed) {
                         println!("  Denied. Action not executed.");
                         pending_action = None;
                         continue;
@@ -389,9 +366,7 @@ pub async fn run(paths: &Paths) -> Result<()> {
                                     continue;
                                 }
 
-                                // Hard-coded tag filters (Okapi/Ollama convention:
-                                // tags can be ":cloud" or "30b-cloud" etc. —
-                                // "cloud" is always the suffix).
+                                // Hard-coded tag filters (Okapi/Ollama convention).
                                 if name == "cloud" || name == "local" {
                                     let filtered: Vec<&String> = if name == "cloud" {
                                         okapi_models
@@ -563,14 +538,16 @@ pub async fn run(paths: &Paths) -> Result<()> {
                         journal_chat_turn(&journal, &session_id, &current_model, trimmed, &content);
 
                         // Check for ACTION: proposal.
-                        match parse_action_from_response(&content, &skills) {
-                            ActionParse::Found(pa) => {
-                                if pa.is_probe {
+                        match action::resolve(&content, &skills) {
+                            Some(Ok(action)) => {
+                                if action.is_probe() {
                                     // Probes are read-only — auto-execute immediately.
                                     println!(
                                         "  → Running probe: {}/{}…",
-                                        pa.skill_id, pa.intervention_id
+                                        action.skill_id(),
+                                        action.action_id()
                                     );
+                                    let pa = PendingAction { action };
                                     execute_pending_action(
                                         &journal,
                                         paths,
@@ -580,19 +557,27 @@ pub async fn run(paths: &Paths) -> Result<()> {
                                     )
                                     .await;
                                 } else {
-                                    let sudo_tag = if pa.needs_sudo { " [needs sudo]" } else { "" };
-                                    println!(
-                                        "  → Jack proposes: {}/{} (risk: {:?}{}).",
-                                        pa.skill_id, pa.intervention_id, pa.risk, sudo_tag
-                                    );
+                                    match &action {
+                                        ResolvedAction::Intervention { risk, needs_sudo, .. } => {
+                                            let sudo_tag = if *needs_sudo { " [needs sudo]" } else { "" };
+                                            println!(
+                                                "  → Jack proposes: {}/{} (risk: {:?}{}).",
+                                                action.skill_id(),
+                                                action.action_id(),
+                                                risk,
+                                                sudo_tag
+                                            );
+                                        }
+                                        _ => unreachable!(),
+                                    }
                                     println!("  → Say 'ok' to approve, or 'no' to refuse.");
-                                    pending_action = Some(pa);
+                                    pending_action = Some(PendingAction { action });
                                 }
                             }
-                            ActionParse::Malformed(msg) => {
-                                println!("  → {msg}");
+                            Some(Err(e)) => {
+                                println!("  → {e}");
                             }
-                            ActionParse::NoAction => { /* normal, no action proposed */ }
+                            None => { /* normal, no action proposed */ }
                         }
                     }
                     Err(e) => {
@@ -624,95 +609,11 @@ pub async fn run(paths: &Paths) -> Result<()> {
     Ok(())
 }
 
-/// Parse an `ACTION: <skill-id>/<probe-or-intervention-id>` line from
-/// Jack's response. Returns `NoAction` if no ACTION: line is present,
-/// `Malformed` with a diagnostic if parsing fails (so the operator can
-/// see what went wrong), or `Found` with the parsed action.
-fn parse_action_from_response(response: &str, skills: &[Skill]) -> ActionParse {
-    let action_line = match response.lines().rev().find(|line| line.trim().starts_with("ACTION:")) {
-        Some(line) => line,
-        None => return ActionParse::NoAction,
-    };
-
-    let raw = action_line.trim();
-    let spec = match raw.strip_prefix("ACTION:") {
-        Some(s) => s.trim(),
-        None => {
-            return ActionParse::Malformed(format!(
-                "Jack proposed an action but the parser couldn't strip the ACTION: prefix. Raw line: `{raw}`"
-            ));
-        }
-    };
-
-    let (skill_id, action_id) = match spec.split_once('/') {
-        Some(pair) => (pair.0.trim(), pair.1.trim()),
-        None => {
-            return ActionParse::Malformed(format!(
-                "'ACTION: {spec}' — missing `/` separator between skill and action ID. Use ACTION: <skill>/<action>."
-            ));
-        }
-    };
-
-    if skill_id.is_empty() || action_id.is_empty() {
-        return ActionParse::Malformed(format!(
-            "'ACTION: {spec}' — skill ID or action ID is empty."
-        ));
-    }
-
-    let skill = match skills.iter().find(|s| s.id == skill_id) {
-        Some(s) => s,
-        None => {
-            let loaded: Vec<&str> = skills.iter().map(|s| s.id.as_str()).collect();
-            return ActionParse::Malformed(format!(
-                "'{skill_id}' is not a loaded skill. Loaded skills: {loaded:?}"
-            ));
-        }
-    };
-
-    // Check probes first — they're read-only and auto-execute.
-    if let Some(probe) = skill.probes.iter().find(|p| p.id == action_id) {
-        return ActionParse::Found(PendingAction {
-            skill_id: skill_id.to_string(),
-            intervention_id: action_id.to_string(),
-            risk: russell_skills::RiskBand::None,
-            needs_sudo: false,
-            cmd: probe.cmd.clone(),
-            max_auto_risk: skill.safety.max_auto_risk,
-            is_probe: true,
-            requires_human: false,
-        });
-    }
-
-    // Then check interventions — require consent.
-    match skill.interventions.iter().find(|i| i.id == action_id) {
-        Some(iv) => {
-            let requires_human = skill.safety.require_human_for.contains(&iv.id);
-            ActionParse::Found(PendingAction {
-                skill_id: skill_id.to_string(),
-                intervention_id: action_id.to_string(),
-                risk: iv.risk,
-                needs_sudo: iv.needs_sudo,
-                cmd: iv.cmd.clone(),
-                max_auto_risk: skill.safety.max_auto_risk,
-                is_probe: false,
-                requires_human,
-            })
-        }
-        None => {
-            let probes: Vec<&str> = skill.probes.iter().map(|p| p.id.as_str()).collect();
-            let ivs: Vec<&str> = skill.interventions.iter().map(|i| i.id.as_str()).collect();
-            ActionParse::Malformed(format!(
-                "'{action_id}' is not a known action in skill '{skill_id}'. Available probes: {probes:?}, interventions: {ivs:?}"
-            ))
-        }
-    }
-}
-
 /// Execute a pending action (probe or intervention) via the skill dispatcher.
 async fn execute_pending_action(
     journal: &JournalWriter,
     paths: &Paths,
-    action: &PendingAction,
+    pending: &PendingAction,
     session_id: &str,
     model: &str,
 ) {
@@ -720,23 +621,40 @@ async fn execute_pending_action(
     use std::io::Write;
     use std::time::Duration;
 
-    let skill_dir = paths.skills().join(&action.skill_id);
+    let action = &pending.action;
+    let skill_id = action.skill_id().to_string();
+    let action_id = action.action_id().to_string();
+    let skill_dir = paths.skills().join(&skill_id);
     let evidence_base = paths.evidence();
 
-    let timeout = if action.is_probe {
+    let timeout = if action.is_probe() {
         Duration::from_secs(30)
     } else {
         Duration::from_secs(120)
+    };
+
+    let is_probe = action.is_probe();
+    let (risk, needs_sudo, max_auto_risk, requires_human) = match action {
+        ResolvedAction::Probe { max_auto_risk, .. } => {
+            (russell_skills::RiskBand::None, false, *max_auto_risk, false)
+        }
+        ResolvedAction::Intervention {
+            risk,
+            needs_sudo,
+            max_auto_risk,
+            requires_human,
+            ..
+        } => (*risk, *needs_sudo, *max_auto_risk, *requires_human),
     };
 
     let mut dispatcher = Dispatcher::new(&skill_dir);
     dispatcher.intervention_timeout = timeout;
     dispatcher.probe_timeout = timeout;
     dispatcher.dry_run = DryRun::Disabled;
-    dispatcher.max_auto_risk = action.max_auto_risk;
+    dispatcher.max_auto_risk = max_auto_risk;
 
     // If this action requires explicit human confirmation, prompt again.
-    if action.requires_human {
+    if requires_human {
         print!("  → This action is marked as requiring explicit human confirmation. Proceed? [y/N]: ");
         let _ = std::io::stdout().flush();
         let mut buf = String::new();
@@ -752,13 +670,13 @@ async fn execute_pending_action(
     }
 
     // Enforce risk cap — probes are always risk: none so this passes.
-    if let Err(e) = dispatcher.check_risk(action.risk, false) {
+    if let Err(e) = dispatcher.check_risk(risk, false) {
         println!("  → Refused: {e}");
         return;
     }
 
     // Prompt for sudo password if needed (secure terminal prompt, not CLI).
-    if action.needs_sudo {
+    if needs_sudo {
         eprint!("  → Sudo password for this action: ");
         let _ = std::io::stderr().flush();
         let password = rpassword::read_password().unwrap_or_default();
@@ -795,7 +713,7 @@ async fn execute_pending_action(
         }
     }
 
-    let step_type = if action.is_probe {
+    let step_type = if is_probe {
         StepType::Probe
     } else {
         StepType::Intervention
@@ -805,11 +723,11 @@ async fn execute_pending_action(
         .run_and_journal(
             journal,
             &evidence_base,
-            &action.cmd,
-            &action.skill_id,
-            &action.intervention_id,
+            action.cmd(),
+            &skill_id,
+            &action_id,
             step_type,
-            action.risk.as_str(),
+            risk.as_str(),
             Some(timeout),
         )
         .await;
@@ -817,40 +735,29 @@ async fn execute_pending_action(
     match result {
         Ok(outcome) => {
             if outcome.exit_code == Some(0) {
-                if action.is_probe {
-                    // Print probe output for Jack to see.
+                if is_probe {
                     if !outcome.stdout.is_empty() {
                         println!("  {}", outcome.stdout.trim());
                     }
-                    println!(
-                        "  → Probe {}/{} complete.",
-                        action.skill_id, action.intervention_id
-                    );
+                    println!("  → Probe {skill_id}/{action_id} complete.");
                 } else {
-                    println!(
-                        "  → Executed {}/{} successfully.",
-                        action.skill_id, action.intervention_id
-                    );
+                    println!("  → Executed {skill_id}/{action_id} successfully.");
                 }
             } else {
                 println!(
-                    "  → {}/{} exited with code {:?}.",
-                    action.skill_id, action.intervention_id, outcome.exit_code
+                    "  → {skill_id}/{action_id} exited with code {:?}.",
+                    outcome.exit_code
                 );
                 if !outcome.stderr.is_empty() {
                     println!("  stderr: {}", outcome.stderr.trim());
                 }
             }
-            // Journal the execution as a chat event.
-            let action_label = if action.is_probe { "probe" } else { "approve" };
+            let action_label = if is_probe { "probe" } else { "approve" };
             journal_chat_turn(
                 journal,
                 session_id,
                 model,
-                &format!(
-                    "/{} {}/{}",
-                    action_label, action.skill_id, action.intervention_id
-                ),
+                &format!("/{action_label} {skill_id}/{action_id}"),
                 &format!(
                     "executed: exit={:?}, stdout_len={}, stderr_len={}",
                     outcome.exit_code,
@@ -860,14 +767,11 @@ async fn execute_pending_action(
             );
         }
         Err(e) => {
-            println!(
-                "  → Error running {}/{intervention_id}: {e}",
-                action.skill_id,
-                intervention_id = action.intervention_id
-            );
+            println!("  → Error running {skill_id}/{action_id}: {e}");
         }
     }
 }
+
 fn build_objective(
     reader: &JournalReader,
     skills: &[Skill],
@@ -994,17 +898,15 @@ fn fmt_f64(v: Option<f64>) -> String {
 const SPINNER_FRAMES: &[&str] = &["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
 
 /// Jack's thinking expressions — a mix of terrier and McFarland energy.
-/// One is picked at random each LLM call so it never gets old.
 const THINKING_EXPRESSIONS: &[&str] = &[
-    "🐶 digging digging digging",         // pure terrier
-    "✨ hey hey! hold your kibble",       // McFarland energy + terrier
-    "🐶 *sniff* *sniff* checking things", // terrier investigative
-    "💅 working it. just a moment.",      // pure McFarland theatrical
-    "🔍 just checking on you",            // protective nurse (both Jacks)
+    "🐶 digging digging digging",
+    "✨ hey hey! hold your kibble",
+    "🐶 *sniff* *sniff* checking things",
+    "💅 working it. just a moment.",
+    "🔍 just checking on you",
 ];
 
 /// Call the LLM via Okapi with an animated thinking spinner on stdout.
-/// The spinner is cleared the instant the response arrives.
 async fn call_okapi_with_spinner(
     cfg: &russell_doctor::client::ClientConfig,
     model: &str,

@@ -52,6 +52,31 @@ pub fn systemd_system_failed_count() -> Option<f64> {
     Some(count as f64)
 }
 
+// -- ProbeDescriptor impls --
+
+use super::descriptor::ProbeDescriptor;
+
+pub struct SystemdDegraded;
+impl ProbeDescriptor for SystemdDegraded {
+    fn name(&self) -> &'static str { "systemd_degraded" }
+    fn unit(&self) -> Option<&'static str> { Some("bool") }
+    fn collect(&self) -> Option<f64> { systemd_degraded() }
+}
+
+pub struct SystemdUserFailedCount;
+impl ProbeDescriptor for SystemdUserFailedCount {
+    fn name(&self) -> &'static str { "systemd_user_failed_count" }
+    fn unit(&self) -> Option<&'static str> { Some("count") }
+    fn collect(&self) -> Option<f64> { systemd_user_failed_count() }
+}
+
+pub struct SystemdSystemFailedCount;
+impl ProbeDescriptor for SystemdSystemFailedCount {
+    fn name(&self) -> &'static str { "systemd_system_failed_count" }
+    fn unit(&self) -> Option<&'static str> { Some("count") }
+    fn collect(&self) -> Option<f64> { systemd_system_failed_count() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

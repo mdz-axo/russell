@@ -45,6 +45,24 @@ pub(crate) fn net_samples() -> Vec<super::Sample> {
     out
 }
 
+// -- ProbeDescriptor impls --
+
+use super::descriptor::ProbeDescriptor;
+
+pub struct NetTcpConnections;
+impl ProbeDescriptor for NetTcpConnections {
+    fn name(&self) -> &'static str { "net_tcp_connections" }
+    fn unit(&self) -> Option<&'static str> { Some("count") }
+    fn collect(&self) -> Option<f64> { net_tcp_connections() }
+}
+
+pub struct NetTcp6Connections;
+impl ProbeDescriptor for NetTcp6Connections {
+    fn name(&self) -> &'static str { "net_tcp6_connections" }
+    fn unit(&self) -> Option<&'static str> { Some("count") }
+    fn collect(&self) -> Option<f64> { net_tcp6_connections() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

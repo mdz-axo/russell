@@ -4,6 +4,7 @@
 use anyhow::{Context, Result};
 use russell_core::journal::JournalWriter;
 use russell_core::paths::Paths;
+use russell_doctor::action::{self, ResolvedAction};
 
 pub async fn run(paths: &Paths, note: Option<&str>) -> Result<()> {
     let writer = JournalWriter::open(&paths.journal())
@@ -13,31 +14,40 @@ pub async fn run(paths: &Paths, note: Option<&str>) -> Result<()> {
         .await
         .context("running Doctor help flow")?;
 
-    // Print the response without the ACTION line (we handle it separately).
+    // Print the response without trailing blank lines.
     let response = outcome.response.trim_end();
-    let (body, action_spec) = split_action_line(response);
-    println!("{body}");
+    println!("{response}");
     println!();
 
     // If Jack proposed an action, resolve it.
-    if let Some(spec) = action_spec {
-        let skills = russell_skills::load_all(&paths.skills()).unwrap_or_default();
-        match resolve_action_type(spec, &skills) {
-            Some(ResolvedAction::Probe(skill, probe)) => {
-                // Probes are read-only — execute immediately.
-                println!("  → Running probe: {}/{}…", skill.id, probe.id);
-                execute_probe(paths, &writer, skill, probe).await;
+    let skills = russell_skills::load_all(&paths.skills()).unwrap_or_default();
+    if let Some(action_result) = action::resolve(response, &skills) {
+        match action_result {
+            Ok(action) => match action {
+                ResolvedAction::Probe { .. } => {
+                    println!(
+                        "  → Running probe: {}/{}…",
+                        action.skill_id(),
+                        action.action_id()
+                    );
+                    execute_probe(paths, &writer, &action).await;
+                }
+                ResolvedAction::Intervention { risk, needs_sudo, .. } => {
+                    let sudo_tag = if needs_sudo { " [needs sudo]" } else { "" };
+                    println!(
+                        "  → Jack proposes: {}/{} (risk: {:?}{})",
+                        action.skill_id(),
+                        action.action_id(),
+                        risk,
+                        sudo_tag,
+                    );
+                    println!("  → Switch to `russell chat` and I'll run it — just say 'ok' when I ask.");
+                    println!();
+                }
+            },
+            Err(e) => {
+                println!("  → {e}");
             }
-            Some(ResolvedAction::Intervention(skill, iv)) => {
-                let sudo_tag = if iv.needs_sudo { " [needs sudo]" } else { "" };
-                println!(
-                    "  → Jack proposes: {}/{} (risk: {:?}{})",
-                    skill.id, iv.id, iv.risk, sudo_tag,
-                );
-                println!("  → Switch to `russell chat` and I'll run it — just say 'ok' when I ask.");
-                println!();
-            }
-            None => {}
         }
     }
 
@@ -48,7 +58,6 @@ pub async fn run(paths: &Paths, note: Option<&str>) -> Result<()> {
         outcome.evidence_dir.display()
     );
 
-    // ADR-0020: skip_reason replaces fell_back
     if let Some(sr) = outcome.skip_reason {
         let msg = match sr {
             russell_doctor::help::SkipReason::OfflineFallback => {
@@ -64,57 +73,30 @@ pub async fn run(paths: &Paths, note: Option<&str>) -> Result<()> {
     Ok(())
 }
 
-/// A resolved ACTION — either a probe or an intervention.
-enum ResolvedAction<'a> {
-    Probe(&'a russell_skills::Skill, &'a russell_skills::Probe),
-    Intervention(&'a russell_skills::Skill, &'a russell_skills::Intervention),
-}
-
-/// Resolve an ACTION spec, checking probes first (read-only), then interventions.
-fn resolve_action_type<'a>(
-    spec: &str,
-    skills: &'a [russell_skills::Skill],
-) -> Option<ResolvedAction<'a>> {
-    let (skill_id, action_id) = spec.split_once('/')?;
-    let skill_id = skill_id.trim();
-    let action_id = action_id.trim();
-    let skill = skills.iter().find(|s| s.id == skill_id)?;
-
-    // Check probes first.
-    if let Some(probe) = skill.probes.iter().find(|p| p.id == action_id) {
-        return Some(ResolvedAction::Probe(skill, probe));
-    }
-    // Then interventions.
-    let iv = skill.interventions.iter().find(|i| i.id == action_id)?;
-    Some(ResolvedAction::Intervention(skill, iv))
-}
-
 /// Execute a probe immediately (read-only, risk: none).
-async fn execute_probe(
-    paths: &Paths,
-    journal: &JournalWriter,
-    skill: &russell_skills::Skill,
-    probe: &russell_skills::Probe,
-) {
+async fn execute_probe(paths: &Paths, journal: &JournalWriter, action: &ResolvedAction) {
     use russell_skills::dispatch::{Dispatcher, DryRun, StepType};
     use std::time::Duration;
 
-    let skill_dir = paths.skills().join(&skill.id);
+    let skill_dir = paths.skills().join(action.skill_id());
     let evidence_base = paths.evidence();
     let timeout = Duration::from_secs(30);
 
     let mut dispatcher = Dispatcher::new(&skill_dir);
     dispatcher.probe_timeout = timeout;
     dispatcher.dry_run = DryRun::Disabled;
-    dispatcher.max_auto_risk = skill.safety.max_auto_risk;
+    dispatcher.max_auto_risk = match action {
+        ResolvedAction::Probe { max_auto_risk, .. } => *max_auto_risk,
+        _ => russell_skills::RiskBand::None,
+    };
 
     let result = dispatcher
         .run_and_journal(
             journal,
             &evidence_base,
-            &probe.cmd,
-            &skill.id,
-            &probe.id,
+            action.cmd(),
+            action.skill_id(),
+            action.action_id(),
             StepType::Probe,
             "none",
             Some(timeout),
@@ -127,11 +109,17 @@ async fn execute_probe(
                 if !outcome.stdout.is_empty() {
                     println!("  {}", outcome.stdout.trim());
                 }
-                println!("  → Probe {}/{} complete.", skill.id, probe.id);
+                println!(
+                    "  → Probe {}/{} complete.",
+                    action.skill_id(),
+                    action.action_id()
+                );
             } else {
                 println!(
                     "  → Probe {}/{} exited with code {:?}.",
-                    skill.id, probe.id, outcome.exit_code
+                    action.skill_id(),
+                    action.action_id(),
+                    outcome.exit_code
                 );
                 if !outcome.stderr.is_empty() {
                     println!("  stderr: {}", outcome.stderr.trim());
@@ -143,22 +131,4 @@ async fn execute_probe(
         }
     }
     println!();
-}
-
-/// Split a response into body text and an optional ACTION: spec.
-/// The ACTION line must be the last line of the response.
-fn split_action_line(response: &str) -> (&str, Option<&str>) {
-    let trimmed = response.trim_end();
-    if let Some(pos) = trimmed.rfind("\nACTION:") {
-        let (body, action) = trimmed.split_at(pos);
-        let spec = action.trim().strip_prefix("ACTION:").map(|s| s.trim());
-        (body.trim_end(), spec)
-    } else if trimmed.starts_with("ACTION:") {
-        (
-            "(action proposed without explanation)",
-            Some(trimmed.strip_prefix("ACTION:").unwrap().trim()),
-        )
-    } else {
-        (trimmed, None)
-    }
 }
