@@ -28,6 +28,53 @@ use tracing::{debug, info};
 use crate::error::{CoreError, Result};
 use crate::event::{Event, Scope, Severity};
 
+/// The four-valued outcome of a help session.
+///
+/// Replaces raw `String` status fields with a compiler-enforced
+/// domain enum — typos and case mismatches are caught at compile
+/// time rather than at query time.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HelpSessionStatus {
+    /// LLM call succeeded.
+    Ok,
+    /// LLM returned an error.
+    Error,
+    /// Offline fallback was engaged.
+    Fallback,
+    /// Below escalation threshold — rule-based summary.
+    ThresholdSkip,
+}
+
+impl HelpSessionStatus {
+    /// Lowercase string for journal persistence.
+    #[must_use]
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Ok => "ok",
+            Self::Error => "error",
+            Self::Fallback => "fallback",
+            Self::ThresholdSkip => "threshold_skip",
+        }
+    }
+
+    /// Parse from a journal row or wire format.
+    ///
+    /// # Errors
+    ///
+    /// Returns `CoreError::Invariant` on unrecognised values.
+    pub fn from_str(s: &str) -> Result<Self> {
+        match s {
+            "ok" => Ok(Self::Ok),
+            "error" => Ok(Self::Error),
+            "fallback" => Ok(Self::Fallback),
+            "threshold_skip" => Ok(Self::ThresholdSkip),
+            other => Err(CoreError::Invariant(format!(
+                "unknown help session status: {other}"
+            ))),
+        }
+    }
+}
+
 /// Write-capable journal handle. Cheap to construct; holds an
 /// open SQLite connection in WAL mode.
 pub struct JournalWriter {
@@ -68,8 +115,8 @@ pub struct HelpSessionInput<'a> {
     pub response_chars: i64,
     /// LLM response latency in milliseconds.
     pub latency_ms: Option<i64>,
-    /// Outcome status (`"ok"`, `"error"`, `"skipped"`).
-    pub status: &'a str,
+    /// Outcome status.
+    pub status: HelpSessionStatus,
     /// Error category if `status` is `"error"`.
     pub error_kind: Option<&'a str>,
     /// Path to the evidence directory.
@@ -216,6 +263,7 @@ impl JournalWriter {
     ///
     /// Returns [`CoreError::Sqlite`] on DB errors.
     pub fn append_help_session(&self, input: &HelpSessionInput<'_>) -> Result<()> {
+        let status = input.status.as_str();
         self.conn.execute(
             r"INSERT INTO help_sessions (
                 id, ts_unix, ts, backend, model, note,
@@ -232,7 +280,7 @@ impl JournalWriter {
                 input.prompt_chars,
                 input.response_chars,
                 input.latency_ms,
-                input.status,
+                status,
                 input.error_kind,
                 input.evidence_ref
             ],
@@ -248,8 +296,7 @@ impl JournalWriter {
     ///
     /// Returns [`CoreError::Sqlite`] on DB errors.
     ///
-    /// **Deprecated**: prefer [`append_help_session`](Self::append_help_session)
-    /// which accepts a [`HelpSessionInput`] struct for clarity.
+    /// #[deprecated(since = "0.4.0", note = "use append_help_session with HelpSessionInput")]
     #[allow(clippy::too_many_arguments)]
     pub fn append_help_session_row(
         &self,
@@ -262,7 +309,7 @@ impl JournalWriter {
         prompt_chars: i64,
         response_chars: i64,
         latency_ms: Option<i64>,
-        status: &str,
+        status: HelpSessionStatus,
         error_kind: Option<&str>,
         evidence_ref: &str,
     ) -> Result<()> {
@@ -580,6 +627,9 @@ impl JournalReader {
         )?;
         let rows = stmt
             .query_map(params![since_unix, until_unix], |r| {
+                let status_str: String = r.get(9)?;
+                let status = HelpSessionStatus::from_str(&status_str)
+                    .unwrap_or(HelpSessionStatus::Error);
                 Ok(HelpSessionRow {
                     id: r.get(0)?,
                     ts_unix: r.get(1)?,
@@ -590,7 +640,7 @@ impl JournalReader {
                     prompt_chars: r.get(6)?,
                     response_chars: r.get(7)?,
                     latency_ms: r.get(8)?,
-                    status: r.get(9)?,
+                    status,
                     error_kind: r.get(10)?,
                     evidence_ref: r.get(11)?,
                 })
@@ -809,8 +859,8 @@ pub struct HelpSessionRow {
     pub response_chars: i64,
     /// Round-trip latency (ms); `None` for offline.
     pub latency_ms: Option<i64>,
-    /// `ok | error | fallback | threshold_skip`.
-    pub status: String,
+    /// Outcome status.
+    pub status: HelpSessionStatus,
     /// Short error kind, if status=error.
     pub error_kind: Option<String>,
     /// Path to evidence bundle.
