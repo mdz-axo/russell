@@ -121,7 +121,7 @@ addition to this table.
 | **ACTION syntax** | `ACTION: <skill>/<probe-or-intervention>` — the format Jack uses to run probes or propose interventions. Parsed and executed by both `russell jack` and `russell chat`. Probes fire immediately; interventions await consent. |
 | **Process probes** | 5 probes scanning `/proc`, `/proc/[pid]/stat`: total count, zombie/stuck/running counts, and top memory % of system. |
 | **GPU probes** | 5 probes reading sysfs (`/sys/class/drm/card*/device/`): VRAM usage %, VRAM MiB, temperature °C, GPU utilization %. Targets the discrete GPU (hardcoded `card1`). |
-| **Disk probes** | 2 probes from `/proc/pressure/io`: I/O pressure "some" and "full" avg10 as percentages. |
+| **Disk probes** | 3 probes: I/O pressure "some" and "full" avg10 from `/proc/pressure/io`, plus root filesystem usage % via `df` subprocess. |
 | **Systemd probes** | 3 probes via `systemctl` subprocess: degraded state (bool), failed user units count, failed system units count. |
 | **Baseline deviation** | The "p95 (30d)" column in Jack's SOAP Objective table — the 95th percentile of each probe's historical values. Jack interprets: 1.5× p95 = mild anomaly, 3× = significant, 10× = crisis. |
 
@@ -139,7 +139,7 @@ Every mutation — whenever mutations land — MUST satisfy all four:
   the journal.
 
 Anything that cannot satisfy all four is a **probe** (`risk:
-none`), not a skill. **MVP Russell has no skills.**
+none`), not a skill. **Phase 3 complete: `okapi-watcher` skill operational.**
 
 ## 7. How to add features
 
@@ -183,7 +183,7 @@ the agent inherits Jack's voice and refusals. See
 [`docs/architecture/THE_JACK.md`](docs/architecture/THE_JACK.md).
 
 Specifically:
-- The LLM (DeepSeek V4 Pro via Okapi by default, or whatever
+- The LLM (configured backend via Okapi by default, or whatever
   backend is configured) receives the persona in [`crates/russell-doctor/prompts/jack.md`](crates/russell-doctor/prompts/jack.md).
 - Jack never emits shell. If asked, he declines in-voice.
 - Jack is short, sassy, loyal, and never pretends to certainty
