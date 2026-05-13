@@ -40,7 +40,7 @@ use std::io::Write;
 use tokio::sync::oneshot;
 use tracing::{info, warn};
 
-/// A pending intervention awaiting operator consent.
+/// A pending action (probe or intervention) awaiting operator consent.
 #[derive(Debug, Clone)]
 struct PendingAction {
     skill_id: String,
@@ -49,6 +49,36 @@ struct PendingAction {
     needs_sudo: bool,
     cmd: Vec<String>,
     max_auto_risk: russell_skills::RiskBand,
+    /// True when this action is a read-only probe (auto-executes without consent).
+    is_probe: bool,
+}
+
+/// Returns true if the input looks like natural-language consent
+/// ("ok", "yes", "do it", "go ahead", "sure", "yep", etc.).
+fn is_affirmative(input: &str) -> bool {
+    let lower = input.to_lowercase();
+    let lower = lower.trim();
+    matches!(
+        lower,
+        "ok" | "okay"
+            | "yes"
+            | "yep"
+            | "yeah"
+            | "yea"
+            | "sure"
+            | "do it"
+            | "go ahead"
+            | "go for it"
+            | "approved"
+            | "run it"
+            | "execute"
+            | "please"
+            | "y"
+            | "yes please"
+            | "ok do it"
+            | "lets go"
+            | "let's go"
+    )
 }
 
 /// One turn in the conversation.
@@ -199,7 +229,7 @@ pub async fn run(paths: &Paths) -> Result<()> {
 
                 // Consent handling — must come before special commands.
                 if let Some(ref pa) = pending_action {
-                    if trimmed == "/approve" {
+                    if trimmed == "/approve" || is_affirmative(trimmed) {
                         execute_pending_action(&journal, paths, pa, &session_id, &current_model)
                             .await;
                         pending_action = None;
@@ -213,15 +243,9 @@ pub async fn run(paths: &Paths) -> Result<()> {
                         pending_action = None;
                         continue;
                     }
-                    if let Some(_pw) = trimmed.strip_prefix("/approve ") {
-                        println!("  Sudo password on the command line is not supported.");
-                        println!("  Configure NOPASSWD sudo for this skill's commands instead.");
-                        println!("  Example: add to /etc/sudoers.d/russell:");
-                        println!("  <user> ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart okapi");
-                        pending_action = None;
-                        continue;
-                    }
-                    if trimmed == "/deny" {
+                    if trimmed == "/deny" || trimmed == "no" || trimmed == "nope"
+                        || trimmed == "cancel" || trimmed == "nah"
+                    {
                         println!("  Denied. Action not executed.");
                         pending_action = None;
                         continue;
@@ -251,7 +275,9 @@ pub async fn run(paths: &Paths) -> Result<()> {
                             println!("  /model list   — list available Okapi models");
                             println!("  /model <name> — switch to a model (fuzzy match)");
                             println!("  /approve      — consent to Jack's proposed action");
+                            println!("                  (also: 'ok', 'yes', 'do it', 'go ahead')");
                             println!("  /deny         — refuse Jack's proposed action");
+                            println!("                  (also: 'no', 'nope', 'cancel')");
                             println!();
                             continue;
                         }
@@ -493,13 +519,32 @@ pub async fn run(paths: &Paths) -> Result<()> {
 
                         // Check for ACTION: proposal.
                         if let Some(pa) = parse_action_from_response(&content, &skills) {
-                            let sudo_tag = if pa.needs_sudo { " [needs sudo]" } else { "" };
-                            println!(
-                                "  → Jack proposes: {}/{} (risk: {:?}{}).",
-                                pa.skill_id, pa.intervention_id, pa.risk, sudo_tag
-                            );
-                            println!("  → /approve to execute, /deny to refuse.");
-                            pending_action = Some(pa);
+                            if pa.is_probe {
+                                // Probes are read-only — auto-execute immediately.
+                                println!(
+                                    "  → Running probe: {}/{}…",
+                                    pa.skill_id, pa.intervention_id
+                                );
+                                execute_pending_action(
+                                    &journal,
+                                    paths,
+                                    &pa,
+                                    &session_id,
+                                    &current_model,
+                                )
+                                .await;
+                            } else {
+                                let sudo_tag =
+                                    if pa.needs_sudo { " [needs sudo]" } else { "" };
+                                println!(
+                                    "  → Jack proposes: {}/{} (risk: {:?}{}).",
+                                    pa.skill_id, pa.intervention_id, pa.risk, sudo_tag
+                                );
+                                println!(
+                                    "  → Say 'ok' to approve, or 'no' to refuse."
+                                );
+                                pending_action = Some(pa);
+                            }
                         }
                     }
                     Err(e) => {
@@ -531,8 +576,9 @@ pub async fn run(paths: &Paths) -> Result<()> {
     Ok(())
 }
 
-/// Parse an `ACTION: <skill-id>/<intervention-id>` line from Jack's
-/// response. Resolves it against the loaded skill set.
+/// Parse an `ACTION: <skill-id>/<probe-or-intervention-id>` line from
+/// Jack's response. Resolves against probes first (risk: none,
+/// auto-executes), then interventions (requires consent).
 fn parse_action_from_response(response: &str, skills: &[Skill]) -> Option<PendingAction> {
     let action_line = response
         .lines()
@@ -540,27 +586,40 @@ fn parse_action_from_response(response: &str, skills: &[Skill]) -> Option<Pendin
         .find(|line| line.trim().starts_with("ACTION:"))?;
 
     let spec = action_line.trim().strip_prefix("ACTION:")?.trim();
-    let (skill_id, intervention_id) = spec.split_once('/')?;
+    let (skill_id, action_id) = spec.split_once('/')?;
     let skill_id = skill_id.trim();
-    let intervention_id = intervention_id.trim();
+    let action_id = action_id.trim();
 
     let skill = skills.iter().find(|s| s.id == skill_id)?;
-    let iv = skill
-        .interventions
-        .iter()
-        .find(|i| i.id == intervention_id)?;
+
+    // Check probes first — they're read-only and auto-execute.
+    if let Some(probe) = skill.probes.iter().find(|p| p.id == action_id) {
+        return Some(PendingAction {
+            skill_id: skill_id.to_string(),
+            intervention_id: action_id.to_string(),
+            risk: russell_skills::RiskBand::None,
+            needs_sudo: false,
+            cmd: probe.cmd.clone(),
+            max_auto_risk: skill.safety.max_auto_risk,
+            is_probe: true,
+        });
+    }
+
+    // Then check interventions — require consent.
+    let iv = skill.interventions.iter().find(|i| i.id == action_id)?;
 
     Some(PendingAction {
         skill_id: skill_id.to_string(),
-        intervention_id: intervention_id.to_string(),
+        intervention_id: action_id.to_string(),
         risk: iv.risk,
         needs_sudo: iv.needs_sudo,
         cmd: iv.cmd.clone(),
         max_auto_risk: skill.safety.max_auto_risk,
+        is_probe: false,
     })
 }
 
-/// Execute a pending intervention via the skill dispatcher.
+/// Execute a pending action (probe or intervention) via the skill dispatcher.
 async fn execute_pending_action(
     journal: &JournalWriter,
     paths: &Paths,
@@ -574,10 +633,15 @@ async fn execute_pending_action(
     let skill_dir = paths.skills().join(&action.skill_id);
     let evidence_base = paths.evidence();
 
-    let intervention_timeout = Duration::from_secs(120);
+    let timeout = if action.is_probe {
+        Duration::from_secs(30)
+    } else {
+        Duration::from_secs(120)
+    };
 
     let mut dispatcher = Dispatcher::new(&skill_dir);
-    dispatcher.intervention_timeout = intervention_timeout;
+    dispatcher.intervention_timeout = timeout;
+    dispatcher.probe_timeout = timeout;
     dispatcher.dry_run = DryRun::Disabled;
     dispatcher.max_auto_risk = action.max_auto_risk;
 
@@ -590,11 +654,17 @@ async fn execute_pending_action(
         );
     }
 
-    // Enforce risk cap — never auto-execute above system default.
+    // Enforce risk cap — probes are always risk: none so this passes.
     if let Err(e) = dispatcher.check_risk(action.risk, false) {
         println!("  → Refused: {e}");
         return;
     }
+
+    let step_type = if action.is_probe {
+        StepType::Probe
+    } else {
+        StepType::Intervention
+    };
 
     let result = dispatcher
         .run_and_journal(
@@ -603,19 +673,30 @@ async fn execute_pending_action(
             &action.cmd,
             &action.skill_id,
             &action.intervention_id,
-            StepType::Intervention,
+            step_type,
             action.risk.as_str(),
-            Some(intervention_timeout),
+            Some(timeout),
         )
         .await;
 
     match result {
         Ok(outcome) => {
             if outcome.exit_code == Some(0) {
-                println!(
-                    "  → Executed {}/{} successfully.",
-                    action.skill_id, action.intervention_id
-                );
+                if action.is_probe {
+                    // Print probe output for Jack to see.
+                    if !outcome.stdout.is_empty() {
+                        println!("  {}", outcome.stdout.trim());
+                    }
+                    println!(
+                        "  → Probe {}/{} complete.",
+                        action.skill_id, action.intervention_id
+                    );
+                } else {
+                    println!(
+                        "  → Executed {}/{} successfully.",
+                        action.skill_id, action.intervention_id
+                    );
+                }
             } else {
                 println!(
                     "  → {}/{} exited with code {:?}.",
@@ -626,11 +707,12 @@ async fn execute_pending_action(
                 }
             }
             // Journal the execution as a chat event.
+            let action_label = if action.is_probe { "probe" } else { "approve" };
             journal_chat_turn(
                 journal,
                 session_id,
                 model,
-                &format!("/approve {}/{}", action.skill_id, action.intervention_id),
+                &format!("/{} {}/{}", action_label, action.skill_id, action.intervention_id),
                 &format!(
                     "executed: exit={:?}, stdout_len={}, stderr_len={}",
                     outcome.exit_code,
