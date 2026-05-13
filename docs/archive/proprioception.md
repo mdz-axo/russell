@@ -4,7 +4,7 @@ audience: [architects, developers]
 last_updated: 2026-04-18
 togaf_phase: "Repository"
 version: "1.0.0"
-status: "Archived"
+status: "Superseded"
 ---
 
 <!-- STATUS: Archived -->

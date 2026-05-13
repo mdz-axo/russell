@@ -12,6 +12,7 @@ status: "Active"
 <!-- TOGAF_DOMAIN: Change Management -->
 <!-- VERSION: 1.0.0 -->
 <!-- STATUS: Active -->
+<!-- LAST_UPDATED: 2026-04-18 -->
 
 These ADRs are **Accepted** — i.e., when their subject ships,
 it ships this way. But their subject is explicitly outside the

@@ -12,6 +12,7 @@ status: "Active"
 <!-- TOGAF_DOMAIN: Change Management -->
 <!-- VERSION: 1.0.0 -->
 <!-- STATUS: Active -->
+<!-- LAST_UPDATED: 2026-05-09 -->
 
 The 14 active ADRs. ADRs 0001–0018 are load-bearing for MVP.
 ADR-0019 opens Phase 2. ADRs 0020–0022 extend Phase 2.

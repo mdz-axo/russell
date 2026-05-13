@@ -12,6 +12,7 @@ status: "Active"
 <!-- TOGAF_DOMAIN: Architecture Vision -->
 <!-- VERSION: 1.0.0 -->
 <!-- STATUS: Active -->
+<!-- LAST_UPDATED: 2026-04-18 -->
 
 > *Though she be but little, she is fierce.*
 > — Shakespeare, *A Midsummer Night's Dream* III.ii.
