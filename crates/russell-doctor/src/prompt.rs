@@ -195,9 +195,9 @@ pub fn compose(
                     )?;
                 }
             }
-                writeln!(
-                    objective,
-                    "\nWhen you identify a next step and a skill is loaded, \
+            writeln!(
+                objective,
+                "\nWhen you identify a next step and a skill is loaded, \
                      propose it on the final line using ACTION syntax:\n\n\
                      For probes (read-only, auto-execute): \
                      ACTION: <skill-id>/<probe-id>\n\
@@ -208,7 +208,7 @@ pub fn compose(
                      Prefer probes first to gather evidence. \
                      Probes run immediately. Interventions wait for the \
                      operator to say 'ok'."
-                )?;
+            )?;
         }
 
         if !knowledge_only.is_empty() {

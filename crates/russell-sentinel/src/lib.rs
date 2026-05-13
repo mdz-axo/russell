@@ -10,11 +10,11 @@
 
 pub mod probes;
 
+use probes::Sample;
 use russell_core::Result;
 use russell_core::RuleSet;
 use russell_core::event::{Event, Scope, Severity};
 use russell_core::journal::JournalWriter;
-use probes::Sample;
 
 /// Run the probe set once and append samples to the journal.
 /// No rule evaluation — samples only.
@@ -29,14 +29,14 @@ pub fn run_once(writer: &JournalWriter) -> Result<usize> {
 /// Evaluates each numeric sample against the [`RuleSet`] and emits
 /// threshold-breach events for any severity above `Info`.
 ///
-/// Returns (sample count, threshold breach events).
+/// Returns (sample count, threshold breach events). The caller is
+/// responsible for journaling the events — this function only
+/// writes samples, not events, preserving the ability to annotate
+/// events with cycle metadata before persistence.
 pub fn run_once_with_rules(writer: &JournalWriter, rules: &RuleSet) -> Result<(usize, Vec<Event>)> {
     let samples = probes::collect();
     journal_samples(writer, &samples)?;
     let events = evaluate_samples(rules, &samples);
-    for ev in &events {
-        writer.append(ev)?;
-    }
     Ok((samples.len(), events))
 }
 

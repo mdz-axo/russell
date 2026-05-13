@@ -30,17 +30,29 @@ use super::descriptor::ProbeDescriptor;
 /// Probe descriptor for `net_tcp_connections`.
 pub struct NetTcpConnections;
 impl ProbeDescriptor for NetTcpConnections {
-    fn name(&self) -> &'static str { "net_tcp_connections" }
-    fn unit(&self) -> Option<&'static str> { Some("count") }
-    fn collect(&self) -> Option<f64> { net_tcp_connections() }
+    fn name(&self) -> &'static str {
+        "net_tcp_connections"
+    }
+    fn unit(&self) -> Option<&'static str> {
+        Some("count")
+    }
+    fn collect(&self) -> Option<f64> {
+        net_tcp_connections()
+    }
 }
 
 /// Probe descriptor for `net_tcp6_connections`.
 pub struct NetTcp6Connections;
 impl ProbeDescriptor for NetTcp6Connections {
-    fn name(&self) -> &'static str { "net_tcp6_connections" }
-    fn unit(&self) -> Option<&'static str> { Some("count") }
-    fn collect(&self) -> Option<f64> { net_tcp6_connections() }
+    fn name(&self) -> &'static str {
+        "net_tcp6_connections"
+    }
+    fn unit(&self) -> Option<&'static str> {
+        Some("count")
+    }
+    fn collect(&self) -> Option<f64> {
+        net_tcp6_connections()
+    }
 }
 
 #[cfg(test)]

@@ -145,41 +145,71 @@ use super::descriptor::ProbeDescriptor;
 /// Probe descriptor for `proc_total_count`.
 pub struct ProcTotalCount;
 impl ProbeDescriptor for ProcTotalCount {
-    fn name(&self) -> &'static str { "proc_total_count" }
-    fn unit(&self) -> Option<&'static str> { Some("count") }
-    fn collect(&self) -> Option<f64> { proc_total_count() }
+    fn name(&self) -> &'static str {
+        "proc_total_count"
+    }
+    fn unit(&self) -> Option<&'static str> {
+        Some("count")
+    }
+    fn collect(&self) -> Option<f64> {
+        proc_total_count()
+    }
 }
 
 /// Probe descriptor for `proc_zombie_count`.
 pub struct ProcZombieCount;
 impl ProbeDescriptor for ProcZombieCount {
-    fn name(&self) -> &'static str { "proc_zombie_count" }
-    fn unit(&self) -> Option<&'static str> { Some("count") }
-    fn collect(&self) -> Option<f64> { proc_zombie_count() }
+    fn name(&self) -> &'static str {
+        "proc_zombie_count"
+    }
+    fn unit(&self) -> Option<&'static str> {
+        Some("count")
+    }
+    fn collect(&self) -> Option<f64> {
+        proc_zombie_count()
+    }
 }
 
 /// Probe descriptor for `proc_stuck_count`.
 pub struct ProcStuckCount;
 impl ProbeDescriptor for ProcStuckCount {
-    fn name(&self) -> &'static str { "proc_stuck_count" }
-    fn unit(&self) -> Option<&'static str> { Some("count") }
-    fn collect(&self) -> Option<f64> { proc_stuck_count() }
+    fn name(&self) -> &'static str {
+        "proc_stuck_count"
+    }
+    fn unit(&self) -> Option<&'static str> {
+        Some("count")
+    }
+    fn collect(&self) -> Option<f64> {
+        proc_stuck_count()
+    }
 }
 
 /// Probe descriptor for `proc_running_count`.
 pub struct ProcRunningCount;
 impl ProbeDescriptor for ProcRunningCount {
-    fn name(&self) -> &'static str { "proc_running_count" }
-    fn unit(&self) -> Option<&'static str> { Some("count") }
-    fn collect(&self) -> Option<f64> { proc_running_count() }
+    fn name(&self) -> &'static str {
+        "proc_running_count"
+    }
+    fn unit(&self) -> Option<&'static str> {
+        Some("count")
+    }
+    fn collect(&self) -> Option<f64> {
+        proc_running_count()
+    }
 }
 
 /// Probe descriptor for `proc_top_mem_pct`.
 pub struct ProcTopMemPct;
 impl ProbeDescriptor for ProcTopMemPct {
-    fn name(&self) -> &'static str { "proc_top_mem_pct" }
-    fn unit(&self) -> Option<&'static str> { Some("%") }
-    fn collect(&self) -> Option<f64> { proc_top_mem_pct() }
+    fn name(&self) -> &'static str {
+        "proc_top_mem_pct"
+    }
+    fn unit(&self) -> Option<&'static str> {
+        Some("%")
+    }
+    fn collect(&self) -> Option<f64> {
+        proc_top_mem_pct()
+    }
 }
 
 #[cfg(test)]

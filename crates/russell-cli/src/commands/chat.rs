@@ -90,7 +90,16 @@ fn is_refusal(input: &str) -> bool {
     let lower = input.trim();
     matches!(
         lower,
-        "/deny" | "no" | "nope" | "cancel" | "nah" | "not now" | "later" | "hang on" | "wait" | "hold on"
+        "/deny"
+            | "no"
+            | "nope"
+            | "cancel"
+            | "nah"
+            | "not now"
+            | "later"
+            | "hang on"
+            | "wait"
+            | "hold on"
     )
 }
 
@@ -278,7 +287,10 @@ pub async fn run(paths: &Paths) -> Result<()> {
                                             now, prev_count
                                         );
                                     } else if now == prev_count {
-                                        println!("  → Skills reloaded ({} loaded, unchanged).", now);
+                                        println!(
+                                            "  → Skills reloaded ({} loaded, unchanged).",
+                                            now
+                                        );
                                     }
                                 }
                                 Err(e) => {
@@ -290,9 +302,7 @@ pub async fn run(paths: &Paths) -> Result<()> {
                         "/help" => {
                             println!("  Commands:");
                             println!("  /exit, /quit  — end the session");
-                            println!(
-                                "  /refresh      — reload skills from disk"
-                            );
+                            println!("  /refresh      — reload skills from disk");
                             println!("  /reload       — same as /refresh");
                             println!("  /history      — show conversation history summary");
                             println!("  /skills       — list available skills");
@@ -561,8 +571,11 @@ pub async fn run(paths: &Paths) -> Result<()> {
                                     .await;
                                 } else {
                                     match &action {
-                                        ResolvedAction::Intervention { risk, needs_sudo, .. } => {
-                                            let sudo_tag = if *needs_sudo { " [needs sudo]" } else { "" };
+                                        ResolvedAction::Intervention {
+                                            risk, needs_sudo, ..
+                                        } => {
+                                            let sudo_tag =
+                                                if *needs_sudo { " [needs sudo]" } else { "" };
                                             println!(
                                                 "  → Jack proposes: {}/{} (risk: {:?}{}).",
                                                 action.skill_id(),
@@ -658,7 +671,9 @@ async fn execute_pending_action(
 
     // If this action requires explicit human confirmation, prompt again.
     if requires_human {
-        print!("  → This action is marked as requiring explicit human confirmation. Proceed? [y/N]: ");
+        print!(
+            "  → This action is marked as requiring explicit human confirmation. Proceed? [y/N]: "
+        );
         let _ = std::io::stdout().flush();
         let mut buf = String::new();
         if std::io::stdin().read_line(&mut buf).is_err() {
@@ -968,7 +983,8 @@ async fn call_llm_via_port(
     model: &str,
     messages: &[serde_json::Value],
 ) -> std::result::Result<String, String> {
-    let system = messages.iter()
+    let system = messages
+        .iter()
         .find(|m| m["role"] == "system")
         .and_then(|m| m["content"].as_str())
         .unwrap_or("")
@@ -993,12 +1009,9 @@ async fn call_llm_via_port(
     let mut chat_cfg = cfg.clone();
     chat_cfg.model = model.to_string();
 
-    let client = OpenRouterClient::new(&chat_cfg)
-        .map_err(|e| format!("client error: {e}"))?;
+    let client = OpenRouterClient::new(&chat_cfg).map_err(|e| format!("client error: {e}"))?;
 
-    let resp = client.chat(&soap)
-        .await
-        .map_err(|e| format!("{e}"))?;
+    let resp = client.chat(&soap).await.map_err(|e| format!("{e}"))?;
 
     Ok(resp.content)
 }

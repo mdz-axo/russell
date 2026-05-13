@@ -629,8 +629,8 @@ impl JournalReader {
         let rows = stmt
             .query_map(params![since_unix, until_unix], |r| {
                 let status_str: String = r.get(9)?;
-                let status = HelpSessionStatus::from_str(&status_str)
-                    .unwrap_or(HelpSessionStatus::Error);
+                let status =
+                    HelpSessionStatus::from_str(&status_str).unwrap_or(HelpSessionStatus::Error);
                 Ok(HelpSessionRow {
                     id: r.get(0)?,
                     ts_unix: r.get(1)?,

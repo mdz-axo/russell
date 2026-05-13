@@ -13,19 +13,14 @@
 use super::Sample;
 use super::descriptor::ProbeDescriptor;
 
-use super::gpu::{
-    GpuTempC, GpuUtilPct, GpuVramTotalMib, GpuVramUsedMib, GpuVramUsedPct,
-};
-use super::memory::{LoadAvg1m, MemAvailableMib, SwapUsedMib};
 use super::disks::{DiskIoPressureFull, DiskIoPressureSome, DiskRootUsedPct};
-use super::network::{NetTcpConnections, NetTcp6Connections};
+use super::gpu::{GpuTempC, GpuUtilPct, GpuVramTotalMib, GpuVramUsedMib, GpuVramUsedPct};
+use super::memory::{LoadAvg1m, MemAvailableMib, SwapUsedMib};
+use super::network::{NetTcp6Connections, NetTcpConnections};
 use super::process::{
-    ProcRunningCount, ProcStuckCount,
-    ProcTopMemPct, ProcTotalCount, ProcZombieCount,
+    ProcRunningCount, ProcStuckCount, ProcTopMemPct, ProcTotalCount, ProcZombieCount,
 };
-use super::systemd::{
-    SystemdDegraded, SystemdSystemFailedCount, SystemdUserFailedCount,
-};
+use super::systemd::{SystemdDegraded, SystemdSystemFailedCount, SystemdUserFailedCount};
 
 /// A collection of host-scope probes. Constructed once at startup;
 /// `collect_all` is called every Sentinel cycle.
@@ -131,13 +126,8 @@ mod tests {
     #[test]
     fn each_probe_has_unique_name() {
         let reg = ProbeRegistry::with_defaults();
-        let names: std::collections::BTreeSet<&str> =
-            reg.probes.iter().map(|p| p.name()).collect();
-        assert_eq!(
-            names.len(),
-            reg.probes.len(),
-            "probe names must be unique"
-        );
+        let names: std::collections::BTreeSet<&str> = reg.probes.iter().map(|p| p.name()).collect();
+        assert_eq!(names.len(), reg.probes.len(), "probe names must be unique");
     }
 
     #[test]
@@ -147,6 +137,9 @@ mod tests {
         }
         let reg = ProbeRegistry::with_defaults();
         let samples = reg.collect_numeric();
-        assert!(!samples.is_empty(), "should have at least one numeric sample on Linux");
+        assert!(
+            !samples.is_empty(),
+            "should have at least one numeric sample on Linux"
+        );
     }
 }

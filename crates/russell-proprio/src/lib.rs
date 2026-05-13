@@ -951,7 +951,13 @@ mod tests {
         let (_tmp, w) = tmp_journal();
         let now = russell_core::time::now_unix();
         // 2 ok, 3 error = 5 total, 3 bad = 60% — triggers alert
-        let statuses: &[HelpSessionStatus] = &[HelpSessionStatus::Ok, HelpSessionStatus::Ok, HelpSessionStatus::Error, HelpSessionStatus::Error, HelpSessionStatus::Error];
+        let statuses: &[HelpSessionStatus] = &[
+            HelpSessionStatus::Ok,
+            HelpSessionStatus::Ok,
+            HelpSessionStatus::Error,
+            HelpSessionStatus::Error,
+            HelpSessionStatus::Error,
+        ];
         for (i, status) in statuses.iter().enumerate() {
             w.append_help_session_row(
                 &format!("id_{i}"),

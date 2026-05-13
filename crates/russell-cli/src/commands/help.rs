@@ -32,7 +32,9 @@ pub async fn run(paths: &Paths, note: Option<&str>) -> Result<()> {
                     );
                     execute_probe(paths, &writer, &action).await;
                 }
-                ResolvedAction::Intervention { risk, needs_sudo, .. } => {
+                ResolvedAction::Intervention {
+                    risk, needs_sudo, ..
+                } => {
                     let sudo_tag = if needs_sudo { " [needs sudo]" } else { "" };
                     println!(
                         "  → Jack proposes: {}/{} (risk: {:?}{})",
@@ -41,7 +43,9 @@ pub async fn run(paths: &Paths, note: Option<&str>) -> Result<()> {
                         risk,
                         sudo_tag,
                     );
-                    println!("  → Switch to `russell chat` and I'll run it — just say 'ok' when I ask.");
+                    println!(
+                        "  → Switch to `russell chat` and I'll run it — just say 'ok' when I ask."
+                    );
                     println!();
                 }
             },
