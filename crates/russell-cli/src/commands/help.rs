@@ -26,7 +26,7 @@ pub async fn run(paths: &Paths, note: Option<&str>) -> Result<()> {
             Some(ResolvedAction::Probe(skill, probe)) => {
                 // Probes are read-only — execute immediately.
                 println!("  → Running probe: {}/{}…", skill.id, probe.id);
-                execute_probe(paths, &writer, &skill, &probe).await;
+                execute_probe(paths, &writer, skill, probe).await;
             }
             Some(ResolvedAction::Intervention(skill, iv)) => {
                 let sudo_tag = if iv.needs_sudo { " [needs sudo]" } else { "" };

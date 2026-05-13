@@ -12,10 +12,16 @@
 //!
 //! ## Consent gate
 //!
-//! Jack may propose interventions using the `ACTION:` syntax
-//! (`ACTION: <skill-id>/<intervention-id>`). The operator
-//! consents via `/approve` or `/deny`. Approved interventions
-//! are dispatched through the IDRS-gated skill dispatcher.
+//! Jack may propose actions using the `ACTION:` syntax
+//! (`ACTION: <skill-id>/<probe-or-intervention-id>`).
+//!
+//! - **Probes** (read-only, risk: none) auto-execute immediately
+//!   when Jack proposes them — no consent needed.
+//! - **Interventions** (mutations) require operator consent.
+//!   The operator can say `/approve`, or natural-language
+//!   affirmatives like "ok", "yes", "do it", "go ahead".
+//!   `/deny`, "no", "nope", "cancel" refuse the action.
+//!
 //! Risk enforcement caps the maximum auto-risk to `Low` by
 //! default; sudo-requiring interventions require NOPASSWD
 //! configuration by the operator.
