@@ -36,7 +36,7 @@ if [ ! -x "$OKAPI_BIN" ]; then
     exit 1
 fi
 
-HIP_LIB="$OKAPI_LIB_DIR/libggml-hip.so"
+HIP_LIB="$OKAPI_LIB_DIR/rocm/libggml-hip.so"
 BASE_LIB="$OKAPI_LIB_DIR/libggml-base.so.0"
 
 if [ ! -f "$HIP_LIB" ]; then
