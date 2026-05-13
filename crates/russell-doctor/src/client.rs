@@ -93,8 +93,7 @@ pub struct ClientConfig {
 impl ClientConfig {
     pub fn from_env() -> Self {
         let backend = Backend::from_env();
-        let model = std::env::var("RUSSELL_DOCTOR_MODEL")
-            .unwrap_or_else(|_| String::new());
+        let model = std::env::var("RUSSELL_DOCTOR_MODEL").unwrap_or_else(|_| String::new());
         let base_url = std::env::var("RUSSELL_DOCTOR_BASE_URL").ok();
         let api_key = std::env::var("RUSSELL_DOCTOR_API_KEY").ok();
         Self {
