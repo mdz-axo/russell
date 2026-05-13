@@ -862,9 +862,10 @@ safety:
         assert!(matches!(reset.risk, RiskBand::Medium));
 
         let okapi = skills.iter().find(|s| s.id == "okapi-watcher").unwrap();
-        assert_eq!(okapi.probes.len(), 2);
+        assert_eq!(okapi.probes.len(), 3);
         assert_eq!(okapi.interventions.len(), 1);
         assert!(okapi.symptoms.contains(&"llm_slow".into()));
+        assert!(okapi.symptoms.contains(&"gpu_fallback_to_cpu".into()));
         assert_eq!(okapi.interventions[0].id, "restart-okapi");
 
         let sysadmin = skills.iter().find(|s| s.id == "sysadmin").unwrap();

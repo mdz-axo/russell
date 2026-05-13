@@ -4,13 +4,14 @@
 # Install: copy this directory to ~/.local/share/harness/skills/okapi-watcher/
 
 id: okapi-watcher
-version: 0.2.0
+version: 0.3.0
 authored: 2026-05-10
 min_harness_version: 0.1.0
 
 symptoms:
   - llm_slow
   - resource_exhaustion
+  - gpu_fallback_to_cpu
 
 applies_when:
   - os_family: linux
@@ -24,6 +25,10 @@ probes:
     cmd: ["bash", "./scripts/probe-models.sh"]
     capture: stdout
     timeout: 10s
+  - id: probe-gpu-libs
+    cmd: ["bash", "./scripts/probe-gpu-libs.sh"]
+    capture: stdout
+    timeout: 15s
 
 interventions:
   - id: restart-okapi

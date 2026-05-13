@@ -36,18 +36,39 @@ pub fn health_url_from_base(base_url: &str) -> String {
 /// Returns `true` if Okapi responded to a health check (either
 /// immediately or after an auto-start attempt). Returns `false` if
 /// Okapi could not be reached even after attempting to start it.
+///
+/// After a cold start, Okapi needs time for GPU discovery before it
+/// can route inference requests (~10 s). This function polls until the
+/// completions endpoint responds (up to ~15 s post-start).
 pub async fn ensure_ready(base_url: &str) -> bool {
-    let url = health_url_from_base(base_url);
+    let tags_url = health_url_from_base(base_url);
 
-    if ping(&url).await {
+    // Fast path: if Okapi is already running and warmed up.
+    if ping(&tags_url).await {
         return true;
     }
 
     info!("okapi not reachable — attempting auto-start");
     start_service().await;
 
-    // Re-check after start.
-    ping(&url).await
+    // Poll until the API responds. Okapi typically needs 10–12 s after
+    // start to complete GPU discovery and become fully ready for
+    // inference routing.
+    wait_until_ready(&tags_url, 14, 1).await
+}
+
+/// Poll `health_url` up to `max_attempts` times, sleeping `interval_s`
+/// between each attempt. Returns `true` on first success.
+async fn wait_until_ready(health_url: &str, max_attempts: u32, interval_s: u64) -> bool {
+    for attempt in 1..=max_attempts {
+        if ping(health_url).await {
+            info!(attempt, "okapi ready");
+            return true;
+        }
+        tokio::time::sleep(std::time::Duration::from_secs(interval_s)).await;
+    }
+    warn!("okapi did not become ready after polling");
+    false
 }
 
 /// Lightweight ping: GET `/api/tags` with a 3 s timeout.
@@ -65,6 +86,9 @@ async fn ping(health_url: &str) -> bool {
 }
 
 /// Attempt to start Okapi via `systemctl --user start okapi`.
+///
+/// If systemctl succeeds, gives the process 1 s to bind the port
+/// before returning (the caller polls for full readiness separately).
 async fn start_service() {
     let output = tokio::process::Command::new("systemctl")
         .args(["--user", "start", "okapi"])
@@ -73,8 +97,8 @@ async fn start_service() {
     match output {
         Ok(o) if o.status.success() => {
             info!("okapi started via systemctl --user");
-            // Give it a moment to bind the port and become ready.
-            tokio::time::sleep(std::time::Duration::from_secs(4)).await;
+            // Brief pause for the port to bind; full readiness is polled by caller.
+            tokio::time::sleep(std::time::Duration::from_secs(1)).await;
         }
         Ok(o) => {
             warn!(
