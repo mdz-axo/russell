@@ -24,7 +24,7 @@ of every meaningful development session.
 - **Phase 1b (install artifacts + systemd units) — SHIPPED + installed.**
 - **Phase 1c (20-day unattended soak) — CLOSED.**
 - **Phase 2 (observation sharpened) — ACTIVE.** Self-vitals (5), rule engine, EWMA baselines, process probes (7), GPU probes (5), disk probes (2), systemd probes (3). Baseline deviation integrated into Jack's SOAP objective.
-- **Phase 3 (skills and dispatch) — ACTIVE.** IDRS-gated skill dispatcher wired for production. `okapi-watcher` skill operational with `restart-okapi` intervention. Consent flow in `russell chat` (`/approve`, `/deny`). `ACTION:` proposal syntax parsed by both `russell jack` and `russell chat`.
+- **Phase 3 (skills and dispatch) — ACTIVE.** IDRS-gated skill dispatcher wired for production. `okapi-watcher` skill operational with `restart-okapi` intervention. Consent flow in `russell chat` — probes auto-execute, interventions accept natural-language consent ("ok", "yes", etc.) or `/approve`. `ACTION:` syntax parsed and executed by both `russell jack` and `russell chat`.
 - **Architecture:** JR-1 austerity maintained throughout. Seven ADRs deferred.
 
 ## 2. What exists today

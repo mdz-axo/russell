@@ -3,9 +3,30 @@
 ## [Unreleased]
 
 ### Added
+- **Natural-language consent**: Operator can say "ok", "yes", "do it",
+  "go ahead", "sure", "yep" (and more) to approve Jack's proposed
+  interventions. "no", "nope", "cancel" to refuse. `/approve` and `/deny`
+  still work.
+- **Probe auto-execution**: Jack can now run probes (risk: none, read-only)
+  directly via `ACTION: <skill>/<probe-id>`. Probes execute immediately
+  without operator consent in both `russell jack` and `russell chat`.
+  Probe output is displayed inline.
+- **ACTION syntax extended**: `ACTION:` now resolves against probes first,
+  then interventions. Jack can gather evidence autonomously before proposing
+  mutations.
+
 - **GitHub Actions CI workflow** (`ci.yml`): enforces `cargo fmt --check`,
   `cargo clippy -D warnings`, `cargo test --workspace`, and `cargo deny check`
   on every push/PR to `main`.
+
+### Changed
+- **Jack persona updated**: Jack now knows he can run probes and propose
+  interventions for consent. Persona no longer says "I can't run things" —
+  instead he acts through registered skill IDs (JR-3 still enforced: no raw
+  shell, only manifest-registered commands).
+- **Consent gate UX**: The `/help` command in `russell chat` now documents
+  natural-language consent. Interventions prompt "Say 'ok' to approve" instead
+  of "→ /approve to execute".
 
 ### Fixed
 - `cargo clippy -D warnings` now passes: added `is_empty()` methods to

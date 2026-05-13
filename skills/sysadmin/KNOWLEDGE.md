@@ -113,8 +113,11 @@ just watching.
 
 The sysadmin skill declares `safety.max_auto_risk: medium`. This
 means the consent gate will allow interventions up to Medium risk
-without additional password prompts (the operator still has to
-`/approve`).
+without additional password prompts. The operator consents with
+natural language ("ok", "yes", "do it") or `/approve`.
+
+Probes (risk: none) execute immediately when Jack proposes them
+via `ACTION:` — no consent required.
 
 `flush-swap` and `force-clock-sync` are additionally listed in
 `require_human_for` — the dispatcher gates on this field to require
