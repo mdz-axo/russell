@@ -26,7 +26,7 @@ use russell_core::event::{Event, Severity};
 use russell_core::journal::{HelpSessionInput, HelpSessionStatus, JournalWriter};
 use russell_core::paths::Paths;
 
-use crate::client::{Backend, ClientConfig, LlmClient};
+use crate::client::{Backend, ClientConfig, LlmClient, SoapPrompt};
 use crate::error::{DoctorError, Result};
 use crate::{fallback, mock, openrouter, prompt};
 
@@ -102,6 +102,303 @@ pub async fn run_help(
     run_help_with_config(paths, writer, note, cfg).await
 }
 
+/// Dispatch result from calling the LLM backend.
+struct DispatchResult {
+    backend_label: &'static str,
+    response: Option<String>,
+    model: Option<String>,
+    latency_ms: Option<i64>,
+    error_kind: Option<String>,
+    skip_reason: Option<SkipReason>,
+}
+
+// ---------------------------------------------------------------------------
+// Stage 1: SOAP composition + augmentation
+// ---------------------------------------------------------------------------
+
+/// Compose the SOAP prompt from journal state, profile, skills, and
+/// operator identity files. Also writes the raw SOAP to the evidence
+/// directory.
+fn compose_and_augment_soap(
+    paths: &Paths,
+    writer: &JournalWriter,
+    note: Option<&str>,
+    evidence_dir: &std::path::Path,
+) -> Result<SoapPrompt> {
+    let profile_path = paths.profile();
+    let profile = if profile_path.exists() {
+        russell_core::Profile::load(&profile_path).ok()
+    } else {
+        None
+    };
+
+    let loaded_skills = russell_skills::load_all(&paths.skills()).unwrap_or_default();
+    tracing::debug!(
+        count = loaded_skills.len(),
+        "loaded skills for help session"
+    );
+
+    let soap = prompt::compose(
+        &writer.reader(),
+        profile.as_ref(),
+        note,
+        &loaded_skills,
+        &paths.skills(),
+    )?;
+
+    // ADR-0022: augment the system prompt with operator identity files.
+    let soap = augment_system_prompt(paths, soap);
+
+    let soap_path = evidence_dir.join("soap.md");
+    std::fs::write(&soap_path, &soap.rendered).map_err(|e| DoctorError::io(&soap_path, e))?;
+
+    Ok(soap)
+}
+
+// ---------------------------------------------------------------------------
+// Stage 2: Threshold gate + backend dispatch
+// ---------------------------------------------------------------------------
+
+/// Check the escalation threshold and dispatch to the LLM backend.
+/// Falls back to the offline summariser if the threshold is not met
+/// or the backend call fails.
+async fn dispatch_backend(
+    writer: &JournalWriter,
+    cfg: &ClientConfig,
+    soap: &SoapPrompt,
+    escalate: bool,
+) -> Result<DispatchResult> {
+    // Threshold gate.
+    if !escalate {
+        let text = fallback::summarise(&writer.reader(), None)?;
+        return Ok(DispatchResult {
+            backend_label: "offline",
+            response: Some(text),
+            model: None,
+            latency_ms: None,
+            error_kind: None,
+            skip_reason: Some(SkipReason::ThresholdSkip),
+        });
+    }
+
+    // Attempt the configured backend. Any failure → fall back to offline.
+    let (backend_label, maybe_response, error_kind, skip_reason) = match cfg.backend {
+        Backend::OpenRouter => {
+            let client = openrouter::OpenRouterClient::new(cfg)?;
+            match client.chat(soap).await {
+                Ok(resp) => ("openrouter", Some(resp), None, None),
+                Err(e) => {
+                    warn!(error = %e, "openrouter call failed — falling back");
+                    (
+                        "openrouter",
+                        None,
+                        Some(error_kind_of(&e)),
+                        Some(SkipReason::OfflineFallback),
+                    )
+                }
+            }
+        }
+        Backend::Okapi => {
+            let mut okapi_cfg = cfg.clone();
+            if okapi_cfg.base_url.is_none() {
+                okapi_cfg.base_url = Some("http://127.0.0.1:11435/v1".into());
+            }
+            if okapi_cfg.api_key.is_none() {
+                okapi_cfg.api_key = Some("okapi".into());
+            }
+            let base = okapi_cfg.base_url.clone().unwrap_or_default();
+            let health_url = base
+                .trim_end_matches("/v1")
+                .trim_end_matches('/')
+                .to_string()
+                + "/api/tags";
+            if !okapi_health_check(&health_url).await {
+                info!("okapi not reachable — attempting auto-start");
+                okapi_start().await;
+            }
+
+            let client = openrouter::OpenRouterClient::new(&okapi_cfg)?;
+            match client.chat(soap).await {
+                Ok(resp) => ("okapi", Some(resp), None, None),
+                Err(e) => {
+                    warn!(error = %e, "okapi call failed — falling back");
+                    (
+                        "okapi",
+                        None,
+                        Some(error_kind_of(&e)),
+                        Some(SkipReason::OfflineFallback),
+                    )
+                }
+            }
+        }
+        Backend::Mock => {
+            let client = mock::MockClient::jack_default();
+            match client.chat(soap).await {
+                Ok(resp) => ("mock", Some(resp), None, None),
+                Err(e) => (
+                    "mock",
+                    None,
+                    Some(error_kind_of(&e)),
+                    Some(SkipReason::OfflineFallback),
+                ),
+            }
+        }
+        Backend::Offline => ("offline", None, None, Some(SkipReason::OfflineFallback)),
+    };
+
+    let (response_text, latency_ms, model) = match maybe_response {
+        Some(resp) => (
+            resp.content.clone(),
+            Some(resp.latency_ms as i64),
+            resp.model,
+        ),
+        None => {
+            let text = fallback::summarise(&writer.reader(), None)?;
+            (text, None, None)
+        }
+    };
+
+    Ok(DispatchResult {
+        backend_label,
+        response: Some(response_text),
+        model,
+        latency_ms,
+        error_kind,
+        skip_reason,
+    })
+}
+
+// ---------------------------------------------------------------------------
+// Stage 3: Evidence persistence + journaling
+// ---------------------------------------------------------------------------
+
+/// Write evidence artefacts, journal the event, and insert the
+/// help-session row. Returns the final `HelpOutcome`.
+fn persist_session(
+    paths: &Paths,
+    writer: &JournalWriter,
+    session_id: &str,
+    ts_unix: i64,
+    ts: &str,
+    evidence_dir: &std::path::Path,
+    soap: &SoapPrompt,
+    dispatch: &DispatchResult,
+    cfg: &ClientConfig,
+    note: Option<&str>,
+) -> Result<HelpOutcome> {
+    let response_text = dispatch.response.as_deref().unwrap_or("");
+    let backend_used = dispatch.backend_label;
+    let skip_reason = dispatch.skip_reason;
+    let status: HelpSessionStatus = if let Some(sr) = skip_reason {
+        match sr {
+            SkipReason::OfflineFallback => HelpSessionStatus::Fallback,
+            SkipReason::ThresholdSkip => HelpSessionStatus::ThresholdSkip,
+        }
+    } else {
+        HelpSessionStatus::Ok
+    };
+    let status_str = status.as_str();
+
+    // Evidence files.
+    let request_path = evidence_dir.join("request.json");
+    let request_rec = json!({
+        "backend": backend_used,
+        "model": &cfg.model,
+        "base_url": &cfg.base_url,
+        "note": note,
+        "soap_chars": soap.rendered.len(),
+    });
+    std::fs::write(&request_path, serde_json::to_vec_pretty(&request_rec)?)
+        .map_err(|e| DoctorError::io(&request_path, e))?;
+
+    let response_path = evidence_dir.join("response.json");
+    let response_rec = json!({
+        "status": status_str,
+        "error_kind": dispatch.error_kind,
+        "latency_ms": dispatch.latency_ms,
+        "model": dispatch.model,
+        "content_chars": response_text.len(),
+    });
+    std::fs::write(&response_path, serde_json::to_vec_pretty(&response_rec)?)
+        .map_err(|e| DoctorError::io(&response_path, e))?;
+
+    let transcript_path = evidence_dir.join("transcript.jsonl");
+    let line = json!({
+        "schema": "harness.llm-transcript.v1",
+        "ts": ts,
+        "backend": backend_used,
+        "model": &cfg.model,
+        "fell_back": skip_reason.is_some(),
+        "skip_reason": skip_reason.map(|s| match s {
+            SkipReason::OfflineFallback => "offline_fallback",
+            SkipReason::ThresholdSkip => "threshold_skip",
+        }),
+        "prompt_chars": soap.rendered.len(),
+        "response_chars": response_text.len(),
+        "response": response_text,
+    });
+    std::fs::write(&transcript_path, format!("{line}\n"))
+        .map_err(|e| DoctorError::io(&transcript_path, e))?;
+
+    // Event journal entry.
+    let evidence_ref_str = evidence_dir.to_string_lossy().into_owned();
+    let mut ev = Event::new("help", Severity::Info);
+    ev.id = russell_core::event::EventId(Ulid::from_string(session_id).unwrap_or_default());
+    ev.run_id = Some(session_id.to_string());
+    ev.tier = Some("doctor".into());
+    ev.module = Some("doctor/help".into());
+    ev.summary = Some(format!(
+        "backend={} status={} chars={}",
+        backend_used,
+        status_str,
+        response_text.len()
+    ));
+    ev.evidence_ref = Some(evidence_ref_str.clone());
+    ev.duration_ms = dispatch.latency_ms.map(|v| v as u64);
+    if let Some(ref k) = dispatch.error_kind {
+        ev.outputs
+            .insert("error_kind".into(), serde_json::Value::from(k.as_str()));
+    }
+    if let Some(sr) = skip_reason {
+        ev.outputs.insert(
+            "skip_reason".into(),
+            serde_json::Value::from(match sr {
+                SkipReason::OfflineFallback => "offline_fallback",
+                SkipReason::ThresholdSkip => "threshold_skip",
+            }),
+        );
+    }
+    writer.append(&ev)?;
+
+    // Help-session row.
+    let input = HelpSessionInput {
+        id: session_id,
+        ts_unix,
+        ts,
+        backend: backend_used,
+        model: dispatch.model.as_deref(),
+        note,
+        prompt_chars: soap.rendered.len() as i64,
+        response_chars: response_text.len() as i64,
+        latency_ms: dispatch.latency_ms,
+        status,
+        error_kind: dispatch.error_kind.as_deref(),
+        evidence_ref: &evidence_ref_str,
+    };
+    writer.append_help_session(&input)?;
+
+    // ADR-0022: append a session note to today's daily log if it exists.
+    append_session_note(paths, session_id, note, status_str);
+
+    Ok(HelpOutcome {
+        session_id: session_id.to_string(),
+        backend: backend_used,
+        evidence_dir: evidence_dir.to_path_buf(),
+        response: response_text.to_string(),
+        skip_reason,
+    })
+}
+
 /// Same as [`run_help`] but with an explicit [`ClientConfig`]. Useful in
 /// tests where mutating process env racily is undesirable.
 pub async fn run_help_with_config(
@@ -117,37 +414,12 @@ pub async fn run_help_with_config(
     let evidence_dir = paths.evidence().join("help").join(&session_id);
     std::fs::create_dir_all(&evidence_dir).map_err(|e| DoctorError::io(&evidence_dir, e))?;
 
-    let profile_path = paths.profile();
-    let profile = if profile_path.exists() {
-        russell_core::Profile::load(&profile_path).ok()
-    } else {
-        None
-    };
-
-    // Phase 3A: load available skills so Jack can recommend interventions.
-    let loaded_skills = russell_skills::load_all(&paths.skills()).unwrap_or_default();
-    tracing::debug!(
-        count = loaded_skills.len(),
-        "loaded skills for help session"
-    );
-
-    let soap = prompt::compose(
-        &writer.reader(),
-        profile.as_ref(),
-        note,
-        &loaded_skills,
-        &paths.skills(),
-    )?;
-
-    // ADR-0022: augment the system prompt with operator identity files if present.
-    let soap = augment_system_prompt(paths, soap);
-
-    let soap_path = evidence_dir.join("soap.md");
-    std::fs::write(&soap_path, &soap.rendered).map_err(|e| DoctorError::io(&soap_path, e))?;
-
     info!(backend = %cfg.backend.label(), model = %cfg.model, session = %session_id, "russell help starting");
 
-    // ADR-0020: threshold gate — check severity before waking the LLM.
+    // Stage 1: compose + augment SOAP.
+    let soap = compose_and_augment_soap(paths, writer, note, &evidence_dir)?;
+
+    // Stage 2: threshold gate + backend dispatch.
     let counts = {
         let now = russell_core::time::now_unix();
         let window_start = now - 24 * 3600;
@@ -159,209 +431,26 @@ pub async fn run_help_with_config(
     let escalate = cfg.escalate_min.satisfied_by(&counts);
     tracing::debug!(escalate = escalate, alert = %counts.alert, crit = %counts.crit, "threshold gate");
 
-    // Attempt the configured backend. Any failure → fall back to offline.
-    let (backend_used, maybe_response, error_kind, skip_reason) = match cfg.backend {
-        Backend::OpenRouter => {
-            let client = openrouter::OpenRouterClient::new(&cfg)?;
-            match client.chat(&soap).await {
-                Ok(resp) => ("openrouter", Some(resp), None, None),
-                Err(e) => {
-                    warn!(error = %e, "openrouter call failed — falling back");
-                    (
-                        "openrouter",
-                        None,
-                        Some(error_kind_of(&e)),
-                        Some(SkipReason::OfflineFallback),
-                    )
-                }
-            }
-        }
-        Backend::Okapi => {
-            // Okapi speaks the same OpenAI-compatible API at :11435/v1
-            let mut okapi_cfg = cfg.clone();
-            if okapi_cfg.base_url.is_none() {
-                okapi_cfg.base_url = Some("http://127.0.0.1:11435/v1".into());
-            }
-            if okapi_cfg.api_key.is_none() {
-                okapi_cfg.api_key = Some("okapi".into());
-            }
+    let dispatch = dispatch_backend(writer, &cfg, &soap, escalate).await?;
 
-            // Check if Okapi is reachable; if not, attempt to start it.
-            let base = okapi_cfg.base_url.clone().unwrap_or_default();
-            let health_url = base
-                .trim_end_matches("/v1")
-                .trim_end_matches('/')
-                .to_string()
-                + "/api/tags";
-            if !okapi_health_check(&health_url).await {
-                info!("okapi not reachable — attempting auto-start");
-                okapi_start().await;
-            }
-
-            let client = openrouter::OpenRouterClient::new(&okapi_cfg)?;
-            match client.chat(&soap).await {
-                Ok(resp) => ("okapi", Some(resp), None, None),
-                Err(e) => {
-                    warn!(error = %e, "okapi call failed — falling back");
-                    (
-                        "okapi",
-                        None,
-                        Some(error_kind_of(&e)),
-                        Some(SkipReason::OfflineFallback),
-                    )
-                }
-            }
-        }
-        Backend::Mock => {
-            let client = mock::MockClient::jack_default();
-            match client.chat(&soap).await {
-                Ok(resp) => ("mock", Some(resp), None, None),
-                Err(e) => (
-                    "mock",
-                    None,
-                    Some(error_kind_of(&e)),
-                    Some(SkipReason::OfflineFallback),
-                ),
-            }
-        }
-        Backend::Offline => ("offline", None, None, Some(SkipReason::OfflineFallback)),
-    };
-
-    // If threshold not met, short-circuit to rule-based summary.
-    let skip_reason = if !escalate {
-        Some(SkipReason::ThresholdSkip)
-    } else {
-        skip_reason
-    };
-
-    let (response_text, latency_ms, model) = match maybe_response {
-        Some(resp) => (
-            resp.content.clone(),
-            Some(resp.latency_ms as i64),
-            resp.model,
-        ),
-        None => {
-            let text = fallback::summarise(&writer.reader(), note)?;
-            (text, None, None)
-        }
-    };
-
-    // Persist request/response/transcript artefacts for inspection.
-    let request_path = evidence_dir.join("request.json");
-    let request_rec = json!({
-        "backend": backend_used,
-        "model": &cfg.model,
-        "base_url": &cfg.base_url,
-        "note": note,
-        "soap_chars": soap.rendered.len(),
-    });
-    std::fs::write(&request_path, serde_json::to_vec_pretty(&request_rec)?)
-        .map_err(|e| DoctorError::io(&request_path, e))?;
-
-    let response_path = evidence_dir.join("response.json");
-    let response_rec = json!({
-        "status": if let Some(sr) = skip_reason {
-            match sr {
-                SkipReason::OfflineFallback => "fallback",
-                SkipReason::ThresholdSkip => "threshold_skip",
-            }
-        } else {
-            "ok"
-        },
-        "error_kind": error_kind,
-        "latency_ms": latency_ms,
-        "model": model,
-        "content_chars": response_text.len(),
-    });
-    std::fs::write(&response_path, serde_json::to_vec_pretty(&response_rec)?)
-        .map_err(|e| DoctorError::io(&response_path, e))?;
-
-    let transcript_path = evidence_dir.join("transcript.jsonl");
-    let line = json!({
-        "schema": "harness.llm-transcript.v1",
-        "ts": &ts,
-        "backend": backend_used,
-        "model": &cfg.model,
-        "fell_back": skip_reason.is_some(),
-        "skip_reason": skip_reason.map(|s| match s {
-            SkipReason::OfflineFallback => "offline_fallback",
-            SkipReason::ThresholdSkip => "threshold_skip",
-        }),
-        "prompt_chars": soap.rendered.len(),
-        "response_chars": response_text.len(),
-        "response": &response_text,
-    });
-    std::fs::write(&transcript_path, format!("{line}\n"))
-        .map_err(|e| DoctorError::io(&transcript_path, e))?;
-
-    // Journal: events row + help_sessions row.
-    let evidence_ref_str = evidence_dir.to_string_lossy().into_owned();
-    let status: HelpSessionStatus = if let Some(sr) = skip_reason {
-        match sr {
-            SkipReason::OfflineFallback => HelpSessionStatus::Fallback,
-            SkipReason::ThresholdSkip => HelpSessionStatus::ThresholdSkip,
-        }
-    } else {
-        HelpSessionStatus::Ok
-    };
-
-    let status_str = status.as_str();
-
-    let mut ev = Event::new("help", Severity::Info);
-    ev.id = russell_core::event::EventId(Ulid::from_string(&session_id).unwrap_or_default());
-    ev.run_id = Some(session_id.clone());
-    ev.tier = Some("doctor".into());
-    ev.module = Some("doctor/help".into());
-    ev.summary = Some(format!(
-        "backend={} status={} chars={}",
-        backend_used,
-        status_str,
-        response_text.len()
-    ));
-    ev.evidence_ref = Some(evidence_ref_str.clone());
-    ev.duration_ms = latency_ms.map(|v| v as u64);
-    if let Some(ref k) = error_kind {
-        ev.outputs
-            .insert("error_kind".into(), serde_json::Value::from(k.as_str()));
-    }
-    if let Some(sr) = skip_reason {
-        ev.outputs.insert(
-            "skip_reason".into(),
-            serde_json::Value::from(match sr {
-                SkipReason::OfflineFallback => "offline_fallback",
-                SkipReason::ThresholdSkip => "threshold_skip",
-            }),
-        );
-    }
-    writer.append(&ev)?;
-
-    let session = HelpSession {
-        id: session_id.clone(),
+    // Stage 3: persist evidence + journal.
+    persist_session(
+        paths,
+        writer,
+        &session_id,
         ts_unix,
-        ts: ts.clone(),
-        backend: backend_used,
-        model,
-        note: note.map(str::to_string),
-        prompt_chars: soap.rendered.len() as i64,
-        response_chars: response_text.len() as i64,
-        latency_ms,
-        status,
-        error_kind,
-        evidence_ref: evidence_ref_str,
-    };
-    insert_help_session(writer, &session)?;
-
-    // ADR-0022: append a session note to today's daily log if it exists.
-    append_session_note(paths, &session_id, note, status_str);
-
-    Ok(HelpOutcome {
-        session_id,
-        backend: backend_used,
-        evidence_dir,
-        response: response_text,
-        skip_reason,
-    })
+        &ts,
+        &evidence_dir,
+        &soap,
+        &dispatch,
+        &cfg,
+        note,
+    )
 }
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
 
 /// ADR-0022: augment the compiled-in Jack persona with operator identity files.
 fn augment_system_prompt(
@@ -490,24 +579,6 @@ fn error_kind_of(e: &DoctorError) -> String {
         DoctorError::Fmt(_) => "fmt".into(),
         DoctorError::Other(_) => "other".into(),
     }
-}
-
-fn insert_help_session(writer: &JournalWriter, s: &HelpSession) -> Result<()> {
-    writer.append_help_session(&HelpSessionInput {
-        id: &s.id,
-        ts_unix: s.ts_unix,
-        ts: &s.ts,
-        backend: s.backend,
-        model: s.model.as_deref(),
-        note: s.note.as_deref(),
-        prompt_chars: s.prompt_chars,
-        response_chars: s.response_chars,
-        latency_ms: s.latency_ms,
-        status: s.status,
-        error_kind: s.error_kind.as_deref(),
-        evidence_ref: &s.evidence_ref,
-    })?;
-    Ok(())
 }
 
 #[cfg(test)]
