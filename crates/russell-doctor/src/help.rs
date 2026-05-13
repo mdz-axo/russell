@@ -23,7 +23,7 @@ use tracing::{info, warn};
 use ulid::Ulid;
 
 use russell_core::event::{Event, Severity};
-use russell_core::journal::{HelpSessionStatus, JournalWriter};
+use russell_core::journal::{HelpSessionInput, HelpSessionStatus, JournalWriter};
 use russell_core::paths::Paths;
 
 use crate::client::{Backend, ClientConfig, LlmClient};
@@ -493,21 +493,20 @@ fn error_kind_of(e: &DoctorError) -> String {
 }
 
 fn insert_help_session(writer: &JournalWriter, s: &HelpSession) -> Result<()> {
-    // russell-core owns DB access; expose a typed method on the writer.
-    writer.append_help_session_row(
-        &s.id,
-        s.ts_unix,
-        &s.ts,
-        s.backend,
-        s.model.as_deref(),
-        s.note.as_deref(),
-        s.prompt_chars,
-        s.response_chars,
-        s.latency_ms,
-        s.status,
-        s.error_kind.as_deref(),
-        &s.evidence_ref,
-    )?;
+    writer.append_help_session(&HelpSessionInput {
+        id: &s.id,
+        ts_unix: s.ts_unix,
+        ts: &s.ts,
+        backend: s.backend,
+        model: s.model.as_deref(),
+        note: s.note.as_deref(),
+        prompt_chars: s.prompt_chars,
+        response_chars: s.response_chars,
+        latency_ms: s.latency_ms,
+        status: s.status,
+        error_kind: s.error_kind.as_deref(),
+        evidence_ref: &s.evidence_ref,
+    })?;
     Ok(())
 }
 

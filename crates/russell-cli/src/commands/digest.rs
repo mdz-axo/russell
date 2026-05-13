@@ -223,7 +223,7 @@ fn day_start_unix(now_unix: i64) -> i64 {
 mod tests {
     use super::*;
     use russell_core::event::{Event, Severity};
-    use russell_core::journal::JournalWriter;
+    use russell_core::journal::{HelpSessionStatus, JournalWriter};
     use russell_core::paths::Paths;
 
     #[test]
@@ -279,7 +279,7 @@ mod tests {
                 100,
                 200,
                 Some(1234),
-                "ok",
+                HelpSessionStatus::Ok,
                 None,
                 "/tmp/evidence/01JQ-abc",
             )

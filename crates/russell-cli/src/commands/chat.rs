@@ -35,7 +35,7 @@
 
 use anyhow::{Context, Result};
 use rand::seq::SliceRandom;
-use russell_core::journal::{HelpSessionStatus, JournalReader, JournalWriter};
+use russell_core::journal::{HelpSessionInput, HelpSessionStatus, JournalReader, JournalWriter};
 use russell_core::paths::Paths;
 use russell_skills::Skill;
 use rustyline::DefaultEditor;
@@ -1120,18 +1120,20 @@ fn journal_chat_turn(
 ) {
     let ts_unix = russell_core::time::now_unix();
     let ts = russell_core::time::now_rfc3339();
-    let _ = journal.append_help_session_row(
-        session_id,
+    let evidence_ref = format!("memory/chats/{session_id}.json");
+    let input = HelpSessionInput {
+        id: session_id,
         ts_unix,
-        &ts,
-        "okapi",
-        Some(model),
-        Some(user_msg),
-        user_msg.len() as i64,
-        assistant_msg.len() as i64,
-        None, // latency not tracked per-turn in chat
-HelpSessionStatus::Ok,
-        None,
-        &format!("memory/chats/{session_id}.json"),
-    );
+        ts: &ts,
+        backend: "okapi",
+        model: Some(model),
+        note: Some(user_msg),
+        prompt_chars: user_msg.len() as i64,
+        response_chars: assistant_msg.len() as i64,
+        latency_ms: None,
+        status: HelpSessionStatus::Ok,
+        error_kind: None,
+        evidence_ref: &evidence_ref,
+    };
+    let _ = journal.append_help_session(&input);
 }

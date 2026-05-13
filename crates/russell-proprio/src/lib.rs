@@ -37,7 +37,7 @@ use std::sync::{Mutex, MutexGuard};
 
 use russell_core::Result;
 use russell_core::event::{Event, Scope, Severity};
-use russell_core::journal::{HelpSessionStatus, JournalReader, JournalWriter};
+use russell_core::journal::{JournalReader, JournalWriter};
 use tracing::{debug, warn};
 
 // ---------------------------------------------------------------------------
@@ -643,7 +643,7 @@ fn emit_event(
 mod tests {
     use super::*;
     use russell_core::event::Scope;
-    use russell_core::journal::JournalWriter;
+    use russell_core::journal::{HelpSessionStatus, JournalWriter};
 
     // -----------------------------------------------------------------------
     // Test TimerSource
