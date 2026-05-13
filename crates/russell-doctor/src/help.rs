@@ -23,7 +23,7 @@ use tracing::{info, warn};
 use ulid::Ulid;
 
 use russell_core::event::{Event, Severity};
-use russell_core::journal::JournalWriter;
+use russell_core::journal::{HelpSessionStatus, JournalWriter};
 use russell_core::paths::Paths;
 
 use crate::client::{Backend, ClientConfig, LlmClient};
@@ -75,8 +75,8 @@ pub struct HelpSession {
     pub response_chars: i64,
     /// Round-trip latency (ms); `None` for offline.
     pub latency_ms: Option<i64>,
-    /// `ok | error | fallback | threshold_skip`.
-    pub status: &'static str,
+    /// Outcome status.
+    pub status: HelpSessionStatus,
     /// Short error kind, if status=error.
     pub error_kind: Option<String>,
     /// Path to evidence bundle.
