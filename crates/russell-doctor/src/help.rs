@@ -154,7 +154,7 @@ async fn dispatch_backend(
                 .unwrap_or(crate::health::DEFAULT_BASE_URL);
             crate::health::ensure_ready(base).await;
 
-            let client = oai_client::OkapiClient::new(&okapi_cfg)?;
+            let client = oai_client::OkapiClient::new(&okapi_cfg).await?;
             match client.chat(soap).await {
                 Ok(resp) => ("okapi", Some(resp), None, None),
                 Err(e) => {

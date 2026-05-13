@@ -1388,6 +1388,7 @@ dependencies = [
  "russell-skills",
  "serde",
  "serde_json",
+ "strsim",
  "tempfile",
  "thiserror",
  "time",

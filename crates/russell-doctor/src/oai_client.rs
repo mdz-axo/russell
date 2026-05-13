@@ -12,7 +12,25 @@ use tracing::{debug, warn};
 use crate::client::{ClientConfig, LlmClient, LlmResponse, SoapPrompt};
 use crate::error::{DoctorError, Result};
 
+/// Model entry from Okapi's `/api/tags` (Ollama-compatible).
+#[derive(Debug, Clone, serde::Deserialize)]
+struct OkapiModel {
+    name: String,
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+struct OkapiTagsResponse {
+    models: Vec<OkapiModel>,
+}
+
 /// OpenAI-compatible LLM client. Targets Okapi at localhost:11435.
+///
+/// Construction via [`OkapiClient::new`] **validates the model name**
+/// against Okapi's actual loaded model list (`/api/tags`). If the
+/// candidate model name does not match any loaded model exactly, the
+/// constructor performs a fuzzy match and returns the closest real
+/// model name. If Okapi is unreachable, the candidate is used as-is
+/// with a warning logged.
 #[derive(Debug, Clone)]
 pub struct OkapiClient {
     base_url: String,
@@ -22,11 +40,18 @@ pub struct OkapiClient {
 }
 
 impl OkapiClient {
-    /// Construct from a resolved [`ClientConfig`].
+    /// Construct from a resolved [`ClientConfig`], **resolving the
+    /// model name** against Okapi's `/api/tags` list.
+    ///
+    /// The model name in `cfg` is treated as a candidate. The
+    /// constructor queries Okapi for loaded models, finds the best
+    /// fuzzy match, and stores the **exact** model name reported by
+    /// Okapi. This prevents stale or misspelled model names from
+    /// reaching the chat-completions endpoint.
     ///
     /// # Errors
     /// Returns [`DoctorError::Config`] if the HTTP client cannot be built.
-    pub fn new(cfg: &ClientConfig) -> Result<Self> {
+    pub async fn new(cfg: &ClientConfig) -> Result<Self> {
         let base_url = cfg
             .base_url
             .clone()
@@ -36,9 +61,20 @@ impl OkapiClient {
             .user_agent(concat!("russell/", env!("CARGO_PKG_VERSION")))
             .build()
             .map_err(|e| DoctorError::Config(format!("HTTP client: {e}")))?;
+
+        let resolved = resolve_model_name(&base_url, &cfg.model, &http).await;
+
+        if resolved != cfg.model {
+            warn!(
+                candidate = %cfg.model,
+                resolved = %resolved,
+                "model name resolved"
+            );
+        }
+
         Ok(Self {
             base_url,
-            model: cfg.model.clone(),
+            model: resolved,
             api_key: cfg.api_key.clone(),
             http,
         })
@@ -114,6 +150,99 @@ impl LlmClient for OkapiClient {
             latency_ms,
         })
     }
+}
+
+/// Resolve a candidate model name against Okapi's actual model list.
+///
+/// Queries `/api/tags` to get the set of loaded models,
+/// then finds the best fuzzy match (Jaro-Winkler ≥ 0.80).
+/// Returns the exact model name from Okapi on match, or the
+/// original candidate if Okapi is unreachable or has no models.
+///
+/// This is the **single gate** that every model name must pass
+/// through before being sent to Okapi's chat-completions endpoint.
+pub async fn resolve_model_name(
+    base_url: &str,
+    candidate: &str,
+    http: &reqwest::Client,
+) -> String {
+    let tags_url = format!(
+        "{}/api/tags",
+        base_url.trim_end_matches("/v1").trim_end_matches('/')
+    );
+
+    let models: Vec<String> = match http
+        .get(&tags_url)
+        .timeout(std::time::Duration::from_secs(5))
+        .send()
+        .await
+    {
+        Ok(resp) if resp.status().is_success() => match resp.json::<OkapiTagsResponse>().await {
+            Ok(body) => body.models.into_iter().map(|m| m.name).collect(),
+            Err(_) => {
+                warn!("failed to parse /api/tags response");
+                return candidate.to_string();
+            }
+        },
+        Ok(resp) => {
+            warn!(status = %resp.status(), "non-success from /api/tags");
+            return candidate.to_string();
+        }
+        Err(e) => {
+            warn!(error = %e, "can't reach Okapi for model resolution");
+            return candidate.to_string();
+        }
+    };
+
+    if models.is_empty() {
+        warn!("Okapi reports zero loaded models");
+        return candidate.to_string();
+    }
+
+    // Exact match.
+    if models.iter().any(|m| m == candidate) {
+        return candidate.to_string();
+    }
+
+    // Fuzzy match: strip non-alphanumeric chars before scoring
+    // so "nemotron3super" matches "nemotron3-super:cloud".
+    let candidate_lower = candidate.to_lowercase();
+    let candidate_clean: String = candidate_lower
+        .chars()
+        .filter(|c| c.is_alphanumeric())
+        .collect();
+
+    let mut scored: Vec<(&str, f64)> = models
+        .iter()
+        .map(|m| {
+            let name_lower = m.to_lowercase();
+            let name_clean: String =
+                name_lower.chars().filter(|c| c.is_alphanumeric()).collect();
+            let score = strsim::jaro_winkler(&candidate_clean, &name_clean);
+            (m.as_str(), score)
+        })
+        .collect();
+
+    scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+
+    if let Some((best_name, score)) = scored.first() {
+        if *score >= 0.80 {
+            debug!(
+                candidate = %candidate,
+                resolved = %best_name,
+                score = %score,
+                "fuzzy model resolution"
+            );
+            return best_name.to_string();
+        }
+    }
+
+    warn!(
+        candidate = %candidate,
+        available = ?models,
+        "no matching model found in Okapi"
+    );
+    candidate.to_string()
 }
 
 /// Convert a [`reqwest::Error`] into [`DoctorError::Http`].

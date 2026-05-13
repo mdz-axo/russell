@@ -977,7 +977,7 @@ async fn call_llm_via_port(
         return Err("can't reach Okapi (tried auto-start)".into());
     }
 
-    let client = OkapiClient::new(&chat_cfg).map_err(|e| format!("client error: {e}"))?;
+    let client = OkapiClient::new(&chat_cfg).await.map_err(|e| format!("client error: {e}"))?;
 
     let resp = client.chat(&soap).await.map_err(|e| format!("{e}"))?;
 
