@@ -44,6 +44,38 @@ pub struct JournalReader {
     path: PathBuf,
 }
 
+/// Input struct for [`JournalWriter::append_help_session`].
+///
+/// Replaces the 12-parameter positional call with a named-field
+/// struct for call-site clarity.
+#[derive(Debug, Clone)]
+pub struct HelpSessionInput<'a> {
+    /// Unique session ID (ULID).
+    pub id: &'a str,
+    /// Unix timestamp of session start.
+    pub ts_unix: i64,
+    /// RFC 3339 timestamp.
+    pub ts: &'a str,
+    /// Backend name (`"okapi"`, `"openrouter"`, `"offline"`, `"mock"`).
+    pub backend: &'a str,
+    /// Model name, if applicable.
+    pub model: Option<&'a str>,
+    /// Operator note or user message.
+    pub note: Option<&'a str>,
+    /// Character count of the prompt sent.
+    pub prompt_chars: i64,
+    /// Character count of the response received.
+    pub response_chars: i64,
+    /// LLM response latency in milliseconds.
+    pub latency_ms: Option<i64>,
+    /// Outcome status (`"ok"`, `"error"`, `"skipped"`).
+    pub status: &'a str,
+    /// Error category if `status` is `"error"`.
+    pub error_kind: Option<&'a str>,
+    /// Path to the evidence directory.
+    pub evidence_ref: &'a str,
+}
+
 /// A single `events` row, in the shape the digest / `journal_query`
 /// consumers want.
 #[derive(Debug, Clone)]
@@ -175,11 +207,49 @@ impl JournalWriter {
         Ok(())
     }
 
+    /// Append a `help_sessions` row using a structured input.
+    ///
+    /// Prefer this over [`append_help_session_row`](Self::append_help_session_row)
+    /// for new code — the named fields prevent positional argument errors.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`CoreError::Sqlite`] on DB errors.
+    pub fn append_help_session(&self, input: &HelpSessionInput<'_>) -> Result<()> {
+        self.conn.execute(
+            r"INSERT INTO help_sessions (
+                id, ts_unix, ts, backend, model, note,
+                prompt_chars, response_chars, latency_ms,
+                status, error_kind, evidence_ref
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
+            params![
+                input.id,
+                input.ts_unix,
+                input.ts,
+                input.backend,
+                input.model,
+                input.note,
+                input.prompt_chars,
+                input.response_chars,
+                input.latency_ms,
+                input.status,
+                input.error_kind,
+                input.evidence_ref
+            ],
+        )?;
+        self.last_write_unix_s
+            .store(crate::time::now_unix(), Ordering::Relaxed);
+        Ok(())
+    }
+
     /// Append a `help_sessions` row produced by the Doctor.
     ///
     /// # Errors
     ///
     /// Returns [`CoreError::Sqlite`] on DB errors.
+    ///
+    /// **Deprecated**: prefer [`append_help_session`](Self::append_help_session)
+    /// which accepts a [`HelpSessionInput`] struct for clarity.
     #[allow(clippy::too_many_arguments)]
     pub fn append_help_session_row(
         &self,
@@ -196,30 +266,20 @@ impl JournalWriter {
         error_kind: Option<&str>,
         evidence_ref: &str,
     ) -> Result<()> {
-        self.conn.execute(
-            r"INSERT INTO help_sessions (
-                id, ts_unix, ts, backend, model, note,
-                prompt_chars, response_chars, latency_ms,
-                status, error_kind, evidence_ref
-            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
-            params![
-                id,
-                ts_unix,
-                ts,
-                backend,
-                model,
-                note,
-                prompt_chars,
-                response_chars,
-                latency_ms,
-                status,
-                error_kind,
-                evidence_ref
-            ],
-        )?;
-        self.last_write_unix_s
-            .store(crate::time::now_unix(), Ordering::Relaxed);
-        Ok(())
+        self.append_help_session(&HelpSessionInput {
+            id,
+            ts_unix,
+            ts,
+            backend,
+            model,
+            note,
+            prompt_chars,
+            response_chars,
+            latency_ms,
+            status,
+            error_kind,
+            evidence_ref,
+        })
     }
 
     /// Return a cloneable read-only handle anchored at the same

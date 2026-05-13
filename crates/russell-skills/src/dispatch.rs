@@ -118,12 +118,37 @@ pub enum StepType {
 }
 
 impl StepType {
-    fn to_string(self) -> &'static str {
+    /// Returns the step type as a lowercase string slice.
+    pub fn as_str(self) -> &'static str {
         match self {
             StepType::Probe => "probe",
             StepType::Intervention => "intervention",
         }
     }
+}
+
+/// Input struct for [`Dispatcher::dispatch`] — the structured
+/// alternative to the multi-parameter [`Dispatcher::run_and_journal`].
+///
+/// Using named fields prevents positional-argument confusion at
+/// call sites with 8+ parameters.
+pub struct DispatchRequest<'a> {
+    /// Journal to write evidence events to.
+    pub journal: &'a JournalWriter,
+    /// Base directory for evidence bundles.
+    pub evidence_base: &'a Path,
+    /// Command to execute.
+    pub cmd: &'a [String],
+    /// Skill identifier (from manifest).
+    pub skill_id: &'a str,
+    /// Step identifier within the skill.
+    pub step_id: &'a str,
+    /// Whether this is a probe or intervention.
+    pub step_type: StepType,
+    /// Risk band string from the manifest.
+    pub risk_band: &'a str,
+    /// Optional timeout override.
+    pub timeout: Option<Duration>,
 }
 
 /// A subprocess dispatcher. Constructed with the skills base directory
@@ -369,7 +394,7 @@ impl Dispatcher {
                 ev.summary = Some(format!("spawn failed: {e} :: skill/{skill_id}/{step_id}",));
                 ev.outputs.insert("risk".into(), risk_band.into());
                 ev.outputs
-                    .insert("step_type".into(), step_type.to_string().into());
+                    .insert("step_type".into(), step_type.as_str().into());
                 if let Err(je) = journal.append(&ev) {
                     tracing::warn!(error = %je, "failed to journal spawn failure");
                 }
@@ -416,7 +441,7 @@ impl Dispatcher {
             .insert("timed_out".into(), outcome.timed_out.into());
         ev.outputs.insert("risk".into(), risk_band.into());
         ev.outputs
-            .insert("step_type".into(), step_type.to_string().into());
+            .insert("step_type".into(), step_type.as_str().into());
 
         // Write evidence bundle.
         let evidence_dir = evidence_base
@@ -441,6 +466,28 @@ impl Dispatcher {
         );
 
         Ok(outcome)
+    }
+
+    /// Run a skill step with journaling, using a structured request.
+    ///
+    /// Prefer this over [`run_and_journal`](Self::run_and_journal) for
+    /// new code — the named fields prevent positional argument errors.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`russell_core::CoreError`] on journal I/O or spawn failure.
+    pub async fn dispatch(&self, req: &DispatchRequest<'_>) -> Result<RunOutcome> {
+        self.run_and_journal(
+            req.journal,
+            req.evidence_base,
+            req.cmd,
+            req.skill_id,
+            req.step_id,
+            req.step_type,
+            req.risk_band,
+            req.timeout,
+        )
+        .await
     }
 
     /// Run an intervention with automatic rollback on failure.

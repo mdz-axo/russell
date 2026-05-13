@@ -1428,11 +1428,8 @@ name = "russell-sentinel"
 version = "0.3.0"
 dependencies = [
  "russell-core",
- "serde",
- "serde_json",
  "thiserror",
  "time",
- "tokio",
  "tracing",
 ]
 
@@ -1440,7 +1437,6 @@ dependencies = [
 name = "russell-skills"
 version = "0.3.0"
 dependencies = [
- "lazy_static",
  "russell-core",
  "serde",
  "serde_json",
