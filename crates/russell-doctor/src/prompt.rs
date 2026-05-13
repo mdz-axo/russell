@@ -201,8 +201,9 @@ pub fn compose(
                  propose it on the final line using:\n\n\
                  ACTION: <skill-id>/<intervention-id>\n\n\
                  (e.g. ACTION: okapi-watcher/restart-okapi). \
-                 Only propose interventions, not probes. \
-                 The operator must consent before execution."
+                 Prefer probes first to gather evidence, then propose interventions. \
+                 Probes execute immediately without consent. \
+                 The operator must consent before interventions execute."
             )?;
         }
 
