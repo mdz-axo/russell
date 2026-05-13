@@ -48,6 +48,7 @@ struct PendingAction {
     risk: russell_skills::RiskBand,
     needs_sudo: bool,
     cmd: Vec<String>,
+    max_auto_risk: russell_skills::RiskBand,
 }
 
 /// One turn in the conversation.
@@ -555,6 +556,7 @@ fn parse_action_from_response(response: &str, skills: &[Skill]) -> Option<Pendin
         risk: iv.risk,
         needs_sudo: iv.needs_sudo,
         cmd: iv.cmd.clone(),
+        max_auto_risk: skill.safety.max_auto_risk,
     })
 }
 
@@ -577,6 +579,7 @@ async fn execute_pending_action(
     let mut dispatcher = Dispatcher::new(&skill_dir);
     dispatcher.intervention_timeout = intervention_timeout;
     dispatcher.dry_run = DryRun::Disabled;
+    dispatcher.max_auto_risk = action.max_auto_risk;
 
     // If this intervention needs sudo, the operator must have
     // NOPASSWD sudo configured. We do not prompt for a password.

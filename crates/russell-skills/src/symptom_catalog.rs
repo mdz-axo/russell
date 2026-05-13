@@ -53,4 +53,13 @@ pub const SYMPTOMS: &[&str] = &[
     "discourse_incoherence",
     "implicit_expectation_mismatch",
     "reference_implementation_drift",
+    // Sysadmin (sysadmin skill — host maintenance tooling)
+    "zombie_accumulation",
+    "clock_skew",
+    "systemd_timer_misfire",
+    "journal_bloat",
+    "process_table_bloat",
+    "swap_retention",
+    "coredump_accumulation",
+    "stale_mount",
 ];
