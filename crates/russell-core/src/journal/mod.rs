@@ -20,6 +20,7 @@
 pub mod migrations;
 
 use std::path::{Path, PathBuf};
+use std::str::FromStr;
 use std::sync::atomic::{AtomicI64, Ordering};
 
 use rusqlite::{Connection, OpenFlags, params};
@@ -46,24 +47,10 @@ pub enum HelpSessionStatus {
     ThresholdSkip,
 }
 
-impl HelpSessionStatus {
-    /// Lowercase string for journal persistence.
-    #[must_use]
-    pub fn as_str(self) -> &'static str {
-        match self {
-            Self::Ok => "ok",
-            Self::Error => "error",
-            Self::Fallback => "fallback",
-            Self::ThresholdSkip => "threshold_skip",
-        }
-    }
+impl FromStr for HelpSessionStatus {
+    type Err = CoreError;
 
-    /// Parse from a journal row or wire format.
-    ///
-    /// # Errors
-    ///
-    /// Returns `CoreError::Invariant` on unrecognised values.
-    pub fn from_str(s: &str) -> Result<Self> {
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         match s {
             "ok" => Ok(Self::Ok),
             "error" => Ok(Self::Error),
