@@ -42,8 +42,8 @@ pub struct Sample {
 /// Collect one sample per probe. Returns only probes that
 /// produced a value on this invocation.
 ///
-/// Delegates to [`ProbeRegistry::collect_all`] which iterates
-/// all registered numeric probes plus text probes.
+/// Uses the lazy-initialised singleton [`REGISTRY`]; the registry
+/// is built once and reused across all Sentinel cycles.
 ///
 /// OKH: `okh.pipeline.sentinel_collect`
 #[tracing::instrument(
@@ -53,24 +53,13 @@ pub struct Sample {
     )
 )]
 pub fn collect() -> Vec<Sample> {
-    ProbeRegistry::with_defaults().collect_all()
+    REGISTRY.collect_all()
 }
 
 /// Lazy-initialised singleton — the registry is built once and
 /// reused across Sentinel cycles.
 static REGISTRY: std::sync::LazyLock<ProbeRegistry> =
     std::sync::LazyLock::new(ProbeRegistry::with_defaults);
-
-/// Collect samples using the cached registry (avoids rebuild per cycle).
-#[tracing::instrument(
-    level = "debug",
-    fields(
-        okh.pipeline.sentinel_collect.items_out,
-    )
-)]
-pub fn collect_cached() -> Vec<Sample> {
-    REGISTRY.collect_all()
-}
 
 #[cfg(test)]
 mod tests {

@@ -82,8 +82,7 @@ impl ProbeRegistry {
     }
 
     /// Collect all samples — numeric probes via the registry, plus
-    /// text-valued probes (process names, memory pressure detail)
-    /// handled separately.
+    /// text-valued probes (process names).
     ///
     /// This is the preferred entry point for the Sentinel orchestrator.
     /// It matches the output of the old `collect()` function —
@@ -95,7 +94,6 @@ impl ProbeRegistry {
 
         // Text-valued probes (no f64 value, names only).
         out.extend(super::process::process_text_samples());
-        out.extend(super::memory::mem_pressure_samples());
 
         tracing::Span::current().record("okh.pipeline.sentinel_collect.items_out", out.len());
         out

@@ -22,7 +22,7 @@ pub mod prompt;
 
 pub use client::{Backend, ClientConfig, EscalateMin, LlmClient, LlmResponse, SoapPrompt};
 pub use error::{DoctorError, Result};
-pub use help::{HelpOutcome, HelpSession, run_help};
+pub use help::{HelpOutcome, run_help};
 
 /// The Jack persona, embedded at compile time so operators cannot
 /// accidentally run Jack without his voice.

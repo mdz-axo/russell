@@ -54,35 +54,6 @@ pub struct HelpOutcome {
     pub skip_reason: Option<SkipReason>,
 }
 
-/// Minimal session record mirrored into the `help_sessions` table.
-#[derive(Debug, Clone, Serialize)]
-pub struct HelpSession {
-    /// ULID.
-    pub id: String,
-    /// Unix timestamp.
-    pub ts_unix: i64,
-    /// RFC3339 timestamp.
-    pub ts: String,
-    /// Backend label.
-    pub backend: &'static str,
-    /// Model, if any.
-    pub model: Option<String>,
-    /// Operator note.
-    pub note: Option<String>,
-    /// Prompt character count.
-    pub prompt_chars: i64,
-    /// Response character count.
-    pub response_chars: i64,
-    /// Round-trip latency (ms); `None` for offline.
-    pub latency_ms: Option<i64>,
-    /// Outcome status.
-    pub status: HelpSessionStatus,
-    /// Short error kind, if status=error.
-    pub error_kind: Option<String>,
-    /// Path to evidence bundle.
-    pub evidence_ref: String,
-}
-
 /// Run the Nurse flow end to end: compose SOAP, call LLM (or fall
 /// back), journal the session, return a print-ready response.
 ///
