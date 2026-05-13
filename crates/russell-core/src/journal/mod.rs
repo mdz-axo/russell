@@ -104,7 +104,7 @@ pub struct HelpSessionInput<'a> {
     pub ts_unix: i64,
     /// RFC 3339 timestamp.
     pub ts: &'a str,
-    /// Backend name (`"okapi"`, `"openrouter"`, `"offline"`, `"mock"`).
+    /// Backend name (`"okapi"`, `"offline"`, `"mock"`).
     pub backend: &'a str,
     /// Model name, if applicable.
     pub model: Option<&'a str>,
