@@ -206,7 +206,9 @@ pub async fn run(paths: &Paths) -> Result<()> {
 
     let chat_models = filter_chat_models(&okapi_models);
 
-    // Warn if the env-specified model doesn't appear in Okapi's list.
+    // Model resolution: env var is authoritative. Never silently pick
+    // from Okapi's model list — that leads to rerankers and other
+    // non-chat models being used as the default.
     let mut current_model = if !current_model_env.is_empty() {
         if !okapi_models.is_empty() && !okapi_models.contains(&current_model_env) {
             warn!(
@@ -215,13 +217,11 @@ pub async fn run(paths: &Paths) -> Result<()> {
             );
         }
         current_model_env
-    } else if let Some(first) = chat_models.first() {
-        first.to_string()
     } else {
         warn!(
             fallback = DEFAULT_FALLBACK_MODEL,
-            available = okapi_models.len(),
-            "no chat model found in Okapi; using hardcoded fallback"
+            available_chat_models = chat_models.len(),
+            "RUSSELL_DOCTOR_MODEL not set; using hardcoded fallback"
         );
         DEFAULT_FALLBACK_MODEL.to_string()
     };
