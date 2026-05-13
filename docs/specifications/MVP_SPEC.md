@@ -159,8 +159,7 @@ Every byte Russell writes is named. Full catalog at
 
 | Path | Owner | Schema | Retention |
 |---|---|---|---|
-| `~/.local/state/harness/journal.db` | `russell-core::journal` | `0001_init.sql` | unbounded |
-| `~/.local/state/harness/baselines.db` | baseline snapshot of journal | `0001_init.sql` | refreshed daily |
+| `~/.local/state/harness/journal.db` | `russell-core::journal` | `0001_init.sql` | unbounded (baselines refreshed daily in-table) |
 | `~/.local/state/harness/profile.json` | `russell-core::profile` | `russell.profile.v1` | unbounded |
 | `~/.local/state/harness/evidence/help/<session-id>/` | `russell-doctor::help` | per-session JSON | 90 days |
 | `~/.local/state/harness/evidence/skills/<skill>/<step>/` | `russell-skills::dispatch` | per-dispatch JSON | 90 days |
@@ -190,8 +189,6 @@ These items remain deferred beyond the current build:
 
 - **GPU path is hardcoded to `card1`.** On machines where the
   dGPU is at a different DRM card index, GPU probes return `None`.
-- **No root-filesystem usage probe.** Requires `statvfs` (libc/nix
-  dependency) which is deferred to avoid `unsafe` in the sentinel crate.
 - **No NVMe SMART probe.** NVMe health files under sysfs require
   root on this kernel/driver combination.
 - **Sudo requires NOPASSWD.** The consent flow does not prompt for
@@ -224,12 +221,15 @@ MVP is **complete** when all three of these are empirically true:
 
 ## 9. Status and Next Step
 
-Phase 1 (MVP Doctor) is **complete**. Phase 2 (observation
-expanded) is **in progress** with process, GPU, disk, and
-systemd probes active. Phase 3 (skills and dispatch) is
-**active** with the IDRS-gated dispatcher, consent flow, and
-the `okapi-watcher` skill operational. The next priorities are
-packaging, install automation, and the 20-day soak.
+Phase 0 (skeleton) is **complete**. Phase 1 (MVP Doctor) is
+**complete**. Phase 1b (install artifacts) is **shipped**.
+Phase 1c (20-day soak) is **closed**. Phase 2 (observation
+sharpened) is **active** with 5 self-vitals, rule engine,
+EWMA baselines, and expanded probes. Phase 3 (skills and
+dispatch) is **complete** with the IDRS-gated dispatcher,
+consent flow, and the `okapi-watcher` skill operational.
+The next priorities are packaging hardening and the next
+ soak cycle.
 
 See [`../status/CONSOLIDATED-STATUS.md`](../status/CONSOLIDATED-STATUS.md)
 for current state.

@@ -60,7 +60,7 @@ of every meaningful development session.
   `profile [--init]`, `digest`, `sentinel-once`, `jack`,
   `chat`, `skill list`, `skill run <id>`, `okapi-probe`,
   `proprio`.
-- 141 tests passing (37 core + 15 doctor + 17 proprio + 8 sentinel + 4 CLI + 28 skills + additional integration tests).
+- 159 tests passing.
 - `cargo fmt --check` ✅, `cargo clippy -- -D warnings` ✅,
   `cargo test` ✅.
 

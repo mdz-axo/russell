@@ -1,0 +1,48 @@
+# SPDX-License-Identifier: MIT
+# web-search — web search, fetch, and browse capabilities for Russell's Nurse (Jack).
+#
+# A knowledge skill: no probes or interventions. When loaded, its
+# KNOWLEDGE.md content is appended to Jack's system prompt, giving him
+# awareness of web search capabilities available through the MCP layer
+# (Brave Search, Firecrawl, Browserbase) and teaching him when and how
+# to request web searches, fetch pages, and browse the web.
+#
+# This skill is the foundation for skill-discovery — Jack uses web
+# search to find, evaluate, and download new skills for Russell.
+#
+# Install: copy this directory to ~/.local/share/harness/skills/web-search/
+
+id: web-search
+version: 1.0.0
+authored: 2026-05-13
+min_harness_version: 0.1.0
+
+# Symptoms Jack can now reason about with web search context.
+symptoms:
+  - search_capability_needed
+  - web_knowledge_gap
+  - skill_source_unknown
+  - external_reference_needed
+  - documentation_outdated
+  - upstream_version_check_needed
+  - api_status_check_needed
+  - package_metadata_stale
+  - security_advisory_relevant
+
+applies_when:
+  - os_family: linux
+
+# Knowledge skill — no probes or interventions.
+# Web search execution happens at the Kilo agent layer via MCP tools.
+probes: []
+interventions: []
+
+safety:
+  max_auto_risk: none
+
+references:
+  - https://api.search.brave.com/app/documentation/web-search/overview
+  - https://docs.firecrawl.dev/
+  - https://browserbase.com/
+  - https://github.com/marketplace/kask
+  - https://kask.ai/docs/arsenal

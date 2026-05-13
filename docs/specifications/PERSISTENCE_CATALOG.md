@@ -39,11 +39,11 @@ flowchart LR
     subgraph CONFIG["~/.config/harness/ (operator-owned)"]
         ENV[russell.env]
         KILL[disable]
-        RULES[rules.d/ &nbsp;<em>(reserved)</em>]
+        RULES[rules.d/]
         ID[PERSONA.md<br/>USER.md]
     end
     subgraph DATA["~/.local/share/harness/ (reserved)"]
-        SKILLS[skills/ &nbsp;<em>(empty in MVP)</em>]
+        SKILLS[skills/]
     end
 ```
 
@@ -77,8 +77,8 @@ against the file.
 | `schema_migrations` | Forward-only migration log | `journal::migrations::apply_one` | migration runner |
 | `samples` | Time-series probe observations | Sentinel, Meta-Sentinel, Proprio | digest, baselines, `arsenal-mcp-russell` |
 | `events` | Structured log rows conforming to `harness.event.v1` | every mutating + observational action | `list`, `digest`, `help` |
-| `baselines` | EWMA mean/var + p50/p95/p99 per probe | (reserved, unused in MVP) | Phase 2 rules |
-| `confirmations` | Andon-cord records for risk≥medium actions | (reserved, unused in MVP) | Phase 3 dispatcher |
+| `baselines` | EWMA mean/var + p50/p95/p99 per probe | `journal::compute_baselines` (daily refresh in sentinel-once) | `read_baselines`, rules, SOAP prompt |
+| `confirmations` | Consent-flow approval records for risk≥medium interventions | `russell-cli::chat` consent path | Phase 3 dispatcher audit |
 | `help_sessions` | One row per `russell jack` round-trip | `russell-doctor::help` | `digest`, future UI |
 
 Column details are in `crates/russell-core/src/journal/migrations/`.
@@ -158,13 +158,16 @@ File is created by the operator. Russell does **not** write to it.
 **Effect.** Every Russell timer becomes a no-op on next trigger
 (post-MVP; in MVP `russell status` surfaces the state).
 
-### 2.7 `~/.config/harness/rules.d/` (reserved)
+### 2.7 `~/.config/harness/rules.d/`
 
-Empty in MVP. Phase 2 rule overrides will land here.
+Operator rule overrides. Default rules ship in
+`crates/russell-sentinel/rules.d/` and are copied at install
+time; operator overrides in this directory take precedence.
 
-### 2.8 `~/.local/share/harness/skills/` (reserved)
+### 2.8 `~/.local/share/harness/skills/`
 
-Empty in MVP. Skill manifests will land here in Phase 3.
+Operator-owned skill manifests. The `okapi-watcher` skill
+ships as a reference implementation.
 
 ### 2.9 `~/.local/state/harness/memory/` (Russell-owned Markdown memory)
 

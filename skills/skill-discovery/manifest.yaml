@@ -1,0 +1,48 @@
+# SPDX-License-Identifier: MIT
+# skill-discovery — teach Jack to find, evaluate, download, and install
+# new skills for Russell using web search capabilities.
+#
+# This is a knowledge skill: no probes or interventions. When loaded,
+# its KNOWLEDGE.md content is appended to Jack's system prompt, giving
+# him the ability to guide skill discovery and bootstrap Russell's
+# capabilities through web search.
+#
+# Requires: web-search skill (for the MCP bridge described therein).
+#
+# Install: copy this directory to ~/.local/share/harness/skills/skill-discovery/
+
+id: skill-discovery
+version: 1.0.0
+authored: 2026-05-13
+min_harness_version: 0.1.0
+
+# Symptoms Jack can now reason about in the skill lifecycle context.
+symptoms:
+  - skill_not_in_catalog
+  - skill_manifest_invalid
+  - skill_install_failed
+  - skill_version_stale
+  - skill_symptom_not_in_catalog
+  - skill_probe_script_missing
+  - skill_rollback_unresolvable
+  - skill_dependency_missing
+  - skill_hardware_incompatible
+
+applies_when:
+  - os_family: linux
+
+# Knowledge skill — no probes or interventions.
+# Skill search uses the web-search MCP bridge.
+probes: []
+interventions: []
+
+safety:
+  max_auto_risk: none
+
+references:
+  - skills/web-search/KNOWLEDGE.md
+  - crates/russell-skills/src/symptom_catalog.rs
+  - docs/specifications/MVP_SPEC.md
+  - docs/architecture/PRINCIPLES_CATALOG.md
+  - https://github.com/Kilo-Org/kilocode
+  - https://kask.ai/docs/arsenal

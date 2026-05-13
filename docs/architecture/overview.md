@@ -105,7 +105,7 @@ a corresponding ADR and a corresponding area of the code:
 | Policy | [ADR-0005](../adr/deferred/0005-privileged-operations.md), [safety.md](../standards/safety.md) | `russell-cli` confirm flow, kill switches |
 | Intelligence | [ADR-0008](../adr/0008-llm-triage-never-emits-shell.md) | `russell-doctor::openrouter`, `russell-core::profile` |
 | Control | [ADR-0007](../adr/deferred/0007-yaml-manifest-subprocess-skill-model.md), [ADR-0015](../adr/0015-proprioception-self-health.md) | `russell-doctor`, `russell-proprio` (MVP self-vital) |
-| Coordination | [ADR-0009](../adr/deferred/0009-tokio-runtime.md) + systemd timers | Unit files under `units/`; timers are OS-level |
+| Coordination | [ADR-0009](../adr/deferred/0009-tokio-runtime.md) + systemd timers | Unit files under `packaging/systemd/`; timers are OS-level |
 | Operations | [ADR-0004](../adr/0004-sqlite-journal.md), [ADR-0006](../adr/0006-profile-abstraction.md) | `russell-sentinel`, `russell-skills` |
 
 ## 2. Crate topology
@@ -123,7 +123,7 @@ flowchart LR
   SENTINEL --> CORE
   SKILLS --> CORE
   DOCTOR --> CORE & SKILLS
-  PROPRIO --> CORE & SKILLS
+  PROPRIO --> CORE
   MCP --> CORE & SENTINEL & DOCTOR & SKILLS & PROPRIO
   CLI --> CORE & SENTINEL & DOCTOR & SKILLS & PROPRIO & MCP
 ```
@@ -161,8 +161,8 @@ derived.
 - Engine: SQLite with WAL + `synchronous=NORMAL`
   ([ADR-0004](../adr/0004-sqlite-journal.md)).
 - Tables: `samples`, `events`, `baselines`, `confirmations`,
-  `migrations`. `proprio_samples` and `proprio_events` mirror
-  the first two but with `scope='self'`
+  `migrations`. Self-scope data (proprioception) uses
+  `scope='self'` in the same `samples` and `events` tables
   ([ADR-0015](../adr/0015-proprioception-self-health.md)).
 - Writer: serialized through a single `spawn_blocking` task in
   `russell-core::journal::writer`. Readers use a connection
@@ -226,12 +226,12 @@ probe's value against the EWMA baseline. Samples and any
 generated events land in the journal.
 
 The Meta-Sentinel (`russell-proprio`) observes Russell himself.
-In MVP it implements one self-vital: `sentinel_last_run_age_s`
-(seconds since the last host sample landed in the journal). It
-runs BEFORE host probes in each cycle so the measurement is
-never stale-by-one. Full meta-Sentinel (timer drift, dispatcher
-latency, journal-writer lag, subprocess zombies, LLM round-trip
-times, MCP error rate) is deferred to Phase 4. See
+Five self-vitals are active (per JR-5):
+`sentinel_last_run_age_s`, `journal_writer_stall_s`,
+`llm_p95_latency_ms`, `timer_drift_s`, `help_error_rate_pct`.
+It runs BEFORE host probes in each cycle so the measurement is
+never stale-by-one. Full meta-Sentinel (additional vitals) is
+deferred to Phase 4. See
 [`../archive/proprioception.md`](../archive/proprioception.md)
 for the aspirational design.
 
