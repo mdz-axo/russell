@@ -151,13 +151,19 @@ pub struct RegistrySources {
     pub sources: Vec<RegistrySource>,
 }
 
+impl Default for RegistryCache {
+    fn default() -> Self {
+        Self {
+            skills: BTreeMap::new(),
+        }
+    }
+}
+
 impl RegistryCache {
     /// Create an empty cache.
     #[must_use]
     pub fn new() -> Self {
-        Self {
-            skills: BTreeMap::new(),
-        }
+        Self::default()
     }
 
     /// Load from a YAML file. Returns empty cache if file doesn't exist.

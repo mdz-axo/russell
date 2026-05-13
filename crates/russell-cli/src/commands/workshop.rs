@@ -9,7 +9,6 @@
 
 use anyhow::{Context, Result};
 use russell_core::paths::Paths;
-use russell_doctor::action::{self, ResolvedAction};
 use russell_doctor::client::LlmClient;
 use russell_doctor::client::SoapPrompt;
 use russell_doctor::oai_client::OkapiClient;
@@ -18,8 +17,6 @@ use russell_skills::registry::{LifecycleStatus, RegistryCache, RegistryEntry, Sa
 use rustyline::DefaultEditor;
 use rustyline::error::ReadlineError;
 use std::fmt::Write as _;
-use std::io::Write;
-use tokio::sync::oneshot;
 use tracing::warn;
 
 /// Run the interactive skill workshop REPL.
@@ -68,7 +65,7 @@ pub async fn run(paths: &Paths) -> Result<()> {
     let workshop_knowledge = load_knowledge("skill-workshop");
     let maintenance_knowledge = load_knowledge("skill-maintenance");
 
-    'outer: loop {
+    loop {
         let line = match rl.readline("workshop> ") {
             Ok(l) => l,
             Err(ReadlineError::Interrupted | ReadlineError::Eof) => break,
@@ -103,7 +100,7 @@ pub async fn run(paths: &Paths) -> Result<()> {
                     if id.contains(&lower)
                         || entry.symptoms.iter().any(|s| s.contains(&lower))
                     {
-                        println!("  {id} ({}) — {}", entry.version, entry.status.as_str(), entry.symptoms.join(", "));
+                        println!("  {id} ({}) — {} {}", entry.version, entry.status.as_str(), entry.symptoms.join(", "));
                     }
                 }
             }
