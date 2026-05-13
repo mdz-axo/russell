@@ -37,7 +37,7 @@ use std::sync::{Mutex, MutexGuard};
 
 use russell_core::Result;
 use russell_core::event::{Event, Scope, Severity};
-use russell_core::journal::{JournalReader, JournalWriter};
+use russell_core::journal::{HelpSessionStatus, JournalReader, JournalWriter};
 use tracing::{debug, warn};
 
 // ---------------------------------------------------------------------------
@@ -862,7 +862,7 @@ mod tests {
                 100,
                 200,
                 Some((i + 1) * 100),
-                "ok",
+                HelpSessionStatus::Ok,
                 None,
                 "ev",
             )
@@ -891,7 +891,7 @@ mod tests {
                 100,
                 200,
                 Some(9_000 + i * 100),
-                "ok",
+                HelpSessionStatus::Ok,
                 None,
                 "ev",
             )
@@ -911,14 +911,14 @@ mod tests {
         let (_tmp, w) = tmp_journal();
         let now = russell_core::time::now_unix();
         // 4 ok, 1 error, 1 fallback, 1 threshold_skip = 7 total, 3 bad = ~42.86%
-        let statuses = [
-            "ok",
-            "ok",
-            "ok",
-            "ok",
-            "error",
-            "fallback",
-            "threshold_skip",
+        let statuses: &[HelpSessionStatus] = &[
+            HelpSessionStatus::Ok,
+            HelpSessionStatus::Ok,
+            HelpSessionStatus::Ok,
+            HelpSessionStatus::Ok,
+            HelpSessionStatus::Error,
+            HelpSessionStatus::Fallback,
+            HelpSessionStatus::ThresholdSkip,
         ];
         for (i, status) in statuses.iter().enumerate() {
             w.append_help_session_row(
@@ -931,7 +931,7 @@ mod tests {
                 100,
                 200,
                 Some(500),
-                status,
+                *status,
                 None,
                 "ev",
             )
@@ -951,7 +951,7 @@ mod tests {
         let (_tmp, w) = tmp_journal();
         let now = russell_core::time::now_unix();
         // 2 ok, 3 error = 5 total, 3 bad = 60% — triggers alert
-        let statuses = ["ok", "ok", "error", "error", "error"];
+        let statuses: &[HelpSessionStatus] = &[HelpSessionStatus::Ok, HelpSessionStatus::Ok, HelpSessionStatus::Error, HelpSessionStatus::Error, HelpSessionStatus::Error];
         for (i, status) in statuses.iter().enumerate() {
             w.append_help_session_row(
                 &format!("id_{i}"),
@@ -963,7 +963,7 @@ mod tests {
                 100,
                 200,
                 Some(500),
-                status,
+                *status,
                 None,
                 "ev",
             )

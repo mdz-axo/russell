@@ -33,7 +33,8 @@ use crate::event::{Event, Scope, Severity};
 /// Replaces raw `String` status fields with a compiler-enforced
 /// domain enum — typos and case mismatches are caught at compile
 /// time rather than at query time.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum HelpSessionStatus {
     /// LLM call succeeded.
     Ok,

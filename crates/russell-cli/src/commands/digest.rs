@@ -171,8 +171,8 @@ fn write_daily_log(paths: &Paths) -> Result<()> {
         } else {
             for s in &sessions {
                 let summary = match s.note.as_deref() {
-                    Some(n) if !n.trim().is_empty() => format!("{n} [{}]", s.status),
-                    _ => format!("(no note) [{}]", s.status),
+                    Some(n) if !n.trim().is_empty() => format!("{n} [{}]", s.status.as_str()),
+                    _ => format!("(no note) [{}]", s.status.as_str()),
                 };
                 writeln!(out, "- [{}] — {summary}", s.id)?;
             }

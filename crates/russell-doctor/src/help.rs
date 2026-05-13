@@ -296,14 +296,16 @@ pub async fn run_help_with_config(
 
     // Journal: events row + help_sessions row.
     let evidence_ref_str = evidence_dir.to_string_lossy().into_owned();
-    let status: &'static str = if let Some(sr) = skip_reason {
+    let status: HelpSessionStatus = if let Some(sr) = skip_reason {
         match sr {
-            SkipReason::OfflineFallback => "fallback",
-            SkipReason::ThresholdSkip => "threshold_skip",
+            SkipReason::OfflineFallback => HelpSessionStatus::Fallback,
+            SkipReason::ThresholdSkip => HelpSessionStatus::ThresholdSkip,
         }
     } else {
-        "ok"
+        HelpSessionStatus::Ok
     };
+
+    let status_str = status.as_str();
 
     let mut ev = Event::new("help", Severity::Info);
     ev.id = russell_core::event::EventId(Ulid::from_string(&session_id).unwrap_or_default());
@@ -313,7 +315,7 @@ pub async fn run_help_with_config(
     ev.summary = Some(format!(
         "backend={} status={} chars={}",
         backend_used,
-        status,
+        status_str,
         response_text.len()
     ));
     ev.evidence_ref = Some(evidence_ref_str.clone());
@@ -350,7 +352,7 @@ pub async fn run_help_with_config(
     insert_help_session(writer, &session)?;
 
     // ADR-0022: append a session note to today's daily log if it exists.
-    append_session_note(paths, &session_id, note, status);
+    append_session_note(paths, &session_id, note, status_str);
 
     Ok(HelpOutcome {
         session_id,

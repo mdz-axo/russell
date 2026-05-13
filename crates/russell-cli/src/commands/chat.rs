@@ -35,7 +35,7 @@
 
 use anyhow::{Context, Result};
 use rand::seq::SliceRandom;
-use russell_core::journal::{JournalReader, JournalWriter};
+use russell_core::journal::{HelpSessionStatus, JournalReader, JournalWriter};
 use russell_core::paths::Paths;
 use russell_skills::Skill;
 use rustyline::DefaultEditor;
@@ -1130,7 +1130,7 @@ fn journal_chat_turn(
         user_msg.len() as i64,
         assistant_msg.len() as i64,
         None, // latency not tracked per-turn in chat
-        "ok",
+HelpSessionStatus::Ok,
         None,
         &format!("memory/chats/{session_id}.json"),
     );
