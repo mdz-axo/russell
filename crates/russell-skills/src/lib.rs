@@ -850,7 +850,7 @@ safety:
     fn loads_gpu_doctor_fixture() {
         let fixture = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures");
         let skills = load_all(&fixture).unwrap();
-        assert_eq!(skills.len(), 2);
+        assert_eq!(skills.len(), 3);
 
         let gpu = skills.iter().find(|s| s.id == "gpu-doctor").unwrap();
         assert_eq!(gpu.probes.len(), 3);
@@ -866,5 +866,13 @@ safety:
         assert_eq!(okapi.interventions.len(), 1);
         assert!(okapi.symptoms.contains(&"llm_slow".into()));
         assert_eq!(okapi.interventions[0].id, "restart-okapi");
+
+        let sysadmin = skills.iter().find(|s| s.id == "sysadmin").unwrap();
+        assert_eq!(sysadmin.probes.len(), 2);
+        assert_eq!(sysadmin.interventions.len(), 3);
+        assert!(sysadmin.symptoms.contains(&"zombie_accumulation".into()));
+        assert!(sysadmin.symptoms.contains(&"clock_skew".into()));
+        assert!(sysadmin.symptoms.contains(&"systemd_service_degraded".into()));
+        assert!(matches!(sysadmin.safety.max_auto_risk, RiskBand::Medium));
     }
 }

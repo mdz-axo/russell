@@ -1,0 +1,51 @@
+id: sysadmin
+version: 0.1.0
+authored: 2026-05-12
+min_harness_version: 0.1.0
+
+symptoms:
+  - zombie_accumulation
+  - clock_skew
+  - systemd_service_degraded
+
+applies_when:
+  - os_family: linux
+
+probes:
+  - id: probe-systemd-failed
+    cmd: ["bash", "./scripts/probe-systemd-failed.sh"]
+    capture: stdout
+    timeout: 10s
+
+  - id: probe-clock-offset
+    cmd: ["bash", "./scripts/probe-clock-offset.sh"]
+    capture: stdout
+    timeout: 10s
+
+interventions:
+  - id: systemd-reset-failed
+    cmd: ["systemctl", "--user", "reset-failed"]
+    risk: low
+    idempotent: true
+    rollback: none_needed
+    timeout: 15s
+    needs_sudo: false
+
+  - id: force-clock-sync
+    cmd: ["bash", "./scripts/force-clock-sync.sh"]
+    risk: medium
+    idempotent: true
+    rollback: none_needed
+    timeout: 30s
+    needs_sudo: true
+
+  - id: reap-zombies
+    cmd: ["bash", "./scripts/reap-zombies.sh"]
+    risk: medium
+    idempotent: true
+    rollback: none_needed
+    timeout: 30s
+    needs_sudo: false
+
+safety:
+  max_auto_risk: medium
