@@ -128,9 +128,6 @@ async fn okapi_list_models(base_url: &str) -> Result<Vec<String>, String> {
     Ok(body.models.into_iter().map(|m| m.name).collect())
 }
 
-/// Re-export from russell-doctor for local use.
-const DEFAULT_MODEL: &str = russell_doctor::client::DEFAULT_MODEL;
-
 /// Find top fuzzy matches for `needle` in `models`.
 ///
 /// Strips non-alphanumeric characters from both sides before scoring
@@ -205,23 +202,12 @@ pub async fn run(paths: &Paths) -> Result<()> {
     let mut editor = DefaultEditor::new().context("initialising readline")?;
     let mut pending_action: Option<PendingAction> = None;
 
-    // Russell owns its model config. The model comes from the env var
-    // (loaded from .env or shell) or the compiled-in default. We never
-    // query Okapi to decide which model to use — Okapi is a router,
-    // Russell tells it what to route to.
-    let base_url = std::env::var("RUSSELL_DOCTOR_BASE_URL")
-        .unwrap_or_else(|_| "http://127.0.0.1:11435/v1".into());
-    let current_model_env = std::env::var("RUSSELL_DOCTOR_MODEL").unwrap_or_default();
-
-    let mut current_model = if !current_model_env.is_empty() {
-        current_model_env
-    } else {
-        warn!(
-            model = DEFAULT_MODEL,
-            "RUSSELL_DOCTOR_MODEL not set; using default"
-        );
-        DEFAULT_MODEL.to_string()
-    };
+    // Load model config from the shared ClientConfig. This reads
+    // RUSSELL_DOCTOR_MODEL from env (loaded from russell.env or shell)
+    // or falls back to the compiled-in DEFAULT_MODEL.
+    let client_cfg = russell_doctor::client::ClientConfig::from_env();
+    let base_url = client_cfg.base_url.clone().unwrap_or_else(|| "http://127.0.0.1:11435/v1".into());
+    let mut current_model = client_cfg.model;
 
     // Okapi's model list is fetched lazily — only when the operator
     // uses `/model list` or `/model <name>`. Not at startup.
