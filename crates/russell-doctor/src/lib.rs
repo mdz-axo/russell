@@ -15,6 +15,7 @@ pub mod action;
 pub mod client;
 pub mod error;
 pub mod fallback;
+pub mod health;
 pub mod help;
 pub mod mock;
 pub mod oai_client;

@@ -986,10 +986,16 @@ async fn call_llm_via_port(
     chat_cfg.model = model.to_string();
     // Ensure we always point at Okapi.
     if chat_cfg.base_url.is_none() {
-        chat_cfg.base_url = Some("http://127.0.0.1:11435/v1".into());
+        chat_cfg.base_url = Some(russell_doctor::health::DEFAULT_BASE_URL.to_string());
     }
     if chat_cfg.api_key.is_none() {
         chat_cfg.api_key = Some("okapi".into());
+    }
+
+    // Shared health pipeline: verify Okapi is reachable, auto-start if needed.
+    let base = chat_cfg.base_url.as_deref().unwrap_or(russell_doctor::health::DEFAULT_BASE_URL);
+    if !russell_doctor::health::ensure_ready(base).await {
+        return Err("can't reach Okapi (tried auto-start)".into());
     }
 
     let client = OkapiClient::new(&chat_cfg).map_err(|e| format!("client error: {e}"))?;

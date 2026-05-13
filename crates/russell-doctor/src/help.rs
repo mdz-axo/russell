@@ -148,16 +148,11 @@ async fn dispatch_backend(
             if okapi_cfg.api_key.is_none() {
                 okapi_cfg.api_key = Some("okapi".into());
             }
-            let base = okapi_cfg.base_url.clone().unwrap_or_default();
-            let health_url = base
-                .trim_end_matches("/v1")
-                .trim_end_matches('/')
-                .to_string()
-                + "/api/tags";
-            if !okapi_health_check(&health_url).await {
-                info!("okapi not reachable — attempting auto-start");
-                okapi_start().await;
-            }
+            let base = okapi_cfg
+                .base_url
+                .as_deref()
+                .unwrap_or(crate::health::DEFAULT_BASE_URL);
+            crate::health::ensure_ready(base).await;
 
             let client = oai_client::OkapiClient::new(&okapi_cfg)?;
             match client.chat(soap).await {
@@ -458,44 +453,7 @@ fn append_session_note(paths: &Paths, session_id: &str, note: Option<&str>, stat
     }
 }
 
-/// Check whether Okapi's API is reachable by hitting `/api/tags`.
-async fn okapi_health_check(health_url: &str) -> bool {
-    let Ok(client) = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(3))
-        .build()
-    else {
-        return false;
-    };
-    match client.get(health_url).send().await {
-        Ok(resp) => resp.status().is_success(),
-        Err(_) => false,
-    }
-}
 
-/// Attempt to start Okapi via `systemctl --user start okapi`.
-async fn okapi_start() {
-    let output = tokio::process::Command::new("systemctl")
-        .args(["--user", "start", "okapi"])
-        .output()
-        .await;
-    match output {
-        Ok(o) if o.status.success() => {
-            info!("okapi started via systemctl --user");
-            // Give it a moment to become ready.
-            tokio::time::sleep(std::time::Duration::from_secs(3)).await;
-        }
-        Ok(o) => {
-            warn!(
-                stderr = %String::from_utf8_lossy(&o.stderr),
-                code = o.status.code(),
-                "systemctl --user start okapi returned non-zero"
-            );
-        }
-        Err(e) => {
-            warn!(error = %e, "failed to run systemctl --user start okapi");
-        }
-    }
-}
 
 /// Short tag for the `error_kind` column.
 fn error_kind_of(e: &DoctorError) -> String {
