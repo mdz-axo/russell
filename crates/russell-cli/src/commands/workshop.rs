@@ -114,7 +114,7 @@ pub async fn run(paths: &Paths) -> Result<()> {
             _ => {
                 // Delegate to Jack via LLM for free-form workshop interaction.
                 let _ = jack_workshop_turn(
-                    &input,
+                    input,
                     &workshop_knowledge,
                     &maintenance_knowledge,
                     &skills,
@@ -193,7 +193,7 @@ fn print_skill_list(registry: &RegistryCache) {
         println!("No skills in registry.");
         return;
     }
-    println!("{:<30} {:<10} {:<14} {}", "skill", "version", "status", "symptoms");
+    println!("{:<30} {:<10} {:<14} symptoms", "skill", "version", "status");
     println!("{}", "-".repeat(80));
     for (id, entry) in &registry.skills {
         let status_mark = match entry.status {
@@ -265,25 +265,25 @@ fn print_evaluate(registry: &RegistryCache, skills_dir: &std::path::Path, name: 
     // Try to read the manifest and scan it.
     let skill_path = skills_dir.join(name);
     let manifest_path = skill_path.join("manifest.yaml");
-    if manifest_path.exists() {
-        if let Ok(content) = std::fs::read_to_string(&manifest_path) {
-            let scan = SafetyScan::scan(&content);
-            println!("\n  Safety scan:");
-            if scan.findings.is_empty() {
-                println!("    ✓ No findings.");
-            } else {
-                for f in &scan.findings {
-                    let severity = match f.severity {
-                        russell_skills::registry::ScanSeverity::Info => "INFO",
-                        russell_skills::registry::ScanSeverity::Warn => "WARN",
-                        russell_skills::registry::ScanSeverity::Block => "BLOCK",
-                    };
-                    println!("    [{severity}] {id}: {desc}", id = f.rule_id, desc = f.description);
-                }
+    if manifest_path.exists()
+        && let Ok(content) = std::fs::read_to_string(&manifest_path)
+    {
+        let scan = SafetyScan::scan(&content);
+        println!("\n  Safety scan:");
+        if scan.findings.is_empty() {
+            println!("    ✓ No findings.");
+        } else {
+            for f in &scan.findings {
+                let severity = match f.severity {
+                    russell_skills::registry::ScanSeverity::Info => "INFO",
+                    russell_skills::registry::ScanSeverity::Warn => "WARN",
+                    russell_skills::registry::ScanSeverity::Block => "BLOCK",
+                };
+                println!("    [{severity}] {id}: {desc}", id = f.rule_id, desc = f.description);
             }
-            if scan.has_blocks() {
-                println!("    ⛔ Skill has blocking findings — review before installing.");
-            }
+        }
+        if scan.has_blocks() {
+            println!("    ⛔ Skill has blocking findings — review before installing.");
         }
     }
 

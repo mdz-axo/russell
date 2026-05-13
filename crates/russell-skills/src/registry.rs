@@ -13,7 +13,7 @@ use std::collections::BTreeMap;
 use std::path::Path;
 
 /// The local registry cache — one entry per known skill.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct RegistryCache {
     /// Map of skill_id → cache entry.
     pub skills: BTreeMap<String, RegistryEntry>,
@@ -149,14 +149,6 @@ pub enum RegistryKind {
 pub struct RegistrySources {
     /// Configured remote sources.
     pub sources: Vec<RegistrySource>,
-}
-
-impl Default for RegistryCache {
-    fn default() -> Self {
-        Self {
-            skills: BTreeMap::new(),
-        }
-    }
 }
 
 impl RegistryCache {
@@ -402,11 +394,8 @@ impl SafetyScan {
             });
         }
 
-        // Block-level: destructive rm
-        if lower.contains("rm -rf /")
-            || lower.contains("rm -rf ~/")
-            || lower.contains("rm -rf *")
-        {
+        // Block-level: destructive rm (root, home, or wildcard)
+        if has_destructive_rm(&lower) {
             findings.push(ScanFinding {
                 severity: ScanSeverity::Block,
                 rule_id: "destructive-delete".into(),
@@ -485,6 +474,34 @@ fn secret_exfiltration(lower: &str) -> bool {
         || lower.contains("/etc/shadow")
         || lower.contains(".ssh/");
     has_network && has_sensitive
+}
+
+fn has_destructive_rm(lower: &str) -> bool {
+    if lower.contains("rm -rf /*")
+        || lower.contains("rm -rf ~/")
+        || lower.contains("rm -rf * ")
+        || lower.ends_with("rm -rf *")
+    {
+        return true;
+    }
+    let haystack = lower.as_bytes();
+    let needle = "rm -rf /".as_bytes();
+    let mut pos = 0;
+    while let Some(idx) = haystack[pos..]
+        .windows(needle.len())
+        .position(|w| w == needle)
+    {
+        let abs = pos + idx + needle.len();
+        if abs >= haystack.len() {
+            return true;
+        }
+        let next = haystack[abs];
+        if next.is_ascii_whitespace() || next == b'*' {
+            return true;
+        }
+        pos = abs;
+    }
+    false
 }
 
 /// Extract a surrounding snippet of text around a keyword.
