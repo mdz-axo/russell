@@ -67,9 +67,10 @@ Under JR-4, Russell escalates from day one.
    `help_sessions` table and an evidence bundle.
 5. Print the model's response.
 
-If Jack proposes an intervention (`ACTION: <skill>/<id>`), the
-response is parsed and the operator is shown guidance on how to
-execute it via `russell chat` or `russell skill run`.
+If Jack proposes a probe (`ACTION: <skill>/<probe-id>`), it
+executes immediately and the output is printed. If Jack proposes
+an intervention (`ACTION: <skill>/<intervention-id>`), the
+operator is shown the risk band and prompted for consent.
 
 **Offline fallback.** If the LLM is unreachable, a rule-based
 summary of severity counts and most-recent events is printed.
@@ -77,11 +78,19 @@ summary of severity counts and most-recent events is printed.
 ### 2.2 The `chat` verb — interactive consent flow
 
 `russell chat` is the canonical path for operator consent to
-interventions. Jack proposes actions; the operator types
-`/approve` or `/deny`. The skill dispatcher executes approved
-interventions with full IDRS journaling. Risk enforcement gates
-on `max_auto_risk` (default: Low). Sudo-requiring interventions
-require NOPASSWD configuration by the operator.
+interventions. Jack can:
+
+- **Run probes** (risk: none) immediately via `ACTION:` — no
+  consent required. Probe output is printed inline.
+- **Propose interventions** via `ACTION:` — the operator
+  consents with natural language ("ok", "yes", "do it",
+  "go ahead") or `/approve`. Refusal via "no", "nope",
+  "cancel", or `/deny`.
+
+The skill dispatcher executes approved interventions with full
+IDRS journaling. Risk enforcement gates on `max_auto_risk`
+(default: Low). Sudo-requiring interventions require NOPASSWD
+configuration by the operator.
 
 ## 3. The Observation Loop
 
