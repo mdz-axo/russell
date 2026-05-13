@@ -47,6 +47,19 @@ pub enum HelpSessionStatus {
     ThresholdSkip,
 }
 
+impl HelpSessionStatus {
+    /// Lowercase string for journal persistence.
+    #[must_use]
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Ok => "ok",
+            Self::Error => "error",
+            Self::Fallback => "fallback",
+            Self::ThresholdSkip => "threshold_skip",
+        }
+    }
+}
+
 impl FromStr for HelpSessionStatus {
     type Err = CoreError;
 
