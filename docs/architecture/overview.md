@@ -137,15 +137,6 @@ reference_sources: PRINCIPLES_CATALOG.md JR-6 (reuse over dependency)
 status: VERIFIED
 -->
 
-<!-- DIAGRAM_ALIGNMENT
-id: DIAG-OVERVIEW-002
-type: flowchart
-verified_date: 2026-05-13
-verified_against: ADR-0013 (rust-workspace-layout); cargo.toml dependency declarations
-reference_sources: PRINCIPLES_CATALOG.md JR-6 (reuse over dependency)
-status: VERIFIED
--->
-
 See [ADR-0013](../adr/0013-rust-workspace-layout.md). No crate
 depends on `russell-cli`. The dependency DAG is rooted at
 `russell-core`.
