@@ -95,16 +95,8 @@ impl ChatHistory {
     }
 }
 
-/// A model entry from Okapi's `/api/tags` (Ollama-compatible).
-#[derive(Debug, Clone, Deserialize)]
-struct OkapiModel {
-    name: String,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-struct OkapiTagsResponse {
-    models: Vec<OkapiModel>,
-}
+/// Prompt the operator to pick from a numbered list of models.
+/// Returns `Some(zero-based-index)` on valid selection, `None` on cancel.
 
 /// Fetch the list of available models from Okapi's `/api/tags`.
 async fn okapi_list_models(base_url: &str) -> Result<Vec<String>, String> {
@@ -124,41 +116,16 @@ async fn okapi_list_models(base_url: &str) -> Result<Vec<String>, String> {
     if !resp.status().is_success() {
         return Err(format!("Okapi returned HTTP {}", resp.status()));
     }
-    let body: OkapiTagsResponse = resp.json().await.map_err(|e| format!("parse error: {e}"))?;
-    Ok(body.models.into_iter().map(|m| m.name).collect())
+    let body: serde_json::Value =
+        resp.json().await.map_err(|e| format!("parse error: {e}"))?;
+    Ok(body["models"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|m| m["name"].as_str().map(str::to_string))
+        .collect())
 }
 
-/// Find top fuzzy matches for `needle` in `models`.
-///
-/// Strips non-alphanumeric characters from both sides before scoring
-/// (so `deepseekv4pro` matches `deepseek-v4-pro:cloud`).
-/// Returns all models scoring ≥ 0.75 via Jaro-Winkler.
-/// If exactly one, the caller auto-selects it; if multiple, the caller
-/// shows a numbered list for disambiguation.
-fn fuzzy_match_models<'a>(needle: &str, models: &'a [String]) -> Vec<&'a str> {
-    let needle_lower = needle.to_lowercase();
-    let needle_clean: String = needle_lower
-        .chars()
-        .filter(|c| c.is_alphanumeric())
-        .collect();
-
-    let mut scored: Vec<(&str, f64)> = models
-        .iter()
-        .map(|m| {
-            let name_lower = m.to_lowercase();
-            let name_clean: String = name_lower.chars().filter(|c| c.is_alphanumeric()).collect();
-            let score = strsim::jaro_winkler(&needle_clean, &name_clean);
-            (m.as_str(), score)
-        })
-        .filter(|(_, s)| *s >= 0.75)
-        .collect();
-
-    scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
-    scored.into_iter().map(|(name, _)| name).collect()
-}
-
-/// Prompt the operator to pick from a numbered list of models.
-/// Returns `Some(zero-based-index)` on valid selection, `None` on cancel.
 fn prompt_model_selection(
     editor: &mut DefaultEditor,
     history_entry: &str,
@@ -431,27 +398,30 @@ pub async fn run(paths: &Paths) -> Result<()> {
                                     println!();
                                     continue;
                                 }
-                                // Fuzzy match against Okapi's model list.
-                                let matches = fuzzy_match_models(name, &okapi_models);
-                                match matches.len() {
-                                    0 => {
-                                        println!("  No model found matching \"{name}\". Try /model list.");
+                                // Resolve the model name using the shared validator.
+                                let http = match reqwest::Client::builder()
+                                    .timeout(std::time::Duration::from_secs(5))
+                                    .build()
+                                {
+                                    Ok(c) => c,
+                                    Err(e) => {
+                                        println!("  Can't resolve model: {e}");
+                                        println!();
+                                        continue;
                                     }
-                                    1 => {
-                                        current_model = matches[0].to_string();
-                                        println!("  Switched to model: {current_model}");
-                                    }
-                                    n => {
-                                        println!("  Multiple models match \"{name}\":");
-                                        for (i, m) in matches.iter().enumerate() {
-                                            let marker = if *m == current_model { " ← current" } else { "" };
-                                            println!("    {}. {m}{marker}", i + 1);
-                                        }
-                                        if let Some(selected) = prompt_model_selection(&mut editor, trimmed, n) {
-                                            current_model = matches[selected].to_string();
-                                            println!("  Switched to model: {current_model}");
-                                        }
-                                    }
+                                };
+                                let resolved =
+                                    russell_doctor::oai_client::resolve_model_name(
+                                        &base_url, name, &http,
+                                    )
+                                    .await;
+                                if resolved == name {
+                                    println!(
+                                        "  No model found matching \"{name}\". Try /model list."
+                                    );
+                                } else {
+                                    current_model = resolved;
+                                    println!("  Switched to model: {current_model}");
                                 }
                                 println!();
                                 continue;

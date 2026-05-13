@@ -30,7 +30,6 @@ time.workspace = true
 rustyline.workspace = true
 reqwest.workspace = true
 ulid.workspace = true
-strsim.workspace = true
 rand.workspace = true
 rpassword = "5"
 

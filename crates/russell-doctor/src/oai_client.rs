@@ -158,7 +158,7 @@ impl LlmClient for OkapiClient {
 /// then finds the best fuzzy match (Jaro-Winkler ≥ 0.80).
 /// Returns the exact model name from Okapi on match, or the
 /// original candidate if Okapi is unreachable or has no models.
-async fn resolve_model_name(
+pub(crate) async fn resolve_model_name(
     base_url: &str,
     candidate: &str,
     http: &reqwest::Client,

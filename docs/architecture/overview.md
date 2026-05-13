@@ -87,6 +87,15 @@ flowchart TB
   DOCTOR --> NOTIFY
 ```
 
+<!-- DIAGRAM_ALIGNMENT
+id: DIAG-OVERVIEW-001
+type: flowchart
+verified_date: 2026-05-13
+verified_against: AGENTS.md §5 (VSM layers); ADR-0004, ADR-0006, ADR-0008, ADR-0013, ADR-0015
+reference_sources: PRINCIPLES_CATALOG.md JR-1 through JR-7; cybernetic-health-harness.md
+status: VERIFIED
+-->
+
 The five VSM layers — Policy, Intelligence, Control, Coordination,
 Operations — are not just diagramming convenience. Each layer has
 a corresponding ADR and a corresponding area of the code:
