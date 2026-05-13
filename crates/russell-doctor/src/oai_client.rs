@@ -158,7 +158,12 @@ impl LlmClient for OkapiClient {
 /// then finds the best fuzzy match (Jaro-Winkler ≥ 0.80).
 /// Returns the exact model name from Okapi on match, or the
 /// original candidate if Okapi is unreachable or has no models.
-pub(crate) async fn resolve_model_name(
+///
+/// This is the **single resolution gate**. Every model name passed
+/// to Okapi's chat-completions endpoint must go through this function
+/// (via [`OkapiClient::new`], [`resolve_and_correct_model`], or direct
+/// call for model-listing UIs).
+pub async fn resolve_model_name(
     base_url: &str,
     candidate: &str,
     http: &reqwest::Client,
