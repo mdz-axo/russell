@@ -145,7 +145,7 @@ engines land in Phase 2.
 | Key | Purpose | Optional |
 |---|---|---|
 | `OPENROUTER_API_KEY` | Authenticates the Doctor's LLM calls | yes (fallback kicks in if absent) |
-| `RUSSELL_DOCTOR_MODEL` | Override default model ID | yes (default `deepseekv4pro`) |
+| `RUSSELL_DOCTOR_MODEL` | Override default model ID | yes (default `nemotron3-super:cloud`) |
 | `RUSSELL_DOCTOR_BACKEND` | `okapi` \| `openrouter` \| `mock` \| `offline` | yes (default `okapi`) |
 | `RUSSELL_LOG` | Tracing filter | yes |
 

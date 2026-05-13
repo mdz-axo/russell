@@ -79,8 +79,8 @@ Configuration flows from `~/.config/harness/russell.env` (see
 [`../specifications/PERSISTENCE_CATALOG.md`](../specifications/PERSISTENCE_CATALOG.md) §2.5):
 
 ```
-RUSSELL_DOCTOR_BACKEND=ollama          # ollama | openrouter | mock | offline
-RUSSELL_DOCTOR_MODEL=deepseekv4pro     # default model
+RUSSELL_DOCTOR_BACKEND=okapi            # okapi | openrouter | mock | offline
+RUSSELL_DOCTOR_MODEL=nemotron3-super:cloud  # default model
 OPENROUTER_API_KEY=sk-or-...           # only required for openrouter backend
 ```
 
@@ -93,20 +93,20 @@ There is no longer a magic auto-detection path that silently
 switches to OpenRouter when a key is present. OpenRouter is
 **explicit opt-in** via `RUSSELL_DOCTOR_BACKEND=openrouter`.
 
-### 3. Ollama backend — the default
+### 3. Okapi backend — the default
 
-The Ollama backend:
+The Okapi backend:
 
-- **Base URL:** `http://127.0.0.1:11434/v1` (Ollama's
+- **Base URL:** `http://127.0.0.1:11435/v1` (Okapi's
   OpenAI-compatible endpoint, overridable).
-- **Default model:** `deepseekv4pro`.
+- **Default model:** `nemotron3-super:cloud`.
 - **Timeout:** 60 seconds. One attempt. No retry.
 - **Auto-start.** Before sending the prompt, Russell checks
-  whether Ollama is reachable via a quick GET to `/api/tags`
+  whether Okapi is reachable via a quick GET to `/api/tags`
   (3-second timeout). If not reachable, he runs
-  `systemctl --user start ollama` and waits 3 seconds for it
+  `systemctl --user start okapi` and waits 3 seconds for it
   to become ready. This is a best-effort convenience; it does
-  not install or configure Ollama.
+  not install or configure Okapi.
 - **Fallback on failure.** If Ollama cannot be reached after
   the auto-start attempt, or if the chat completion fails, the
   offline rule-based summary is emitted instead.
@@ -118,7 +118,7 @@ as in ADR-0016 v1.0.0:
 
 - **Base URL:** `https://openrouter.ai/api/v1` (overridable).
 - **Default model:** whatever `RUSSELL_DOCTOR_MODEL` says, or
-  `deepseekv4pro`.
+  `nemotron3-super:cloud`.
 - **Timeout:** 60 seconds. One attempt. No retry.
 - **Provider preferences sent in every request:**
 

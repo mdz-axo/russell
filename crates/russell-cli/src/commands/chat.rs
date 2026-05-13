@@ -140,8 +140,9 @@ fn is_chat_model(name: &str) -> bool {
     !NON_CHAT_PATTERNS.iter().any(|p| lower.contains(p))
 }
 
-/// Sensible fallback when no chat model is found.
-const DEFAULT_FALLBACK_MODEL: &str = "nemotron3-super:cloud";
+/// Russell's default model. Russell owns its model config; Okapi is
+/// just the router. This must match `RUSSELL_DOCTOR_MODEL` in `.env`.
+const DEFAULT_MODEL: &str = "nemotron3-super:cloud";
 
 /// Filter `models` to those that look like chat models.
 fn filter_chat_models(models: &[String]) -> Vec<&str> {
@@ -198,33 +199,28 @@ pub async fn run(paths: &Paths) -> Result<()> {
     let mut editor = DefaultEditor::new().context("initialising readline")?;
     let mut pending_action: Option<PendingAction> = None;
 
-    // Resolve the default model from env, and fetch available models from Okapi.
+    // Russell owns its model config. The model comes from the env var
+    // (loaded from .env or shell) or the compiled-in default. We never
+    // query Okapi to decide which model to use — Okapi is a router,
+    // Russell tells it what to route to.
     let base_url = std::env::var("RUSSELL_DOCTOR_BASE_URL")
         .unwrap_or_else(|_| "http://127.0.0.1:11435/v1".into());
     let current_model_env = std::env::var("RUSSELL_DOCTOR_MODEL").unwrap_or_default();
-    let okapi_models: Vec<String> = okapi_list_models(&base_url).await.unwrap_or_default();
 
-    let chat_models = filter_chat_models(&okapi_models);
-
-    // Model resolution: env var is authoritative. Never silently pick
-    // from Okapi's model list — that leads to rerankers and other
-    // non-chat models being used as the default.
     let mut current_model = if !current_model_env.is_empty() {
-        if !okapi_models.is_empty() && !okapi_models.contains(&current_model_env) {
-            warn!(
-                model = %current_model_env,
-                "RUSSELL_DOCTOR_MODEL not found in Okapi models; using anyway"
-            );
-        }
         current_model_env
     } else {
         warn!(
-            fallback = DEFAULT_FALLBACK_MODEL,
-            available_chat_models = chat_models.len(),
-            "RUSSELL_DOCTOR_MODEL not set; using hardcoded fallback"
+            model = DEFAULT_MODEL,
+            "RUSSELL_DOCTOR_MODEL not set; using default"
         );
-        DEFAULT_FALLBACK_MODEL.to_string()
+        DEFAULT_MODEL.to_string()
     };
+
+    // Okapi's model list is fetched lazily — only when the operator
+    // uses `/model list` or `/model <name>`. Not at startup.
+    let mut okapi_models: Vec<String> = Vec::new();
+    let mut okapi_models_fetched = false;
 
     // Banner.
     println!();
@@ -368,6 +364,11 @@ pub async fn run(paths: &Paths) -> Result<()> {
                                 continue;
                             }
                             if other == "/model list" {
+                                // Lazy-fetch Okapi models on first use.
+                                if !okapi_models_fetched {
+                                    okapi_models = okapi_list_models(&base_url).await.unwrap_or_default();
+                                    okapi_models_fetched = true;
+                                }
                                 println!("  Available models ({}):", okapi_models.len());
                                 for m in &okapi_models {
                                     let marker = if m == &current_model {
@@ -383,6 +384,28 @@ pub async fn run(paths: &Paths) -> Result<()> {
                             if let Some(name) = other.strip_prefix("/model ") {
                                 let name = name.trim();
                                 if name.is_empty() {
+                                    println!("  Current model: {current_model}");
+                                    println!();
+                                    continue;
+                                }
+                                // Lazy-fetch Okapi models for switching.
+                                if !okapi_models_fetched {
+                                    okapi_models = okapi_list_models(&base_url).await.unwrap_or_default();
+                                    okapi_models_fetched = true;
+                                }
+                                // If the name is typed exactly (no fuzzy needed),
+                                // just switch directly — even if Okapi is unreachable.
+                                if okapi_models.contains(&name.to_string()) || okapi_models.is_empty() {
+                                    if okapi_models.is_empty() {
+                                        // Okapi unreachable; trust the operator.
+                                        current_model = name.to_string();
+                                        println!("  Switched to model: {current_model} (unverified — Okapi unreachable)");
+                                        println!();
+                                        continue;
+                                    }
+                                }
+                                if false {
+                                    // dead arm — original empty-check was here
                                     println!("  Current model: {current_model}");
                                     println!();
                                     continue;
