@@ -128,6 +128,26 @@ async fn okapi_list_models(base_url: &str) -> Result<Vec<String>, String> {
     Ok(body.models.into_iter().map(|m| m.name).collect())
 }
 
+/// Known non-chat model name patterns (rerankers, embedders, etc.).
+/// Models matching any of these substrings are excluded from
+/// auto-selection (but still available via explicit `/model` switch).
+const NON_CHAT_PATTERNS: &[&str] = &["reranker", "rerank", "embed", "embedding"];
+
+/// Returns true if the model name does NOT match any known
+/// non-chat pattern (reranker, embedder, etc.).
+fn is_chat_model(name: &str) -> bool {
+    let lower = name.to_lowercase();
+    !NON_CHAT_PATTERNS.iter().any(|p| lower.contains(p))
+}
+
+/// Sensible fallback when no chat model is found.
+const DEFAULT_FALLBACK_MODEL: &str = "nemotron3-super:cloud";
+
+/// Filter `models` to those that look like chat models.
+fn filter_chat_models(models: &[String]) -> Vec<&str> {
+    models.iter().filter(|m| is_chat_model(m)).map(|m| m.as_str()).collect()
+}
+
 /// Find top fuzzy matches for `needle` in `models`.
 ///
 /// Strips non-alphanumeric characters from both sides before scoring
@@ -181,17 +201,30 @@ pub async fn run(paths: &Paths) -> Result<()> {
     // Resolve the default model from env, and fetch available models from Okapi.
     let base_url = std::env::var("RUSSELL_DOCTOR_BASE_URL")
         .unwrap_or_else(|_| "http://127.0.0.1:11435/v1".into());
-    let mut current_model = std::env::var("RUSSELL_DOCTOR_MODEL").unwrap_or_default();
+    let current_model_env = std::env::var("RUSSELL_DOCTOR_MODEL").unwrap_or_default();
     let okapi_models: Vec<String> = okapi_list_models(&base_url).await.unwrap_or_default();
 
-    // Auto-select a model if none configured.
-    if current_model.is_empty() {
-        if let Some(first) = okapi_models.first() {
-            current_model = first.clone();
-        } else {
-            current_model = "default".into();
+    let chat_models = filter_chat_models(&okapi_models);
+
+    // Warn if the env-specified model doesn't appear in Okapi's list.
+    let mut current_model = if !current_model_env.is_empty() {
+        if !okapi_models.is_empty() && !okapi_models.contains(&current_model_env) {
+            warn!(
+                model = %current_model_env,
+                "RUSSELL_DOCTOR_MODEL not found in Okapi models; using anyway"
+            );
         }
-    }
+        current_model_env
+    } else if let Some(first) = chat_models.first() {
+        first.to_string()
+    } else {
+        warn!(
+            fallback = DEFAULT_FALLBACK_MODEL,
+            available = okapi_models.len(),
+            "no chat model found in Okapi; using hardcoded fallback"
+        );
+        DEFAULT_FALLBACK_MODEL.to_string()
+    };
 
     // Banner.
     println!();
