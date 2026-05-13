@@ -19,7 +19,7 @@ use clap::{Parser, Subcommand};
 #[command(
     name = "russell",
     version,
-    about = "Cybernetic health harness for a Linux AI/ML workstation",
+    about = "Observes a Linux AI/ML workstation, records telemetry in a SQLite journal, and consults a local LLM for health assessment",
     long_about = None,
 )]
 struct Cli {
@@ -71,26 +71,21 @@ enum Command {
         #[arg(long, default_value = "")]
         default_model: String,
     },
-    /// Ask Jack for help — composes a SOAP bundle, consults the
-    /// LLM (or offline fallback), writes evidence, prints the
-    /// response.
+    /// Ask Jack to assess machine health. Composes a SOAP bundle from recent samples, consults the LLM, writes evidence, and prints the response.
     #[command(name = "jack")]
     Jack {
         /// Free-text context to include as Subjective.
         #[arg(long)]
         note: Option<String>,
     },
-    /// List or run skill probes.
+    /// List or run skill probes and interventions.
     Skill {
         #[command(subcommand)]
         cmd: SkillCmd,
     },
-    /// Start an interactive chat with Jack.
-    /// Each turn sends the latest journal state to the LLM,
-    /// maintaining conversation context across turns.
+    /// Start an interactive multi-turn conversation with Jack. Each turn sends the latest journal state to the LLM.
     Chat,
-    /// Run Russell's self-observation (proprioception) and
-    /// append self-vital samples to the journal.
+    /// Run Russell's self-observation cycle. Computes five self-vitals and appends samples to the journal.
     Proprio,
 }
 
