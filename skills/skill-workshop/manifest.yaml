@@ -1,0 +1,42 @@
+# SPDX-License-Identifier: MIT
+# skill-workshop — interactive skill composition and adaptation for Russell's Nurse (Jack).
+#
+# A knowledge skill: no probes or interventions. When loaded, its
+# KNOWLEDGE.md content is appended to Jack's system prompt, teaching
+# him how to guide the operator through interactive skill creation,
+# evaluation, adaptation, and installation in the skill workshop REPL.
+#
+# This skill is loaded during `russell skill workshop` sessions.
+# It pairs with skill-maintenance (for staleness/coverage auditing)
+# and skill-discovery (for web-based skill searching).
+#
+# Install: copy this directory to ~/.local/share/harness/skills/skill-workshop/
+
+id: skill-workshop
+version: 1.0.0
+authored: 2026-05-13
+min_harness_version: 0.1.0
+
+symptoms:
+  - skill_not_in_catalog
+  - skill_manifest_invalid
+  - skill_probe_script_missing
+  - skill_rollback_unresolvable
+  - skill_hardware_incompatible
+  - skill_symptom_not_in_catalog
+  - skill_dependency_missing
+
+applies_when:
+  - os_family: linux
+
+probes: []
+interventions: []
+
+safety:
+  max_auto_risk: none
+
+references:
+  - docs/adr/0024-skill-registry-workshop-lifecycle.md
+  - skills/skill-discovery/KNOWLEDGE.md
+  - skills/web-search/KNOWLEDGE.md
+  - skills/skill-maintenance/KNOWLEDGE.md

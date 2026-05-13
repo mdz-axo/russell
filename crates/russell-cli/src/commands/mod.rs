@@ -10,4 +10,5 @@ pub mod profile;
 pub mod proprio;
 pub mod sentinel_once;
 pub mod skill;
+pub mod workshop;
 pub mod status;

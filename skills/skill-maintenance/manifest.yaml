@@ -1,0 +1,43 @@
+# SPDX-License-Identifier: MIT
+# skill-maintenance — skill lifecycle auditing, staleness detection, and
+# coverage analysis for Russell's Nurse (Jack).
+#
+# A knowledge skill: no probes or interventions. When loaded, its
+# KNOWLEDGE.md content is appended to Jack's system prompt, teaching
+# him to audit installed skills for staleness, detect symptom coverage
+# gaps, score skill quality, and guide deprecation/retirement.
+#
+# This skill is loaded during `russell skill workshop` sessions.
+# It pairs with skill-workshop (for composition/adaptation) and
+# skill-discovery (for web-based searching).
+#
+# Install: copy this directory to ~/.local/share/harness/skills/skill-maintenance/
+
+id: skill-maintenance
+version: 1.0.0
+authored: 2026-05-13
+min_harness_version: 0.1.0
+
+symptoms:
+  - skill_not_in_catalog
+  - skill_version_stale
+  - skill_install_failed
+  - skill_symptom_not_in_catalog
+  - skill_probe_script_missing
+  - skill_rollback_unresolvable
+  - skill_dependency_missing
+  - skill_hardware_incompatible
+
+applies_when:
+  - os_family: linux
+
+probes: []
+interventions: []
+
+safety:
+  max_auto_risk: none
+
+references:
+  - docs/adr/0024-skill-registry-workshop-lifecycle.md
+  - skills/skill-discovery/KNOWLEDGE.md
+  - skills/skill-workshop/KNOWLEDGE.md

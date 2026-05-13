@@ -30,6 +30,9 @@ mod symptom_catalog;
 /// Subprocess dispatcher for probe and intervention execution.
 pub mod dispatch;
 
+/// Skill registry — cache, lifecycle, lookup, safety scanner.
+pub mod registry;
+
 pub use symptom_catalog::SYMPTOMS;
 
 /// Errors that can occur during manifest loading.

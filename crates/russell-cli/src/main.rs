@@ -85,6 +85,8 @@ enum Command {
     },
     /// Start an interactive multi-turn conversation with Jack. Each turn sends the latest journal state to the LLM.
     Chat,
+    /// Start an interactive skill workshop with Jack — discover, evaluate, build, adapt, and maintain skills.
+    Workshop,
     /// Run Russell's self-observation cycle. Computes five self-vitals and appends samples to the journal.
     Proprio,
 }
@@ -145,6 +147,7 @@ async fn main() -> Result<()> {
             SkillCmd::Run { id, dry_run } => commands::skill::run(&paths, &id, dry_run).await,
         },
         Command::Chat => commands::chat::run(&paths).await,
+        Command::Workshop => commands::workshop::run(&paths).await,
         Command::Proprio => commands::proprio::run(&paths),
     }
 }
