@@ -249,8 +249,11 @@ pub async fn run(paths: &Paths) -> Result<()> {
                         pending_action = None;
                         continue;
                     }
-                    if trimmed == "/deny" || trimmed == "no" || trimmed == "nope"
-                        || trimmed == "cancel" || trimmed == "nah"
+                    if trimmed == "/deny"
+                        || trimmed == "no"
+                        || trimmed == "nope"
+                        || trimmed == "cancel"
+                        || trimmed == "nah"
                     {
                         println!("  Denied. Action not executed.");
                         pending_action = None;
@@ -540,15 +543,12 @@ pub async fn run(paths: &Paths) -> Result<()> {
                                 )
                                 .await;
                             } else {
-                                let sudo_tag =
-                                    if pa.needs_sudo { " [needs sudo]" } else { "" };
+                                let sudo_tag = if pa.needs_sudo { " [needs sudo]" } else { "" };
                                 println!(
                                     "  → Jack proposes: {}/{} (risk: {:?}{}).",
                                     pa.skill_id, pa.intervention_id, pa.risk, sudo_tag
                                 );
-                                println!(
-                                    "  → Say 'ok' to approve, or 'no' to refuse."
-                                );
+                                println!("  → Say 'ok' to approve, or 'no' to refuse.");
                                 pending_action = Some(pa);
                             }
                         }
@@ -718,7 +718,10 @@ async fn execute_pending_action(
                 journal,
                 session_id,
                 model,
-                &format!("/{} {}/{}", action_label, action.skill_id, action.intervention_id),
+                &format!(
+                    "/{} {}/{}",
+                    action_label, action.skill_id, action.intervention_id
+                ),
                 &format!(
                     "executed: exit={:?}, stdout_len={}, stderr_len={}",
                     outcome.exit_code,

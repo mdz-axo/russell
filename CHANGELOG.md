@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [0.3.0] — 2026-05-12
 
 ### Added
 - **Natural-language consent**: Operator can say "ok", "yes", "do it",

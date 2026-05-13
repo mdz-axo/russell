@@ -162,5 +162,3 @@ fn split_action_line(response: &str) -> (&str, Option<&str>) {
         (trimmed, None)
     }
 }
-
-

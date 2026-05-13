@@ -872,7 +872,11 @@ safety:
         assert_eq!(sysadmin.interventions.len(), 3);
         assert!(sysadmin.symptoms.contains(&"zombie_accumulation".into()));
         assert!(sysadmin.symptoms.contains(&"clock_skew".into()));
-        assert!(sysadmin.symptoms.contains(&"systemd_service_degraded".into()));
+        assert!(
+            sysadmin
+                .symptoms
+                .contains(&"systemd_service_degraded".into())
+        );
         assert!(matches!(sysadmin.safety.max_auto_risk, RiskBand::Medium));
     }
 }
