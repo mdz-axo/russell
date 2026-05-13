@@ -2,7 +2,7 @@
 title: "Russell Consolidated Status"
 audience: [operators, developers, contributors, architects, agents]
 last_updated: 2026-05-12
-togaf_phase: "G — Governance"
+togaf_phase: "G"
 version: "2.1.0"
 status: "Active"
 ---

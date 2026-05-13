@@ -2,7 +2,7 @@
 title: "Architecture Overview"
 audience: [architects, developers, contributors]
 last_updated: 2026-05-06
-togaf_phase: "A — Architecture Vision"
+togaf_phase: "A"
 version: "1.1.0"
 status: "Active"
 ---

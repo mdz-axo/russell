@@ -2,10 +2,16 @@
 title: "Disk & Package Hygiene — Task 4: Provenance Registry"
 audience: [developers, operators, agents]
 last_updated: 2026-05-06
-togaf_phase: "C — Data Architecture"
+togaf_phase: "C"
 version: "0.1.0"
 status: "Draft"
 ---
+
+<!-- TOGAF_DOMAIN: Application -->
+<!-- VERSION: 0.1.0 -->
+<!-- STATUS: Draft -->
+<!-- LAST_UPDATED: 2026-05-06 -->
+
 
 # Task 4 — Provenance Registry: Tracking curl-installed and GitHub-sourced Binaries
 

@@ -2,7 +2,7 @@
 title: "Operations"
 audience: [operators, developers]
 last_updated: 2026-04-18
-togaf_phase: "G — Governance"
+togaf_phase: "G"
 version: "1.0.0"
 status: "Active"
 ---

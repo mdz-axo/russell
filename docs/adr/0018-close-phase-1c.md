@@ -2,7 +2,7 @@
 title: "ADR-0018: Close Phase 1c — 20-Day Soak Sufficient"
 audience: [developers, architects, operators]
 last_updated: 2026-05-06
-togaf_phase: "H — Change Management"
+togaf_phase: "H"
 version: "1.0.0"
 status: "Active"
 ---

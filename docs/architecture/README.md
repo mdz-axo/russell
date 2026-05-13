@@ -2,7 +2,7 @@
 title: "Architecture Documents"
 audience: [architects, developers, contributors]
 last_updated: 2026-04-18
-togaf_phase: "A — Architecture Vision"
+togaf_phase: "A"
 version: "1.0.0"
 status: "Active"
 ---

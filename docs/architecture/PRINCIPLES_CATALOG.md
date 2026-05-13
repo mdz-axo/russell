@@ -2,7 +2,7 @@
 title: "Russell Architecture Principles Catalog"
 audience: [architects, developers, contributors, agents]
 last_updated: 2026-04-18
-togaf_phase: "Preliminary — Architecture Principles"
+togaf_phase: "Preliminary"
 version: "1.0.0"
 status: "Active"
 ---

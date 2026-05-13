@@ -2,10 +2,16 @@
 title: "Disk & Package Hygiene — Task 6: Open Questions"
 audience: [developers, architects, operators]
 last_updated: 2026-05-06
-togaf_phase: "Preliminary / Governance"
+togaf_phase: "Preliminary"
 version: "0.1.0"
 status: "Draft"
 ---
+
+<!-- TOGAF_DOMAIN: Cross-cutting -->
+<!-- VERSION: 0.1.0 -->
+<!-- STATUS: Draft -->
+<!-- LAST_UPDATED: 2026-05-06 -->
+
 
 # Task 6 — Open Questions and Underspecified Aspects
 

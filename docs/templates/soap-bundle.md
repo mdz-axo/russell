@@ -2,7 +2,7 @@
 title: "SOAP Bundle Template"
 audience: [developers]
 last_updated: 2026-04-18
-togaf_phase: "C — Information Systems"
+togaf_phase: "C"
 version: "1.0.0"
 status: "Active"
 ---

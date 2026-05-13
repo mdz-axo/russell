@@ -2,7 +2,7 @@
 title: "Russell Documentation Portal"
 audience: [operators, developers, contributors, architects, agents]
 last_updated: 2026-05-09
-togaf_phase: "Cross-cutting — Documentation Governance"
+togaf_phase: "C"
 version: "1.0.0"
 status: "Active"
 ---

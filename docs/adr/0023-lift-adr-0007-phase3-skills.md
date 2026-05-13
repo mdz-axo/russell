@@ -2,9 +2,9 @@
 title: "ADR-0023: Lift ADR-0007 Deferral — Phase 3 Skills and Dispatch"
 audience: [developers, architects]
 last_updated: 2026-05-11
-togaf_phase: "H — Change Management"
+togaf_phase: "H"
 version: "1.1.0"
-status: "Implemented"
+status: "Active"
 ---
 
 <!-- TOGAF_DOMAIN: Change Management -->

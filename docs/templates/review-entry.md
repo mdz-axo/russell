@@ -2,7 +2,7 @@
 title: "REVIEW.md Entry Template"
 audience: [operators, developers, agents]
 last_updated: 2026-05-09
-togaf_phase: "C — Data Architecture"
+togaf_phase: "C"
 version: "1.0.0"
 status: "Active"
 ---

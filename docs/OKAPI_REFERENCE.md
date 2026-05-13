@@ -2,10 +2,16 @@
 title: "Okapi Reference"
 audience: [operators, developers, contributors]
 last_updated: 2026-05-12
-togaf_phase: "D — Technology Architecture"
+togaf_phase: "D"
 version: "1.0.0"
 status: "Active"
 ---
+
+<!-- TOGAF_DOMAIN: Technology -->
+<!-- VERSION: 1.0.0 -->
+<!-- STATUS: Active -->
+<!-- LAST_UPDATED: 2026-05-12 -->
+
 
 # Okapi Reference — For Russell
 

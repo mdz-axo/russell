@@ -2,7 +2,7 @@
 title: "Writing Excellence Protocol"
 audience: [contributors, developers, agents]
 last_updated: 2026-05-09
-togaf_phase: "Preliminary — Framework and Principles"
+togaf_phase: "Preliminary"
 version: "0.11.0"
 status: "Active"
 ---

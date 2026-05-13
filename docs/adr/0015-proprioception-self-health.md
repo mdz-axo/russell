@@ -2,7 +2,7 @@
 title: "ADR-0015: Proprioception — Self-Health"
 audience: [developers, architects]
 last_updated: 2026-04-18
-togaf_phase: "H — Change Management"
+togaf_phase: "H"
 version: "1.0.0"
 status: "Active"
 ---

@@ -2,10 +2,16 @@
 title: "Disk & Package Hygiene — Policy: Dependency Drag"
 audience: [operators, developers, agents]
 last_updated: 2026-05-07
-togaf_phase: "H — Change Management"
+togaf_phase: "H"
 version: "1.0.0"
 status: "Active"
 ---
+
+<!-- TOGAF_DOMAIN: Architecture Change Management -->
+<!-- VERSION: 1.0.0 -->
+<!-- STATUS: Active -->
+<!-- LAST_UPDATED: 2026-05-07 -->
+
 
 # Dependency Drag Policy
 

@@ -2,7 +2,7 @@
 title: "TOGAF Traceability Matrix"
 audience: [architects, developers, contributors]
 last_updated: 2026-05-12
-togaf_phase: "Cross-cutting — Architecture Governance"
+togaf_phase: "C"
 version: "1.0.0"
 status: "Active"
 ---

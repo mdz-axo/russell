@@ -2,11 +2,17 @@
 title: "Disk & Package Hygiene — Task 2: Disk Hygiene Probes"
 audience: [developers, agents]
 last_updated: 2026-05-06
-togaf_phase: "D — Technology Architecture"
+togaf_phase: "D"
 version: "0.1.0"
 status: "Draft"
 parent: "../DISK_PKG_HYGIENE_SPEC.md"
 ---
+
+<!-- TOGAF_DOMAIN: Technology -->
+<!-- VERSION: 0.1.0 -->
+<!-- STATUS: Draft -->
+<!-- LAST_UPDATED: 2026-05-06 -->
+
 
 # Task 2 — Probe Design: Disk Hygiene Observation
 

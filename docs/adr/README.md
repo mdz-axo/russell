@@ -2,7 +2,7 @@
 title: "Architecture Decision Records (Active)"
 audience: [developers, architects, contributors]
 last_updated: 2026-05-09
-togaf_phase: "H — Change Management"
+togaf_phase: "H"
 version: "1.0.0"
 status: "Active"
 ---

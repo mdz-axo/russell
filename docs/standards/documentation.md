@@ -7,6 +7,12 @@ version: "1.1.0"
 status: "Superseded"
 ---
 
+<!-- TOGAF_DOMAIN: Cross-cutting -->
+<!-- VERSION: 1.1.0 -->
+<!-- STATUS: Superseded -->
+<!-- LAST_UPDATED: 2026-05-12 -->
+
+
 > This document's unique content (doc tiers, Markov conventions, cross-linking
 > rules, tables, terminology discipline) has been merged into
 > [`DOCUMENTATION_STANDARDS.md`](DOCUMENTATION_STANDARDS.md) §§11–15.

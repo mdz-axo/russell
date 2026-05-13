@@ -2,9 +2,9 @@
 title: "ADR-0022: Markdown Memory Layer — Derived Exports for Human Legibility"
 audience: [developers, architects]
 last_updated: 2026-05-09
-togaf_phase: "C — Data Architecture"
+togaf_phase: "C"
 version: "1.0.0"
-status: "Accepted"
+status: "Active"
 ---
 
 <!-- TOGAF_DOMAIN: Data Architecture -->

@@ -2,7 +2,7 @@
 title: "ADR-0001: Scope and Charter"
 audience: [architects, developers, contributors]
 last_updated: 2026-04-18
-togaf_phase: "H — Change Management"
+togaf_phase: "H"
 version: "1.0.0"
 status: "Active"
 ---

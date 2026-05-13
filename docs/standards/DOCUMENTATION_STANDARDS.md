@@ -2,7 +2,7 @@
 title: "Documentation Standards"
 audience: [contributors, developers, architects]
 last_updated: 2026-05-12
-togaf_phase: "Preliminary — Governance"
+togaf_phase: "Preliminary"
 version: "1.1.0"
 status: "Active"
 ---
@@ -193,7 +193,7 @@ Every new authoritative document begins with:
 title: "Short Title Case"
 audience: [operators, developers]
 last_updated: YYYY-MM-DD
-togaf_phase: "Preliminary | A | B | C | D | E | F | G | H | Requirements Management"
+togaf_phase: "Preliminary"
 version: "MAJOR.MINOR.PATCH"
 status: "Active | Proposed | Superseded | Deprecated"
 ---

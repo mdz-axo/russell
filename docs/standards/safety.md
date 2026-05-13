@@ -2,7 +2,7 @@
 title: "Safety Standard — IDRS, Risk Bands, Kill Switches"
 audience: [developers, operators, agents]
 last_updated: 2026-04-18
-togaf_phase: "G — Governance"
+togaf_phase: "G"
 version: "1.0.0"
 status: "Active"
 ---

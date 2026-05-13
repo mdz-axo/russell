@@ -2,10 +2,16 @@
 title: "Disk & Package Hygiene — Task 3: Package Ecosystem Probes"
 audience: [developers, agents]
 last_updated: 2026-05-06
-togaf_phase: "D — Technology Architecture"
+togaf_phase: "D"
 version: "0.1.0"
 status: "Draft"
 ---
+
+<!-- TOGAF_DOMAIN: Technology -->
+<!-- VERSION: 0.1.0 -->
+<!-- STATUS: Draft -->
+<!-- LAST_UPDATED: 2026-05-06 -->
+
 
 # Task 3 — Probe Design: Package Ecosystem Observation
 

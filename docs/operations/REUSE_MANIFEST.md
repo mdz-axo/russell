@@ -2,7 +2,7 @@
 title: "Reuse Manifest — what Russell copied and from where"
 audience: [developers, architects, contributors]
 last_updated: 2026-04-18
-togaf_phase: "D — Technology Architecture"
+togaf_phase: "D"
 version: "1.0.0"
 status: "Active"
 ---

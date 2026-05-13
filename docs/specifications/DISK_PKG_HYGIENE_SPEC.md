@@ -2,11 +2,17 @@
 title: "Disk & Package Hygiene — Specification Suite"
 audience: [developers, architects, operators, agents]
 last_updated: 2026-05-06
-togaf_phase: "B–D (Business through Technology Architecture)"
+togaf_phase: "B"
 version: "0.1.0"
 status: "Draft"
 phase: "Phase 2 (post-MVP)"
 ---
+
+<!-- TOGAF_DOMAIN: Business -->
+<!-- VERSION: 0.1.0 -->
+<!-- STATUS: Draft -->
+<!-- LAST_UPDATED: 2026-05-06 -->
+
 
 # Disk & Package Hygiene — Specification Suite
 

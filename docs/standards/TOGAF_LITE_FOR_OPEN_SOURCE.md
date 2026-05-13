@@ -5,10 +5,16 @@ status: "Active"
 last_updated: "2026-05-09"
 pattern_name: "TOGAF-Lite for Open Source"
 category: "Documentation Architecture Pattern"
-togaf_phase: "Preliminary — Framework and Principles"
+togaf_phase: "Preliminary"
 audience: "Open-source project maintainers, documentation architects, technical writers"
 keywords: ["TOGAF", "documentation", "open source", "architecture", "pattern"]
 ---
+
+<!-- TOGAF_DOMAIN: Cross-cutting -->
+<!-- VERSION: 0.11.0 -->
+<!-- STATUS: Active -->
+<!-- LAST_UPDATED: 2026-05-09 -->
+
 
 # TOGAF-Lite for Open Source
 

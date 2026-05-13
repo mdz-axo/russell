@@ -2,9 +2,9 @@
 title: "ADR-0019: Probe Cadence Separation and OKH Instrumentation"
 audience: [developers, architects]
 last_updated: 2026-05-06
-togaf_phase: "D — Technology Architecture"
+togaf_phase: "D"
 version: "1.0.0"
-status: "Accepted"
+status: "Active"
 ---
 
 <!-- TOGAF_DOMAIN: Technology Architecture -->

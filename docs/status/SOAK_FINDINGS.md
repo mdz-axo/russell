@@ -2,7 +2,7 @@
 title: "Soak Findings — Phase 1c backlog"
 audience: [developers, architects, operators, contributors]
 last_updated: 2026-05-12
-togaf_phase: "G — Governance"
+togaf_phase: "G"
 version: "1.1.0"
 status: "Active"
 ---

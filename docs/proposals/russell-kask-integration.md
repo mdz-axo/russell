@@ -2,10 +2,16 @@
 title: "Proposal: Russell as Kask's Local System Agent"
 audience: [architects, developers]
 last_updated: 2026-05-06
-togaf_phase: "A — Architecture Vision"
+togaf_phase: "A"
 version: "1.0.0"
 status: "Proposed"
 ---
+
+<!-- TOGAF_DOMAIN: Business -->
+<!-- VERSION: 1.0.0 -->
+<!-- STATUS: Proposed -->
+<!-- LAST_UPDATED: 2026-05-06 -->
+
 
 # Proposal: Russell as Kask's Local System Agent
 

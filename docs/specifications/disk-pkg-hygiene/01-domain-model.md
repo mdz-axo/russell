@@ -2,11 +2,17 @@
 title: "Disk & Package Hygiene — Task 1: Domain Model"
 audience: [developers, architects, agents]
 last_updated: 2026-05-06
-togaf_phase: "C — Data Architecture"
+togaf_phase: "C"
 version: "0.1.0"
 status: "Draft"
 parent: "../DISK_PKG_HYGIENE_SPEC.md"
 ---
+
+<!-- TOGAF_DOMAIN: Application -->
+<!-- VERSION: 0.1.0 -->
+<!-- STATUS: Draft -->
+<!-- LAST_UPDATED: 2026-05-06 -->
+
 
 # Task 1 — Domain Model: RDF Graph and Entity-Relationship Diagram
 

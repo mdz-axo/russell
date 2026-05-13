@@ -2,9 +2,9 @@
 title: "ADR-0021: Proprioception Phase 2 — Reflex Arcs and Self-Vitals"
 audience: [developers, architects]
 last_updated: 2026-05-09
-togaf_phase: "H — Change Management"
+togaf_phase: "H"
 version: "1.0.0"
-status: "Accepted"
+status: "Active"
 ---
 
 <!-- TOGAF_DOMAIN: Change Management -->

@@ -2,9 +2,9 @@
 title: "ADR-0009: Tokio Runtime (Deferred)"
 audience: [developers, architects]
 last_updated: 2026-04-18
-togaf_phase: "H — Change Management"
+togaf_phase: "H"
 version: "1.0.0"
-status: "Accepted — Deferred"
+status: "Deprecated"
 ---
 
 <!-- TOGAF_DOMAIN: Change Management -->
