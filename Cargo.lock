@@ -1335,7 +1335,7 @@ dependencies = [
 
 [[package]]
 name = "russell-cli"
-version = "0.3.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -1362,7 +1362,7 @@ dependencies = [
 
 [[package]]
 name = "russell-core"
-version = "0.3.0"
+version = "0.2.0"
 dependencies = [
  "insta",
  "rusqlite",
@@ -1380,7 +1380,7 @@ dependencies = [
 
 [[package]]
 name = "russell-doctor"
-version = "0.3.0"
+version = "0.2.0"
 dependencies = [
  "insta",
  "reqwest",
@@ -1398,7 +1398,7 @@ dependencies = [
 
 [[package]]
 name = "russell-mcp"
-version = "0.3.0"
+version = "0.2.0"
 dependencies = [
  "russell-core",
  "russell-doctor",
@@ -1414,7 +1414,7 @@ dependencies = [
 
 [[package]]
 name = "russell-proprio"
-version = "0.3.0"
+version = "0.2.0"
 dependencies = [
  "rusqlite",
  "russell-core",
@@ -1425,7 +1425,7 @@ dependencies = [
 
 [[package]]
 name = "russell-sentinel"
-version = "0.3.0"
+version = "0.2.0"
 dependencies = [
  "russell-core",
  "thiserror",
@@ -1435,7 +1435,7 @@ dependencies = [
 
 [[package]]
 name = "russell-skills"
-version = "0.3.0"
+version = "0.2.0"
 dependencies = [
  "russell-core",
  "serde",
