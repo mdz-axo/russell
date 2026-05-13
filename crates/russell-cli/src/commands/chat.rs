@@ -207,7 +207,22 @@ pub async fn run(paths: &Paths) -> Result<()> {
     // or falls back to the compiled-in DEFAULT_MODEL.
     let client_cfg = russell_doctor::client::ClientConfig::from_env();
     let base_url = client_cfg.base_url.clone().unwrap_or_else(|| "http://127.0.0.1:11435/v1".into());
-    let mut current_model = client_cfg.model;
+
+    // Resolve the configured model name against Okapi's actual model
+    // list. If the name is misspelled or stale, this corrects it
+    // (both in the env file and process environment).
+    let resolved = russell_doctor::oai_client::resolve_and_correct_model(
+        &client_cfg,
+        &paths.config,
+    )
+    .await;
+    if resolved != client_cfg.model {
+        println!(
+            "  Corrected: model \"{}\" → \"{}\" (env file updated)",
+            client_cfg.model, resolved
+        );
+    }
+    let mut current_model = resolved;
 
     // Okapi's model list is fetched lazily — only when the operator
     // uses `/model list` or `/model <name>`. Not at startup.

@@ -10,6 +10,20 @@ pub async fn run(paths: &Paths, note: Option<&str>) -> Result<()> {
     let writer = JournalWriter::open(&paths.journal())
         .with_context(|| format!("opening journal {}", paths.journal().display()))?;
 
+    // Resolve and correct the model name before the help flow starts.
+    let cfg = russell_doctor::client::ClientConfig::from_env();
+    let resolved = russell_doctor::oai_client::resolve_and_correct_model(
+        &cfg,
+        &paths.config,
+    )
+    .await;
+    if resolved != cfg.model {
+        println!(
+            "  Corrected: model \"{}\" → \"{}\" (env file updated)",
+            cfg.model, resolved
+        );
+    }
+
     let outcome = russell_doctor::run_help(paths, &writer, note)
         .await
         .context("running Doctor help flow")?;

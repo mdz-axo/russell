@@ -124,6 +124,81 @@ pub fn load_discovered(
     first_found
 }
 
+/// Find the first existing env file in Russell's discovery order
+/// (read-only — does not load any values).
+///
+/// Search order matches [`load_discovered`]: config dir first,
+/// then repo root, then cwd. Returns `None` if no env file exists.
+pub fn find_env_file(config_harness_dir: &Path) -> Option<std::path::PathBuf> {
+    let mut candidates: Vec<std::path::PathBuf> = Vec::new();
+    candidates.push(config_harness_dir.join("russell.env"));
+    if let Ok(cwd) = std::env::current_dir()
+        && let Some(repo) = find_repo_root(&cwd)
+    {
+        candidates.push(repo.join(".env"));
+    }
+    candidates.push(std::path::PathBuf::from(".env"));
+    for c in candidates {
+        if c.exists() {
+            return Some(c);
+        }
+    }
+    None
+}
+
+/// Update a `KEY=value` line in an env file, replacing `old_value`
+/// with `new_value`. Only the **first** matching key with that
+/// exact value is updated; duplicate lines are removed. Comments
+/// and unrelated lines are preserved.
+///
+/// Also updates the process environment so subsequent
+/// `std::env::var` calls see the new value.
+///
+/// Returns `true` if a line was modified.
+pub fn correct_env_var(
+    env_path: &Path,
+    key: &str,
+    old_value: &str,
+    new_value: &str,
+) -> std::io::Result<bool> {
+    let text = fs::read_to_string(env_path)?;
+    let mut found = false;
+    let mut updated = String::with_capacity(text.len() + 32);
+
+    for raw in text.lines() {
+        let line = raw.trim();
+        if line.is_empty() || line.starts_with('#') {
+            updated.push_str(raw);
+            updated.push('\n');
+            continue;
+        }
+        if let Some((k, v)) = line.split_once('=') {
+            if k.trim() == key && v.trim() == old_value && !found {
+                updated.push_str(&format!("{key}={new_value}\n"));
+                found = true;
+                continue;
+            }
+            if k.trim() == key && v.trim() == old_value {
+                // Duplicate line with same old value — skip.
+                continue;
+            }
+        }
+        updated.push_str(raw);
+        updated.push('\n');
+    }
+
+    if found {
+        fs::write(env_path, &updated)?;
+        // SAFETY: set from async context where no concurrent reads
+        // of this env var happen.
+        #[allow(unsafe_code)]
+        unsafe {
+            std::env::set_var(key, new_value);
+        }
+    }
+    Ok(found)
+}
+
 /// Walk up from `start` looking for a `Cargo.toml` that declares a
 /// `[workspace]`. Returns the directory containing it, or `None`.
 fn find_repo_root(start: &std::path::Path) -> Option<std::path::PathBuf> {

@@ -245,6 +245,65 @@ pub async fn resolve_model_name(
     candidate.to_string()
 }
 
+/// Resolve the model name against Okapi's actual model list, and if
+/// the resolved name differs from the configured name, **correct the
+/// env file** so the fix persists across restarts.
+///
+/// Searches Russell's env-file discovery order (config dir first,
+/// then repo root, then cwd). If a `russell.env` or `.env` file
+/// contains `RUSSELL_DOCTOR_MODEL=<old value>`, the line is
+/// replaced with the resolved name. Also updates the process
+/// environment so subsequent reads see the correction.
+///
+/// Returns the resolved (actual) model name.
+pub async fn resolve_and_correct_model(
+    cfg: &ClientConfig,
+    config_harness_dir: &std::path::Path,
+) -> String {
+    let http = match reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(5))
+        .build()
+    {
+        Ok(c) => c,
+        Err(_) => return cfg.model.clone(),
+    };
+    let base_url = cfg.base_url.as_deref().unwrap_or(crate::health::DEFAULT_BASE_URL);
+    let resolved = resolve_model_name(base_url, &cfg.model, &http).await;
+
+    if resolved != cfg.model {
+        tracing::info!(
+            candidate = %cfg.model,
+            resolved = %resolved,
+            "correcting model name in env file"
+        );
+        if let Some(env_path) = russell_core::env::find_env_file(config_harness_dir) {
+            match russell_core::env::correct_env_var(
+                &env_path,
+                "RUSSELL_DOCTOR_MODEL",
+                &cfg.model,
+                &resolved,
+            ) {
+                Ok(true) => {
+                    tracing::info!(
+                        path = %env_path.display(),
+                        old = %cfg.model,
+                        new = %resolved,
+                        "env file corrected"
+                    );
+                }
+                Ok(false) => {
+                    tracing::warn!("model name differs but no matching line found in env file to correct");
+                }
+                Err(e) => {
+                    tracing::warn!(error = %e, "failed to correct env file");
+                }
+            }
+        }
+    }
+
+    resolved
+}
+
 /// Convert a [`reqwest::Error`] into [`DoctorError::Http`].
 fn map_reqwest_error(context: &str, e: &reqwest::Error) -> DoctorError {
     DoctorError::Http {
