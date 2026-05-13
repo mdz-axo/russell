@@ -23,32 +23,11 @@ pub fn net_tcp6_connections() -> Option<f64> {
     tools::parse_sockstat(&content, "TCP6")
 }
 
-/// Return both network probes in a single collection.
-pub(crate) fn net_samples() -> Vec<super::Sample> {
-    let mut out = Vec::new();
-    if let Some(v) = net_tcp_connections() {
-        out.push(super::Sample {
-            name: "net_tcp_connections".into(),
-            value_num: Some(v),
-            value_text: None,
-            unit: Some("count"),
-        });
-    }
-    if let Some(v) = net_tcp6_connections() {
-        out.push(super::Sample {
-            name: "net_tcp6_connections".into(),
-            value_num: Some(v),
-            value_text: None,
-            unit: Some("count"),
-        });
-    }
-    out
-}
-
 // -- ProbeDescriptor impls --
 
 use super::descriptor::ProbeDescriptor;
 
+/// Probe descriptor for `net_tcp_connections`.
 pub struct NetTcpConnections;
 impl ProbeDescriptor for NetTcpConnections {
     fn name(&self) -> &'static str { "net_tcp_connections" }
@@ -56,6 +35,7 @@ impl ProbeDescriptor for NetTcpConnections {
     fn collect(&self) -> Option<f64> { net_tcp_connections() }
 }
 
+/// Probe descriptor for `net_tcp6_connections`.
 pub struct NetTcp6Connections;
 impl ProbeDescriptor for NetTcp6Connections {
     fn name(&self) -> &'static str { "net_tcp6_connections" }

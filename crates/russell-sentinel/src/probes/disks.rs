@@ -27,31 +27,6 @@ pub fn disk_io_pressure_full_pct() -> Option<f64> {
     tools::parse_io_pressure_full(&content)
 }
 
-/// Return both I/O pressure probes in a single read.
-/// Avoids the double-read of the individual probe functions.
-pub(crate) fn disk_io_pressure_samples() -> Vec<super::Sample> {
-    let mut out = Vec::new();
-    if let Some(content) = connectors::read_file_to_string("/proc/pressure/io") {
-        if let Some(v) = tools::parse_io_pressure_some(&content) {
-            out.push(super::Sample {
-                name: "disk_io_pressure_some_pct".into(),
-                value_num: Some(v),
-                value_text: None,
-                unit: Some("%"),
-            });
-        }
-        if let Some(v) = tools::parse_io_pressure_full(&content) {
-            out.push(super::Sample {
-                name: "disk_io_pressure_full_pct".into(),
-                value_num: Some(v),
-                value_text: None,
-                unit: Some("%"),
-            });
-        }
-    }
-    out
-}
-
 /// Probe: root filesystem usage as a percentage.
 ///
 /// Uses `df -B1 --output=size,used /` via the subprocess connector.
@@ -62,20 +37,6 @@ pub fn disk_root_used_pct() -> Option<f64> {
         return None;
     }
     Some((used as f64 / total as f64) * 100.0)
-}
-
-/// Single-sample wrapper for the orchestrator.
-pub(crate) fn disk_root_used_pct_sample() -> Vec<super::Sample> {
-    let mut out = Vec::new();
-    if let Some(v) = disk_root_used_pct() {
-        out.push(super::Sample {
-            name: "disk_root_used_pct".into(),
-            value_num: Some(v),
-            value_text: None,
-            unit: Some("%"),
-        });
-    }
-    out
 }
 
 // -- ProbeDescriptor impls --

@@ -56,6 +56,7 @@ pub fn systemd_system_failed_count() -> Option<f64> {
 
 use super::descriptor::ProbeDescriptor;
 
+/// Probe descriptor for `systemd_degraded`.
 pub struct SystemdDegraded;
 impl ProbeDescriptor for SystemdDegraded {
     fn name(&self) -> &'static str { "systemd_degraded" }
@@ -63,6 +64,7 @@ impl ProbeDescriptor for SystemdDegraded {
     fn collect(&self) -> Option<f64> { systemd_degraded() }
 }
 
+/// Probe descriptor for `systemd_user_failed_count`.
 pub struct SystemdUserFailedCount;
 impl ProbeDescriptor for SystemdUserFailedCount {
     fn name(&self) -> &'static str { "systemd_user_failed_count" }
@@ -70,6 +72,7 @@ impl ProbeDescriptor for SystemdUserFailedCount {
     fn collect(&self) -> Option<f64> { systemd_user_failed_count() }
 }
 
+/// Probe descriptor for `systemd_system_failed_count`.
 pub struct SystemdSystemFailedCount;
 impl ProbeDescriptor for SystemdSystemFailedCount {
     fn name(&self) -> &'static str { "systemd_system_failed_count" }

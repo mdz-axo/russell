@@ -66,6 +66,7 @@ pub(crate) fn mem_pressure_samples() -> Vec<super::Sample> {
 use super::descriptor::ProbeDescriptor;
 
 /// Probe descriptor for `mem_available_mib`.
+/// Probe descriptor for `mem_available_mib`.
 pub struct MemAvailableMib;
 impl ProbeDescriptor for MemAvailableMib {
     fn name(&self) -> &'static str { "mem_available_mib" }

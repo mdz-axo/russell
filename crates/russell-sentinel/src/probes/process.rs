@@ -111,66 +111,6 @@ pub fn proc_top_mem_pct() -> Option<f64> {
     Some((max_rss_kib as f64 / total_kib as f64) * 100.0)
 }
 
-/// Collect all process samples in a single `/proc` scan.
-/// This is the preferred entry point for the orchestrator.
-pub(crate) fn process_samples() -> Vec<super::Sample> {
-    let stats = collect_stats();
-    let mut out = process_numeric_samples(&stats);
-    out.extend(process_text_samples_from(&stats));
-    out
-}
-
-/// Numeric-only process samples (used by the ProbeRegistry).
-pub(crate) fn process_numeric_samples(stats: &[ProcessStat]) -> Vec<super::Sample> {
-    let mut out = Vec::new();
-    let total = stats.len() as f64;
-    let zombies = stats.iter().filter(|s| s.state == 'Z').count() as f64;
-    let stuck = stats.iter().filter(|s| s.state == 'D').count() as f64;
-    let running = stats.iter().filter(|s| s.state == 'R').count() as f64;
-
-    out.push(super::Sample {
-        name: "proc_total_count".into(),
-        value_num: Some(total),
-        value_text: None,
-        unit: Some("count"),
-    });
-    out.push(super::Sample {
-        name: "proc_zombie_count".into(),
-        value_num: Some(zombies),
-        value_text: None,
-        unit: Some("count"),
-    });
-    out.push(super::Sample {
-        name: "proc_stuck_count".into(),
-        value_num: Some(stuck),
-        value_text: None,
-        unit: Some("count"),
-    });
-    out.push(super::Sample {
-        name: "proc_running_count".into(),
-        value_num: Some(running),
-        value_text: None,
-        unit: Some("count"),
-    });
-
-    // Top memory %.
-    if let Some(max_rss_pages) = stats.iter().map(|s| s.rss_pages).max()
-        && let Some(meminfo) = connectors::read_file_to_string("/proc/meminfo")
-        && let Some(total_kib) = tools::parse_meminfo_kib(&meminfo, "MemTotal")
-        && total_kib > 0
-    {
-        let max_rss_kib = max_rss_pages * 4;
-        let pct = (max_rss_kib as f64 / total_kib as f64) * 100.0;
-        out.push(super::Sample {
-            name: "proc_top_mem_pct".into(),
-            value_num: Some(pct),
-            value_text: None,
-            unit: Some("%"),
-        });
-    }
-    out
-}
-
 /// Text-valued process samples (top CPU/memory names).
 pub(crate) fn process_text_samples() -> Vec<super::Sample> {
     let stats = collect_stats();
@@ -202,6 +142,7 @@ fn process_text_samples_from(stats: &[ProcessStat]) -> Vec<super::Sample> {
 
 use super::descriptor::ProbeDescriptor;
 
+/// Probe descriptor for `proc_total_count`.
 pub struct ProcTotalCount;
 impl ProbeDescriptor for ProcTotalCount {
     fn name(&self) -> &'static str { "proc_total_count" }
@@ -209,6 +150,7 @@ impl ProbeDescriptor for ProcTotalCount {
     fn collect(&self) -> Option<f64> { proc_total_count() }
 }
 
+/// Probe descriptor for `proc_zombie_count`.
 pub struct ProcZombieCount;
 impl ProbeDescriptor for ProcZombieCount {
     fn name(&self) -> &'static str { "proc_zombie_count" }
@@ -216,6 +158,7 @@ impl ProbeDescriptor for ProcZombieCount {
     fn collect(&self) -> Option<f64> { proc_zombie_count() }
 }
 
+/// Probe descriptor for `proc_stuck_count`.
 pub struct ProcStuckCount;
 impl ProbeDescriptor for ProcStuckCount {
     fn name(&self) -> &'static str { "proc_stuck_count" }
@@ -223,6 +166,7 @@ impl ProbeDescriptor for ProcStuckCount {
     fn collect(&self) -> Option<f64> { proc_stuck_count() }
 }
 
+/// Probe descriptor for `proc_running_count`.
 pub struct ProcRunningCount;
 impl ProbeDescriptor for ProcRunningCount {
     fn name(&self) -> &'static str { "proc_running_count" }
@@ -230,20 +174,7 @@ impl ProbeDescriptor for ProcRunningCount {
     fn collect(&self) -> Option<f64> { proc_running_count() }
 }
 
-pub struct ProcTopCpuName;
-impl ProbeDescriptor for ProcTopCpuName {
-    fn name(&self) -> &'static str { "proc_top_cpu_name" }
-    fn unit(&self) -> Option<&'static str> { None }
-    fn collect(&self) -> Option<f64> { None }
-}
-
-pub struct ProcTopMemName;
-impl ProbeDescriptor for ProcTopMemName {
-    fn name(&self) -> &'static str { "proc_top_mem_name" }
-    fn unit(&self) -> Option<&'static str> { None }
-    fn collect(&self) -> Option<f64> { None }
-}
-
+/// Probe descriptor for `proc_top_mem_pct`.
 pub struct ProcTopMemPct;
 impl ProbeDescriptor for ProcTopMemPct {
     fn name(&self) -> &'static str { "proc_top_mem_pct" }

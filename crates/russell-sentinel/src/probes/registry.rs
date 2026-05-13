@@ -121,11 +121,11 @@ mod tests {
     use super::*;
 
     #[test]
-    fn registry_has_all_25_mvp_probes() {
+    fn registry_has_all_mvp_numeric_probes() {
         let reg = ProbeRegistry::with_defaults();
         assert!(
-            reg.len() >= 25,
-            "expected at least 25 MVP probes, got {}",
+            reg.len() >= 20,
+            "expected at least 20 numeric MVP probes, got {}",
             reg.len()
         );
     }
