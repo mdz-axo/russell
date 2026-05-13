@@ -138,12 +138,7 @@ pub fn find_env_file(config_harness_dir: &Path) -> Option<std::path::PathBuf> {
         candidates.push(repo.join(".env"));
     }
     candidates.push(std::path::PathBuf::from(".env"));
-    for c in candidates {
-        if c.exists() {
-            return Some(c);
-        }
-    }
-    None
+    candidates.into_iter().find(|c| c.exists())
 }
 
 /// Walk up from `start` looking for a `Cargo.toml` that declares a

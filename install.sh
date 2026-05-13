@@ -189,13 +189,18 @@ RULES_README
 fi
 
 echo "==> Installing default skills…"
-if [ -d "${REPO_ROOT}/skills/okapi-watcher" ]; then
-    if [ ! -d "${SHARE_DIR}/skills/okapi-watcher" ]; then
-        cp -r "${REPO_ROOT}/skills/okapi-watcher" "${SHARE_DIR}/skills/"
-        echo "  → okapi-watcher skill installed"
-    else
-        echo "  → okapi-watcher skill already present (not overwritten)"
-    fi
+if [ -d "${REPO_ROOT}/skills" ]; then
+    for skill_dir in "${REPO_ROOT}/skills"/*/; do
+        skill_name=$(basename "$skill_dir")
+        # Skip hidden/underscore-prefixed dirs
+        [[ "$skill_name" =~ ^[_\.] ]] && continue
+        if [ ! -d "${SHARE_DIR}/skills/${skill_name}" ]; then
+            cp -r "$skill_dir" "${SHARE_DIR}/skills/"
+            echo "  → ${skill_name} skill installed"
+        else
+            echo "  → ${skill_name} skill already present (not overwritten)"
+        fi
+    done
 fi
 
 echo "==> Setting up environment…"
