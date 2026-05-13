@@ -1,0 +1,233 @@
+# SPDX-License-Identifier: MIT OR Apache-2.0
+# Factory default rules for Russell's rule engine.
+# Operators override individual probes via rules.d/*.toml.
+# See ADR-0012 for the rule engine design.
+
+schema = "russell.rule.v1"
+
+[[rule]]
+probe = "mem_available_mib"
+description = "Available system memory"
+unit = "MiB"
+warn_below = 4096.0
+alert_below = 2048.0
+crit_below = 1024.0
+
+[[rule]]
+probe = "swap_used_mib"
+description = "Swap usage"
+unit = "MiB"
+warn_above = 7168.0
+alert_above = 7680.0
+crit_above = 7936.0
+
+[[rule]]
+probe = "mem_pressure_some_pct"
+description = "Memory pressure — some tasks stalled"
+unit = "%"
+warn_above = 10.0
+alert_above = 30.0
+crit_above = 50.0
+
+[[rule]]
+probe = "mem_pressure_full_pct"
+description = "Memory pressure — all tasks stalled"
+unit = "%"
+warn_above = 5.0
+alert_above = 15.0
+crit_above = 30.0
+
+[[rule]]
+probe = "loadavg_1m"
+description = "1-minute load average"
+warn_above = 8.0
+alert_above = 16.0
+crit_above = 32.0
+
+[[rule]]
+probe = "proc_total_count"
+description = "Total running processes"
+unit = "count"
+warn_above = 500.0
+alert_above = 800.0
+crit_above = 1200.0
+
+[[rule]]
+probe = "proc_zombie_count"
+description = "Zombie (defunct) processes"
+unit = "count"
+warn_above = 5.0
+alert_above = 20.0
+crit_above = 50.0
+
+[[rule]]
+probe = "proc_stuck_count"
+description = "Processes in uninterruptible sleep"
+unit = "count"
+warn_above = 10.0
+alert_above = 30.0
+crit_above = 100.0
+
+[[rule]]
+probe = "proc_running_count"
+description = "Processes currently on the run queue"
+unit = "count"
+warn_above = 16.0
+alert_above = 32.0
+crit_above = 64.0
+
+[[rule]]
+probe = "proc_top_mem_pct"
+description = "Memory usage of largest process"
+unit = "%"
+warn_above = 25.0
+alert_above = 50.0
+crit_above = 75.0
+
+[[rule]]
+probe = "gpu_vram_used_pct"
+description = "dGPU VRAM usage"
+unit = "%"
+warn_above = 80.0
+alert_above = 90.0
+crit_above = 95.0
+
+[[rule]]
+probe = "gpu_temp_c"
+description = "dGPU temperature"
+unit = "°C"
+warn_above = 80.0
+alert_above = 90.0
+crit_above = 100.0
+
+[[rule]]
+probe = "gpu_vram_used_mib"
+description = "dGPU VRAM used"
+unit = "MiB"
+
+[[rule]]
+probe = "gpu_vram_total_mib"
+description = "dGPU total VRAM"
+unit = "MiB"
+
+[[rule]]
+probe = "gpu_util_pct"
+description = "dGPU compute utilisation"
+unit = "%"
+warn_above = 90.0
+alert_above = 95.0
+crit_above = 98.0
+
+[[rule]]
+probe = "disk_io_pressure_some_pct"
+description = "I/O pressure — some tasks stalled"
+unit = "%"
+warn_above = 10.0
+alert_above = 30.0
+crit_above = 50.0
+
+[[rule]]
+probe = "disk_root_used_pct"
+description = "Root filesystem usage"
+unit = "%"
+warn_above = 80.0
+alert_above = 90.0
+crit_above = 95.0
+
+[[rule]]
+probe = "disk_io_pressure_full_pct"
+description = "I/O pressure — all tasks stalled"
+unit = "%"
+warn_above = 5.0
+alert_above = 15.0
+crit_above = 30.0
+
+[[rule]]
+probe = "systemd_degraded"
+description = "Systemd degraded state"
+unit = "bool"
+warn_above = 0.5
+alert_above = 0.5
+crit_above = 0.5
+
+[[rule]]
+probe = "systemd_user_failed_count"
+description = "Failed user systemd units"
+unit = "count"
+warn_above = 1.0
+alert_above = 3.0
+crit_above = 5.0
+
+[[rule]]
+probe = "systemd_system_failed_count"
+description = "Failed system systemd units"
+unit = "count"
+warn_above = 1.0
+alert_above = 3.0
+crit_above = 5.0
+
+[[rule]]
+probe = "net_tcp_connections"
+description = "TCP IPv4 sockets in use"
+unit = "count"
+warn_above = 1000.0
+alert_above = 5000.0
+crit_above = 10000.0
+
+[[rule]]
+probe = "net_tcp6_connections"
+description = "TCP IPv6 sockets in use"
+unit = "count"
+warn_above = 500.0
+alert_above = 2000.0
+crit_above = 5000.0
+
+# Okapi inference engine probes.
+
+[[rule]]
+probe = "okapi_tokens_per_sec"
+description = "Okapi token generation throughput"
+unit = "t/s"
+warn_below = 5.0
+alert_below = 2.0
+crit_below = 1.0
+
+[[rule]]
+probe = "okapi_gpu_memory_used_pct"
+description = "Okapi model GPU memory usage"
+unit = "%"
+warn_above = 85.0
+alert_above = 95.0
+crit_above = 98.0
+
+[[rule]]
+probe = "okapi_goroutine_count"
+description = "Okapi server goroutine count"
+unit = "count"
+warn_above = 200.0
+alert_above = 500.0
+crit_above = 1000.0
+
+[[rule]]
+probe = "okapi_errors_total"
+description = "Okapi inference errors since start"
+unit = "count"
+warn_above = 1.0
+alert_above = 10.0
+crit_above = 50.0
+
+[[rule]]
+probe = "okapi_adapter_count"
+description = "Loaded LoRA adapters"
+unit = "count"
+warn_above = 4.0
+alert_above = 8.0
+crit_above = 12.0
+
+[[rule]]
+probe = "okapi_uptime_hours"
+description = "Okapi server uptime"
+unit = "hours"
+warn_above = 24.0
+alert_above = 72.0
+crit_above = 168.0

@@ -44,7 +44,12 @@ pub struct ScheduleSet {
     entries: Vec<Schedule>,
 }
 
-fn now_local() -> (u8, u8, time::Weekday) {
+/// Returns the current UTC hour, minute, and weekday.
+///
+/// Note: this is UTC, not local time. Schedule windows are evaluated
+/// against UTC. If local-time scheduling is needed, a timezone-aware
+/// implementation (requiring a new dependency) must replace this.
+fn now_utc() -> (u8, u8, time::Weekday) {
     let now = std::time::SystemTime::now();
     let since_epoch = now.duration_since(std::time::UNIX_EPOCH).unwrap();
     let total_secs = since_epoch.as_secs();
@@ -131,13 +136,22 @@ impl ScheduleSet {
         }
     }
 
-    /// Return the schedule entry active at the current local time, if any.
+    /// Return the schedule entry active at the current UTC time, if any.
+    ///
+    /// Entries with malformed time strings are skipped (logged at warn
+    /// level) rather than aborting the entire lookup.
     pub fn active_now(&self) -> Option<&Schedule> {
-        let (now_h, now_m, now_wday) = now_local();
+        let (now_h, now_m, now_wday) = now_utc();
 
         for entry in &self.entries {
-            let (sh, sm) = parse_time(&entry.start)?;
-            let (eh, em) = parse_time(&entry.end)?;
+            let Some((sh, sm)) = parse_time(&entry.start) else {
+                tracing::warn!(start = %entry.start, model = %entry.model, "skipping schedule: bad start time");
+                continue;
+            };
+            let Some((eh, em)) = parse_time(&entry.end) else {
+                tracing::warn!(end = %entry.end, model = %entry.model, "skipping schedule: bad end time");
+                continue;
+            };
             let start = (sh, sm);
             let end = (eh, em);
             let now = (now_h, now_m);

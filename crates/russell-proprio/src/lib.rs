@@ -308,117 +308,75 @@ pub fn run_once_with(
     // 5. Help error rate.
     let (help_error_rate_pct, error_rate_severity) = gather_help_error_rate(writer, reader, now)?;
 
-    // Emit events for any vital that breached.
-    let mut event_emitted = sentinel_severity != Severity::Info;
-
-    if sentinel_severity != Severity::Info {
-        emit_event(
-            writer,
+    // Emit events for any vital that breached threshold.
+    // Descriptors: (severity, module, probe_name, value_f64, warn_threshold, alert_threshold, json_key)
+    let vitals: &[(Severity, &str, &str, f64, f64, f64, &str)] = &[
+        (
             sentinel_severity,
             "proprio/sentinel_age",
-            &format!(
-                "{PROBE_SENTINEL_AGE} = {} (threshold: {} for {sentinel_severity:?})",
-                age_s.unwrap_or(-1),
-                if matches!(sentinel_severity, Severity::Alert | Severity::Crit) {
-                    SENTINEL_ALERT_THRESHOLD_S
-                } else {
-                    SENTINEL_WARN_THRESHOLD_S
-                },
-            ),
-            &[("age_s", serde_json::Value::from(age_s.unwrap_or(-1)))],
-        )?;
-    }
-
-    if stall_severity != Severity::Info {
-        emit_event(
-            writer,
+            PROBE_SENTINEL_AGE,
+            age_s.unwrap_or(-1) as f64,
+            SENTINEL_WARN_THRESHOLD_S as f64,
+            SENTINEL_ALERT_THRESHOLD_S as f64,
+            "age_s",
+        ),
+        (
             stall_severity,
             "proprio/journal_stall",
-            &format!(
-                "{PROBE_JOURNAL_STALL} = {} (threshold: {} for {stall_severity:?})",
-                journal_stall_s.unwrap_or(-1),
-                if matches!(stall_severity, Severity::Alert | Severity::Crit) {
-                    STALL_ALERT_THRESHOLD_S
-                } else {
-                    STALL_WARN_THRESHOLD_S
-                },
-            ),
-            &[(
-                "stall_s",
-                serde_json::Value::from(journal_stall_s.unwrap_or(-1)),
-            )],
-        )?;
-        event_emitted = true;
-    }
-
-    if llm_p95_severity != Severity::Info {
-        emit_event(
-            writer,
+            PROBE_JOURNAL_STALL,
+            journal_stall_s.unwrap_or(-1) as f64,
+            STALL_WARN_THRESHOLD_S as f64,
+            STALL_ALERT_THRESHOLD_S as f64,
+            "stall_s",
+        ),
+        (
             llm_p95_severity,
             "proprio/llm_latency",
-            &format!(
-                "{PROBE_LLM_P95_LATENCY} = {} (threshold: {} for {llm_p95_severity:?})",
-                llm_p95_latency_ms.unwrap_or(-1.0),
-                if matches!(llm_p95_severity, Severity::Alert | Severity::Crit) {
-                    LLM_P95_ALERT_THRESHOLD_MS
-                } else {
-                    LLM_P95_WARN_THRESHOLD_MS
-                },
-            ),
-            &[(
-                "p95_ms",
-                serde_json::Value::from(llm_p95_latency_ms.unwrap_or(-1.0)),
-            )],
-        )?;
-        event_emitted = true;
-    }
-
-    if drift_severity != Severity::Info {
-        emit_event(
-            writer,
+            PROBE_LLM_P95_LATENCY,
+            llm_p95_latency_ms.unwrap_or(-1.0),
+            LLM_P95_WARN_THRESHOLD_MS,
+            LLM_P95_ALERT_THRESHOLD_MS,
+            "p95_ms",
+        ),
+        (
             drift_severity,
             "proprio/timer_drift",
-            &format!(
-                "{PROBE_TIMER_DRIFT} = {} (threshold: {} for {drift_severity:?})",
-                timer_drift_s.unwrap_or(-1),
-                if matches!(drift_severity, Severity::Alert | Severity::Crit) {
-                    DRIFT_ALERT_THRESHOLD_S
-                } else {
-                    DRIFT_WARN_THRESHOLD_S
-                },
-            ),
-            &[(
-                "drift_s",
-                serde_json::Value::from(timer_drift_s.unwrap_or(-1)),
-            )],
-        )?;
-        event_emitted = true;
-    }
-
-    if error_rate_severity != Severity::Info {
-        emit_event(
-            writer,
+            PROBE_TIMER_DRIFT,
+            timer_drift_s.unwrap_or(-1) as f64,
+            DRIFT_WARN_THRESHOLD_S as f64,
+            DRIFT_ALERT_THRESHOLD_S as f64,
+            "drift_s",
+        ),
+        (
             error_rate_severity,
             "proprio/help_error_rate",
-            &format!(
-                "{PROBE_HELP_ERROR_RATE} = {:.1}% (threshold: {} for {error_rate_severity:?})",
-                help_error_rate_pct.unwrap_or(-1.0),
-                if matches!(error_rate_severity, Severity::Alert | Severity::Crit) {
-                    ERROR_RATE_ALERT_THRESHOLD_PCT
-                } else {
-                    ERROR_RATE_WARN_THRESHOLD_PCT
-                },
-            ),
-            &[(
-                "pct",
-                serde_json::Value::from(
-                    help_error_rate_pct
-                        .map(|v| (v * 10.0).round() / 10.0)
-                        .unwrap_or(-1.0),
-                ),
-            )],
-        )?;
-        event_emitted = true;
+            PROBE_HELP_ERROR_RATE,
+            help_error_rate_pct
+                .map(|v| (v * 10.0).round() / 10.0)
+                .unwrap_or(-1.0),
+            ERROR_RATE_WARN_THRESHOLD_PCT,
+            ERROR_RATE_ALERT_THRESHOLD_PCT,
+            "pct",
+        ),
+    ];
+
+    let mut event_emitted = false;
+    for &(sev, module, probe, value, warn_t, alert_t, json_key) in vitals {
+        if sev != Severity::Info {
+            let threshold = if matches!(sev, Severity::Alert | Severity::Crit) {
+                alert_t
+            } else {
+                warn_t
+            };
+            emit_event(
+                writer,
+                sev,
+                module,
+                &format!("{probe} = {value} (threshold: {threshold} for {sev:?})"),
+                &[(json_key, serde_json::Value::from(value))],
+            )?;
+            event_emitted = true;
+        }
     }
 
     Ok(ProprioResult {
