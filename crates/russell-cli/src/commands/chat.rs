@@ -1237,14 +1237,22 @@ fn build_kask_tool_infos(registry: &ToolRegistry) -> Vec<KaskToolInfo> {
 
 /// Execute a Kask MCP tool call. Returns a formatted result string
 /// for injection into the LLM conversation history.
+///
+/// Writes an IDRS-structured evidence bundle to
+/// `evidence/kask/<tool_name>/<ISO-ts>/` with `result.txt` and
+/// `event.json`, matching the local skill dispatcher's evidence format.
 async fn execute_kask_tool(
     journal: &JournalWriter,
     kask_client: &Option<KaskMcpClient>,
     action: &ResolvedAction,
     session_id: &str,
     model: &str,
+    paths: &Paths,
 ) -> Option<String> {
-    let tool_name = action.action_id();
+    use std::time::Duration;
+
+    let tool_name = action.action_id().to_string();
+    let risk = action.risk_band();
 
     let client = match kask_client {
         Some(c) => c,
@@ -1254,72 +1262,164 @@ async fn execute_kask_tool(
         }
     };
 
-    println!("  → Calling kask/{tool_name}...");
+    msg!("  → Calling kask/{tool_name}…");
+    let started = std::time::Instant::now();
 
-    // For now, call without arguments. Future: parse arguments from
-    // Jack's response or prompt the operator.
-    match client.call_tool(tool_name, None).await {
-        Ok(result) => {
-            // Extract text content from the tool result.
+    // Per-tool timeout: probes get 30s, interventions get 120s.
+    let timeout = if risk == RiskBand::None {
+        Duration::from_secs(30)
+    } else {
+        Duration::from_secs(120)
+    };
+
+    let tool_result = tokio::time::timeout(timeout, client.call_tool(&tool_name, None)).await;
+
+    let duration = started.elapsed();
+
+    let (success, text, is_error, timed_out) = match tool_result {
+        Ok(Ok(result)) => {
             let text: String = result
                 .content
                 .iter()
                 .filter_map(|c| c.text.as_deref())
                 .collect::<Vec<_>>()
                 .join("\n");
+            (true, text, result.is_error, false)
+        }
+        Ok(Err(e)) => {
+            let error_msg = format!("{e}");
+            (false, error_msg, true, false)
+        }
+        Err(_elapsed) => {
+            let msg = format!("timed out after {timeout:?}");
+            (false, msg, false, true)
+        }
+    };
 
-            let truncated = if text.len() > 3000 {
-                format!("{}… (truncated)", &text[..3000])
-            } else {
-                text.clone()
-            };
+    let truncated = if text.len() > 3000 {
+        format!("{}… (truncated)", &text[..3000])
+    } else {
+        text.clone()
+    };
 
-            if result.is_error {
-                println!("  → kask/{tool_name} returned an error:");
-                println!("  {truncated}");
-            } else {
-                println!("  → kask/{tool_name} complete.");
-                if !truncated.is_empty() {
-                    // Print first few lines for the operator.
-                    for line in truncated.lines().take(10) {
-                        println!("  {line}");
-                    }
-                    let line_count = truncated.lines().count();
-                    if line_count > 10 {
-                        println!("  … ({} more lines)", line_count - 10);
-                    }
-                }
+    if timed_out {
+        msg!("  → kask/{tool_name} timed out after {timeout:?}.");
+    } else if is_error {
+        msg!("  → kask/{tool_name} returned an error:");
+        msg!("  {truncated}");
+    } else {
+        msg!("  → kask/{tool_name} complete.");
+        if !truncated.is_empty() {
+            for line in truncated.lines().take(10) {
+                msg!("  {line}");
             }
+            let line_count = truncated.lines().count();
+            if line_count > 10 {
+                msg!("  … ({} more lines)", line_count - 10);
+            }
+        }
+    }
 
-            // Journal the tool call.
-            journal_chat_turn(
-                journal,
-                session_id,
-                model,
-                &format!("/kask-tool {tool_name}"),
-                &format!(
-                    "kask/{tool_name}: is_error={}, content_len={}",
-                    result.is_error,
-                    text.len()
-                ),
-            );
+    // Write evidence bundle (IDRS-S) matching local skill dispatch format.
+    write_kask_evidence(paths, &tool_name, risk, &text, success, timed_out, duration);
 
-            // Build result for LLM context.
-            let status = if result.is_error { "error" } else { "ok" };
-            Some(format!(
-                "[kask tool result: {tool_name}, status={status}]\n{truncated}"
-            ))
+    // Journal as a skill-level event (not just a chat turn).
+    let action_str = if success { "kask_tool" } else { "kask_tool_failure" };
+    let severity = if success && !is_error {
+        Severity::Info
+    } else {
+        Severity::Warn
+    };
+    let mut ev = Event::new(action_str, severity);
+    ev.tier = Some("skill".into());
+    ev.module = Some(format!("kask/{tool_name}"));
+    ev.duration_ms = Some(duration.as_millis() as u64);
+    ev.summary = Some(format!(
+        "kask/{tool_name}: success={success}, is_error={is_error}, timed_out={timed_out}"
+    ));
+    ev.outputs.insert("risk".into(), risk.as_str().into());
+    ev.outputs.insert("step_type".into(), "kask_tool".into());
+    ev.outputs.insert("success".into(), success.into());
+    ev.outputs.insert("is_error".into(), is_error.into());
+    ev.outputs.insert("timed_out".into(), timed_out.into());
+    ev.outputs.insert("content_len".into(), text.len().into());
+    if let Err(e) = journal.append(&ev) {
+        warn!(error = %e, "failed to journal kask tool event");
+    }
+
+    // Also journal as chat turn for session history.
+    journal_chat_turn(
+        journal,
+        session_id,
+        model,
+        &format!("/kask-tool {tool_name}"),
+        &format!(
+            "kask/{tool_name}: success={success}, is_error={is_error}, timed_out={timed_out}, content_len={}",
+            text.len()
+        ),
+    );
+
+    // Build result for LLM context injection.
+    let status = if timed_out {
+        "timeout"
+    } else if is_error {
+        "error"
+    } else {
+        "ok"
+    };
+    Some(format!(
+        "[kask tool result: {tool_name}, status={status}]\n{truncated}"
+    ))
+}
+
+/// Write an IDRS-structured evidence bundle for a Kask MCP tool call.
+///
+/// Produces `evidence/kask/<tool_name>/<ISO-ts>/` with `result.txt`
+/// and `event.json`, mirroring the local skill dispatcher's bundle format.
+fn write_kask_evidence(
+    paths: &Paths,
+    tool_name: &str,
+    risk: RiskBand,
+    result_text: &str,
+    success: bool,
+    timed_out: bool,
+    duration: std::time::Duration,
+) {
+    let ts = russell_core::time::now_rfc3339().replace(':', "-");
+    let evidence_dir = paths.evidence().join("kask").join(tool_name).join(&ts);
+
+    if let Err(e) = std::fs::create_dir_all(&evidence_dir) {
+        warn!(dir = %evidence_dir.display(), error = %e, "failed to create kask evidence dir");
+        return;
+    }
+
+    // Write result text (equivalent to stdout.txt for local skills).
+    if let Err(e) = std::fs::write(evidence_dir.join("result.txt"), result_text) {
+        warn!(dir = %evidence_dir.display(), error = %e, "failed to write kask result.txt");
+    }
+
+    // Write structured event record.
+    let mut ev = Event::new("kask_tool", if success { Severity::Info } else { Severity::Warn });
+    ev.tier = Some("skill".into());
+    ev.module = Some(format!("kask/{tool_name}"));
+    ev.duration_ms = Some(duration.as_millis() as u64);
+    ev.summary = Some(format!(
+        "kask/{tool_name}: success={success}, timed_out={timed_out}"
+    ));
+    ev.outputs.insert("risk".into(), risk.as_str().into());
+    ev.outputs.insert("step_type".into(), "kask_tool".into());
+    ev.outputs.insert("success".into(), success.into());
+    ev.outputs.insert("timed_out".into(), timed_out.into());
+    ev.evidence_ref = Some(evidence_dir.display().to_string());
+
+    match serde_json::to_string_pretty(&ev) {
+        Ok(json) => {
+            if let Err(e) = std::fs::write(evidence_dir.join("event.json"), json) {
+                warn!(dir = %evidence_dir.display(), error = %e, "failed to write kask event.json");
+            }
         }
         Err(e) => {
-            println!("  → kask/{tool_name} failed: {e}");
-            journal_chat_turn(
-                journal,
-                session_id,
-                model,
-                &format!("/kask-tool {tool_name}"),
-                &format!("kask/{tool_name}: error={e}"),
-            );
-            Some(format!("[kask tool error: {tool_name}]\n{e}"))
+            warn!(error = %e, "failed to serialize kask event json");
         }
     }
 }
