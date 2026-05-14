@@ -178,7 +178,7 @@ They live under [`adr/deferred/`](adr/deferred/):
 
 | Bucket | Count |
 |---|---|---|
-| Active authoritative docs | 73 |
+| Active authoritative docs | 75 |
 | Active ADRs | 17 |
 | Deferred ADRs | 7 |
 | Archived docs | 6 |

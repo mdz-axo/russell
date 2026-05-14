@@ -16,7 +16,7 @@ ReadWritePaths=%h/.local/state/harness %h/.local/share/harness
 PrivateTmp=yes
 NoNewPrivileges=yes
 EnvironmentFile=%h/.config/harness/russell.env
-ExecStart=%h/.local/bin/russell okapi-probe --auto-apply ${RUSSELL_OKAPI_DEFAULT_MODEL:+--default-model $RUSSELL_OKAPI_DEFAULT_MODEL}
+ExecStart=%h/.local/bin/russell okapi-probe --auto-apply
 StandardOutput=journal
 StandardError=journal
 
