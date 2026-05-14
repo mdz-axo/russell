@@ -15,7 +15,6 @@ use russell_core::Result;
 use russell_core::RuleSet;
 use russell_core::event::{Event, Scope, Severity};
 use russell_core::journal::{JournalReader, JournalWriter};
-use tracing::info;
 
 /// Run the probe set once and append samples to the journal.
 /// No rule evaluation — samples only.
@@ -118,17 +117,14 @@ pub fn evaluate_scenario_samples(
 ) -> Vec<Event> {
     let now = russell_core::time::now_unix();
     let since = now - window_seconds;
-    info!(since, now, "scanning for scenario metrics in journal");
 
     let samples = match reader.host_samples_summary(since, now) {
         Ok(s) => s,
-        Err(e) => {
-            info!(error = %e, "cannot read scenario samples");
+        Err(_) => {
+            tracing::debug!("cannot read scenario samples for rule evaluation");
             return Vec::new();
         }
     };
-
-    info!(count = samples.len(), "samples found in window");
 
     let existing_probes: std::collections::BTreeSet<&str> = existing_events
         .iter()
@@ -144,14 +140,14 @@ pub fn evaluate_scenario_samples(
             continue;
         };
         let sev = rules.evaluate(&s.probe, value);
-        if s.probe == "okapi_latency_p95_ms" || s.probe == "okapi_latency_p50_ms" {
-            info!(probe = %s.probe, value, severity = ?sev, "EVALUATED");
-        }
         if sev != Severity::Info {
+            tracing::info!(
+                probe = %s.probe, value, ?sev,
+                "scenario metric breach detected"
+            );
             events.push(build_breach_event(&s.probe, value, None, sev));
         }
     }
-    info!(breaches = events.len(), "scenario breaches found");
     events
 }
 
