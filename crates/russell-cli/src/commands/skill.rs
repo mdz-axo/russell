@@ -6,6 +6,23 @@
 use anyhow::{Context, Result};
 use russell_core::paths::Paths;
 use russell_skills::{Skill, load_all};
+use std::time::Duration;
+
+/// Parse a duration string like "180s", "5m", "1h" to a Duration.
+/// Returns None on parse failure.
+fn parse_duration(s: &str) -> Option<Duration> {
+    let s = s.trim();
+    if let Some(num) = s.strip_suffix('s') {
+        return Some(Duration::from_secs(num.parse().ok()?));
+    }
+    if let Some(num) = s.strip_suffix('m') {
+        return Some(Duration::from_secs(num.parse::<u64>().ok()?.saturating_mul(60)));
+    }
+    if let Some(num) = s.strip_suffix('h') {
+        return Some(Duration::from_secs(num.parse::<u64>().ok()?.saturating_mul(3600)));
+    }
+    None
+}
 
 /// Enumeration of the loaded skills and their probes/interventions.
 pub fn list(paths: &Paths) -> Result<()> {
@@ -60,8 +77,11 @@ pub async fn run(paths: &Paths, id: &str, dry_run: bool) -> Result<()> {
         return Ok(());
     }
 
+    // Respect the probe's declared timeout from the manifest.
+    let timeout_override = step_timeout(skill, step_id);
+
     let outcome = dispatcher
-        .run(cmd, None)
+        .run(cmd, timeout_override)
         .await
         .with_context(|| format!("running {}/{}", skill_id, step_id))?;
 
@@ -109,4 +129,15 @@ fn parse_skill_ref(id: &str) -> Result<(&str, &str)> {
         anyhow::bail!("invalid skill reference: '{id}' (use <skill>/<id>)");
     }
     Ok((skill, step))
+}
+
+/// Extract the timeout from a probe or intervention's manifest entry.
+fn step_timeout(skill: &Skill, step_id: &str) -> Option<Duration> {
+    if let Some(p) = skill.probes.iter().find(|p| p.id == step_id) {
+        parse_duration(&p.timeout)
+    } else if let Some(i) = skill.interventions.iter().find(|i| i.id == step_id) {
+        parse_duration(&i.timeout)
+    } else {
+        None
+    }
 }
