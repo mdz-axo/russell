@@ -902,7 +902,6 @@ async fn execute_pending_action(
                         forward.stderr.len()
                     ),
                 );
-                let _is_probe = false;
                 let report = format_intervention_result(&outcome, &skill_id, &action_id);
                 Some(report)
             } else if outcome.rollback_applied {
@@ -1115,7 +1114,7 @@ fn build_objective(
     }
 
     // Sentinel freshness.
-    if let Ok(Some(ts)) = reader.last_sample_ts() {
+    if let Ok(Some(ts)) = reader.last_host_sample_ts() {
         let age = now.saturating_sub(ts);
         let _ = writeln!(obj, "\n### Freshness\n- Last sample {} seconds ago.", age);
     }

@@ -378,6 +378,9 @@ mod tests {
             warn_above: Some(80.0),  // too hot: warn
             alert_above: Some(90.0), // too hot: alert
             crit_above: None,
+            rate_warn: None,
+            rate_alert: None,
+            rate_crit: None,
         };
         let mut rs = RuleSet::new();
         rs.rules.push(rule);

@@ -15,10 +15,6 @@ pub enum McpError {
         url: String,
     },
 
-    /// The endpoint URL could not be parsed.
-    #[error("invalid endpoint URL: {0}")]
-    InvalidUrl(String),
-
     /// HTTP transport error (connection refused, timeout, etc.).
     #[error("transport error: {message}")]
     Transport {
@@ -63,10 +59,6 @@ pub enum McpError {
     /// Configuration error (missing or invalid env vars).
     #[error("configuration error: {0}")]
     Config(String),
-
-    /// The tool registry is unavailable (Kask unreachable, cache empty).
-    #[error("tool registry unavailable: {0}")]
-    RegistryUnavailable(String),
 }
 
 /// Result alias for MCP operations.

@@ -147,7 +147,7 @@ pub struct ToolCallParams {
 }
 
 /// Content item in a tool call result.
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct ToolContent {
     /// Content type ("text", "image", "resource").
     #[serde(rename = "type")]

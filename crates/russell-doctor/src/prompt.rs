@@ -381,7 +381,7 @@ fn append_skill_knowledge(system: &mut String, skills: &[Skill], skills_base_dir
 }
 
 fn last_sample_age(reader: &JournalReader) -> Option<i64> {
-    let ts = reader.last_sample_ts().ok().flatten()?;
+    let ts = reader.last_host_sample_ts().ok().flatten()?;
     let now = russell_core::time::now_unix();
     Some(now - ts)
 }
@@ -556,5 +556,78 @@ mod tests {
 
         // F-2: operator note still present.
         assert!(prompt.rendered.contains("checking trends"));
+    }
+
+    #[test]
+    fn compose_with_kask_includes_kask_tools_section() {
+        let tmp = tempfile::tempdir().unwrap();
+        let db = tmp.path().join("journal.db");
+        let w = JournalWriter::open(&db).unwrap();
+        let reader = w.reader();
+        let skills_dir = tmp.path().join("skills");
+        std::fs::create_dir_all(&skills_dir).unwrap();
+
+        let kask_tools = vec![
+            (
+                "paradigm_shift_query".to_string(),
+                Some("medium".to_string()),
+            ),
+            (
+                "russell_host_snapshot".to_string(),
+                Some("none".to_string()),
+            ),
+        ];
+
+        let prompt = compose_with_kask(
+            &reader,
+            None,
+            Some("test kask tools"),
+            &[],
+            Path::new("/nonexistent"),
+            &kask_tools,
+        )
+        .unwrap();
+
+        assert!(
+            prompt.rendered.contains("### Kask MCP tools"),
+            "should include Kask MCP tools section"
+        );
+        assert!(
+            prompt.rendered.contains("paradigm_shift_query"),
+            "should list paradigm_shift_query"
+        );
+        assert!(
+            prompt.rendered.contains("russell_host_snapshot"),
+            "should list russell_host_snapshot"
+        );
+        assert!(
+            prompt.rendered.contains("ACTION: kask/"),
+            "should include Kask ACTION syntax"
+        );
+    }
+
+    #[test]
+    fn compose_with_kask_empty_tools_no_section() {
+        let tmp = tempfile::tempdir().unwrap();
+        let db = tmp.path().join("journal.db");
+        let w = JournalWriter::open(&db).unwrap();
+        let reader = w.reader();
+
+        let kask_tools: Vec<(String, Option<String>)> = vec![];
+
+        let prompt = compose_with_kask(
+            &reader,
+            None,
+            Some("test empty kask"),
+            &[],
+            Path::new("/nonexistent"),
+            &kask_tools,
+        )
+        .unwrap();
+
+        assert!(
+            !prompt.rendered.contains("### Kask MCP tools"),
+            "should NOT include Kask section when no tools available"
+        );
     }
 }

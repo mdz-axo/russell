@@ -767,7 +767,8 @@ impl JournalReader {
 
             // Percentiles on sorted values (ignoring timestamps).
             let mut sorted_vals = vals.clone();
-            sorted_vals.sort_unstable_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+            sorted_vals
+                .sort_unstable_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
             let p50 = percentile(&sorted_vals, 50.0);
             let p95 = percentile(&sorted_vals, 95.0);
             let p99 = percentile(&sorted_vals, 99.0);
@@ -854,6 +855,25 @@ impl JournalReader {
             |r| r.get(0),
         )
         .ok()
+    }
+
+    /// Count reflex_proposed events for a probe within a time window.
+    /// Used for reflex arc cooldown enforcement.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`CoreError::Sqlite`] on DB errors.
+    pub fn count_reflex_events(&self, probe: &str, since: i64, until: i64) -> Result<i64> {
+        let conn = self.open_ro()?;
+        conn.query_row(
+            "SELECT COUNT(*) FROM events
+              WHERE json_extract(outputs, '$.probe') = ?1
+                AND ts >= ?2 AND ts <= ?3
+                AND action = 'reflex_proposed'",
+            params![probe, since, until],
+            |r| r.get(0),
+        )
+        .map_err(CoreError::Sqlite)
     }
 
     /// Path the journal lives at. May not exist yet on very fresh

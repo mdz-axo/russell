@@ -48,7 +48,7 @@ impl std::fmt::Display for EventId {
 /// Five-valued severity band used across journal events.
 ///
 /// See `cybernetic-health-harness.md` §8 for the symptom ladder.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Severity {
     /// Normal-state observation.

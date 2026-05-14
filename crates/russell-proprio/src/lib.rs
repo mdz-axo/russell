@@ -165,7 +165,8 @@ pub const KASK_LATENCY_WARN_THRESHOLD_MS: u64 = 2_000;
 /// Process-wide guard preventing re-entrant meta-Doctor runs.
 ///
 /// When held, any attempt to re-enter meta-Doctor should be refused.
-/// Built here (Phase 2A) as a foundation; not yet wired into `run_once`.
+/// Wired into [`run_once`], [`run_once_with`], and [`run_once_with_kask`]
+/// (Phase 2A, ADR-0015).
 ///
 /// Uses [`std::sync::Mutex`] because the current proprioception cycle is
 /// synchronous. Can be upgraded to `tokio::sync::Mutex` if needed for async

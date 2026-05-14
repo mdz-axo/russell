@@ -10,6 +10,7 @@
 //! the age is always ~0 s and the self-vital can never trigger.
 
 use anyhow::{Context, Result};
+use russell_core::ReflexSet;
 use russell_core::RuleSet;
 use russell_core::event::{Event, Scope, Severity};
 use russell_core::journal::{JournalReader, JournalWriter};
@@ -23,6 +24,10 @@ pub fn run(paths: &Paths) -> Result<()> {
     // Load rule set: defaults + operator overrides from rules.d/.
     let mut rules = RuleSet::with_defaults();
     rules.load_from_dir(&paths.rules());
+
+    // Load reflex arcs: defaults + operator overrides from reflex.d/.
+    let mut reflexes = ReflexSet::with_defaults();
+    reflexes.load_from_dir(&paths.reflex());
 
     // 1. Proprioception: self-vital (JR-5).
     //    Must run BEFORE host probes so it measures the age of the
@@ -116,7 +121,62 @@ pub fn run(paths: &Paths) -> Result<()> {
     }
     journal.append(&ev)?;
 
-    // 4. Refresh EWMA baselines once per 24h.
+    // 4. Reflex arc check — for each threshold breach, find matching
+    //    arcs and emit reflex_proposed events. These events are consumed
+    //    by the Nurse (russell jack / chat) which may auto-execute
+    //    risk:low interventions or propose risk:medium/+ for consent.
+    //
+    //    Cooldown: skip arcs that fired for the same probe within the
+    //    arc's cooldown window (prevents oscillation).
+    let now = russell_core::time::now_unix();
+    for ev in threshold_events.iter().chain(scenario_events.iter()) {
+        let Some(probe) = ev.outputs.get("probe").and_then(|v| v.as_str()) else {
+            continue;
+        };
+        let Some(arc) = reflexes.find(probe, ev.severity) else {
+            continue;
+        };
+
+        // Check cooldown: has this arc fired recently for this probe?
+        let cooldown_since = now - arc.cooldown_secs;
+        let recent_for_probe = reader
+            .count_reflex_events(probe, cooldown_since, now)
+            .unwrap_or(0);
+
+        if recent_for_probe > 0 {
+            tracing::debug!(
+                probe,
+                cooldown_secs = arc.cooldown_secs,
+                "reflex arc in cooldown — skipping"
+            );
+            continue;
+        }
+
+        let mut ref_ev = Event::new("reflex_proposed", ev.severity);
+        ref_ev.tier = Some("sentinel".into());
+        ref_ev.module = Some(format!("reflex/{}", probe));
+        ref_ev.summary = Some(format!(
+            "probe {} at {:?} → proposed intervention {}",
+            probe, ev.severity, arc.intervention
+        ));
+        ref_ev.outputs.insert("probe".into(), probe.into());
+        ref_ev
+            .outputs
+            .insert("severity".into(), format!("{:?}", ev.severity).into());
+        ref_ev
+            .outputs
+            .insert("intervention".into(), arc.intervention.clone().into());
+        ref_ev
+            .outputs
+            .insert("cooldown_secs".into(), arc.cooldown_secs.into());
+        ref_ev
+            .outputs
+            .insert("max_retries".into(), arc.max_retries.into());
+
+        journal.append(&ref_ev)?;
+    }
+
+    // 5. Refresh EWMA baselines once per 24h.
     maybe_refresh_baselines(&journal, &reader);
 
     println!(

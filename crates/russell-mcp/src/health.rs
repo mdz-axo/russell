@@ -11,9 +11,6 @@ use tracing::debug;
 
 use crate::config::KaskMcpConfig;
 
-/// Probe name for the Kask MCP reachability self-vital.
-pub const PROBE_KASK_MCP_REACHABLE: &str = "kask_mcp_reachable_ms";
-
 /// Timeout for the reachability probe (short — must not block proprio).
 const HEALTH_TIMEOUT: Duration = Duration::from_secs(2);
 

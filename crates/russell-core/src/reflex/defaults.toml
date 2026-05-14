@@ -1,0 +1,18 @@
+# SPDX-License-Identifier: MIT OR Apache-2.0
+# Factory default reflex arcs for Russell's autonomous correction engine.
+# Operators override individual arcs via reflex.d/*.toml.
+#
+# Each arc defines: when a probe breaches a minimum severity, run a
+# skill intervention (subject to IDRS risk gating). Cooldown prevents
+# oscillation; max_retries caps attempts before escalation.
+
+schema = "russell.reflex.v1"
+
+# ── Disk-space recovery ──
+
+[[arc]]
+probe = "disk_root_used_pct"
+min_severity = "alert"
+intervention = "sysadmin/sweep-caches"
+cooldown_secs = 3600
+max_retries = 3

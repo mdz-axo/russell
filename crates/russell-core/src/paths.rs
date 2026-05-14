@@ -139,6 +139,12 @@ impl Paths {
         self.config.join("rules.d")
     }
 
+    /// Directory that holds reflex arc TOML configurations.
+    #[must_use]
+    pub fn reflex(&self) -> PathBuf {
+        self.config.join("reflex.d")
+    }
+
     /// Directory that holds Russell's Markdown memory layer
     /// (daily logs, REVIEW.md). All files in this tree are
     /// derived exports rebuildable from the journal.
@@ -185,6 +191,7 @@ impl Paths {
             &self.digest_dir(),
             &self.skills(),
             &self.rules(),
+            &self.reflex(),
             &self.memory_dir(),
             &self.memory_daily_dir(),
         ] {

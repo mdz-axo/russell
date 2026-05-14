@@ -445,6 +445,11 @@ fn extract_required_fields(schema: &Option<serde_json::Value>) -> Vec<String> {
 /// 1. `Arguments: {"key": "value"}` line anywhere in the response
 /// 2. An inline JSON object at the end of the ACTION line:
 ///    `ACTION: kask/tool --prompt "text" --depth 3`
+///
+/// The `_tool_name` parameter is unused but kept in the signature
+/// for potential future use (e.g., validating args against the
+/// tool's input schema). Current implementation re-parses the tool
+/// name from the ACTION line directly.
 fn extract_arguments_from_response(response: &str, _tool_name: &str) -> Option<serde_json::Value> {
     // Format 1: Look for "Arguments:" line with JSON payload.
     if let Some(line) = response
