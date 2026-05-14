@@ -146,10 +146,10 @@ pub fn compose_with_kask(
                     .map(|(p, e)| (*p, *e))
                     .unwrap_or((None, None));
                 let p95_str = p95
-                    .map(|v| fmt_f64_baseline(v))
+                    .map(fmt_f64_baseline)
                     .unwrap_or_else(|| "—".to_string());
                 let ewma_str = ewma
-                    .map(|v| fmt_f64_baseline(v))
+                    .map(fmt_f64_baseline)
                     .unwrap_or_else(|| "—".to_string());
                 writeln!(
                     objective,
