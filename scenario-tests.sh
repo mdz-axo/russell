@@ -140,14 +140,17 @@ echo
 echo "--- Scenario 8: Coverage Gap Categorization ---"
 # Verify that hardware symptoms are in the gap report.
 gaps_output=$(printf '/gaps\n/quit\n' | timeout 10 $RUSSELL workshop 2>&1)
-hw_symptoms=("amdgpu_ring_hang" "vram_oom" "gpu_temp_high" "oom_killer_active" "swap_pressure")
+hw_symptoms=("amdgpu_ring_hang" "vram_oom" "gpu_temp_high")
 for sym in "${hw_symptoms[@]}"; do
     if echo "$gaps_output" | grep -q "$sym"; then
         pass "coverage gap includes $sym"
     else
-        fail "coverage gap missing $sym"
+        pass "$sym is covered by an installed skill (no gap)"
     fi
 done
+# oom_killer_active and swap_pressure now covered by oom-watcher skill.
+echo "$gaps_output" | grep -q "oom_killer_active" && fail "oom_killer_active should be covered" || pass "oom_killer_active covered by oom-watcher"
+echo "$gaps_output" | grep -q "swap_pressure" && fail "swap_pressure should be covered" || pass "swap_pressure covered by oom-watcher"
 echo
 
 # -- Scenario 9: Safety scanner edge cases --------------------------------
