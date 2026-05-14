@@ -186,10 +186,14 @@ ADR-0007 deferral lifted per ADR-0023.
 - [x] `russell chat` — interactive readline REPL with Jack's chat persona
 - [x] Persona shift: Jack is a nurse, not a doctor
 
-### Phase 4 — MCP surface, real skills, operational depth (NEXT)
+### Phase 4 — MCP surface, real skills, operational depth (CURRENT)
 
-MCP server is still a stub crate. No live Ollama/GPU/disk probes
-beyond the MVP three. No operator-facing skill authoring tools.
+MCP server is still a stub crate. Skill lifecycle is operational
+with registry cache, workshop REPL, safety scanner, and scenario
+testing pipeline. The skill catalogue covers 11 symptoms with
+installed skills (up from 3 at Phase 3 close). Scenario metrics
+feed into the sentinel rule engine. The `oom-watcher` skill
+demonstrates end-to-end build→install→test→sentinel flow.
 
 ## 4. Open questions
 

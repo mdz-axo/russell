@@ -1,9 +1,9 @@
 ---
 title: "Russell Documentation Portal"
 audience: [operators, developers, contributors, architects, agents]
-last_updated: 2026-05-09
+last_updated: 2026-05-14
 togaf_phase: "C"
-version: "1.0.0"
+version: "1.1.0"
 status: "Active"
 ---
 
@@ -24,7 +24,7 @@ not belong in the corpus (yet).
 | Section | Contents | TOGAF Phase | Audience |
 |---|---|---|---|
 | [`architecture/`](architecture/) | System architecture & principles | A / Preliminary | All |
-| [`architecture/adr/`](adr/) | Architecture Decision Records (16 active, 8 deferred) | H | Developers |
+| [`architecture/adr/`](adr/) | Architecture Decision Records (17 active, 7 deferred) | H | Developers |
 | [`specifications/`](specifications/) | MVP boundary, persistence catalog, integration refs | Requirements | All |
 | [`standards/`](standards/) | Documentation, coding, commits, safety, ADR, writing excellence | Preliminary | Contributors |
 | [`operations/`](operations/) | Reuse manifest, operator runbooks | D / G | Developers, Operators |
@@ -115,6 +115,8 @@ may exist but must not contradict these.
 - [`adr/0020-threshold-gated-llm-escalation.md`](adr/0020-threshold-gated-llm-escalation.md)
 - [`adr/0021-proprioception-phase2-reflex-arcs.md`](adr/0021-proprioception-phase2-reflex-arcs.md)
 - [`adr/0022-markdown-memory-layer.md`](adr/0022-markdown-memory-layer.md)
+- [`adr/0023-lift-adr-0007-phase3-skills.md`](adr/0023-lift-adr-0007-phase3-skills.md)
+- [`adr/0024-skill-registry-workshop-lifecycle.md`](adr/0024-skill-registry-workshop-lifecycle.md)
 
 ### 2.8 ADRs (deferred — not MVP-load-bearing but retained)
 
@@ -125,7 +127,6 @@ They live under [`adr/deferred/`](adr/deferred/):
 
 - 0003 MCP transport
 - 0005 Privileged operations (PolKit)
-- 0007 YAML skill manifests
 - 0009 Tokio runtime
 - 0010 Observability stack
 - 0012 Config formats
@@ -177,9 +178,9 @@ They live under [`adr/deferred/`](adr/deferred/):
 
 | Bucket | Count |
 |---|---|---|
-| Active authoritative docs | 72 |
-| Active ADRs | 16 |
-| Deferred ADRs | 8 |
+| Active authoritative docs | 73 |
+| Active ADRs | 17 |
+| Deferred ADRs | 7 |
 | Archived docs | 6 |
 | Templates | 5 |
 

@@ -1,3 +1,12 @@
+---
+title: "Skill Lifecycle Gap Analysis"
+audience: [developers, architects]
+last_updated: 2026-05-14
+togaf_phase: "H"
+version: "1.0.0"
+status: "Active"
+---
+
 # Skill Lifecycle Gap Analysis — 2026-05-13
 
 > Derived from running 10 end-to-end scenarios against the newly built
