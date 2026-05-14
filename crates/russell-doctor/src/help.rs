@@ -45,6 +45,9 @@ pub struct HelpOutcome {
 ///
 /// `paths` and `writer` come from the CLI. The CLI is the only caller.
 ///
+/// `kask_tool_names` is a list of (tool_name, risk_band) pairs from
+/// the Kask MCP tool registry (ADR-0025). Empty if Kask is unreachable.
+///
 /// # Errors
 ///
 /// Returns `DoctorError` if the filesystem write or journal write fails.
@@ -54,9 +57,10 @@ pub async fn run_help(
     paths: &Paths,
     writer: &JournalWriter,
     note: Option<&str>,
+    kask_tool_names: &[(String, Option<String>)],
 ) -> Result<HelpOutcome> {
     let cfg = ClientConfig::from_env();
-    run_help_with_config(paths, writer, note, cfg).await
+    run_help_with_config(paths, writer, note, cfg, kask_tool_names).await
 }
 
 /// Dispatch result from calling the LLM backend.
@@ -81,6 +85,7 @@ fn compose_and_augment_soap(
     writer: &JournalWriter,
     note: Option<&str>,
     evidence_dir: &std::path::Path,
+    kask_tool_names: &[(String, Option<String>)],
 ) -> Result<SoapPrompt> {
     let profile_path = paths.profile();
     let profile = if profile_path.exists() {
@@ -92,15 +97,17 @@ fn compose_and_augment_soap(
     let loaded_skills = russell_skills::load_all(&paths.skills()).unwrap_or_default();
     tracing::debug!(
         count = loaded_skills.len(),
-        "loaded skills for help session"
+        kask_tools = kask_tool_names.len(),
+        "loaded skills and kask tools for help session"
     );
 
-    let soap = prompt::compose(
+    let soap = prompt::compose_with_kask(
         &writer.reader(),
         profile.as_ref(),
         note,
         &loaded_skills,
         &paths.skills(),
+        kask_tool_names,
     )?;
 
     // ADR-0022: augment the system prompt with operator identity files.
@@ -344,6 +351,7 @@ pub async fn run_help_with_config(
     writer: &JournalWriter,
     note: Option<&str>,
     cfg: ClientConfig,
+    kask_tool_names: &[(String, Option<String>)],
 ) -> Result<HelpOutcome> {
     let session_id = Ulid::new().to_string();
     let ts_unix = russell_core::time::now_unix();
@@ -355,7 +363,7 @@ pub async fn run_help_with_config(
     info!(backend = %cfg.backend.label(), model = %cfg.model, session = %session_id, "russell help starting");
 
     // Stage 1: compose + augment SOAP.
-    let soap = compose_and_augment_soap(paths, writer, note, &evidence_dir)?;
+    let soap = compose_and_augment_soap(paths, writer, note, &evidence_dir, kask_tool_names)?;
 
     // Stage 2: threshold gate + backend dispatch.
     let counts = {
@@ -499,7 +507,7 @@ mod tests {
             timeout: std::time::Duration::from_secs(5),
             escalate_min: EscalateMin::Alert,
         };
-        let out = run_help_with_config(&paths, &writer, Some("unit test"), cfg)
+        let out = run_help_with_config(&paths, &writer, Some("unit test"), cfg, &[])
             .await
             .unwrap();
 
@@ -529,7 +537,7 @@ mod tests {
             timeout: std::time::Duration::from_secs(5),
             escalate_min: EscalateMin::Always,
         };
-        let out = run_help_with_config(&paths, &writer, None, cfg)
+        let out = run_help_with_config(&paths, &writer, None, cfg, &[])
             .await
             .unwrap();
 

@@ -94,6 +94,9 @@ pub const PROBE_TIMER_DRIFT: &str = "timer_drift_s";
 /// Probe name for the help error rate self-vital.
 pub const PROBE_HELP_ERROR_RATE: &str = "help_error_rate_pct";
 
+/// Probe name for the Kask MCP reachability self-vital (Phase 4C, ADR-0025 §5).
+pub const PROBE_KASK_MCP_REACHABLE: &str = "kask_mcp_reachable_ms";
+
 // ---------------------------------------------------------------------------
 // Sentinel age thresholds
 // ---------------------------------------------------------------------------
@@ -146,6 +149,14 @@ pub const ERROR_RATE_WARN_THRESHOLD_PCT: f64 = 20.0;
 
 /// Threshold (percentage) above which the help error rate vital emits `alert`.
 pub const ERROR_RATE_ALERT_THRESHOLD_PCT: f64 = 50.0;
+
+// ---------------------------------------------------------------------------
+// Kask MCP reachability thresholds
+// ---------------------------------------------------------------------------
+
+/// Threshold (milliseconds) above which the kask MCP latency vital emits `warn`.
+/// 2× the 2s health probe timeout.
+pub const KASK_LATENCY_WARN_THRESHOLD_MS: u64 = 2_000;
 
 // ---------------------------------------------------------------------------
 // AutoimmuneGuard
@@ -239,6 +250,23 @@ pub struct ProprioResult {
     pub help_error_rate_pct: Option<f64>,
     /// Severity of the help error rate vital.
     pub help_error_rate_severity: Severity,
+
+    // -- Kask MCP reachability (Phase 4C, ADR-0025 §5) --
+    /// Kask MCP latency in milliseconds, or `None` if the probe was not
+    /// run (no kask config) or the endpoint was unreachable.
+    pub kask_mcp_reachable_ms: Option<u64>,
+    /// Severity of the kask MCP reachability vital.
+    pub kask_mcp_reachable_severity: Severity,
+}
+
+/// Input from the async Kask MCP health probe, passed into the proprio cycle
+/// by the CLI layer (which performs the async HTTP check).
+#[derive(Debug, Clone, Copy)]
+pub struct KaskHealthInput {
+    /// Whether the endpoint responded.
+    pub reachable: bool,
+    /// Round-trip latency in milliseconds.
+    pub latency_ms: Option<u64>,
 }
 
 // ---------------------------------------------------------------------------
@@ -247,14 +275,14 @@ pub struct ProprioResult {
 
 /// Run the proprioception cycle once.
 ///
-/// Convenience wrapper around [`run_once_with`] that uses the real
-/// [`SystemdTimerSource`].
+/// Convenience wrapper around [`run_once_inner`] with the real
+/// [`SystemdTimerSource`] and no Kask health probe.
 ///
 /// # Errors
 ///
 /// Returns [`russell_core::CoreError`] on journal I/O failures.
 pub fn run_once(writer: &JournalWriter, reader: &JournalReader) -> Result<ProprioResult> {
-    run_once_with(writer, reader, &SystemdTimerSource)
+    run_once_inner(writer, reader, &SystemdTimerSource, None)
 }
 
 /// Run the proprioception cycle once with a caller-provided [`TimerSource`].
@@ -273,7 +301,28 @@ pub fn run_once_with(
     reader: &JournalReader,
     timer: &dyn TimerSource,
 ) -> Result<ProprioResult> {
-    let now = russell_core::time::now_unix();
+    run_once_inner(writer, reader, timer, None)
+}
+
+/// Run the proprioception cycle once with Kask MCP health data.
+///
+/// In addition to the five standard self-vitals, journals the
+/// `kask_mcp_reachable_ms` probe (Phase 4C, ADR-0025 §5).
+///
+/// The caller (CLI) performs the async HTTP health check, then
+/// passes the result here so the synchronous proprio cycle can
+/// journal it without depending on async runtime.
+///
+/// # Errors
+///
+/// Returns [`russell_core::CoreError`] on journal I/O failures.
+pub fn run_once_with_kask(
+    writer: &JournalWriter,
+    reader: &JournalReader,
+    kask_health: KaskHealthInput,
+) -> Result<ProprioResult> {
+    run_once_inner(writer, reader, &SystemdTimerSource, Some(kask_health))
+}
 
     // 1. Sentinel age (existing MVP vital).
     let last_host_ts = reader.last_host_sample_ts()?;

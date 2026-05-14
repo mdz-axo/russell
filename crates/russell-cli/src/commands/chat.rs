@@ -705,7 +705,9 @@ async fn execute_pending_action(
     session_id: &str,
     model: &str,
 ) -> Option<String> {
-    use russell_skills::dispatch::{Dispatcher, DryRun, StepType};
+    use russell_skills::dispatch::{
+        Dispatcher, DryRun, RollbackStrategy, StepType,
+    };
     use std::io::Write;
     use std::time::Duration;
 
@@ -722,20 +724,21 @@ async fn execute_pending_action(
     };
 
     let is_probe = action.is_probe();
-    let (risk, needs_sudo, max_auto_risk, requires_human) = match action {
+    let (risk, needs_sudo, max_auto_risk, requires_human, rollback_id, rollback_cmd, rollback_is_reboot) = match action {
         ResolvedAction::Probe { max_auto_risk, .. } => {
-            (russell_skills::RiskBand::None, false, *max_auto_risk, false)
+            (RiskBand::None, false, *max_auto_risk, false, None, None, false)
         }
         ResolvedAction::Intervention {
             risk,
             needs_sudo,
             max_auto_risk,
             requires_human,
+            rollback_id,
+            rollback_cmd,
+            rollback_is_reboot,
             ..
-        } => (*risk, *needs_sudo, *max_auto_risk, *requires_human),
+        } => (*risk, *needs_sudo, *max_auto_risk, *requires_human, rollback_id.clone(), rollback_cmd.clone(), *rollback_is_reboot),
         ResolvedAction::KaskTool { .. } => {
-            // KaskTool actions are handled by execute_kask_tool, not here.
-            // If we reach this point, it's a logic error in the caller.
             println!("  → Internal error: KaskTool routed to local dispatcher.");
             return None;
         }
@@ -815,31 +818,129 @@ async fn execute_pending_action(
         StepType::Intervention
     };
 
-    let result = dispatcher
-        .run_and_journal(
+    if is_probe {
+        // Probes: use run_and_journal (read-only, no rollback needed).
+        let result = dispatcher
+            .run_and_journal(
+                journal,
+                &evidence_base,
+                action.cmd(),
+                &skill_id,
+                &action_id,
+                step_type,
+                risk.as_str(),
+                Some(timeout),
+            )
+            .await;
+        return format_probe_result(result, &skill_id, &action_id);
+    }
+
+    // Interventions: use run_intervention_with_rollback for IDRS-R compliance.
+    let rollback_strategy = if rollback_is_reboot {
+        RollbackStrategy::Reboot
+    } else if let Some(ref rid) = rollback_id {
+        RollbackStrategy::RollbackId { id: rid.clone() }
+    } else {
+        RollbackStrategy::NoneNeeded
+    };
+
+    let rollback_cmd_owned = rollback_cmd.clone();
+    let rollback_outcome = dispatcher
+        .run_intervention_with_rollback(
             journal,
             &evidence_base,
-            action.cmd(),
             &skill_id,
             &action_id,
-            step_type,
+            action.cmd(),
             risk.as_str(),
+            rollback_strategy,
+            |_rb_id| rollback_cmd_owned.clone(),
             Some(timeout),
         )
         .await;
 
+    match rollback_outcome {
+        Ok(outcome) => {
+            let forward = &outcome.forward;
+            if forward.exit_code == Some(0) && !forward.timed_out {
+                println!("  → Executed {skill_id}/{action_id} successfully.");
+                journal_chat_turn(
+                    journal,
+                    session_id,
+                    model,
+                    &format!("/approve {skill_id}/{action_id}"),
+                    &format!("executed: exit=0, stdout_len={}, stderr_len={}",
+                        forward.stdout.len(), forward.stderr.len()),
+                );
+                let _is_probe = false;
+                let report = format_intervention_result(&outcome, &skill_id, &action_id);
+                Some(report)
+            } else if outcome.rollback_applied {
+                let rb = outcome.rollback.as_ref().unwrap();
+                println!(
+                    "  → {skill_id}/{action_id} failed (exit {:?}). Rollback applied: exit {:?}.",
+                    forward.exit_code, rb.exit_code
+                );
+                if !forward.stderr.is_empty() {
+                    println!("  stderr: {}", forward.stderr.trim());
+                }
+                journal_chat_turn(
+                    journal,
+                    session_id,
+                    model,
+                    &format!("/approve {skill_id}/{action_id}"),
+                    &format!("failed: forward_exit={:?}, rollback_exit={:?}",
+                        forward.exit_code, rb.exit_code),
+                );
+                Some(format!(
+                    "[intervention result: {skill_id}/{action_id}, failed, rolled back]\n\
+                     forward exit={:?}\nrollback exit={:?}",
+                    forward.exit_code, rb.exit_code
+                ))
+            } else {
+                println!(
+                    "  → {skill_id}/{action_id} failed (exit {:?}). No rollback available.",
+                    forward.exit_code
+                );
+                if !forward.stderr.is_empty() {
+                    println!("  stderr: {}", forward.stderr.trim());
+                }
+                journal_chat_turn(
+                    journal,
+                    session_id,
+                    model,
+                    &format!("/approve {skill_id}/{action_id}"),
+                    &format!("failed: exit={:?}, no_rollback", forward.exit_code),
+                );
+                Some(format!(
+                    "[intervention result: {skill_id}/{action_id}, failed, exit={:?}, no rollback]",
+                    forward.exit_code
+                ))
+            }
+        }
+        Err(e) => {
+            println!("  → Error running {skill_id}/{action_id}: {e}");
+            Some(format!("[intervention error: {skill_id}/{action_id}] {e}\n"))
+        }
+    }
+}
+
+/// Format a probe result for LLM context injection.
+fn format_probe_result(
+    result: std::result::Result<
+        russell_skills::dispatch::RunOutcome,
+        russell_core::CoreError,
+    >,
+    skill_id: &str,
+    action_id: &str,
+) -> Option<String> {
     match result {
         Ok(outcome) => {
-            // Print to terminal for the operator.
             if outcome.exit_code == Some(0) {
-                if is_probe {
-                    if !outcome.stdout.is_empty() {
-                        println!("  {}", outcome.stdout.trim());
-                    }
-                    println!("  → Probe {skill_id}/{action_id} complete.");
-                } else {
-                    println!("  → Executed {skill_id}/{action_id} successfully.");
+                if !outcome.stdout.is_empty() {
+                    println!("  {}", outcome.stdout.trim());
                 }
+                println!("  → Probe {skill_id}/{action_id} complete.");
             } else {
                 println!(
                     "  → {skill_id}/{action_id} exited with code {:?}.",
@@ -849,34 +950,13 @@ async fn execute_pending_action(
                     println!("  stderr: {}", outcome.stderr.trim());
                 }
             }
-
-            // Journal the metadata.
-            let action_label = if is_probe { "probe" } else { "approve" };
-            journal_chat_turn(
-                journal,
-                session_id,
-                model,
-                &format!("/{action_label} {skill_id}/{action_id}"),
-                &format!(
-                    "executed: exit={:?}, stdout_len={}, stderr_len={}",
-                    outcome.exit_code,
-                    outcome.stdout.len(),
-                    outcome.stderr.len(),
-                ),
-            );
-
-            // Build the result string for LLM context injection.
-            // This is what lets Jack "see" what the probe/intervention produced.
-            let label = if is_probe { "probe" } else { "intervention" };
             let exit_str = match outcome.exit_code {
                 Some(code) => format!("exit={code}"),
                 None => "killed/timeout".to_string(),
             };
-            let mut report = format!("[{label} result: {skill_id}/{action_id}, {exit_str}]\n");
-
+            let mut report = format!("[probe result: {skill_id}/{action_id}, {exit_str}]\n");
             if !outcome.stdout.is_empty() {
                 let stdout = outcome.stdout.trim();
-                // Cap at 3000 chars to avoid blowing up LLM context.
                 if stdout.len() > 3000 {
                     report.push_str(&stdout[..3000]);
                     report.push_str("\n… (output truncated)\n");
@@ -894,15 +974,47 @@ async fn execute_pending_action(
                 };
                 report.push_str(&format!("stderr: {stderr_truncated}\n"));
             }
-
             Some(report)
         }
         Err(e) => {
-            println!("  → Error running {skill_id}/{action_id}: {e}");
-            let label = if is_probe { "probe" } else { "intervention" };
-            Some(format!("[{label} error: {skill_id}/{action_id}] {e}\n"))
+            println!("  → Error running probe {skill_id}/{action_id}: {e}");
+            Some(format!("[probe error: {skill_id}/{action_id}] {e}\n"))
         }
     }
+}
+
+/// Format an intervention result for LLM context injection.
+fn format_intervention_result(
+    outcome: &russell_skills::dispatch::RollbackOutcome,
+    skill_id: &str,
+    action_id: &str,
+) -> String {
+    let forward = &outcome.forward;
+    let exit_str = match forward.exit_code {
+        Some(code) => format!("exit={code}"),
+        None => "killed/timeout".to_string(),
+    };
+    let mut report = format!("[intervention result: {skill_id}/{action_id}, {exit_str}]\n");
+    if !forward.stdout.is_empty() {
+        let stdout = forward.stdout.trim();
+        if stdout.len() > 3000 {
+            report.push_str(&stdout[..3000]);
+            report.push_str("\n… (output truncated)\n");
+        } else {
+            report.push_str(stdout);
+            report.push('\n');
+        }
+    }
+    if !forward.stderr.is_empty() {
+        let stderr = forward.stderr.trim();
+        let stderr_truncated = if stderr.len() > 1000 {
+            format!("{}… (truncated)", &stderr[..1000])
+        } else {
+            stderr.to_string()
+        };
+        report.push_str(&format!("stderr: {stderr_truncated}\n"));
+    }
+    report
 }
 
 fn build_objective(
@@ -1265,7 +1377,7 @@ async fn execute_kask_tool(
         }
     };
 
-    msg!("  → Calling kask/{tool_name}…");
+    println!("  → Calling kask/{tool_name}…");
     let started = std::time::Instant::now();
 
     // Per-tool timeout: probes get 30s, interventions get 120s.
@@ -1306,19 +1418,19 @@ async fn execute_kask_tool(
     };
 
     if timed_out {
-        msg!("  → kask/{tool_name} timed out after {timeout:?}.");
+        println!("  → kask/{tool_name} timed out after {timeout:?}.");
     } else if is_error {
-        msg!("  → kask/{tool_name} returned an error:");
-        msg!("  {truncated}");
+        println!("  → kask/{tool_name} returned an error:");
+        println!("  {truncated}");
     } else {
-        msg!("  → kask/{tool_name} complete.");
+        println!("  → kask/{tool_name} complete.");
         if !truncated.is_empty() {
             for line in truncated.lines().take(10) {
-                msg!("  {line}");
+                println!("  {line}");
             }
             let line_count = truncated.lines().count();
             if line_count > 10 {
-                msg!("  … ({} more lines)", line_count - 10);
+                println!("  … ({} more lines)", line_count - 10);
             }
         }
     }

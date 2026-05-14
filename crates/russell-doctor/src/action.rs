@@ -20,7 +20,7 @@
 //! Both `russell jack` and `russell chat` use this module,
 //! eliminating duplicated parsing and resolution logic.
 
-use russell_skills::{RiskBand, Skill};
+use russell_skills::{RiskBand, Rollback, Skill};
 
 /// A resolved ACTION — either a probe (read-only), an intervention
 /// (mutating, requires consent per JR-2), or a Kask MCP tool call
@@ -54,6 +54,14 @@ pub enum ResolvedAction {
         max_auto_risk: RiskBand,
         /// Whether the manifest's safety.require_human_for lists this ID.
         requires_human: bool,
+        /// Rollback strategy from the manifest (for IDRS-R).
+        rollback_id: Option<String>,
+        /// Rollback command argv, if rollback is via a named intervention.
+        rollback_cmd: Option<Vec<String>>,
+        /// Whether rollback requires a reboot.
+        rollback_is_reboot: bool,
+        /// Post-intervention evaluation checks from the skill manifest.
+        eval_checks: Vec<EvalCheckInfo>,
     },
     /// Kask MCP tool call (ADR-0025). Executed via the MCP client,
     /// not the local skill dispatcher.
@@ -209,6 +217,19 @@ pub struct KaskToolInfo {
     pub risk_band: RiskBand,
 }
 
+/// A post-intervention evaluation check, resolved from the skill manifest.
+#[derive(Debug, Clone)]
+pub struct EvalCheckInfo {
+    /// Unique ID within the evaluation checks.
+    pub id: String,
+    /// Argv to execute.
+    pub cmd: Vec<String>,
+    /// Expected exit code (default 0).
+    pub expect_exit: i32,
+    /// Timeout duration.
+    pub timeout: String,
+}
+
 /// Parse the last `ACTION:` line from a response and resolve it
 /// against the loaded skill set.
 ///
@@ -301,6 +322,33 @@ pub fn resolve_with_kask(
     // Then check interventions.
     if let Some(iv) = skill.interventions.iter().find(|i| i.id == action_id) {
         let requires_human = skill.safety.require_human_for.contains(&iv.id);
+        let (rollback_id, rollback_cmd, rollback_is_reboot) = match &iv.rollback {
+            Rollback::RollbackId { rollback_id: rid } => {
+                let rb_cmd = skill
+                    .interventions
+                    .iter()
+                    .find(|i| i.id == *rid)
+                    .map(|i| i.cmd.clone());
+                (Some(rid.clone()), rb_cmd, false)
+            }
+            Rollback::NoneNeeded { .. } => (None, None, false),
+            Rollback::Reboot { .. } => (None, None, true),
+        };
+        let eval_checks: Vec<EvalCheckInfo> = skill
+            .evaluation
+            .as_ref()
+            .map(|ev| {
+                ev.after_intervention
+                    .iter()
+                    .map(|c| EvalCheckInfo {
+                        id: c.id.clone(),
+                        cmd: c.cmd.clone(),
+                        expect_exit: c.expect_exit,
+                        timeout: c.timeout.clone(),
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
         return Some(Ok(ResolvedAction::Intervention {
             skill_id: skill_id.to_string(),
             action_id: action_id.to_string(),
@@ -309,6 +357,10 @@ pub fn resolve_with_kask(
             needs_sudo: iv.needs_sudo,
             max_auto_risk: skill.safety.max_auto_risk,
             requires_human,
+            rollback_id,
+            rollback_cmd,
+            rollback_is_reboot,
+            eval_checks,
         }));
     }
 

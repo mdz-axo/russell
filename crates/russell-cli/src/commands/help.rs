@@ -4,7 +4,12 @@
 use anyhow::{Context, Result};
 use russell_core::journal::JournalWriter;
 use russell_core::paths::Paths;
-use russell_doctor::action::{self, ResolvedAction};
+use russell_doctor::action::{self, KaskToolInfo, ResolvedAction};
+use russell_mcp::client::KaskMcpClient;
+use russell_mcp::config::KaskMcpConfig;
+use russell_mcp::registry::ToolRegistry;
+use russell_skills::RiskBand;
+use tracing::debug;
 
 pub async fn run(paths: &Paths, note: Option<&str>) -> Result<()> {
     let writer = JournalWriter::open(&paths.journal())
@@ -20,7 +25,14 @@ pub async fn run(paths: &Paths, note: Option<&str>) -> Result<()> {
         );
     }
 
-    let outcome = russell_doctor::run_help(paths, &writer, note)
+    // Collect Kask MCP tool names for the SOAP prompt (ADR-0025 §7).
+    // Graceful degradation: empty list if Kask is unreachable.
+    let kask_tool_names = collect_kask_tool_names().await;
+    if !kask_tool_names.is_empty() {
+        debug!(count = kask_tool_names.len(), "kask tools available for jack");
+    }
+
+    let outcome = russell_doctor::run_help(paths, &writer, note, &kask_tool_names)
         .await
         .context("running Doctor help flow")?;
 
@@ -31,7 +43,8 @@ pub async fn run(paths: &Paths, note: Option<&str>) -> Result<()> {
 
     // If Jack proposed an action, resolve it.
     let skills = russell_skills::load_all(&paths.skills()).unwrap_or_default();
-    if let Some(action_result) = action::resolve(response, &skills) {
+    let kask_tool_infos = build_kask_tool_infos_from_names(&kask_tool_names);
+    if let Some(action_result) = action::resolve_with_kask(response, &skills, &kask_tool_infos) {
         match action_result {
             Ok(action) => match action {
                 ResolvedAction::Probe { .. } => {
@@ -150,4 +163,65 @@ async fn execute_probe(paths: &Paths, journal: &JournalWriter, action: &Resolved
         }
     }
     println!();
+}
+
+/// Collect Kask MCP tool names and risk bands for the SOAP prompt.
+/// Returns an empty list on any failure (graceful degradation per ADR-0025 §5).
+async fn collect_kask_tool_names() -> Vec<(String, Option<String>)> {
+    let kask_config = KaskMcpConfig::from_env();
+    if kask_config.validate().is_err() {
+        return vec![];
+    }
+
+    let mut client = match KaskMcpClient::new(kask_config.clone()) {
+        Ok(c) => c,
+        Err(e) => {
+            debug!(error = %e, "kask MCP client construction failed");
+            return vec![];
+        }
+    };
+
+    if client.connect().await.is_err() {
+        debug!("kask MCP connect failed — tools unavailable this session");
+        return vec![];
+    }
+
+    let mut registry = ToolRegistry::new(kask_config.tool_ttl);
+    if let Err(e) = registry.refresh(&client).await {
+        debug!(error = %e, "kask tool registry refresh failed");
+        return vec![];
+    }
+
+    registry
+        .tools()
+        .iter()
+        .map(|t| {
+            let risk = registry.tool_risk_band(&t.name);
+            (t.name.clone(), risk)
+        })
+        .collect()
+}
+
+/// Build [`KaskToolInfo`] list from (name, risk) tuples for the action resolver.
+fn build_kask_tool_infos_from_names(names: &[(String, Option<String>)]) -> Vec<KaskToolInfo> {
+    names
+        .iter()
+        .map(|(name, risk)| {
+            let risk_band = risk
+                .as_deref()
+                .map(|s| match s {
+                    "none" => RiskBand::None,
+                    "low" => RiskBand::Low,
+                    "medium" => RiskBand::Medium,
+                    "high" => RiskBand::High,
+                    "critical" => RiskBand::Critical,
+                    _ => RiskBand::Medium,
+                })
+                .unwrap_or(RiskBand::Medium);
+            KaskToolInfo {
+                name: name.clone(),
+                risk_band,
+            }
+        })
+        .collect()
 }
