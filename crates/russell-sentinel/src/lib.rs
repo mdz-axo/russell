@@ -114,9 +114,7 @@ pub fn evaluate_samples_with_rates(
         }
 
         // Rate-of-change check: compare against previous sample.
-        if let Some(prev_val) = reader.previous_sample_value(&s.name, now)
-            && let Some(prev_ts) = reader.previous_sample_ts(&s.name, now)
-        {
+        if let Some((prev_val, prev_ts)) = reader.previous_sample(&s.name, now) {
             let dt = ((now - prev_ts).max(1)) as f64;
             let rate = (v - prev_val).abs() / dt;
             let sev_rate = rules.evaluate_rate(&s.name, rate);

@@ -117,20 +117,20 @@ pub fn compose_with_kask(
         writeln!(objective, "- (no samples recorded)")?;
     } else {
         // Read 30-day baselines for deviation detection.
-        let baselines: std::collections::BTreeMap<String, f64> = reader
+        let baselines: std::collections::BTreeMap<String, (Option<f64>, Option<f64>)> = reader
             .read_baselines()
             .unwrap_or_default()
             .into_iter()
-            .filter_map(|b| b.p95.map(|v| (b.probe, v)))
+            .map(|b| (b.probe, (b.p95, b.ewma_mean)))
             .collect();
         let has_baselines = !baselines.is_empty();
 
         if has_baselines {
             writeln!(
                 objective,
-                "| probe | count | min | avg | max | last | p95 (30d) | unit |"
+                "| probe | count | min | avg | max | last | p95 (30d) | ewma (7d) | unit |"
             )?;
-            writeln!(objective, "|---|---|---|---|---|---|---|---|")?;
+            writeln!(objective, "|---|---|---|---|---|---|---|---|---|")?;
         } else {
             writeln!(
                 objective,
@@ -141,20 +141,27 @@ pub fn compose_with_kask(
         for s in &summaries {
             let unit = s.unit.as_deref().unwrap_or("");
             if has_baselines {
-                let p95 = baselines
+                let (p95, ewma) = baselines
                     .get(&s.probe)
-                    .map(|v| fmt_f64_baseline(*v))
+                    .map(|(p, e)| (*p, *e))
+                    .unwrap_or((None, None));
+                let p95_str = p95
+                    .map(|v| fmt_f64_baseline(v))
+                    .unwrap_or_else(|| "—".to_string());
+                let ewma_str = ewma
+                    .map(|v| fmt_f64_baseline(v))
                     .unwrap_or_else(|| "—".to_string());
                 writeln!(
                     objective,
-                    "| {} | {} | {} | {} | {} | {} | {} | {} |",
+                    "| {} | {} | {} | {} | {} | {} | {} | {} | {} |",
                     s.probe,
                     s.count,
                     fmt_opt_f64(s.min),
                     fmt_opt_f64(s.avg),
                     fmt_opt_f64(s.max),
                     fmt_opt_f64(s.last),
-                    p95,
+                    p95_str,
+                    ewma_str,
                     unit,
                 )?;
             } else {
@@ -305,6 +312,9 @@ pub fn compose_with_kask(
         }
     }
 
+    // Reflex arcs: proposed interventions from the sentinel's reflex engine.
+    build_reflex_section(reader, &mut objective)?;
+
     let mut rendered = String::new();
     writeln!(rendered, "# SOAP — russell help\n")?;
     writeln!(rendered, "## Subjective\n\n{subjective}\n")?;
@@ -400,6 +410,31 @@ fn fmt_opt_f64(v: Option<f64>) -> String {
         }
         None => "—".into(),
     }
+}
+
+/// Build the reflex actions section: list reflex_proposed events from
+/// the last 7 days so Jack can see and propose the interventions.
+fn build_reflex_section(reader: &JournalReader, objective: &mut String) -> Result<()> {
+    let now = russell_core::time::now_unix();
+    let since = now - 7 * 86_400;
+
+    let rows = reader.list_reflex_events(since, now)?;
+    if rows.is_empty() {
+        return Ok(());
+    }
+
+    writeln!(objective, "\n### Reflex arcs — proposed interventions")?;
+    writeln!(objective, "| ts | severity | intervention | summary |")?;
+    writeln!(objective, "|---|---|---|---|")?;
+    for (sev, intervention, summary, ts) in &rows {
+        writeln!(objective, "| {ts} | {sev} | `{intervention}` | {summary} |")?;
+    }
+
+    writeln!(
+        objective,
+        "- If any reflex arc above is within the risk cap, propose it via ACTION: <intervention>."
+    )?;
+    Ok(())
 }
 
 /// Format a baseline f64 value for the p95 column.

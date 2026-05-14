@@ -50,6 +50,11 @@ pub const MIGRATIONS: &[Migration] = &[
         slug: "threshold_skip_status",
         sql: include_str!("migrations/0004_threshold_skip_status.sql"),
     },
+    Migration {
+        version: 5,
+        slug: "add_outputs_column",
+        sql: include_str!("migrations/0005_add_outputs_column.sql"),
+    },
 ];
 
 /// Apply any migrations newer than the DB's current version.
@@ -132,10 +137,10 @@ mod tests {
     fn runs_once_then_noop() {
         let c = fresh();
         run(&c).unwrap();
-        assert_eq!(current_version(&c).unwrap(), 4);
+        assert_eq!(current_version(&c).unwrap(), 5);
         // Second run must not re-apply.
         run(&c).unwrap();
-        assert_eq!(current_version(&c).unwrap(), 4);
+        assert_eq!(current_version(&c).unwrap(), 5);
     }
 
     #[test]

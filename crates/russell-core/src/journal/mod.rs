@@ -826,35 +826,26 @@ impl JournalReader {
     /// # Errors
     ///
     /// Returns [`CoreError::Sqlite`] on DB errors.
-    pub fn previous_sample_value(&self, probe: &str, before_ts: i64) -> Option<f64> {
+    pub fn previous_sample(&self, probe: &str, before_ts: i64) -> Option<(f64, i64)> {
         let conn = self.open_ro().ok()?;
         conn.query_row(
-            "SELECT value_num FROM samples
+            "SELECT value_num, ts FROM samples
               WHERE probe = ?1 AND ts < ?2 AND value_num IS NOT NULL
               ORDER BY ts DESC LIMIT 1",
             params![probe, before_ts],
-            |r| r.get(0),
+            |r| Ok((r.get(0)?, r.get(1)?)),
         )
         .ok()
     }
 
-    /// Read the timestamp of the most recent numeric sample for a
-    /// probe before the given timestamp. Returns `None` if no prior
-    /// sample exists.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`CoreError::Sqlite`] on DB errors.
+    /// Legacy alias: returns just the value (for rate-of-change).
+    pub fn previous_sample_value(&self, probe: &str, before_ts: i64) -> Option<f64> {
+        self.previous_sample(probe, before_ts).map(|(v, _)| v)
+    }
+
+    /// Legacy alias: returns just the timestamp.
     pub fn previous_sample_ts(&self, probe: &str, before_ts: i64) -> Option<i64> {
-        let conn = self.open_ro().ok()?;
-        conn.query_row(
-            "SELECT ts FROM samples
-              WHERE probe = ?1 AND ts < ?2 AND value_num IS NOT NULL
-              ORDER BY ts DESC LIMIT 1",
-            params![probe, before_ts],
-            |r| r.get(0),
-        )
-        .ok()
+        self.previous_sample(probe, before_ts).map(|(_, ts)| ts)
     }
 
     /// Count reflex_proposed events for a probe within a time window.
@@ -867,13 +858,46 @@ impl JournalReader {
         let conn = self.open_ro()?;
         conn.query_row(
             "SELECT COUNT(*) FROM events
-              WHERE json_extract(outputs, '$.probe') = ?1
-                AND ts >= ?2 AND ts <= ?3
+              WHERE json_extract(payload, '$.outputs.probe') = ?1
+                AND ts_unix >= ?2 AND ts_unix <= ?3
                 AND action = 'reflex_proposed'",
             params![probe, since, until],
             |r| r.get(0),
         )
         .map_err(CoreError::Sqlite)
+    }
+
+    /// List reflex_proposed events for a time window. Returns the
+    /// most recent events first (max 10). Each entry contains
+    /// (severity, intervention_id, summary).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`CoreError::Sqlite`] on DB errors.
+    pub fn list_reflex_events(
+        &self,
+        since: i64,
+        until: i64,
+    ) -> Result<Vec<(String, String, String, i64)>> {
+        let conn = self.open_ro()?;
+        let mut stmt = conn.prepare(
+            "SELECT severity, json_extract(payload, '$.outputs.intervention'), summary, ts_unix
+               FROM events
+              WHERE action = 'reflex_proposed'
+                AND ts_unix >= ?1 AND ts_unix <= ?2
+              ORDER BY ts_unix DESC
+              LIMIT 10",
+        )?;
+        let rows = stmt
+            .query_map(params![since, until], |r| {
+                let sev: String = r.get(0)?;
+                let intervention: String = r.get(1)?;
+                let summary: String = r.get(2)?;
+                let ts: i64 = r.get(3)?;
+                Ok((sev, intervention, summary, ts))
+            })?
+            .collect::<std::result::Result<Vec<_>, _>>()?;
+        Ok(rows)
     }
 
     /// Path the journal lives at. May not exist yet on very fresh
