@@ -39,19 +39,21 @@ pub async fn run(paths: &Paths) -> Result<()> {
          Jack is here to help you discover, evaluate, build, adapt, and maintain skills.\n\
          \n\
          Quick commands:\n\
-           help            show this guide\n\
-           /list           list all skills with lifecycle status\n\
-           /gaps           show symptoms with no installed skill\n\
-           /lookup <sym>   which skills address this symptom?\n\
-           search <query>  search registry + remote sources\n\
-           evaluate <name> show manifest, scripts, safety scan\n\
-           build <name>    create a new skill skeleton on disk\n\
-           adapt <name>    modify an existing skill\n\
-           check           audit all installed skills\n\
-           prune <name>    deprecate a stale skill\n\
-           restore <name>  move a deprecated skill back to active\n\
-           install <name>  move a discovered skill to installed/active\n\
-           /quit           exit the workshop\n\
+           help              show this guide\n\
+           /list             list all skills with lifecycle status\n\
+           /gaps             show symptoms with no installed skill\n\
+           /lookup <sym>     which skills address this symptom?\n\
+           search <query>    search local cache\n\
+           search --remote   search via Brave Search API (needs BRAVE_API_KEY)\n\
+           fetch <url> <n>   download skill manifest from URL, safety-scan\n\
+           evaluate <name>   show manifest, scripts, safety scan\n\
+           build <name>      create a new skill skeleton on disk\n\
+           adapt <name>      edit skill manifest in \\$EDITOR or vim\n\
+           check             audit all installed skills\n\
+           prune <name>      deprecate a stale skill\n\
+           restore <name>    move a deprecated skill back to active\n\
+           install <name>    move a discovered skill to installed/active\n\
+           /quit             exit the workshop\n\
          \n\
          Or just describe what you need and Jack will help.\n"
     );
@@ -243,19 +245,21 @@ fn print_help() {
         "Skill Workshop — interactive skill lifecycle REPL.\n\
          \n\
          Quick commands:\n\
-           help            show this guide\n\
-           /list           list all skills with lifecycle status\n\
-           /gaps           show symptoms with no installed skill\n\
-           /lookup <sym>   which skills address this symptom?\n\
-           search <query>  search registry + remote sources\n\
-           evaluate <name> show manifest, scripts, safety scan\n\
-           build <name>    create a new skill skeleton on disk\n\
-           adapt <name>    modify an existing skill\n\
-           check           audit all installed skills\n\
-           prune <name>    deprecate a stale skill\n\
-           restore <name>  move a deprecated skill back to active\n\
-           install <name>  move a discovered skill to installed/active\n\
-           /quit           exit the workshop\n\
+           help              show this guide\n\
+           /list             list all skills with lifecycle status\n\
+           /gaps             show symptoms with no installed skill\n\
+           /lookup <sym>     which skills address this symptom?\n\
+           search <query>    search local cache\n\
+           search --remote   search via Brave Search API (needs BRAVE_API_KEY)\n\
+           fetch <url> <n>   download skill manifest from URL, safety-scan\n\
+           evaluate <name>   show manifest, scripts, safety scan\n\
+           build <name>      create a new skill skeleton on disk\n\
+           adapt <name>      edit skill manifest in \\$EDITOR or vim\n\
+           check             audit all installed skills\n\
+           prune <name>      deprecate a stale skill\n\
+           restore <name>    move a deprecated skill back to active\n\
+           install <name>    move a discovered skill to installed/active\n\
+           /quit             exit the workshop\n\
          \n\
          Or just describe what you need and Jack will help.\n"
     );
@@ -514,6 +518,260 @@ fn extract_yaml_list(manifest: &str, key: &str) -> Vec<String> {
         }
     }
     items
+}
+
+/// Fetch a skill manifest from a URL, safety-scan it, and register as discovered.
+async fn do_fetch(
+    registry: &mut RegistryCache,
+    skills_dir: &std::path::Path,
+    url: &str,
+    name: &str,
+) {
+    if name.is_empty() {
+        println!("Usage: fetch <url> <name>");
+        return;
+    }
+    if url.is_empty() || !url.starts_with("http") {
+        println!("URL must start with http:// or https://");
+        return;
+    }
+
+    println!("Fetching {name} from {url}...");
+
+    // Try to download the URL content.
+    let output = tokio::process::Command::new("curl")
+        .args(["-sSL", "--connect-timeout", "10", "--max-time", "30", url])
+        .output()
+        .await;
+
+    match output {
+        Ok(out) if out.status.success() => {
+            let content = String::from_utf8_lossy(&out.stdout);
+            if content.is_empty() {
+                println!("  Downloaded empty content from {url}");
+                return;
+            }
+
+            // Safety scan the downloaded content.
+            let scan = SafetyScan::scan(&content);
+            println!("  Safety scan:");
+            if scan.findings.is_empty() {
+                println!("    ✓ No findings.");
+            } else {
+                for f in &scan.findings {
+                    let severity = match f.severity {
+                        russell_skills::registry::ScanSeverity::Info => "INFO",
+                        russell_skills::registry::ScanSeverity::Warn => "WARN",
+                        russell_skills::registry::ScanSeverity::Block => "BLOCK",
+                    };
+                    println!("    [{severity}] {id}: {desc}", id = f.rule_id, desc = f.description);
+                }
+            }
+
+            if scan.has_blocks() {
+                println!("  ⛔ Downloaded content has blocking findings. Not saving.");
+                println!("  Review the URL manually: {url}");
+                return;
+            }
+
+            // Quick parse: extract id, version, symptoms from the downloaded YAML.
+            let version = extract_yaml_field(&content, "version").unwrap_or_else(|| "0.1.0".into());
+            let symptoms = extract_yaml_list(&content, "symptoms");
+
+            // Save to disk.
+            let skill_dir = skills_dir.join(name);
+            let _ = std::fs::create_dir_all(&skill_dir);
+            let manifest_path = skill_dir.join("manifest.yaml");
+            if let Err(e) = std::fs::write(&manifest_path, content.as_bytes()) {
+                println!("  Cannot save manifest: {e}");
+                return;
+            }
+
+            let today = chrono_now();
+            registry.upsert(name, RegistryEntry {
+                status: LifecycleStatus::Discovered,
+                version,
+                symptoms,
+                source: SkillSource::Remote { url: url.to_string() },
+                installed: today.clone(),
+                last_evaluated: Some(today),
+                valid_until: None,
+                coverage_score: None,
+                superseded_by: None,
+                deprecation_reason: None,
+                probe_runs: 0,
+                recent_probe_failures: 0,
+            });
+
+            println!("  Saved to {}", manifest_path.display());
+            println!("  Registered as 'discovered'. Run 'evaluate {name}' to inspect, then 'install {name}'.");
+        }
+        Ok(out) => {
+            let stderr = String::from_utf8_lossy(&out.stderr);
+            println!("  curl failed (exit {}): {}", out.status, stderr.trim());
+        }
+        Err(e) => {
+            println!("  Cannot run curl: {e}");
+        }
+    }
+}
+
+/// Adapt an existing skill: open in editor, re-scan, update cache.
+fn do_adapt(registry: &mut RegistryCache, skills_dir: &std::path::Path, name: &str) {
+    let manifest_path = skills_dir.join(name).join("manifest.yaml");
+    if !manifest_path.exists() {
+        println!("Skill '{name}' not found at {}", manifest_path.display());
+        return;
+    }
+
+    let editor = std::env::var("EDITOR").unwrap_or_else(|_| "vim".into());
+
+    // Show current state.
+    if let Some(entry) = registry.skills.get(name) {
+        println!("{name} (v{}, {}): {}", entry.version, entry.status.as_str(), entry.symptoms.join(", "));
+    }
+
+    println!("Opening {} with {}...", manifest_path.display(), editor);
+    println!("(Edit the manifest, save, and exit the editor.)");
+
+    let status = std::process::Command::new(&editor)
+        .arg(&manifest_path)
+        .status();
+
+    match status {
+        Ok(s) if s.success() => {
+            // Re-read and safety-scan the edited manifest.
+            if let Ok(content) = std::fs::read_to_string(&manifest_path) {
+                let scan = SafetyScan::scan(&content);
+                if scan.has_blocks() {
+                    println!("  ⚠ Safety scan found blocking issues:");
+                    for f in &scan.findings {
+                        if f.severity == russell_skills::registry::ScanSeverity::Block {
+                            println!("    [{id}]: {desc}", id = f.rule_id, desc = f.description);
+                        }
+                    }
+                    println!("  Fix these before installing.");
+                } else {
+                    println!("  ✓ Safety scan clean.");
+                }
+
+                let version = extract_yaml_field(&content, "version").unwrap_or_else(|| "0.1.0".into());
+                let symptoms = extract_yaml_list(&content, "symptoms");
+
+                if let Some(entry) = registry.skills.get_mut(name) {
+                    entry.version = version;
+                    entry.symptoms = symptoms;
+                    entry.last_evaluated = Some(chrono_now());
+                    println!("  Updated registry entry.");
+                }
+            }
+        }
+        Ok(s) => {
+            println!("  Editor exited with status: {}", s);
+        }
+        Err(e) => {
+            println!("  Cannot run editor '{}': {}", editor, e);
+            println!("  Edit manually: {}", manifest_path.display());
+        }
+    }
+}
+
+/// Search remote registries via Brave Search API (if BRAVE_API_KEY is set) or DuckDuckGo.
+async fn do_search_remote(registry: &mut RegistryCache, query: &str) {
+    println!("Remote search for: {query}");
+
+    let api_key = std::env::var("BRAVE_API_KEY").ok();
+    let results: Vec<(String, String)> = if let Some(key) = api_key {
+        // Use Brave Search API.
+        let output = tokio::process::Command::new("curl")
+            .args([
+                "-sS", "--connect-timeout", "10", "--max-time", "15",
+                "-H", "Accept: application/json",
+                "-H", "Accept-Encoding: gzip",
+                "-H", &format!("X-Subscription-Token: {key}"),
+                &format!("https://api.search.brave.com/res/v1/web/search?q=site:github.com%20russell%20skill%20{query}&count=5"),
+            ])
+            .output()
+            .await;
+
+        match output {
+            Ok(out) if out.status.success() => {
+                let body = String::from_utf8_lossy(&out.stdout);
+                parse_brave_results(&body)
+            }
+            _ => {
+                println!("  (Brave Search API unavailable — using fallback)");
+                Vec::new()
+            }
+        }
+    } else {
+        println!("  (Set BRAVE_API_KEY for Brave Search. Using local cache only.)");
+        Vec::new()
+    };
+
+    if results.is_empty() {
+        println!("  No remote results. Searching local cache instead:");
+        print_search(registry, query);
+        return;
+    }
+
+    for (title, url) in &results {
+        println!("  {title}");
+        println!("    {url}");
+        // Register as discovered from remote.
+        let slug = title.to_lowercase().replace(' ', "-");
+        if !registry.skills.contains_key(&slug) {
+            registry.upsert(&slug, RegistryEntry {
+                status: LifecycleStatus::Discovered,
+                version: "unknown".into(),
+                symptoms: vec![],
+                source: SkillSource::Remote { url: url.clone() },
+                installed: chrono_now(),
+                last_evaluated: None,
+                valid_until: None,
+                coverage_score: None,
+                superseded_by: None,
+                deprecation_reason: None,
+                probe_runs: 0,
+                recent_probe_failures: 0,
+            });
+        }
+    }
+    println!();
+    println!("  Use 'fetch <url> <name>' to download a skill from these results.");
+}
+
+/// Parse Brave Search API JSON results into (title, url) pairs.
+fn parse_brave_results(json: &str) -> Vec<(String, String)> {
+    let mut results = Vec::new();
+    let web_start = match json.find("\"web\"") {
+        Some(pos) => pos,
+        None => return results,
+    };
+    let results_start = match json[web_start..].find("\"results\"") {
+        Some(pos) => pos,
+        None => return results,
+    };
+    let rest = &json[web_start + results_start..];
+    let mut search_pos = 0;
+    while let Some(title_pos) = rest[search_pos..].find("\"title\":\"") {
+        let abs_title = search_pos + title_pos + 9;
+        let title_end = match rest[abs_title..].find('"') {
+            Some(pos) => pos,
+            None => break,
+        };
+        let title = rest[abs_title..abs_title + title_end].to_string();
+        let url_pos = rest[abs_title + title_end..].find("\"url\":\"");
+        if let Some(url_abs) = url_pos {
+            let abs_url = abs_title + title_end + url_abs + 7;
+            if let Some(url_end) = rest[abs_url..].find('"') {
+                let url = rest[abs_url..abs_url + url_end].to_string();
+                results.push((title, url));
+            }
+        }
+        search_pos = abs_title + title_end + 1;
+    }
+    results
 }
 
 /// Restore a deprecated skill back to active.

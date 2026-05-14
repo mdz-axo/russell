@@ -60,6 +60,11 @@ probes:
     capture: stdout
     timeout: 10s
 
+  - id: probe-scenario-full
+    cmd: ["bash", "./scripts/scenario-full.sh"]
+    capture: stdout
+    timeout: 300s
+
 interventions: []
 
 safety:
