@@ -195,6 +195,34 @@ installed skills (up from 3 at Phase 3 close). Scenario metrics
 feed into the sentinel rule engine. The `oom-watcher` skill
 demonstrates end-to-end build→install→test→sentinel flow.
 
+- [x] **EWMA statistics**: `ewma_mean`/`ewma_var` in `BaselineRow`, computed with
+  7-day half-life over timestamp-ordered series. Stored via `upsert_baseline()`
+  and surfaced in Jack's SOAP sample table alongside p95.
+- [x] **Rate-of-change rules**: `rate_warn`/`rate_alert`/`rate_crit` fields on
+  `Rule`, factory defaults for GPU temp (0.5/1.5/5.0 °C/s), VRAM used
+  (51.2/102.4/512.0 MiB/s), and disk usage (0.5/2.0/5.0 %/s).
+  `evaluate_samples_with_rates()` emits `rate_breach` events when the absolute
+  rate exceeds thresholds. Rate computed from the previous journaled sample.
+- [x] **Reflex arc engine**: `ReflexSet` in `russell-core::reflex`, TOML-based
+  arcs (`arc.d/*.toml`) mapping (probe, severity) → (intervention, cooldown,
+  max_retries). Factory default arc: `disk_root_used_pct/alert → sysadmin/sweep-caches`
+  with 1h cooldown. Evaluated after threshold/rate breaches in `sentinel-once`;
+  emits `reflex_proposed` events consumed by the Nurse SOAP.
+- [x] **Reflex → Nurse wiring**: `build_reflex_section()` in `prompt.rs` renders
+  dedicated "Reflex arcs — proposed interventions" table in Jack's SOAP.
+  `JournalReader::list_reflex_events()` and `count_reflex_events()` for cooldown
+  enforcement.
+- [x] **IDRS rollback & evaluation wired**: `run_intervention_with_rollback()`
+  used in chat.rs consent path; `eval_checks` resolved from skill manifests and
+  passed through `ResolvedAction::Intervention`. Rollback strategies
+  (RollbackId, NoneNeeded, Reboot) propagated from manifest to dispatcher.
+- [x] **KaskTool IDRS parity**: evidence bundles for Kask MCP tool calls
+  (`evidence/kask/<tool>/<ts>/result.txt + event.json`), per-tool timeout (30s/120s),
+  unified `RiskBand` enum (no more string comparison).
+- [x] **AutoimmuneGuard wired**: `AUTOIMMUNE` static guard acquired in
+  `run_once()`, `run_once_with()`, and `run_once_with_kask()`.
+- [x] **Sentinel watchdog**: `TimeoutStartSec=120` on `russell-sentinel.service`.
+
 ## 4. Open questions
 
 - (ADR-0016 v2) Default backend is Ollama with model
