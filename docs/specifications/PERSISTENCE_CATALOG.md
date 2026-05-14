@@ -83,6 +83,27 @@ against the file.
 
 Column details are in `crates/russell-core/src/journal/migrations/`.
 
+**Event action types (new additions).**
+
+| Action | Meaning | Emitted by |
+|---|---|---|
+| `rate_breach` | Rate-of-change threshold crossed | `sentinel::evaluate_samples_with_rates` |
+| `reflex_proposed` | Reflex arc matched a breach → intervention proposed | `sentinel-once` reflex evaluation |
+
+**Baselines columns (new additions).**
+
+The `baselines` table now stores per-probe EWMA statistics
+alongside percentiles:
+
+| Column | Type | Meaning |
+|---|---|---|
+| `ewma_mean` | REAL | Exponentially-weighted moving average, 7-day half-life |
+| `ewma_var` | REAL | EWMA variance around the mean |
+
+Both are `NULL` until the first `compute_baselines()` run for a
+probe; computed once every 24h in `sentinel-once`. Surfacen in
+Jack's SOAP sample table as `ewma (7d)` column.
+
 #### Self-scope samples (`russell-proprio`)
 
 The `samples` table also holds self-observation rows written by
@@ -163,6 +184,24 @@ File is created by the operator. Russell does **not** write to it.
 Operator rule overrides. Default rules ship in
 `crates/russell-sentinel/rules.d/` and are copied at install
 time; operator overrides in this directory take precedence.
+
+### 2.7a `~/.config/harness/reflex.d/`
+
+Operator reflex arc overrides. Default arcs ship in
+`crates/russell-core/src/reflex/defaults.toml` and are compiled
+into the binary; operator overrides take precedence. Each TOML
+file conforms to `russell.reflex.v1` schema:
+```toml
+schema = "russell.reflex.v1"
+[[arc]]
+probe = "disk_root_used_pct"
+min_severity = "alert"
+intervention = "sysadmin/sweep-caches"
+cooldown_secs = 3600
+max_retries = 3
+```
+Evaluation: `sentinel-once` checks each threshold/rate breach
+against the reflex set and emits `reflex_proposed` events.
 
 ### 2.8 `~/.local/share/harness/skills/`
 
