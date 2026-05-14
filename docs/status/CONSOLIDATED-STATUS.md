@@ -85,11 +85,11 @@ of every meaningful development session.
 
 ### Not yet
 
-- Kask-aware probes: Ollama, disk, systemd services (Phase B of integration).
-- Full MCP server surface (Phase 4).
-- Corrective reflex arcs — require mutation and IDRS (deferred).
-- Tier I / II / III separate cadences (Phase 4).
-- Remote skill registry (Phase 4).
+- Full MCP server surface (Phase 4 — `russell-mcp` is still a stub).
+- Corrective reflex arcs — require mutation and IDRS.
+- Tier I / II / III separate cadences.
+- Remote skill registry sync (`registry-sources.yaml` schema defined, `fetch --remote` deferred).
+- Skill probe telemetry (`probe_runs` counters not wired to Dispatcher).
 - Chaos probes (deferred).
 
 ## 3. Phase-by-phase plan
