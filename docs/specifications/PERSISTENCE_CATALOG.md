@@ -1,9 +1,9 @@
 ---
 title: "Persistence Catalog — where Russell remembers"
 audience: [operators, developers, architects]
-last_updated: 2026-05-06
+last_updated: 2026-05-14
 togaf_phase: "C"
-version: "1.0.0"
+version: "1.1.0"
 status: "Active"
 ---
 
