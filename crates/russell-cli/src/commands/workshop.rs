@@ -45,11 +45,12 @@ pub async fn run(paths: &Paths) -> Result<()> {
            /lookup <sym>   which skills address this symptom?\n\
            search <query>  search registry + remote sources\n\
            evaluate <name> show manifest, scripts, safety scan\n\
-           build <name>    compose a new skill interactively\n\
+           build <name>    create a new skill skeleton on disk\n\
            adapt <name>    modify an existing skill\n\
            check           audit all installed skills\n\
-           prune <name>    deprecate or retire a stale skill\n\
-           install <name>  copy a skill from discovered to installed\n\
+           prune <name>    deprecate a stale skill\n\
+           restore <name>  move a deprecated skill back to active\n\
+           install <name>  move a discovered skill to installed/active\n\
            /quit           exit the workshop\n\
          \n\
          Or just describe what you need and Jack will help.\n"
@@ -151,6 +152,15 @@ async fn handle_builtin(
             do_prune(registry, name);
             true
         }
+        _ if input.starts_with("restore ") || input.starts_with("unprune ") => {
+            let name = if let Some(n) = input.strip_prefix("restore ") {
+                n
+            } else {
+                input.strip_prefix("unprune ").unwrap_or("")
+            };
+            do_restore(registry, name);
+            true
+        }
         _ if input.starts_with("install ") => {
             let name = input.strip_prefix("install ").unwrap_or("");
             do_install(registry, skills_dir, name);
@@ -221,11 +231,12 @@ fn print_help() {
            /lookup <sym>   which skills address this symptom?\n\
            search <query>  search registry + remote sources\n\
            evaluate <name> show manifest, scripts, safety scan\n\
-           build <name>    compose a new skill interactively\n\
+           build <name>    create a new skill skeleton on disk\n\
            adapt <name>    modify an existing skill\n\
            check           audit all installed skills\n\
-           prune <name>    deprecate or retire a stale skill\n\
-           install <name>  copy a skill from discovered to installed\n\
+           prune <name>    deprecate a stale skill\n\
+           restore <name>  move a deprecated skill back to active\n\
+           install <name>  move a discovered skill to installed/active\n\
            /quit           exit the workshop\n\
          \n\
          Or just describe what you need and Jack will help.\n"
@@ -487,12 +498,28 @@ fn extract_yaml_list(manifest: &str, key: &str) -> Vec<String> {
     items
 }
 
-/// Build a new skill interactively via Jack.
+/// Restore a deprecated skill back to active.
+fn do_restore(registry: &mut RegistryCache, name: &str) {
+    if let Some(entry) = registry.skills.get_mut(name) {
+        if entry.status != LifecycleStatus::Deprecated {
+            println!("{name} is {} — restore only applies to deprecated skills.", entry.status.as_str());
+            return;
+        }
+        println!("Restoring {name} (v{}) from deprecated → active.", entry.version);
+        entry.status = LifecycleStatus::Active;
+        entry.deprecation_reason = None;
+        entry.superseded_by = None;
+        println!("  Done. Skill will be loaded on next restart.");
+    } else {
+        println!("Skill '{name}' not found in registry.");
+    }
+}
+
 /// Build a new skill interactively via Jack.
 #[allow(clippy::too_many_arguments)]
 async fn do_build(
     registry: &mut RegistryCache,
-    _skills_dir: &std::path::Path,
+    skills_dir: &std::path::Path,
     name: &str,
     workshop_knowledge: &str,
     maintenance_knowledge: &str,
@@ -501,22 +528,45 @@ async fn do_build(
     _fallback_model: &str,
 ) {
     if registry.skills.contains_key(name) {
-        println!("Skill '{name}' already exists. Use 'adapt {name}' to modify it.");
+        let status = registry.skills[name].status;
+        if status.is_loadable() || status == LifecycleStatus::Deprecated {
+            println!("Skill '{name}' already exists ({}). Use 'adapt {name}' to modify it or 'restore {name}' if deprecated.", status.as_str());
+            return;
+        }
+    }
+
+    // Create the skill directory and a minimal valid manifest.
+    let skill_dir = skills_dir.join(name);
+    if let Err(e) = std::fs::create_dir_all(&skill_dir) {
+        println!("Cannot create directory for {name}: {e}");
         return;
     }
 
-    println!("Building new skill: {name}");
-    println!("Jack will help compose a manifest and probe scripts.");
-    println!("Describe what you need the skill to do, or just start typing.\n");
-
-    // Start interactive build session via Jack.
-    let build_prompt = format!(
-        "The operator wants to build a new skill called '{name}'. \
-         Guide them through manifest composition, probe script writing, \
-         and safety scanning. Start by asking what symptom(s) this skill \
-         should address from the catalog. Be concise."
+    let manifest_path = skill_dir.join("manifest.yaml");
+    let today = chrono_now();
+    let manifest_content = format!(
+        r#"# {name} — TODO: describe what this skill does.
+id: {name}
+version: 0.1.0
+authored: {today}
+min_harness_version: 0.1.0
+symptoms: []
+applies_when:
+  - os_family: linux
+probes: []
+interventions: []
+safety:
+  max_auto_risk: none
+"#
     );
-    let _ = jack_workshop_turn(&build_prompt, workshop_knowledge, maintenance_knowledge, skills, client_cfg).await;
+
+    if let Err(e) = std::fs::write(&manifest_path, &manifest_content) {
+        println!("Cannot write manifest for {name}: {e}");
+        return;
+    }
+
+    println!("Created: {}", manifest_path.display());
+    println!("Edit the manifest to add symptoms and probes, then run 'install {name}'.");
 
     // Register as discovered in the cache.
     registry.upsert(name, RegistryEntry {
@@ -524,7 +574,7 @@ async fn do_build(
         version: "0.1.0".into(),
         symptoms: vec![],
         source: SkillSource::Workshop,
-        installed: chrono_now(),
+        installed: today,
         last_evaluated: None,
         valid_until: None,
         coverage_score: None,
@@ -533,9 +583,17 @@ async fn do_build(
         probe_runs: 0,
         recent_probe_failures: 0,
     });
-    println!();
-    println!("Skill '{name}' registered as 'discovered'.");
-    println!("Continue describing it to Jack, then use 'install {name}' when ready.");
+
+    // Invoke Jack to help compose the skill interactively.
+    let build_prompt = format!(
+        "The operator just created a new skill called '{name}' at {}. \
+         The manifest has no symptoms or probes yet. Help them design \
+         what this skill should watch and what probes it needs. \
+         Ask what symptom(s) from the catalog this skill addresses. Be concise.",
+        manifest_path.display()
+    );
+    println!("\nJack is ready to help design this skill:");
+    let _ = jack_workshop_turn(&build_prompt, workshop_knowledge, maintenance_knowledge, skills, client_cfg).await;
 }
 
 fn print_check(registry: &RegistryCache) {

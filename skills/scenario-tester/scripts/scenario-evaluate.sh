@@ -96,3 +96,20 @@ cat <<EOF
 {"metric":"latency_regression_pct","value":$latency_regression,"unit":"pct","timestamp":"$ts","status":"$latency_status"}
 {"metric":"error_rate_regression_pp","value":$error_regression,"unit":"pp","timestamp":"$ts","status":"$error_status"}
 EOF
+
+# Optionally write metrics as journal samples for the rule engine.
+if [ "${WRITE_SAMPLES:-0}" = "1" ] && [ -f "$JOURNAL" ]; then
+    now_ts=$(date +%s)
+    sqlite3 "$JOURNAL" \
+        "INSERT OR REPLACE INTO samples (ts, scope, probe, value_num, unit)
+         VALUES ($now_ts, 'host', 'okapi_latency_p95_ms', $current_latency_p95, 'ms');" 2>/dev/null || true
+    sqlite3 "$JOURNAL" \
+        "INSERT OR REPLACE INTO samples (ts, scope, probe, value_num, unit)
+         VALUES ($now_ts, 'host', 'okapi_error_rate_pct', $current_error_rate, 'pct');" 2>/dev/null || true
+    sqlite3 "$JOURNAL" \
+        "INSERT OR REPLACE INTO samples (ts, scope, probe, value_num, unit)
+         VALUES ($now_ts, 'host', 'latency_regression_pct', $latency_regression, 'pct');" 2>/dev/null || true
+    sqlite3 "$JOURNAL" \
+        "INSERT OR REPLACE INTO samples (ts, scope, probe, value_num, unit)
+         VALUES ($now_ts, 'host', 'error_rate_regression_pp', $error_regression, 'pp');" 2>/dev/null || true
+fi

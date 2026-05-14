@@ -55,6 +55,11 @@ probes:
     capture: stdout
     timeout: 15s
 
+  - id: probe-scenario-journal
+    cmd: ["bash", "./scripts/scenario-journal.sh"]
+    capture: stdout
+    timeout: 10s
+
 interventions: []
 
 safety:
