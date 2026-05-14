@@ -48,32 +48,38 @@ pub async fn run(paths: &Paths, note: Option<&str>) -> Result<()> {
         })
         .collect();
 
+    let skills = russell_skills::load_all(&paths.skills()).unwrap_or_default();
+
     let outcome = russell_doctor::run_help(paths, &writer, note, &kask_tool_names)
         .await
         .context("running Doctor help flow")?;
 
-    // Print the response without trailing blank lines.
-    let response = outcome.response.trim_end();
-    println!("{response}");
-    println!();
-
-    // If Jack proposed an action, resolve it.
-    let skills = russell_skills::load_all(&paths.skills()).unwrap_or_default();
-    if let Some(action_result) = action::resolve_with_kask(response, &skills, &kask_tool_infos) {
+    // If Jack proposed a probe, run it FIRST and feed results back for analysis.
+    let final_response = if let Some(action_result) =
+        action::resolve_with_kask(&outcome.response, &skills, &kask_tool_infos)
+    {
         match action_result {
-            Ok(action) => match action {
+            Ok(action) => match &action {
                 ResolvedAction::Probe { .. } => {
                     println!(
                         "  → Running probe: {}/{}…",
                         action.skill_id(),
                         action.action_id()
                     );
-                    execute_probe(paths, &writer, &action).await;
+                    let probe_output = execute_probe_capture(paths, &writer, &action).await;
+                    // Feed probe results back to Jack for analysis.
+                    match analyze_probe_result(paths, &writer, &outcome.response, &probe_output, &kask_tool_names).await {
+                        Ok(analysis) => analysis,
+                        Err(e) => {
+                            debug!(error = %e, "probe analysis failed, using original response");
+                            outcome.response.clone()
+                        }
+                    }
                 }
                 ResolvedAction::Intervention {
                     risk, needs_sudo, ..
                 } => {
-                    let sudo_tag = if needs_sudo { " [needs sudo]" } else { "" };
+                    let sudo_tag = if *needs_sudo { " [needs sudo]" } else { "" };
                     println!(
                         "  → Jack proposes: {}/{} (risk: {:?}{})",
                         action.skill_id(),
@@ -85,18 +91,28 @@ pub async fn run(paths: &Paths, note: Option<&str>) -> Result<()> {
                         "  → Switch to `russell chat` and I'll run it — just say 'ok' when I ask."
                     );
                     println!();
+                    outcome.response.clone()
                 }
                 ResolvedAction::KaskTool { .. } => {
                     println!("  → Jack proposes kask tool: {}.", action.action_id(),);
                     println!("  → Switch to `russell chat` to execute Kask tools interactively.");
                     println!();
+                    outcome.response.clone()
                 }
             },
             Err(e) => {
                 println!("  → {e}");
+                outcome.response.clone()
             }
         }
-    }
+    } else {
+        outcome.response.clone()
+    };
+
+    // Print the final response (Jack's analysis, possibly including probe findings).
+    let response = final_response.trim_end();
+    println!("{response}");
+    println!();
 
     println!(
         "  [jack via {} · session {} · bundle {}]",
@@ -120,8 +136,12 @@ pub async fn run(paths: &Paths, note: Option<&str>) -> Result<()> {
     Ok(())
 }
 
-/// Execute a probe immediately (read-only, risk: none).
-async fn execute_probe(paths: &Paths, journal: &JournalWriter, action: &ResolvedAction) {
+/// Execute a probe and capture output for analysis.
+async fn execute_probe_capture(
+    paths: &Paths,
+    journal: &JournalWriter,
+    action: &ResolvedAction,
+) -> ProbeOutput {
     use russell_skills::dispatch::{Dispatcher, DryRun, StepType};
     use std::time::Duration;
 
@@ -151,33 +171,92 @@ async fn execute_probe(paths: &Paths, journal: &JournalWriter, action: &Resolved
         .await;
 
     match result {
-        Ok(outcome) => {
-            if outcome.exit_code == Some(0) {
-                if !outcome.stdout.is_empty() {
-                    println!("  {}", outcome.stdout.trim());
-                }
-                println!(
-                    "  → Probe {}/{} complete.",
-                    action.skill_id(),
-                    action.action_id()
-                );
-            } else {
-                println!(
-                    "  → Probe {}/{} exited with code {:?}.",
-                    action.skill_id(),
-                    action.action_id(),
-                    outcome.exit_code
-                );
-                if !outcome.stderr.is_empty() {
-                    println!("  stderr: {}", outcome.stderr.trim());
-                }
-            }
-        }
-        Err(e) => {
-            println!("  → Failed to run probe: {e}");
-        }
+        Ok(outcome) => ProbeOutput {
+            success: outcome.exit_code == Some(0),
+            stdout: outcome.stdout,
+            stderr: outcome.stderr,
+            exit_code: outcome.exit_code,
+        },
+        Err(e) => ProbeOutput {
+            success: false,
+            stdout: String::new(),
+            stderr: format!("Dispatcher error: {e}"),
+            exit_code: None,
+        },
     }
-    println!();
+}
+
+/// Feed probe results back to Jack for analysis.
+async fn analyze_probe_result(
+    _paths: &Paths,
+    _writer: &JournalWriter,
+    _original_response: &str,
+    probe_output: &ProbeOutput,
+    _kask_tool_names: &[(String, Option<String>)],
+) -> Result<String> {
+    use russell_doctor::client::{ClientConfig, LlmClient, SoapPrompt};
+    use russell_doctor::oai_client;
+
+    let cfg = ClientConfig::from_env();
+    let client = match cfg.backend {
+        russell_doctor::client::Backend::Okapi => {
+            let mut okapi_cfg = cfg.clone();
+            if okapi_cfg.base_url.is_none() {
+                okapi_cfg.base_url = Some("http://127.0.0.1:11435/v1".into());
+            }
+            if okapi_cfg.api_key.is_none() {
+                okapi_cfg.api_key = Some("okapi".into());
+            }
+            oai_client::OkapiClient::new(&okapi_cfg).await?
+        }
+        russell_doctor::client::Backend::Mock => {
+            return Ok(format!(
+                "[mock backend] Probe result: {}\nAnalysis would happen here.",
+                probe_output.stdout.trim()
+            ));
+        }
+        russell_doctor::client::Backend::Offline => {
+            return Ok(format!(
+                "[offline] Probe returned: {}",
+                probe_output.stdout.trim()
+            ));
+        }
+    };
+
+    let probe_summary = if probe_output.success {
+        format!("Probe output:\n{}", probe_output.stdout.trim())
+    } else {
+        format!(
+            "Probe failed with exit code {:?}.\nStdout: {}\nStderr: {}",
+            probe_output.exit_code,
+            probe_output.stdout.trim(),
+            probe_output.stderr.trim()
+        )
+    };
+
+    let response = client
+        .chat(&SoapPrompt {
+            system: "You are Jack, the Nurse. Analyze probe results and explain what they mean. \
+                     You previously proposed running a probe. Here are the results.\n\n\
+                     Analyze what this result means in the context of your previous analysis. \
+                     What does this tell us about the system? What should we do next?\n\n\
+                     If you identify another probe to run, propose it with ACTION: syntax.".into(),
+            subjective: "Probe results".into(),
+            objective: probe_summary.clone(),
+            rendered: format!("Probe results:\n\n{}", probe_summary),
+        })
+        .await?;
+
+    Ok(response.content)
+}
+
+/// Output from a probe execution.
+#[derive(Debug, Clone)]
+struct ProbeOutput {
+    success: bool,
+    stdout: String,
+    stderr: String,
+    exit_code: Option<i32>,
 }
 
 /// Collect Kask MCP tool infos (name, risk, input_schema) for the SOAP prompt
