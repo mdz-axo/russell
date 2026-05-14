@@ -12,15 +12,14 @@ authors.workspace = true
 path = "src/lib.rs"
 
 [dependencies]
-
 russell-core.workspace = true
-russell-sentinel.workspace = true
-russell-doctor.workspace = true
-russell-skills.workspace = true
-russell-proprio.workspace = true
 thiserror.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 tokio.workspace = true
 tracing.workspace = true
+reqwest.workspace = true
 
+[dev-dependencies]
+tempfile.workspace = true
+tokio = { workspace = true, features = ["test-util"] }

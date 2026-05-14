@@ -1,16 +1,29 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
-//! `russell-mcp` — Phase 0 placeholder.
+//! `russell-mcp` — MCP client for the trusted Kask relationship.
 //!
-//! This crate is reserved per
-//! [ADR-0013](../../docs/adr/0013-rust-workspace-layout.md).
-//! Phase 0 (`cybernetic-health-harness.md` §20) only populates
-//! [`russell-core`] and [`russell-cli`]; the other crates exist so
-//! the dependency DAG is correct from day one and so imports do not
-//! churn when implementation lands.
+//! Per [ADR-0025](../../docs/adr/0025-kask-mcp-client-trusted-relationship.md),
+//! Russell gains an MCP client that connects **exclusively** to the local
+//! Kask installation's MCP endpoint. No general remote MCP servers. No
+//! remote skill registries. Kask is the sole trust boundary.
+//!
+//! # Architecture
+//!
+//! - [`config::KaskMcpConfig`] — env-driven configuration.
+//! - [`client::KaskMcpClient`] — the MCP JSON-RPC client (HTTP POST).
+//! - [`registry::ToolRegistry`] — cached `tools/list` with TTL refresh.
+//! - [`error::McpError`] — error taxonomy.
+//!
+//! # Safety constraints
+//!
+//! The client **refuses** to connect to any non-loopback address. This
+//! is enforced at the transport layer in [`client::validate_endpoint`].
 
 #![forbid(unsafe_code)]
 #![deny(rust_2018_idioms)]
 #![warn(missing_docs)]
 
-/// Phase-0 version marker. Removed when the crate gains real APIs.
-pub const PHASE0_STUB: &str = "russell-mcp";
+pub mod client;
+pub mod config;
+pub mod error;
+pub mod registry;
+pub mod types;
