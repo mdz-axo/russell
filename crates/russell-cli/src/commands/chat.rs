@@ -226,16 +226,30 @@ pub async fn run(paths: &Paths) -> Result<()> {
                 // Consent handling — must come before special commands.
                 if let Some(ref pa) = pending_action {
                     if trimmed == "/approve" || is_affirmative(trimmed) {
-                        execute_pending_action(&journal, paths, pa, &session_id, &current_model)
+                        let action_result = execute_pending_action(&journal, paths, pa, &session_id, &current_model)
                             .await;
+                        if let Some(result_text) = action_result {
+                            history.turns.push(Turn {
+                                role: "user".into(),
+                                content: result_text,
+                            });
+                            save_history(&chat_path, &history)?;
+                        }
                         pending_action = None;
                         continue;
                     }
                     if let Some(_pw) = trimmed.strip_prefix("/approve ") {
                         println!("  → Approving. Use `/approve` without a password next time —");
                         println!("    Jack will prompt you securely if sudo is needed.");
-                        execute_pending_action(&journal, paths, pa, &session_id, &current_model)
+                        let action_result = execute_pending_action(&journal, paths, pa, &session_id, &current_model)
                             .await;
+                        if let Some(result_text) = action_result {
+                            history.turns.push(Turn {
+                                role: "user".into(),
+                                content: result_text,
+                            });
+                            save_history(&chat_path, &history)?;
+                        }
                         pending_action = None;
                         continue;
                     }
@@ -515,7 +529,7 @@ pub async fn run(paths: &Paths) -> Result<()> {
                                         action.action_id()
                                     );
                                     let pa = PendingAction { action };
-                                    execute_pending_action(
+                                    let probe_result = execute_pending_action(
                                         &journal,
                                         paths,
                                         &pa,
@@ -523,6 +537,17 @@ pub async fn run(paths: &Paths) -> Result<()> {
                                         &current_model,
                                     )
                                     .await;
+                                    // Inject the result into conversation history so
+                                    // Jack can see and interpret the output on the
+                                    // next turn (or in this turn's context if the LLM
+                                    // is called again).
+                                    if let Some(result_text) = probe_result {
+                                        history.turns.push(Turn {
+                                            role: "user".into(),
+                                            content: result_text,
+                                        });
+                                        save_history(&chat_path, &history)?;
+                                    }
                                 } else {
                                     match &action {
                                         ResolvedAction::Intervention {
@@ -580,13 +605,15 @@ pub async fn run(paths: &Paths) -> Result<()> {
 }
 
 /// Execute a pending action (probe or intervention) via the skill dispatcher.
+/// Returns a formatted result string suitable for injection into the LLM
+/// conversation history, so Jack can see and interpret what happened.
 async fn execute_pending_action(
     journal: &JournalWriter,
     paths: &Paths,
     pending: &PendingAction,
     session_id: &str,
     model: &str,
-) {
+) -> Option<String> {
     use russell_skills::dispatch::{Dispatcher, DryRun, StepType};
     use std::io::Write;
     use std::time::Duration;
@@ -632,19 +659,19 @@ async fn execute_pending_action(
         let mut buf = String::new();
         if std::io::stdin().read_line(&mut buf).is_err() {
             println!("  → Could not read input. Aborting.");
-            return;
+            return None;
         }
         let answer = buf.trim().to_lowercase();
         if answer != "y" && answer != "yes" {
             println!("  → Aborted by operator.");
-            return;
+            return None;
         }
     }
 
     // Enforce risk cap — probes are always risk: none so this passes.
     if let Err(e) = dispatcher.check_risk(risk, false) {
         println!("  → Refused: {e}");
-        return;
+        return None;
     }
 
     // Prompt for sudo password if needed (secure terminal prompt, not CLI).
@@ -654,7 +681,7 @@ async fn execute_pending_action(
         let password = rpassword::read_password().unwrap_or_default();
         if password.is_empty() {
             println!("  → Empty password. Aborting action.");
-            return;
+            return None;
         }
         // Verify password by trying: sudo -S true
         use tokio::io::AsyncWriteExt;
@@ -668,7 +695,7 @@ async fn execute_pending_action(
             Ok(child) => child,
             Err(_) => {
                 println!("  → Could not run sudo. Aborting action.");
-                return;
+                return None;
             }
         };
         if let Some(ref mut stdin) = verify.stdin {
@@ -680,7 +707,7 @@ async fn execute_pending_action(
             }
             _ => {
                 println!("  → Wrong sudo password. Aborting action.");
-                return;
+                return None;
             }
         }
     }
@@ -706,6 +733,7 @@ async fn execute_pending_action(
 
     match result {
         Ok(outcome) => {
+            // Print to terminal for the operator.
             if outcome.exit_code == Some(0) {
                 if is_probe {
                     if !outcome.stdout.is_empty() {
@@ -724,6 +752,8 @@ async fn execute_pending_action(
                     println!("  stderr: {}", outcome.stderr.trim());
                 }
             }
+
+            // Journal the metadata.
             let action_label = if is_probe { "probe" } else { "approve" };
             journal_chat_turn(
                 journal,
@@ -737,9 +767,43 @@ async fn execute_pending_action(
                     outcome.stderr.len(),
                 ),
             );
+
+            // Build the result string for LLM context injection.
+            // This is what lets Jack "see" what the probe/intervention produced.
+            let label = if is_probe { "probe" } else { "intervention" };
+            let exit_str = match outcome.exit_code {
+                Some(code) => format!("exit={code}"),
+                None => "killed/timeout".to_string(),
+            };
+            let mut report = format!("[{label} result: {skill_id}/{action_id}, {exit_str}]\n");
+
+            if !outcome.stdout.is_empty() {
+                let stdout = outcome.stdout.trim();
+                // Cap at 3000 chars to avoid blowing up LLM context.
+                if stdout.len() > 3000 {
+                    report.push_str(&stdout[..3000]);
+                    report.push_str("\n… (output truncated)\n");
+                } else {
+                    report.push_str(stdout);
+                    report.push('\n');
+                }
+            }
+            if !outcome.stderr.is_empty() {
+                let stderr = outcome.stderr.trim();
+                let stderr_truncated = if stderr.len() > 1000 {
+                    format!("{}… (truncated)", &stderr[..1000])
+                } else {
+                    stderr.to_string()
+                };
+                report.push_str(&format!("stderr: {stderr_truncated}\n"));
+            }
+
+            Some(report)
         }
         Err(e) => {
             println!("  → Error running {skill_id}/{action_id}: {e}");
+            let label = if is_probe { "probe" } else { "intervention" };
+            Some(format!("[{label} error: {skill_id}/{action_id}] {e}\n"))
         }
     }
 }
