@@ -5,10 +5,13 @@ use anyhow::{Context, Result};
 use rand::seq::SliceRandom;
 use russell_core::journal::{HelpSessionInput, HelpSessionStatus, JournalReader, JournalWriter};
 use russell_core::paths::Paths;
-use russell_doctor::action::{self, ResolvedAction};
+use russell_doctor::action::{self, KaskToolInfo, ResolvedAction};
 use russell_doctor::client::LlmClient;
 use russell_doctor::client::SoapPrompt;
 use russell_doctor::oai_client::OkapiClient;
+use russell_mcp::client::KaskMcpClient;
+use russell_mcp::config::KaskMcpConfig;
+use russell_mcp::registry::ToolRegistry;
 use russell_skills::Skill;
 use rustyline::DefaultEditor;
 use rustyline::error::ReadlineError;
@@ -16,7 +19,7 @@ use serde::{Deserialize, Serialize};
 use std::fmt::Write as _;
 use std::io::Write;
 use tokio::sync::oneshot;
-use tracing::{info, warn};
+use tracing::{debug, info, warn};
 
 /// A pending action (probe or intervention) awaiting operator consent.
 /// Derived from [`ResolvedAction`] with UI-specific fields.
@@ -163,6 +166,35 @@ pub async fn run(paths: &Paths) -> Result<()> {
     // Load skills at session start; can be reloaded with /reload.
     let mut skills = russell_skills::load_all(&paths.skills()).unwrap_or_default();
     let profile = russell_core::Profile::load(&paths.profile()).ok();
+
+    // Initialize Kask MCP client (ADR-0025). Non-blocking — graceful
+    // degradation if Kask is unreachable.
+    let kask_config = KaskMcpConfig::from_env();
+    let mut kask_client: Option<KaskMcpClient> = None;
+    let mut kask_registry = ToolRegistry::new(kask_config.tool_ttl);
+
+    if kask_config.validate().is_ok() {
+        match KaskMcpClient::new(kask_config.clone()) {
+            Ok(mut client) => {
+                if let Ok(_init) = client.connect().await {
+                    debug!(
+                        server = ?client.server_name(),
+                        "kask MCP connected"
+                    );
+                    // Populate tool registry.
+                    if let Err(e) = kask_registry.refresh(&client).await {
+                        debug!(error = %e, "kask tool registry initial refresh failed");
+                    }
+                    kask_client = Some(client);
+                } else {
+                    debug!("kask MCP connect failed — tools unavailable this session");
+                }
+            }
+            Err(e) => {
+                debug!(error = %e, "kask MCP client construction failed");
+            }
+        }
+    }
 
     let mut history = ChatHistory::new(session_id.clone());
     let mut editor = DefaultEditor::new().context("initialising readline")?;
@@ -531,9 +563,51 @@ pub async fn run(paths: &Paths) -> Result<()> {
                         journal_chat_turn(&journal, &session_id, &current_model, trimmed, &content);
 
                         // Check for ACTION: proposal.
-                        match action::resolve(&content, &skills) {
+                        let kask_tool_infos = build_kask_tool_infos(&kask_registry);
+                        match action::resolve_with_kask(&content, &skills, &kask_tool_infos) {
                             Some(Ok(action)) => {
-                                if action.is_probe() {
+                                if action.is_kask_tool() {
+                                    // Kask MCP tool — determine consent based on risk.
+                                    let risk_str = match &action {
+                                        ResolvedAction::KaskTool { risk_band, .. } => {
+                                            risk_band.as_deref().unwrap_or("medium")
+                                        }
+                                        _ => unreachable!(),
+                                    };
+                                    if risk_str == "none" {
+                                        // Auto-execute (probe-equivalent).
+                                        println!(
+                                            "  → Calling kask tool: {}…",
+                                            action.action_id()
+                                        );
+                                        let result = execute_kask_tool(
+                                            &journal,
+                                            &kask_client,
+                                            &action,
+                                            &session_id,
+                                            &current_model,
+                                        )
+                                        .await;
+                                        if let Some(result_text) = result {
+                                            history.turns.push(Turn {
+                                                role: "user".into(),
+                                                content: result_text,
+                                            });
+                                            save_history(&chat_path, &history)?;
+                                        }
+                                    } else {
+                                        // Requires consent.
+                                        println!(
+                                            "  → Jack proposes kask tool: {} (risk: {}).",
+                                            action.action_id(),
+                                            risk_str
+                                        );
+                                        println!(
+                                            "  → Say 'ok' to approve, or 'no' to refuse."
+                                        );
+                                        pending_action = Some(PendingAction { action });
+                                    }
+                                } else if action.is_probe() {
                                     // Probes are read-only — auto-execute immediately.
                                     println!(
                                         "  → Running probe: {}/{}…",

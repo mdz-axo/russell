@@ -22,8 +22,9 @@
 
 use russell_skills::{RiskBand, Skill};
 
-/// A resolved ACTION — either a probe (read-only) or an intervention
-/// (mutating, requires consent per JR-2).
+/// A resolved ACTION — either a probe (read-only), an intervention
+/// (mutating, requires consent per JR-2), or a Kask MCP tool call
+/// (ADR-0025).
 #[derive(Debug, Clone)]
 pub enum ResolvedAction {
     /// Read-only probe. Auto-executable (risk: none).
@@ -54,6 +55,14 @@ pub enum ResolvedAction {
         /// Whether the manifest's safety.require_human_for lists this ID.
         requires_human: bool,
     },
+    /// Kask MCP tool call (ADR-0025). Executed via the MCP client,
+    /// not the local skill dispatcher.
+    KaskTool {
+        /// The MCP tool name (from `tools/list`).
+        tool_name: String,
+        /// Risk band from tool annotations. `None` means treat as medium.
+        risk_band: Option<String>,
+    },
 }
 
 impl ResolvedAction {
@@ -63,12 +72,19 @@ impl ResolvedAction {
         matches!(self, Self::Probe { .. })
     }
 
+    /// Returns `true` if this is a Kask MCP tool call.
+    #[must_use]
+    pub fn is_kask_tool(&self) -> bool {
+        matches!(self, Self::KaskTool { .. })
+    }
+
     /// The skill ID, regardless of action type.
     #[must_use]
     pub fn skill_id(&self) -> &str {
         match self {
             Self::Probe { skill_id, .. } => skill_id,
             Self::Intervention { skill_id, .. } => skill_id,
+            Self::KaskTool { .. } => "kask",
         }
     }
 
@@ -78,15 +94,17 @@ impl ResolvedAction {
         match self {
             Self::Probe { action_id, .. } => action_id,
             Self::Intervention { action_id, .. } => action_id,
+            Self::KaskTool { tool_name, .. } => tool_name,
         }
     }
 
-    /// The command argv.
+    /// The command argv. Empty for Kask tools (they're MCP calls, not subprocesses).
     #[must_use]
     pub fn cmd(&self) -> &[String] {
         match self {
             Self::Probe { cmd, .. } => cmd,
             Self::Intervention { cmd, .. } => cmd,
+            Self::KaskTool { .. } => &[],
         }
     }
 }
@@ -168,6 +186,16 @@ impl std::fmt::Display for ActionError {
     }
 }
 
+/// Metadata for a Kask tool available in the registry, passed by
+/// the caller (keeps `russell-doctor` free of `russell-mcp` dependency).
+#[derive(Debug, Clone)]
+pub struct KaskToolInfo {
+    /// Tool name (the callable ID).
+    pub name: String,
+    /// Risk band from annotations, if declared.
+    pub risk_band: Option<String>,
+}
+
 /// Parse the last `ACTION:` line from a response and resolve it
 /// against the loaded skill set.
 ///
@@ -181,6 +209,21 @@ impl std::fmt::Display for ActionError {
 pub fn resolve(
     response: &str,
     skills: &[Skill],
+) -> Option<std::result::Result<ResolvedAction, ActionError>> {
+    resolve_with_kask(response, skills, &[])
+}
+
+/// Parse the last `ACTION:` line from a response and resolve it
+/// against both the loaded skill set AND the Kask MCP tool registry.
+///
+/// When `skill_id == "kask"`, the action_id is validated against
+/// `kask_tools` (the poka-yoke for MCP tools per ADR-0025 §7).
+///
+/// Returns `None` if no `ACTION:` line is present in the response.
+pub fn resolve_with_kask(
+    response: &str,
+    skills: &[Skill],
+    kask_tools: &[KaskToolInfo],
 ) -> Option<std::result::Result<ResolvedAction, ActionError>> {
     let action_line = response
         .lines()
@@ -211,10 +254,20 @@ pub fn resolve(
         }
     };
 
+    // Kask MCP tool path (ADR-0025 §7).
+    // Only route to Kask if tools are available (registry is populated).
+    if skill_id == "kask" && !kask_tools.is_empty() {
+        return resolve_kask_tool(action_id, kask_tools, skills);
+    }
+
     let skill = match skills.iter().find(|s| s.id == skill_id) {
         Some(s) => s,
         None => {
-            let loaded: Vec<String> = skills.iter().map(|s| s.id.clone()).collect();
+            // Include "kask" in the loaded list if we have kask tools.
+            let mut loaded: Vec<String> = skills.iter().map(|s| s.id.clone()).collect();
+            if !kask_tools.is_empty() {
+                loaded.push("kask".to_string());
+            }
             return Some(Err(ActionError::UnknownSkill {
                 skill_id: skill_id.to_string(),
                 loaded,
@@ -253,6 +306,35 @@ pub fn resolve(
         action_id: action_id.to_string(),
         probes,
         interventions,
+    }))
+}
+
+/// Resolve a Kask MCP tool reference against the cached tool registry.
+fn resolve_kask_tool(
+    tool_name: &str,
+    kask_tools: &[KaskToolInfo],
+    skills: &[Skill],
+) -> Option<std::result::Result<ResolvedAction, ActionError>> {
+    // Poka-yoke: tool must exist in the registry.
+    if let Some(tool) = kask_tools.iter().find(|t| t.name == tool_name) {
+        return Some(Ok(ResolvedAction::KaskTool {
+            tool_name: tool.name.clone(),
+            risk_band: tool.risk_band.clone(),
+        }));
+    }
+
+    // Tool not found — build a diagnostic error.
+    let available: Vec<String> = kask_tools.iter().map(|t| t.name.clone()).collect();
+    let mut loaded: Vec<String> = skills.iter().map(|s| s.id.clone()).collect();
+    if !kask_tools.is_empty() {
+        loaded.push("kask".to_string());
+    }
+
+    Some(Err(ActionError::UnknownAction {
+        skill_id: "kask".to_string(),
+        action_id: tool_name.to_string(),
+        probes: available,
+        interventions: vec![],
     }))
 }
 
@@ -359,5 +441,81 @@ mod tests {
         let skills = [make_skill()];
         let err = resolve("ACTION: /", &skills).unwrap().unwrap_err();
         assert!(err.to_string().contains("empty"));
+    }
+
+    // ── Kask MCP tool resolution tests (ADR-0025) ──────────────────
+
+    fn make_kask_tools() -> Vec<KaskToolInfo> {
+        vec![
+            KaskToolInfo {
+                name: "paradigm_shift_query".into(),
+                risk_band: None,
+            },
+            KaskToolInfo {
+                name: "russell_host_snapshot".into(),
+                risk_band: Some("none".into()),
+            },
+        ]
+    }
+
+    #[test]
+    fn resolves_kask_tool() {
+        let skills = [make_skill()];
+        let kask_tools = make_kask_tools();
+        let result =
+            resolve_with_kask("ACTION: kask/paradigm_shift_query", &skills, &kask_tools)
+                .unwrap()
+                .unwrap();
+        assert!(result.is_kask_tool());
+        assert_eq!(result.skill_id(), "kask");
+        assert_eq!(result.action_id(), "paradigm_shift_query");
+    }
+
+    #[test]
+    fn kask_tool_with_risk_band() {
+        let skills = [make_skill()];
+        let kask_tools = make_kask_tools();
+        let result =
+            resolve_with_kask("ACTION: kask/russell_host_snapshot", &skills, &kask_tools)
+                .unwrap()
+                .unwrap();
+        match result {
+            ResolvedAction::KaskTool { risk_band, .. } => {
+                assert_eq!(risk_band, Some("none".into()));
+            }
+            _ => panic!("expected KaskTool"),
+        }
+    }
+
+    #[test]
+    fn unknown_kask_tool_is_error() {
+        let skills = [make_skill()];
+        let kask_tools = make_kask_tools();
+        let err = resolve_with_kask("ACTION: kask/nonexistent", &skills, &kask_tools)
+            .unwrap()
+            .unwrap_err();
+        assert!(err.to_string().contains("nonexistent"));
+    }
+
+    #[test]
+    fn kask_prefix_without_tools_is_unknown_skill() {
+        let skills = [make_skill()];
+        // No kask tools available — "kask" is not a loaded skill.
+        let err = resolve_with_kask("ACTION: kask/anything", &skills, &[])
+            .unwrap()
+            .unwrap_err();
+        assert!(err.to_string().contains("kask"));
+    }
+
+    #[test]
+    fn local_skill_still_resolves_with_kask_tools_present() {
+        let skills = [make_skill()];
+        let kask_tools = make_kask_tools();
+        let result =
+            resolve_with_kask("ACTION: test-skill/probe-1", &skills, &kask_tools)
+                .unwrap()
+                .unwrap();
+        assert!(result.is_probe());
+        assert_eq!(result.skill_id(), "test-skill");
     }
 }
