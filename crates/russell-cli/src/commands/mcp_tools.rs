@@ -37,8 +37,7 @@ pub async fn run() -> Result<()> {
         .context("endpoint validation failed — only loopback addresses are permitted")?;
 
     // Build client.
-    let mut client =
-        KaskMcpClient::new(config).context("failed to construct MCP client")?;
+    let mut client = KaskMcpClient::new(config).context("failed to construct MCP client")?;
 
     // Perform handshake.
     println!("Connecting...");
@@ -61,10 +60,7 @@ pub async fn run() -> Result<()> {
     println!();
 
     // List tools.
-    let tools = client
-        .list_tools()
-        .await
-        .context("tools/list failed")?;
+    let tools = client.list_tools().await.context("tools/list failed")?;
 
     if tools.is_empty() {
         println!("No tools available (Kask returned empty tools/list).");
@@ -98,9 +94,7 @@ pub async fn run() -> Result<()> {
 /// Returns Ok if reachable, Err otherwise.
 pub async fn ping() -> Result<()> {
     let config = KaskMcpConfig::from_env();
-    config
-        .validate()
-        .context("endpoint validation")?;
+    config.validate().context("endpoint validation")?;
 
     let mut client = KaskMcpClient::new(config).context("client construction")?;
     client.connect().await.context("handshake")?;

@@ -13,7 +13,7 @@ use crate::config::KaskMcpConfig;
 use crate::error::{McpError, Result};
 use crate::types::{
     InitializeResult, JsonRpcNotification, JsonRpcRequest, JsonRpcResponse, McpToolDefinition,
-    ToolCallParams, ToolCallResult, ToolsListResult, PROTOCOL_VERSION,
+    PROTOCOL_VERSION, ToolCallParams, ToolCallResult, ToolsListResult,
 };
 
 /// Validate that a URL points to a loopback address.
@@ -51,15 +51,15 @@ pub fn validate_endpoint(url: &str) -> Result<()> {
         "127.0.0.1" | "localhost" | "::1" => Ok(()),
         other => {
             // Try parsing as an IP to check loopback.
-            if let Ok(ip) = other.parse::<std::net::Ipv4Addr>() {
-                if ip.is_loopback() {
-                    return Ok(());
-                }
+            if let Ok(ip) = other.parse::<std::net::Ipv4Addr>()
+                && ip.is_loopback()
+            {
+                return Ok(());
             }
-            if let Ok(ip) = other.parse::<std::net::Ipv6Addr>() {
-                if ip.is_loopback() {
-                    return Ok(());
-                }
+            if let Ok(ip) = other.parse::<std::net::Ipv6Addr>()
+                && ip.is_loopback()
+            {
+                return Ok(());
             }
             Err(McpError::NonLoopbackRefused {
                 url: url.to_owned(),
@@ -267,12 +267,10 @@ impl KaskMcpClient {
         }
 
         // Parse JSON-RPC response.
-        let body = resp.text().await.map_err(|e| {
-            McpError::Transport {
-                message: format!("failed to read response body: {e}"),
-                is_connect: false,
-                is_timeout: false,
-            }
+        let body = resp.text().await.map_err(|e| McpError::Transport {
+            message: format!("failed to read response body: {e}"),
+            is_connect: false,
+            is_timeout: false,
         })?;
 
         let rpc_response: JsonRpcResponse = serde_json::from_str(&body)
@@ -314,12 +312,6 @@ impl KaskMcpClient {
         }
 
         Ok(())
-    }
-
-    /// Get the next request ID (for external inspection/testing).
-    #[cfg(test)]
-    fn next_id(&self) -> u64 {
-        self.request_id.load(Ordering::Relaxed)
     }
 }
 

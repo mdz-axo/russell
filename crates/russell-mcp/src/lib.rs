@@ -25,5 +25,6 @@
 pub mod client;
 pub mod config;
 pub mod error;
+pub mod health;
 pub mod registry;
 pub mod types;

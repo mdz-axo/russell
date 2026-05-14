@@ -226,8 +226,14 @@ pub async fn run(paths: &Paths) -> Result<()> {
                 // Consent handling — must come before special commands.
                 if let Some(ref pa) = pending_action {
                     if trimmed == "/approve" || is_affirmative(trimmed) {
-                        let action_result = execute_pending_action(&journal, paths, pa, &session_id, &current_model)
-                            .await;
+                        let action_result = execute_pending_action(
+                            &journal,
+                            paths,
+                            pa,
+                            &session_id,
+                            &current_model,
+                        )
+                        .await;
                         if let Some(result_text) = action_result {
                             history.turns.push(Turn {
                                 role: "user".into(),
@@ -241,8 +247,14 @@ pub async fn run(paths: &Paths) -> Result<()> {
                     if let Some(_pw) = trimmed.strip_prefix("/approve ") {
                         println!("  → Approving. Use `/approve` without a password next time —");
                         println!("    Jack will prompt you securely if sudo is needed.");
-                        let action_result = execute_pending_action(&journal, paths, pa, &session_id, &current_model)
-                            .await;
+                        let action_result = execute_pending_action(
+                            &journal,
+                            paths,
+                            pa,
+                            &session_id,
+                            &current_model,
+                        )
+                        .await;
                         if let Some(result_text) = action_result {
                             history.turns.push(Turn {
                                 role: "user".into(),

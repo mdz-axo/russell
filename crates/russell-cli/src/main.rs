@@ -154,7 +154,7 @@ async fn main() -> Result<()> {
         },
         Command::Chat => commands::chat::run(&paths).await,
         Command::Workshop => commands::workshop::run(&paths).await,
-        Command::Proprio => commands::proprio::run(&paths),
+        Command::Proprio => commands::proprio::run(&paths).await,
         Command::McpTools { ping } => {
             if ping {
                 commands::mcp_tools::ping().await

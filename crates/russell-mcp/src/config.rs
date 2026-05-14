@@ -53,10 +53,12 @@ impl KaskMcpConfig {
     /// Does NOT fail on missing token — the client can be constructed
     /// in a degraded state (for health checks / reachability probes).
     pub fn from_env() -> Self {
-        let endpoint = std::env::var(ENV_KASK_MCP_ENDPOINT)
-            .unwrap_or_else(|_| DEFAULT_ENDPOINT.to_owned());
+        let endpoint =
+            std::env::var(ENV_KASK_MCP_ENDPOINT).unwrap_or_else(|_| DEFAULT_ENDPOINT.to_owned());
 
-        let token = std::env::var(ENV_KASK_MCP_TOKEN).ok().filter(|s| !s.is_empty());
+        let token = std::env::var(ENV_KASK_MCP_TOKEN)
+            .ok()
+            .filter(|s| !s.is_empty());
 
         let tool_ttl = std::env::var(ENV_KASK_MCP_TOOL_TTL_SECS)
             .ok()

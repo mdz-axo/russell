@@ -5,7 +5,7 @@ use anyhow::{Context, Result};
 use russell_core::journal::{JournalReader, JournalWriter};
 use russell_core::paths::Paths;
 
-pub fn run(paths: &Paths) -> Result<()> {
+pub async fn run(paths: &Paths) -> Result<()> {
     let journal = JournalWriter::open(&paths.journal())
         .with_context(|| format!("opening journal {}", paths.journal().display()))?;
     let reader = JournalReader::new(paths.journal());
@@ -42,5 +42,20 @@ pub fn run(paths: &Paths) -> Result<()> {
             result.help_error_rate_severity
         );
     }
+
+    // Kask MCP reachability check (Phase 4A, ADR-0025 §5).
+    let kask_health = russell_mcp::health::probe_reachability().await;
+    if kask_health.reachable {
+        println!(
+            "  kask_mcp_reachable_ms:    {}ms (ok)",
+            kask_health.latency_ms.unwrap_or(0)
+        );
+    } else {
+        println!(
+            "  kask_mcp_reachable_ms:    unreachable ({})",
+            kask_health.error.as_deref().unwrap_or("unknown")
+        );
+    }
+
     Ok(())
 }

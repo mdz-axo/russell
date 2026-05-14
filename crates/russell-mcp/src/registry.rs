@@ -45,10 +45,7 @@ impl ToolRegistry {
     pub async fn refresh(&mut self, client: &KaskMcpClient) -> Result<()> {
         match client.list_tools().await {
             Ok(tools) => {
-                info!(
-                    count = tools.len(),
-                    "kask tool registry refreshed"
-                );
+                info!(count = tools.len(), "kask tool registry refreshed");
                 self.tools = tools;
                 self.last_refresh = Some(Instant::now());
                 Ok(())

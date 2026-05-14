@@ -16,10 +16,14 @@ fn parse_duration(s: &str) -> Option<Duration> {
         return Some(Duration::from_secs(num.parse().ok()?));
     }
     if let Some(num) = s.strip_suffix('m') {
-        return Some(Duration::from_secs(num.parse::<u64>().ok()?.saturating_mul(60)));
+        return Some(Duration::from_secs(
+            num.parse::<u64>().ok()?.saturating_mul(60),
+        ));
     }
     if let Some(num) = s.strip_suffix('h') {
-        return Some(Duration::from_secs(num.parse::<u64>().ok()?.saturating_mul(3600)));
+        return Some(Duration::from_secs(
+            num.parse::<u64>().ok()?.saturating_mul(3600),
+        ));
     }
     None
 }

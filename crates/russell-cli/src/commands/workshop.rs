@@ -13,7 +13,9 @@ use russell_doctor::client::LlmClient;
 use russell_doctor::client::SoapPrompt;
 use russell_doctor::oai_client::OkapiClient;
 use russell_skills::Skill;
-use russell_skills::registry::{LifecycleStatus, RegistryCache, RegistryEntry, SafetyScan, SkillSource};
+use russell_skills::registry::{
+    LifecycleStatus, RegistryCache, RegistryEntry, SafetyScan, SkillSource,
+};
 use rustyline::DefaultEditor;
 use rustyline::error::ReadlineError;
 use std::fmt::Write as _;
@@ -60,7 +62,11 @@ pub async fn run(paths: &Paths) -> Result<()> {
 
     println!(
         "Loaded {} installed skills.",
-        registry.skills.values().filter(|e| e.status.is_loadable()).count()
+        registry
+            .skills
+            .values()
+            .filter(|e| e.status.is_loadable())
+            .count()
     );
 
     let mut rl = DefaultEditor::new().context("initializing readline")?;
@@ -87,7 +93,19 @@ pub async fn run(paths: &Paths) -> Result<()> {
         let _ = rl.add_history_entry(&input);
 
         let mut quit = false;
-        if handle_builtin(&input, &mut registry, &skills_dir, &skills, &workshop_knowledge, &maintenance_knowledge, &client_cfg, &fallback_model, &mut quit).await {
+        if handle_builtin(
+            &input,
+            &mut registry,
+            &skills_dir,
+            &skills,
+            &workshop_knowledge,
+            &maintenance_knowledge,
+            &client_cfg,
+            &fallback_model,
+            &mut quit,
+        )
+        .await
+        {
             if quit {
                 break;
             }
@@ -127,16 +145,33 @@ async fn handle_builtin(
     quit: &mut bool,
 ) -> bool {
     match input {
-        "/quit" | "/exit" => { *quit = true; true }
-        "help" => { print_help(); true }
-        "/list" => { print_skill_list(registry); true }
-        "/gaps" => { print_coverage_gaps(registry); true }
+        "/quit" | "/exit" => {
+            *quit = true;
+            true
+        }
+        "help" => {
+            print_help();
+            true
+        }
+        "/list" => {
+            print_skill_list(registry);
+            true
+        }
+        "/gaps" => {
+            print_coverage_gaps(registry);
+            true
+        }
         _ if input.starts_with("/lookup ") => {
             print_lookup(registry, input.strip_prefix("/lookup ").unwrap_or(""));
             true
         }
         _ if input.starts_with("search ") && input.contains("--remote") => {
-            let query = input.strip_prefix("search ").unwrap_or("").replace("--remote", "").trim().to_string();
+            let query = input
+                .strip_prefix("search ")
+                .unwrap_or("")
+                .replace("--remote", "")
+                .trim()
+                .to_string();
             do_search_remote(registry, &query).await;
             true
         }
@@ -188,7 +223,17 @@ async fn handle_builtin(
         }
         _ if input.starts_with("build ") => {
             let name = input.strip_prefix("build ").unwrap_or("");
-            do_build(registry, skills_dir, name, workshop_knowledge, maintenance_knowledge, skills, client_cfg, fallback_model).await;
+            do_build(
+                registry,
+                skills_dir,
+                name,
+                workshop_knowledge,
+                maintenance_knowledge,
+                skills,
+                client_cfg,
+                fallback_model,
+            )
+            .await;
             true
         }
         _ => false,
@@ -229,9 +274,18 @@ fn sync_registry_from_skills(registry: &mut RegistryCache, skills: &[Skill]) {
 
 /// Heuristic: bundled skills match a known set shipped with Russell.
 fn is_bundled_skill(id: &str) -> bool {
-    matches!(id, "okapi-watcher" | "web-search" | "skill-discovery"
-        | "skill-workshop" | "skill-maintenance" | "scenario-tester"
-        | "pragmatic-cybernetics" | "pragmatic-semantics" | "ubuntu-jack")
+    matches!(
+        id,
+        "okapi-watcher"
+            | "web-search"
+            | "skill-discovery"
+            | "skill-workshop"
+            | "skill-maintenance"
+            | "scenario-tester"
+            | "pragmatic-cybernetics"
+            | "pragmatic-semantics"
+            | "ubuntu-jack"
+    )
 }
 
 /// Load a KNOWLEDGE.md file from the installed skills directory.
@@ -267,16 +321,20 @@ fn print_help() {
 
 fn print_search(registry: &RegistryCache, query: &str) {
     println!("Searching for: {query}");
-    println!("(Remote search via MCP bridge — the web-search skill connects Brave Search / Firecrawl here.)");
+    println!(
+        "(Remote search via MCP bridge — the web-search skill connects Brave Search / Firecrawl here.)"
+    );
     println!("Local registry cache matches:");
     let lower = query.to_lowercase();
     let mut found = false;
     for (id, entry) in &registry.skills {
-        if id.contains(&lower)
-            || entry.symptoms.iter().any(|s| s.contains(&lower))
-        {
-            println!("  {id} ({}, {}) — {}",
-                entry.version, entry.status.as_str(), entry.symptoms.join(", "));
+        if id.contains(&lower) || entry.symptoms.iter().any(|s| s.contains(&lower)) {
+            println!(
+                "  {id} ({}, {}) — {}",
+                entry.version,
+                entry.status.as_str(),
+                entry.symptoms.join(", ")
+            );
             found = true;
         }
     }
@@ -300,7 +358,10 @@ fn print_skill_list(registry: &RegistryCache) {
         println!("No skills in registry.");
         return;
     }
-    println!("{:<30} {:<10} {:<14} symptoms", "skill", "version", "status");
+    println!(
+        "{:<30} {:<10} {:<14} symptoms",
+        "skill", "version", "status"
+    );
     println!("{}", "-".repeat(80));
     for (id, entry) in &registry.skills {
         let status_mark = match entry.status {
@@ -343,7 +404,12 @@ fn print_lookup(registry: &RegistryCache, symptom: &str) {
     }
     println!("Skills covering '{symptom}':");
     for entry in &matches {
-        println!("  {}/v{} (status: {})", entry.symptoms.join(", "), entry.version, entry.status.as_str());
+        println!(
+            "  {}/v{} (status: {})",
+            entry.symptoms.join(", "),
+            entry.version,
+            entry.status.as_str()
+        );
     }
 }
 
@@ -403,7 +469,11 @@ fn scan_file(skills_dir: &std::path::Path, name: &str, filename: &str, label: &s
                     russell_skills::registry::ScanSeverity::Warn => "WARN",
                     russell_skills::registry::ScanSeverity::Block => "BLOCK",
                 };
-                println!("    [{severity}] {id}: {desc}", id = f.rule_id, desc = f.description);
+                println!(
+                    "    [{severity}] {id}: {desc}",
+                    id = f.rule_id,
+                    desc = f.description
+                );
             }
             if scan.has_blocks() {
                 println!("    ⛔ Blocking findings — review before installing.");
@@ -419,7 +489,10 @@ fn do_prune(registry: &mut RegistryCache, name: &str) {
             println!("{name} is already {}.", entry.status.as_str());
             return;
         }
-        let reason = entry.deprecation_reason.clone().unwrap_or_else(|| "operator requested".into());
+        let reason = entry
+            .deprecation_reason
+            .clone()
+            .unwrap_or_else(|| "operator requested".into());
         println!("Deprecating {name} (v{}): {}", entry.version, reason);
         println!("  Status: {} → deprecated", entry.status.as_str());
         println!("  Files remain on disk. Skill will no longer be loaded.");
@@ -428,8 +501,12 @@ fn do_prune(registry: &mut RegistryCache, name: &str) {
         if entry.superseded_by.is_none() {
             entry.superseded_by = Some("operator".into());
         }
-        println!("  Done. To retire (delete files), remove from {}",
-            std::env::var("HOME").map(|h| format!("{h}/.local/share/harness/skills/{name}/")).unwrap_or_default());
+        println!(
+            "  Done. To retire (delete files), remove from {}",
+            std::env::var("HOME")
+                .map(|h| format!("{h}/.local/share/harness/skills/{name}/"))
+                .unwrap_or_default()
+        );
     } else {
         println!("Skill '{name}' not found in registry.");
     }
@@ -440,10 +517,13 @@ fn do_install(registry: &mut RegistryCache, skills_dir: &std::path::Path, name: 
     let source = skills_dir.join(name);
     if !source.exists() || !source.join("manifest.yaml").exists() {
         if let Some(entry) = registry.skills.get(name)
-            && (entry.status == LifecycleStatus::Discovered || entry.status == LifecycleStatus::Evaluated)
+            && (entry.status == LifecycleStatus::Discovered
+                || entry.status == LifecycleStatus::Evaluated)
         {
-            println!("{name} is {}. Use 'fetch <url>' to download it, then 'install {name}'.",
-                entry.status.as_str());
+            println!(
+                "{name} is {}. Use 'fetch <url>' to download it, then 'install {name}'.",
+                entry.status.as_str()
+            );
             return;
         }
         println!("Skill '{name}' not found as a directory. Use 'build {name}' to create it first.");
@@ -467,22 +547,26 @@ fn do_install(registry: &mut RegistryCache, skills_dir: &std::path::Path, name: 
         if let Ok(manifest) = std::fs::read_to_string(source.join("manifest.yaml")) {
             // Quick parse for id/version.
             let id = name.to_string();
-            let version = extract_yaml_field(&manifest, "version").unwrap_or_else(|| "0.1.0".into());
+            let version =
+                extract_yaml_field(&manifest, "version").unwrap_or_else(|| "0.1.0".into());
             let symptoms = extract_yaml_list(&manifest, "symptoms");
-            registry.upsert(&id, RegistryEntry {
-                status: LifecycleStatus::Installed,
-                version,
-                symptoms,
-                source: SkillSource::Manual,
-                installed: chrono_now(),
-                last_evaluated: Some(chrono_now()),
-                valid_until: None,
-                coverage_score: None,
-                superseded_by: None,
-                deprecation_reason: None,
-                probe_runs: 0,
-                recent_probe_failures: 0,
-            });
+            registry.upsert(
+                &id,
+                RegistryEntry {
+                    status: LifecycleStatus::Installed,
+                    version,
+                    symptoms,
+                    source: SkillSource::Manual,
+                    installed: chrono_now(),
+                    last_evaluated: Some(chrono_now()),
+                    valid_until: None,
+                    coverage_score: None,
+                    superseded_by: None,
+                    deprecation_reason: None,
+                    probe_runs: 0,
+                    recent_probe_failures: 0,
+                },
+            );
             println!("{name} installed and registered.");
         } else {
             println!("Cannot read manifest for {name}.");
@@ -564,7 +648,11 @@ async fn do_fetch(
                         russell_skills::registry::ScanSeverity::Warn => "WARN",
                         russell_skills::registry::ScanSeverity::Block => "BLOCK",
                     };
-                    println!("    [{severity}] {id}: {desc}", id = f.rule_id, desc = f.description);
+                    println!(
+                        "    [{severity}] {id}: {desc}",
+                        id = f.rule_id,
+                        desc = f.description
+                    );
                 }
             }
 
@@ -588,23 +676,30 @@ async fn do_fetch(
             }
 
             let today = chrono_now();
-            registry.upsert(name, RegistryEntry {
-                status: LifecycleStatus::Discovered,
-                version,
-                symptoms,
-                source: SkillSource::Remote { url: url.to_string() },
-                installed: today.clone(),
-                last_evaluated: Some(today),
-                valid_until: None,
-                coverage_score: None,
-                superseded_by: None,
-                deprecation_reason: None,
-                probe_runs: 0,
-                recent_probe_failures: 0,
-            });
+            registry.upsert(
+                name,
+                RegistryEntry {
+                    status: LifecycleStatus::Discovered,
+                    version,
+                    symptoms,
+                    source: SkillSource::Remote {
+                        url: url.to_string(),
+                    },
+                    installed: today.clone(),
+                    last_evaluated: Some(today),
+                    valid_until: None,
+                    coverage_score: None,
+                    superseded_by: None,
+                    deprecation_reason: None,
+                    probe_runs: 0,
+                    recent_probe_failures: 0,
+                },
+            );
 
             println!("  Saved to {}", manifest_path.display());
-            println!("  Registered as 'discovered'. Run 'evaluate {name}' to inspect, then 'install {name}'.");
+            println!(
+                "  Registered as 'discovered'. Run 'evaluate {name}' to inspect, then 'install {name}'."
+            );
         }
         Ok(out) => {
             let stderr = String::from_utf8_lossy(&out.stderr);
@@ -628,7 +723,12 @@ fn do_adapt(registry: &mut RegistryCache, skills_dir: &std::path::Path, name: &s
 
     // Show current state.
     if let Some(entry) = registry.skills.get(name) {
-        println!("{name} (v{}, {}): {}", entry.version, entry.status.as_str(), entry.symptoms.join(", "));
+        println!(
+            "{name} (v{}, {}): {}",
+            entry.version,
+            entry.status.as_str(),
+            entry.symptoms.join(", ")
+        );
     }
 
     println!("Opening {} with {}...", manifest_path.display(), editor);
@@ -655,7 +755,8 @@ fn do_adapt(registry: &mut RegistryCache, skills_dir: &std::path::Path, name: &s
                     println!("  ✓ Safety scan clean.");
                 }
 
-                let version = extract_yaml_field(&content, "version").unwrap_or_else(|| "0.1.0".into());
+                let version =
+                    extract_yaml_field(&content, "version").unwrap_or_else(|| "0.1.0".into());
                 let symptoms = extract_yaml_list(&content, "symptoms");
 
                 if let Some(entry) = registry.skills.get_mut(name) {
@@ -721,20 +822,23 @@ async fn do_search_remote(registry: &mut RegistryCache, query: &str) {
         // Register as discovered from remote.
         let slug = title.to_lowercase().replace(' ', "-");
         if !registry.skills.contains_key(&slug) {
-            registry.upsert(&slug, RegistryEntry {
-                status: LifecycleStatus::Discovered,
-                version: "unknown".into(),
-                symptoms: vec![],
-                source: SkillSource::Remote { url: url.clone() },
-                installed: chrono_now(),
-                last_evaluated: None,
-                valid_until: None,
-                coverage_score: None,
-                superseded_by: None,
-                deprecation_reason: None,
-                probe_runs: 0,
-                recent_probe_failures: 0,
-            });
+            registry.upsert(
+                &slug,
+                RegistryEntry {
+                    status: LifecycleStatus::Discovered,
+                    version: "unknown".into(),
+                    symptoms: vec![],
+                    source: SkillSource::Remote { url: url.clone() },
+                    installed: chrono_now(),
+                    last_evaluated: None,
+                    valid_until: None,
+                    coverage_score: None,
+                    superseded_by: None,
+                    deprecation_reason: None,
+                    probe_runs: 0,
+                    recent_probe_failures: 0,
+                },
+            );
         }
     }
     println!();
@@ -778,10 +882,16 @@ fn parse_brave_results(json: &str) -> Vec<(String, String)> {
 fn do_restore(registry: &mut RegistryCache, name: &str) {
     if let Some(entry) = registry.skills.get_mut(name) {
         if entry.status != LifecycleStatus::Deprecated {
-            println!("{name} is {} — restore only applies to deprecated skills.", entry.status.as_str());
+            println!(
+                "{name} is {} — restore only applies to deprecated skills.",
+                entry.status.as_str()
+            );
             return;
         }
-        println!("Restoring {name} (v{}) from deprecated → active.", entry.version);
+        println!(
+            "Restoring {name} (v{}) from deprecated → active.",
+            entry.version
+        );
         entry.status = LifecycleStatus::Active;
         entry.deprecation_reason = None;
         entry.superseded_by = None;
@@ -806,7 +916,10 @@ async fn do_build(
     if registry.skills.contains_key(name) {
         let status = registry.skills[name].status;
         if status.is_loadable() || status == LifecycleStatus::Deprecated {
-            println!("Skill '{name}' already exists ({}). Use 'adapt {name}' to modify it or 'restore {name}' if deprecated.", status.as_str());
+            println!(
+                "Skill '{name}' already exists ({}). Use 'adapt {name}' to modify it or 'restore {name}' if deprecated.",
+                status.as_str()
+            );
             return;
         }
     }
@@ -845,20 +958,23 @@ safety:
     println!("Edit the manifest to add symptoms and probes, then run 'install {name}'.");
 
     // Register as discovered in the cache.
-    registry.upsert(name, RegistryEntry {
-        status: LifecycleStatus::Discovered,
-        version: "0.1.0".into(),
-        symptoms: vec![],
-        source: SkillSource::Workshop,
-        installed: today,
-        last_evaluated: None,
-        valid_until: None,
-        coverage_score: None,
-        superseded_by: None,
-        deprecation_reason: None,
-        probe_runs: 0,
-        recent_probe_failures: 0,
-    });
+    registry.upsert(
+        name,
+        RegistryEntry {
+            status: LifecycleStatus::Discovered,
+            version: "0.1.0".into(),
+            symptoms: vec![],
+            source: SkillSource::Workshop,
+            installed: today,
+            last_evaluated: None,
+            valid_until: None,
+            coverage_score: None,
+            superseded_by: None,
+            deprecation_reason: None,
+            probe_runs: 0,
+            recent_probe_failures: 0,
+        },
+    );
 
     // Invoke Jack to help compose the skill interactively.
     let build_prompt = format!(
@@ -869,7 +985,14 @@ safety:
         manifest_path.display()
     );
     println!("\nJack is ready to help design this skill:");
-    let _ = jack_workshop_turn(&build_prompt, workshop_knowledge, maintenance_knowledge, skills, client_cfg).await;
+    let _ = jack_workshop_turn(
+        &build_prompt,
+        workshop_knowledge,
+        maintenance_knowledge,
+        skills,
+        client_cfg,
+    )
+    .await;
 }
 
 fn print_check(registry: &RegistryCache) {
@@ -960,8 +1083,12 @@ async fn jack_workshop_turn(
     let mut system = String::new();
     system.push_str("You are Jack, in the skill workshop.\n\n");
     system.push_str("Your job: help the operator discover, evaluate, build, adapt, and maintain Russell skills.\n");
-    system.push_str("You have knowledge of the skill manifest format, the symptom catalog (85 entries),\n");
-    system.push_str("the poka-yoke validation rules, the safety scanner, and the skill lifecycle.\n\n");
+    system.push_str(
+        "You have knowledge of the skill manifest format, the symptom catalog (85 entries),\n",
+    );
+    system.push_str(
+        "the poka-yoke validation rules, the safety scanner, and the skill lifecycle.\n\n",
+    );
     system.push_str("Tone: helpful, direct, enthusiastic about building tools. You're a terrier making toys.\n\n");
 
     if !workshop_knowledge.is_empty() {
@@ -979,7 +1106,13 @@ async fn jack_workshop_turn(
     if !skills.is_empty() {
         let _ = write!(system, "\n## Available Skills\n\n");
         for s in skills {
-            let _ = writeln!(system, "- {} (v{}): {}", s.id, s.version, s.symptoms.join(", "));
+            let _ = writeln!(
+                system,
+                "- {} (v{}): {}",
+                s.id,
+                s.version,
+                s.symptoms.join(", ")
+            );
         }
     }
 
