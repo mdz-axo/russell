@@ -267,6 +267,7 @@ pub async fn run(paths: &Paths) -> Result<()> {
                                 &pa.action,
                                 &session_id,
                                 &current_model,
+                                paths,
                             )
                             .await
                         } else {
@@ -293,6 +294,7 @@ pub async fn run(paths: &Paths) -> Result<()> {
                                 &pa.action,
                                 &session_id,
                                 &current_model,
+                                paths,
                             )
                             .await
                         } else {
@@ -590,6 +592,7 @@ pub async fn run(paths: &Paths) -> Result<()> {
                                             &action,
                                             &session_id,
                                             &current_model,
+                                            paths,
                                         )
                                         .await;
                                         if let Some(result_text) = result {
