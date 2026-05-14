@@ -154,37 +154,6 @@ pub fn evaluate_scenario_samples(
     info!(breaches = events.len(), "scenario breaches found");
     events
 }
-    };
-
-    info!(count = samples.len(), "samples found in window");
-
-    // Track which probes already have breach events from the sentinel's
-    // own collection so we don't double-count.
-    let existing_probes: std::collections::BTreeSet<&str> = existing_events
-        .iter()
-        .filter_map(|ev| ev.outputs.get("probe").and_then(|v| v.as_str()))
-        .collect();
-
-    let mut events = Vec::new();
-    for s in &samples {
-        if existing_probes.contains(s.probe.as_str()) {
-            continue;
-        }
-        let Some(value) = s.last else {
-            continue;
-        };
-        let sev = rules.evaluate(&s.probe, value);
-        // Log any probe with a non-Info result or any scenario-type probe.
-        if sev != Severity::Info || s.probe.starts_with("okapi") || s.probe.starts_with("latency_regression") || s.probe.starts_with("error_rate_regression") {
-            info!(probe = %s.probe, value, severity = ?sev, "scenario metric evaluated");
-        }
-        if sev != Severity::Info {
-            events.push(build_breach_event(&s.probe, value, None, sev));
-        }
-    }
-    info!(breaches = events.len(), "scenario breaches found");
-    events
-}
 
 #[cfg(test)]
 mod tests {
