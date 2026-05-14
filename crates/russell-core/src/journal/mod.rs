@@ -724,7 +724,8 @@ impl JournalReader {
     /// of (probe, p50, p95, p99, count).
     ///
     /// For each probe, values are sorted and percentiles computed
-    /// by index interpolation.
+    /// by index interpolation. EWMA mean and variance are computed
+    /// with a 7-day half-life over the timestamp-ordered series.
     ///
     /// # Errors
     ///
@@ -733,42 +734,54 @@ impl JournalReader {
         let conn = self.open_ro()?;
         let since = crate::time::now_unix() - i64::from(window_days) * 86_400;
 
-        // Get all host-scope numeric samples in the window, sorted by probe.
+        // Get all host-scope numeric samples in the window, sorted by
+        // probe then timestamp for correct temporal ordering.
         let mut stmt = conn.prepare(
-            "SELECT probe, value_num
-              FROM samples
-              WHERE scope = 'host'
-                AND ts >= ?1
-                AND value_num IS NOT NULL
-              ORDER BY probe ASC, value_num ASC",
+            "SELECT probe, value_num, ts
+               FROM samples
+               WHERE scope = 'host'
+                 AND ts >= ?1
+                 AND value_num IS NOT NULL
+               ORDER BY probe ASC, ts ASC",
         )?;
         let rows = stmt
             .query_map(params![since], |r| {
                 let probe: String = r.get(0)?;
                 let val: f64 = r.get(1)?;
-                Ok((probe, val))
+                let ts: i64 = r.get(2)?;
+                Ok((probe, val, ts))
             })?
             .collect::<std::result::Result<Vec<_>, _>>()?;
 
-        // Group by probe.
+        // Group by probe, preserving timestamp order.
         use std::collections::BTreeMap;
-        let mut groups: BTreeMap<String, Vec<f64>> = BTreeMap::new();
-        for (probe, val) in rows {
-            groups.entry(probe).or_default().push(val);
+        let mut groups: BTreeMap<String, Vec<(f64, i64)>> = BTreeMap::new();
+        for (probe, val, ts) in rows {
+            groups.entry(probe).or_default().push((val, ts));
         }
 
         let mut results = Vec::new();
-        for (probe, vals) in groups {
+        for (probe, vals_and_ts) in groups {
+            let vals: Vec<f64> = vals_and_ts.iter().map(|(v, _)| *v).collect();
             let count = vals.len() as i64;
-            // Already sorted by the ORDER BY.
-            let p50 = percentile(&vals, 50.0);
-            let p95 = percentile(&vals, 95.0);
-            let p99 = percentile(&vals, 99.0);
+
+            // Percentiles on sorted values (ignoring timestamps).
+            let mut sorted_vals = vals.clone();
+            sorted_vals.sort_unstable_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+            let p50 = percentile(&sorted_vals, 50.0);
+            let p95 = percentile(&sorted_vals, 95.0);
+            let p99 = percentile(&sorted_vals, 99.0);
+
+            // EWMA with 7-day half-life (604 800 seconds).
+            let (ewma_mean, ewma_var) = compute_ewma(&vals_and_ts, 604_800.0);
+
             results.push(BaselineRow {
                 probe,
                 p50,
                 p95,
                 p99,
+                ewma_mean,
+                ewma_var,
                 count,
             });
         }
@@ -785,7 +798,7 @@ impl JournalReader {
     pub fn read_baselines(&self) -> Result<Vec<BaselineRow>> {
         let conn = self.open_ro()?;
         let mut stmt = conn.prepare(
-            "SELECT probe, p50, p95, p99
+            "SELECT probe, p50, p95, p99, ewma_mean, ewma_var
                FROM baselines
               WHERE scope = 'host'
                 AND p95 IS NOT NULL",
@@ -797,11 +810,50 @@ impl JournalReader {
                     p50: r.get(1)?,
                     p95: r.get(2)?,
                     p99: r.get(3)?,
+                    ewma_mean: r.get(4)?,
+                    ewma_var: r.get(5)?,
                     count: 0,
                 })
             })?
             .collect::<std::result::Result<Vec<_>, _>>()?;
         Ok(rows)
+    }
+
+    /// Read the most recent numeric sample value for a probe before
+    /// the given timestamp. Returns `None` if no prior sample exists.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`CoreError::Sqlite`] on DB errors.
+    pub fn previous_sample_value(&self, probe: &str, before_ts: i64) -> Option<f64> {
+        let conn = self.open_ro().ok()?;
+        conn.query_row(
+            "SELECT value_num FROM samples
+              WHERE probe = ?1 AND ts < ?2 AND value_num IS NOT NULL
+              ORDER BY ts DESC LIMIT 1",
+            params![probe, before_ts],
+            |r| r.get(0),
+        )
+        .ok()
+    }
+
+    /// Read the timestamp of the most recent numeric sample for a
+    /// probe before the given timestamp. Returns `None` if no prior
+    /// sample exists.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`CoreError::Sqlite`] on DB errors.
+    pub fn previous_sample_ts(&self, probe: &str, before_ts: i64) -> Option<i64> {
+        let conn = self.open_ro().ok()?;
+        conn.query_row(
+            "SELECT ts FROM samples
+              WHERE probe = ?1 AND ts < ?2 AND value_num IS NOT NULL
+              ORDER BY ts DESC LIMIT 1",
+            params![probe, before_ts],
+            |r| r.get(0),
+        )
+        .ok()
     }
 
     /// Path the journal lives at. May not exist yet on very fresh
@@ -903,6 +955,10 @@ pub struct BaselineRow {
     pub p95: Option<f64>,
     /// 99th percentile.
     pub p99: Option<f64>,
+    /// Exponentially-weighted moving average (7-day half-life).
+    pub ewma_mean: Option<f64>,
+    /// EWMA variance around the mean.
+    pub ewma_var: Option<f64>,
     /// Number of samples in the window.
     pub count: i64,
 }
@@ -923,6 +979,41 @@ fn percentile(sorted: &[f64], pct: f64) -> Option<f64> {
     }
     let frac = rank - lower as f64;
     Some(sorted[lower] * (1.0 - frac) + sorted[upper] * frac)
+}
+
+/// Compute exponentially-weighted moving average (mean and variance)
+/// over a time-ordered series of (value, unix_timestamp) pairs.
+///
+/// Uses an exponential decay kernel with the given half-life in seconds.
+/// Returns `(None, None)` if the series has fewer than 2 data points.
+fn compute_ewma(series: &[(f64, i64)], half_life_s: f64) -> (Option<f64>, Option<f64>) {
+    if series.len() < 2 {
+        return (None, None);
+    }
+
+    let decay = (-std::f64::consts::LN_2 / half_life_s).exp();
+
+    let mut mean = series[0].0;
+
+    for i in 1..series.len() {
+        let dt = ((series[i].1 - series[i - 1].1).max(1)) as f64;
+        let alpha = 1.0 - decay.powf(dt);
+        mean = alpha * series[i].0 + (1.0 - alpha) * mean;
+    }
+
+    // EWMA variance: weighted average of squared deviations.
+    let mut var = 0.0f64;
+    let mut var_sum_weights = 0.0f64;
+    for &(val, _) in series {
+        let dev = val - mean;
+        var += dev * dev;
+        var_sum_weights += 1.0;
+    }
+    if var_sum_weights > 0.0 {
+        var /= var_sum_weights;
+    }
+
+    (Some(mean), Some(var))
 }
 
 fn configure_pragmas(conn: &Connection) -> Result<()> {

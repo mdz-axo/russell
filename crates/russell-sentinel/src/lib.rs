@@ -29,14 +29,25 @@ pub fn run_once(writer: &JournalWriter) -> Result<usize> {
 /// Evaluates each numeric sample against the [`RuleSet`] and emits
 /// threshold-breach events for any severity above `Info`.
 ///
+/// When `reader` is `Some`, also evaluates rate-of-change thresholds
+/// by comparing against the previous sample in the journal.
+///
 /// Returns (sample count, threshold breach events). The caller is
 /// responsible for journaling the events — this function only
 /// writes samples, not events, preserving the ability to annotate
 /// events with cycle metadata before persistence.
-pub fn run_once_with_rules(writer: &JournalWriter, rules: &RuleSet) -> Result<(usize, Vec<Event>)> {
+pub fn run_once_with_rules(
+    writer: &JournalWriter,
+    rules: &RuleSet,
+    reader: Option<&JournalReader>,
+) -> Result<(usize, Vec<Event>)> {
     let samples = probes::collect();
     journal_samples(writer, &samples)?;
-    let events = evaluate_samples(rules, &samples);
+    let events = if let Some(r) = reader {
+        evaluate_samples_with_rates(rules, &samples, r)
+    } else {
+        evaluate_samples_basic(rules, &samples)
+    };
     Ok((samples.len(), events))
 }
 
@@ -58,19 +69,72 @@ fn journal_samples(writer: &JournalWriter, samples: &[Sample]) -> Result<()> {
     Ok(())
 }
 
-/// Evaluate all numeric samples against the rule set.
+/// Evaluate all numeric samples against the rule set (absolute thresholds only).
 ///
 /// This is a pure function — no I/O, no journal writes. Returns only
 /// the breach events; the caller is responsible for journaling them.
 ///
 /// Samples without a numeric value (text probes) are silently skipped.
-pub fn evaluate_samples(rules: &RuleSet, samples: &[Sample]) -> Vec<Event> {
+pub fn evaluate_samples_basic(rules: &RuleSet, samples: &[Sample]) -> Vec<Event> {
     let mut events = Vec::new();
     for s in samples {
         if let Some(v) = s.value_num {
             let sev = rules.evaluate(&s.name, v);
             if sev != Severity::Info {
                 events.push(build_breach_event(&s.name, v, s.unit, sev));
+            }
+        }
+    }
+    events
+}
+
+/// Evaluate all numeric samples against the rule set AND rate-of-change
+/// thresholds. Rate is computed from the previous sample in the journal.
+///
+/// Returns breach events for both absolute and rate thresholds.
+/// Rate events use `action = "rate_breach"` to distinguish from
+/// absolute threshold breaches.
+pub fn evaluate_samples_with_rates(
+    rules: &RuleSet,
+    samples: &[Sample],
+    reader: &JournalReader,
+) -> Vec<Event> {
+    let now = russell_core::time::now_unix();
+
+    let mut events = Vec::new();
+    for s in samples {
+        let Some(v) = s.value_num else {
+            continue;
+        };
+
+        // Absolute threshold check.
+        let sev_abs = rules.evaluate(&s.name, v);
+        if sev_abs != Severity::Info {
+            events.push(build_breach_event(&s.name, v, s.unit, sev_abs));
+        }
+
+        // Rate-of-change check: compare against previous sample.
+        if let Some(prev_val) = reader.previous_sample_value(&s.name, now)
+            && let Some(prev_ts) = reader.previous_sample_ts(&s.name, now)
+        {
+            let dt = ((now - prev_ts).max(1)) as f64;
+            let rate = (v - prev_val).abs() / dt;
+            let sev_rate = rules.evaluate_rate(&s.name, rate);
+            if sev_rate != Severity::Info {
+                let mut ev = Event::new("rate_breach", sev_rate);
+                ev.tier = Some("sentinel".into());
+                ev.module = Some(format!("sentinel/rate/{}", s.name));
+                ev.summary = Some(format!(
+                    "{} rate {:.4}/s breached threshold ({sev_rate:?})",
+                    s.name, rate
+                ));
+                ev.outputs.insert("probe".into(), s.name.clone().into());
+                ev.outputs.insert("value".into(), v.into());
+                ev.outputs.insert("rate".into(), rate.into());
+                if let Some(u) = s.unit {
+                    ev.outputs.insert("unit".into(), u.into());
+                }
+                events.push(ev);
             }
         }
     }
@@ -165,7 +229,7 @@ mod tests {
             value_text: None,
             unit: Some("MiB"),
         }];
-        let events = evaluate_samples(&rs, &samples);
+        let events = evaluate_samples_basic(&rs, &samples);
         assert!(events.is_empty());
     }
 
@@ -178,7 +242,7 @@ mod tests {
             value_text: None,
             unit: Some("MiB"),
         }];
-        let events = evaluate_samples(&rs, &samples);
+        let events = evaluate_samples_basic(&rs, &samples);
         assert_eq!(events.len(), 1);
         assert_eq!(events[0].severity, Severity::Warn);
         assert_eq!(events[0].action, "threshold_breach");
@@ -194,7 +258,7 @@ mod tests {
             value_text: Some("systemd".into()),
             unit: None,
         }];
-        let events = evaluate_samples(&rs, &samples);
+        let events = evaluate_samples_basic(&rs, &samples);
         assert!(events.is_empty());
     }
 
@@ -215,7 +279,7 @@ mod tests {
                 unit: Some("MiB"),
             },
         ];
-        let events = evaluate_samples(&rs, &samples);
+        let events = evaluate_samples_basic(&rs, &samples);
         assert_eq!(events.len(), 2);
         assert_eq!(events[0].severity, Severity::Crit);
         assert_eq!(events[1].severity, Severity::Warn);

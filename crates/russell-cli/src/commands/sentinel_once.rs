@@ -30,9 +30,10 @@ pub fn run(paths: &Paths) -> Result<()> {
     let reader = journal.reader();
     let proprio = russell_proprio::run_once(&journal, &reader).context("running proprioception")?;
 
-    // 2. Host probes with rule evaluation.
+    // 2. Host probes with rule evaluation (absolute + rate-of-change).
     let (n, threshold_events) =
-        russell_sentinel::run_once_with_rules(&journal, &rules).context("running Sentinel")?;
+        russell_sentinel::run_once_with_rules(&journal, &rules, Some(&reader))
+            .context("running Sentinel")?;
 
     // 2b. Evaluate externally-written scenario metrics (from scenario-tester skill).
     //     Scenario metrics like okapi_latency_p95_ms are journaled as samples but
@@ -178,8 +179,8 @@ fn maybe_refresh_baselines(journal: &JournalWriter, reader: &JournalReader) {
                 if let Err(e) = journal.upsert_baseline(
                     &row.probe,
                     Scope::Host,
-                    None, // ewma_mean — deferred
-                    None, // ewma_var — deferred
+                    row.ewma_mean,
+                    row.ewma_var,
                     row.p50,
                     row.p95,
                     row.p99,

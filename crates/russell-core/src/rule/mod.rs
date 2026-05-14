@@ -74,6 +74,18 @@ pub struct Rule {
     /// Severity `crit` when value exceeds this.
     #[serde(default)]
     pub crit_above: Option<f64>,
+
+    // --- rate-of-change thresholds (units per second) ---
+    /// Severity `warn` when absolute rate-of-change exceeds this
+    /// (units/second, computed over the previous sample interval).
+    #[serde(default)]
+    pub rate_warn: Option<f64>,
+    /// Severity `alert` when absolute rate-of-change exceeds this.
+    #[serde(default)]
+    pub rate_alert: Option<f64>,
+    /// Severity `crit` when absolute rate-of-change exceeds this.
+    #[serde(default)]
+    pub rate_crit: Option<f64>,
 }
 
 /// Root document for a rules file.
@@ -229,6 +241,38 @@ impl RuleSet {
         }
         if let Some(threshold) = rule.warn_above
             && value >= threshold
+        {
+            return Severity::Warn;
+        }
+
+        Severity::Info
+    }
+
+    /// Evaluate the absolute rate-of-change of a probe value against
+    /// rate thresholds. Returns the highest severity breached, or
+    /// [`Severity::Info`] if no rate thresholds are configured or the
+    /// rate is within bounds.
+    ///
+    /// `rate` is in units per second, computed as `abs(Δvalue) / Δtime`.
+    #[must_use]
+    pub fn evaluate_rate(&self, probe: &str, rate: f64) -> Severity {
+        let Some(rule) = self.rules.iter().find(|r| r.probe == probe) else {
+            return Severity::Info;
+        };
+
+        // Check in order: crit > alert > warn.
+        if let Some(threshold) = rule.rate_crit
+            && rate >= threshold
+        {
+            return Severity::Crit;
+        }
+        if let Some(threshold) = rule.rate_alert
+            && rate >= threshold
+        {
+            return Severity::Alert;
+        }
+        if let Some(threshold) = rule.rate_warn
+            && rate >= threshold
         {
             return Severity::Warn;
         }

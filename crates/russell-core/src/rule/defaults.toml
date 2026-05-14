@@ -99,11 +99,17 @@ unit = "°C"
 warn_above = 80.0
 alert_above = 90.0
 crit_above = 100.0
+rate_warn = 0.5
+rate_alert = 1.5
+rate_crit = 5.0
 
 [[rule]]
 probe = "gpu_vram_used_mib"
 description = "dGPU VRAM used"
 unit = "MiB"
+rate_warn = 51.2
+rate_alert = 102.4
+rate_crit = 512.0
 
 [[rule]]
 probe = "gpu_vram_total_mib"
@@ -133,6 +139,9 @@ unit = "%"
 warn_above = 80.0
 alert_above = 90.0
 crit_above = 95.0
+rate_warn = 0.5
+rate_alert = 2.0
+rate_crit = 5.0
 
 [[rule]]
 probe = "disk_io_pressure_full_pct"
