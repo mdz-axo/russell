@@ -5,6 +5,7 @@ pub mod chat;
 pub mod digest;
 pub mod help;
 pub mod list;
+pub mod mcp_tools;
 pub mod okapi_probe;
 pub mod profile;
 pub mod proprio;

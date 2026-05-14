@@ -1400,13 +1400,11 @@ dependencies = [
 name = "russell-mcp"
 version = "0.20.0"
 dependencies = [
+ "reqwest",
  "russell-core",
- "russell-doctor",
- "russell-proprio",
- "russell-sentinel",
- "russell-skills",
  "serde",
  "serde_json",
+ "tempfile",
  "thiserror",
  "tokio",
  "tracing",

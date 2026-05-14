@@ -89,6 +89,12 @@ enum Command {
     Workshop,
     /// Run Russell's self-observation cycle. Computes five self-vitals and appends samples to the journal.
     Proprio,
+    /// List available MCP tools from the local Kask installation.
+    McpTools {
+        /// Just ping the endpoint (don't list tools).
+        #[arg(long)]
+        ping: bool,
+    },
 }
 
 #[derive(Subcommand, Debug)]
@@ -149,5 +155,12 @@ async fn main() -> Result<()> {
         Command::Chat => commands::chat::run(&paths).await,
         Command::Workshop => commands::workshop::run(&paths).await,
         Command::Proprio => commands::proprio::run(&paths),
+        Command::McpTools { ping } => {
+            if ping {
+                commands::mcp_tools::ping().await
+            } else {
+                commands::mcp_tools::run().await
+            }
+        }
     }
 }
