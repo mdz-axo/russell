@@ -450,17 +450,14 @@ fn extract_arguments_from_response(response: &str, _tool_name: &str) -> Option<s
     if let Some(line) = response
         .lines()
         .find(|l| l.trim().starts_with("Arguments:"))
-    {
-        if let Some(json_str) = line
+        && let Some(json_str) = line
             .trim()
             .strip_prefix("Arguments:")
             .map(|s| s.trim())
             .filter(|s| !s.is_empty())
-        {
-            if let Ok(value) = serde_json::from_str::<serde_json::Value>(json_str) {
-                return Some(value);
-            }
-        }
+        && let Ok(value) = serde_json::from_str::<serde_json::Value>(json_str)
+    {
+        return Some(value);
     }
 
     // Format 2: Key=value pairs on the ACTION line after the tool name.
@@ -470,7 +467,11 @@ fn extract_arguments_from_response(response: &str, _tool_name: &str) -> Option<s
         .rev()
         .find(|line| line.trim().starts_with("ACTION:"))
     {
-        let after_prefix = action_line.trim().strip_prefix("ACTION:").unwrap_or("").trim();
+        let after_prefix = action_line
+            .trim()
+            .strip_prefix("ACTION:")
+            .unwrap_or("")
+            .trim();
 
         // After "kask/tool-name", look for --key value pairs or key=value.
         // Find the tool name (skip "kask/" prefix and tool name).
@@ -490,25 +491,28 @@ fn extract_arguments_from_response(response: &str, _tool_name: &str) -> Option<s
 }
 
 /// Parse `--key value` or `key=value` pairs into a JSON object.
+/// Handles quoted values with internal spaces.
 fn parse_key_value_args(args_str: &str) -> Option<serde_json::Value> {
     let mut map = serde_json::Map::new();
-    let mut parts = args_str.split(' ');
-    let mut pending_key: Option<&str> = None;
+    let tokens = tokenize_args(args_str);
+    let mut i = 0;
 
-    while let Some(token) = parts.next() {
-        let token = token.trim();
-        if token.is_empty() {
-            continue;
-        }
+    while i < tokens.len() {
+        let token = &tokens[i];
 
-        // Handle `--key value` format.
+        // Handle `--key` format.
         if let Some(key) = token.strip_prefix("--") {
-            if let Some(next) = parts.next() {
-                let next = next.trim();
-                let value = parse_arg_value(next);
+            if key.is_empty() {
+                i += 1;
+                continue;
+            }
+            if i + 1 < tokens.len() {
+                let value = parse_arg_value(&tokens[i + 1]);
                 map.insert(key.to_string(), value);
+                i += 2;
             } else {
                 map.insert(key.to_string(), serde_json::Value::Bool(true));
+                i += 1;
             }
             continue;
         }
@@ -517,14 +521,11 @@ fn parse_key_value_args(args_str: &str) -> Option<serde_json::Value> {
         if let Some((key, value)) = token.split_once('=') {
             let value = parse_arg_value(value);
             map.insert(key.to_string(), value);
+            i += 1;
             continue;
         }
 
-        // Floating token — treat as value for a pending key.
-        if let Some(key) = pending_key.take() {
-            let value = parse_arg_value(token);
-            map.insert(key.to_string(), value);
-        }
+        i += 1;
     }
 
     if map.is_empty() {
@@ -534,13 +535,53 @@ fn parse_key_value_args(args_str: &str) -> Option<serde_json::Value> {
     }
 }
 
+/// Tokenize argument string, preserving quoted segments.
+fn tokenize_args(s: &str) -> Vec<String> {
+    let mut tokens = Vec::new();
+    let chars: Vec<char> = s.chars().collect();
+    let mut i = 0;
+
+    while i < chars.len() {
+        // Skip whitespace.
+        while i < chars.len() && chars[i].is_whitespace() {
+            i += 1;
+        }
+        if i >= chars.len() {
+            break;
+        }
+
+        // Quoted string.
+        if chars[i] == '"' {
+            i += 1; // skip opening quote
+            let mut s = String::new();
+            while i < chars.len() && chars[i] != '"' {
+                s.push(chars[i]);
+                i += 1;
+            }
+            if i < chars.len() {
+                i += 1; // skip closing quote
+            }
+            tokens.push(s);
+        } else {
+            let mut s = String::new();
+            while i < chars.len() && !chars[i].is_whitespace() {
+                s.push(chars[i]);
+                i += 1;
+            }
+            tokens.push(s);
+        }
+    }
+
+    tokens
+}
+
 /// Parse a single argument value: try JSON, then number, then string.
 fn parse_arg_value(s: &str) -> serde_json::Value {
     // Try JSON literal first (true, false, null, numbers, quoted strings).
-    if let Ok(v) = serde_json::from_str::<serde_json::Value>(s) {
-        if !v.is_string() {
-            return v;
-        }
+    if let Ok(v) = serde_json::from_str::<serde_json::Value>(s)
+        && !v.is_string()
+    {
+        return v;
     }
     // Try number.
     if let Ok(n) = s.parse::<i64>() {
@@ -594,10 +635,9 @@ mod tests {
     fn kask_tool_with_risk_band() {
         let skills = [make_skill()];
         let kask_tools = make_kask_tools();
-        let result =
-            resolve_with_kask("ACTION: kask/russell_host_snapshot", &skills, &kask_tools)
-                .unwrap()
-                .unwrap();
+        let result = resolve_with_kask("ACTION: kask/russell_host_snapshot", &skills, &kask_tools)
+            .unwrap()
+            .unwrap();
         match result {
             ResolvedAction::KaskTool { risk_band, .. } => {
                 assert_eq!(risk_band, RiskBand::None);

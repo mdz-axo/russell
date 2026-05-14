@@ -712,9 +712,7 @@ async fn execute_pending_action(
     session_id: &str,
     model: &str,
 ) -> Option<String> {
-    use russell_skills::dispatch::{
-        Dispatcher, DryRun, RollbackStrategy, StepType,
-    };
+    use russell_skills::dispatch::{Dispatcher, DryRun, RollbackStrategy, StepType};
     use std::io::Write;
     use std::time::Duration;
 
@@ -731,10 +729,24 @@ async fn execute_pending_action(
     };
 
     let is_probe = action.is_probe();
-    let (risk, needs_sudo, max_auto_risk, requires_human, rollback_id, rollback_cmd, rollback_is_reboot) = match action {
-        ResolvedAction::Probe { max_auto_risk, .. } => {
-            (RiskBand::None, false, *max_auto_risk, false, None, None, false)
-        }
+    let (
+        risk,
+        needs_sudo,
+        max_auto_risk,
+        requires_human,
+        rollback_id,
+        rollback_cmd,
+        rollback_is_reboot,
+    ) = match action {
+        ResolvedAction::Probe { max_auto_risk, .. } => (
+            RiskBand::None,
+            false,
+            *max_auto_risk,
+            false,
+            None,
+            None,
+            false,
+        ),
         ResolvedAction::Intervention {
             risk,
             needs_sudo,
@@ -744,7 +756,15 @@ async fn execute_pending_action(
             rollback_cmd,
             rollback_is_reboot,
             ..
-        } => (*risk, *needs_sudo, *max_auto_risk, *requires_human, rollback_id.clone(), rollback_cmd.clone(), *rollback_is_reboot),
+        } => (
+            *risk,
+            *needs_sudo,
+            *max_auto_risk,
+            *requires_human,
+            rollback_id.clone(),
+            rollback_cmd.clone(),
+            *rollback_is_reboot,
+        ),
         ResolvedAction::KaskTool { .. } => {
             println!("  → Internal error: KaskTool routed to local dispatcher.");
             return None;
@@ -876,8 +896,11 @@ async fn execute_pending_action(
                     session_id,
                     model,
                     &format!("/approve {skill_id}/{action_id}"),
-                    &format!("executed: exit=0, stdout_len={}, stderr_len={}",
-                        forward.stdout.len(), forward.stderr.len()),
+                    &format!(
+                        "executed: exit=0, stdout_len={}, stderr_len={}",
+                        forward.stdout.len(),
+                        forward.stderr.len()
+                    ),
                 );
                 let _is_probe = false;
                 let report = format_intervention_result(&outcome, &skill_id, &action_id);
@@ -896,8 +919,10 @@ async fn execute_pending_action(
                     session_id,
                     model,
                     &format!("/approve {skill_id}/{action_id}"),
-                    &format!("failed: forward_exit={:?}, rollback_exit={:?}",
-                        forward.exit_code, rb.exit_code),
+                    &format!(
+                        "failed: forward_exit={:?}, rollback_exit={:?}",
+                        forward.exit_code, rb.exit_code
+                    ),
                 );
                 Some(format!(
                     "[intervention result: {skill_id}/{action_id}, failed, rolled back]\n\
@@ -927,17 +952,16 @@ async fn execute_pending_action(
         }
         Err(e) => {
             println!("  → Error running {skill_id}/{action_id}: {e}");
-            Some(format!("[intervention error: {skill_id}/{action_id}] {e}\n"))
+            Some(format!(
+                "[intervention error: {skill_id}/{action_id}] {e}\n"
+            ))
         }
     }
 }
 
 /// Format a probe result for LLM context injection.
 fn format_probe_result(
-    result: std::result::Result<
-        russell_skills::dispatch::RunOutcome,
-        russell_core::CoreError,
-    >,
+    result: std::result::Result<russell_skills::dispatch::RunOutcome, russell_core::CoreError>,
     skill_id: &str,
     action_id: &str,
 ) -> Option<String> {
@@ -1395,9 +1419,7 @@ async fn execute_kask_tool(
 
     // If required fields exist but no arguments were provided, warn and cancel.
     if !required_fields.is_empty() && arguments.is_none() {
-        println!(
-            "  → kask/{tool_name} requires arguments: {required_fields:?}",
-        );
+        println!("  → kask/{tool_name} requires arguments: {required_fields:?}",);
         println!("  → Jack didn't provide them. Ask Jack to include arguments in the response.");
         println!("  → Format: Arguments: {{\"field\": \"value\"}}");
         return None;
@@ -1424,7 +1446,8 @@ async fn execute_kask_tool(
         Duration::from_secs(120)
     };
 
-    let tool_result = tokio::time::timeout(timeout, client.call_tool(&tool_name, arguments.clone())).await;
+    let tool_result =
+        tokio::time::timeout(timeout, client.call_tool(&tool_name, arguments.clone())).await;
 
     let duration = started.elapsed();
 
@@ -1476,7 +1499,11 @@ async fn execute_kask_tool(
     write_kask_evidence(paths, &tool_name, risk, &text, success, timed_out, duration);
 
     // Journal as a skill-level event (not just a chat turn).
-    let action_str = if success { "kask_tool" } else { "kask_tool_failure" };
+    let action_str = if success {
+        "kask_tool"
+    } else {
+        "kask_tool_failure"
+    };
     let severity = if success && !is_error {
         Severity::Info
     } else {
@@ -1551,7 +1578,14 @@ fn write_kask_evidence(
     }
 
     // Write structured event record.
-    let mut ev = Event::new("kask_tool", if success { Severity::Info } else { Severity::Warn });
+    let mut ev = Event::new(
+        "kask_tool",
+        if success {
+            Severity::Info
+        } else {
+            Severity::Warn
+        },
+    );
     ev.tier = Some("skill".into());
     ev.module = Some(format!("kask/{tool_name}"));
     ev.duration_ms = Some(duration.as_millis() as u64);

@@ -29,7 +29,10 @@ pub async fn run(paths: &Paths, note: Option<&str>) -> Result<()> {
     // Graceful degradation: empty list if Kask is unreachable.
     let kask_tool_names = collect_kask_tool_names(paths).await;
     if !kask_tool_names.is_empty() {
-        debug!(count = kask_tool_names.len(), "kask tools available for jack");
+        debug!(
+            count = kask_tool_names.len(),
+            "kask tools available for jack"
+        );
     }
 
     let outcome = russell_doctor::run_help(paths, &writer, note, &kask_tool_names)
@@ -225,7 +228,10 @@ fn load_cached_tool_names(paths: &Paths) -> Vec<(String, Option<String>)> {
     let cache_path = paths.memory_dir().join("kask-tools.cache.json");
     let mut registry = ToolRegistry::new(KaskMcpConfig::from_env().tool_ttl);
     if registry.load_from_disk(&cache_path).is_ok() && !registry.is_empty() {
-        debug!(count = registry.tool_count(), "loaded kask tools from disk cache");
+        debug!(
+            count = registry.tool_count(),
+            "loaded kask tools from disk cache"
+        );
         return registry
             .tools()
             .iter()

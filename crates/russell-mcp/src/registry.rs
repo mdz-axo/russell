@@ -217,9 +217,7 @@ impl ToolRegistry {
                 // Don't set last_refresh — this is stale data.
                 Ok(())
             }
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-                Ok(())
-            }
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
             Err(e) => Err(crate::error::McpError::Config(format!(
                 "failed to read tool cache {}: {e}",
                 path.display()
