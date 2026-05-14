@@ -60,8 +60,9 @@ pub enum ResolvedAction {
     KaskTool {
         /// The MCP tool name (from `tools/list`).
         tool_name: String,
-        /// Risk band from tool annotations. `None` means treat as medium.
-        risk_band: Option<String>,
+        /// Risk band from tool annotations. Defaults to `Medium` when
+        /// unset — safe default requiring operator consent.
+        risk_band: RiskBand,
     },
 }
 
@@ -76,6 +77,16 @@ impl ResolvedAction {
     #[must_use]
     pub fn is_kask_tool(&self) -> bool {
         matches!(self, Self::KaskTool { .. })
+    }
+
+    /// Returns the risk band for this action.
+    #[must_use]
+    pub fn risk_band(&self) -> RiskBand {
+        match self {
+            Self::Probe { .. } => RiskBand::None,
+            Self::Intervention { risk, .. } => *risk,
+            Self::KaskTool { risk_band, .. } => *risk_band,
+        }
     }
 
     /// The skill ID, regardless of action type.
@@ -192,8 +203,10 @@ impl std::fmt::Display for ActionError {
 pub struct KaskToolInfo {
     /// Tool name (the callable ID).
     pub name: String,
-    /// Risk band from annotations, if declared.
-    pub risk_band: Option<String>,
+    /// Risk band from annotations. Defaults to `RiskBand::Medium`
+    /// when unset — safe default per IDRS. Probes should explicitly
+    /// declare `RiskBand::None`.
+    pub risk_band: RiskBand,
 }
 
 /// Parse the last `ACTION:` line from a response and resolve it
@@ -319,7 +332,7 @@ fn resolve_kask_tool(
     if let Some(tool) = kask_tools.iter().find(|t| t.name == tool_name) {
         return Some(Ok(ResolvedAction::KaskTool {
             tool_name: tool.name.clone(),
-            risk_band: tool.risk_band.clone(),
+            risk_band: tool.risk_band,
         }));
     }
 
@@ -377,9 +390,19 @@ mod tests {
     }
 
     #[test]
-    fn no_action_line_returns_none() {
+    fn kask_tool_with_risk_band() {
         let skills = [make_skill()];
-        assert!(resolve("hello world", &skills).is_none());
+        let kask_tools = make_kask_tools();
+        let result =
+            resolve_with_kask("ACTION: kask/russell_host_snapshot", &skills, &kask_tools)
+                .unwrap()
+                .unwrap();
+        match result {
+            ResolvedAction::KaskTool { risk_band, .. } => {
+                assert_eq!(risk_band, RiskBand::None);
+            }
+            _ => panic!("expected KaskTool"),
+        }
     }
 
     #[test]
@@ -449,11 +472,11 @@ mod tests {
         vec![
             KaskToolInfo {
                 name: "paradigm_shift_query".into(),
-                risk_band: None,
+                risk_band: RiskBand::Medium,
             },
             KaskToolInfo {
                 name: "russell_host_snapshot".into(),
-                risk_band: Some("none".into()),
+                risk_band: RiskBand::None,
             },
         ]
     }
