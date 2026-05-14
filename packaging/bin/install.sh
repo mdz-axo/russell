@@ -67,7 +67,72 @@ mkdir -p "$HOME/.config/harness" "$HOME/.local/state/harness/runs" \
 say "Installing skills → ~/.local/share/harness/skills/"
 cp -r "$REPO/skills/ollama-watcher" "$HOME/.local/share/harness/skills/"
 cp -r "$REPO/skills/ubuntu-jack"    "$HOME/.local/share/harness/skills/"
+cp -r "$REPO/skills/sysadmin"       "$HOME/.local/share/harness/skills/"
 chmod +x "$HOME/.local/share/harness/skills/ollama-watcher/scripts/"*.sh 2>/dev/null || true
+chmod +x "$HOME/.local/share/harness/skills/sysadmin/scripts/"*.sh 2>/dev/null || true
+
+# Build and install arsenal-mcp-russell if Kask repo is available
+KASK_REPO="${HOME}/Clones/kask"
+if [ -d "$KASK_REPO" ] && [ -f "$KASK_REPO/Cargo.toml" ]; then
+  say "Building arsenal-mcp-russell from Kask repo…"
+  (cd "$KASK_REPO" && cargo build -p arsenal-mcp-russell)
+  MCP_BIN="$KASK_REPO/target/debug/arsenal-mcp-russell"
+  if [ -x "$MCP_BIN" ]; then
+    say "Installing arsenal-mcp-russell → ~/.local/bin/"
+    mkdir -p "$HOME/.local/bin"
+    install -m 0755 "$MCP_BIN" "$HOME/.local/bin/arsenal-mcp-russell"
+    
+    # Update MCP registry to point to correct location
+    say "Updating MCP registry…"
+    mkdir -p "$HOME/.config/stack"
+    cat > "$HOME/.config/stack/mcp-registry.json" <<'MCPREG'
+{
+  "version": "1.0",
+  "servers": {
+    "russell": {
+      "transport": {
+        "type": "stdio",
+        "command": "/home/mdz-axolotl/.local/bin/arsenal-mcp-russell",
+        "args": []
+      },
+      "enabled": true,
+      "auto_start": true,
+      "tags": ["infrastructure", "health", "host"],
+      "description": "Russell host-health bridge"
+    },
+    "okapi-metrics": {
+      "transport": {
+        "type": "stdio",
+        "command": "/home/mdz-axolotl/.local/bin/arsenal-mcp-okapi-metrics",
+        "args": []
+      },
+      "enabled": true,
+      "auto_start": true,
+      "tags": ["okapi", "inference", "metrics"],
+      "description": "Okapi inference metrics"
+    }
+  }
+}
+MCPREG
+    
+    # Build stack-api for MCP HTTP gateway
+    say "Building Kask MCP HTTP gateway (stack-api)…"
+    (cd "$KASK_REPO" && cargo build -p stack-api)
+    if [ -f "$KASK_REPO/target/debug/stack-api" ]; then
+      say "MCP gateway binary ready at $KASK_REPO/target/debug/stack-api"
+      say "To start the MCP gateway, run:"
+      say "  $REPO/scripts/start-kask-mcp-gateway.sh --background"
+    fi
+  else
+    say "WARNING: arsenal-mcp-russell build failed, MCP tools unavailable"
+  fi
+else
+  say "Kask repo not found at $KASK_REPO — skipping MCP server build"
+  say "Note: Russell's MCP client requires Kask for advanced tool access"
+fi
+else
+  say "Kask repo not found at $KASK_REPO — skipping MCP server build"
+fi
 
 if [ ! -f "$HOME/.config/harness/russell.env" ]; then
   # Prefer the repo .env if it's populated (convenience during dev).

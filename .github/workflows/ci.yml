@@ -37,6 +37,15 @@ jobs:
       - name: cargo test
         run: cargo test --workspace
 
+      - name: Build MCP servers (verify Kask integration compiles)
+        run: |
+          if [ -d "$HOME/Clones/kask" ]; then
+            cd "$HOME/Clones/kask"
+            cargo check -p arsenal-mcp-russell -p arsenal-mcp-okapi-metrics
+          else
+            echo "Kask repo not present — skipping MCP build check"
+          fi
+
       - name: Install cargo-deny
         run: cargo install cargo-deny --locked
 
