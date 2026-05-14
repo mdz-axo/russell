@@ -14,7 +14,8 @@ use probes::Sample;
 use russell_core::Result;
 use russell_core::RuleSet;
 use russell_core::event::{Event, Scope, Severity};
-use russell_core::journal::JournalWriter;
+use russell_core::journal::{JournalReader, JournalWriter};
+use tracing::info;
 
 /// Run the probe set once and append samples to the journal.
 /// No rule evaluation — samples only.
@@ -96,6 +97,93 @@ fn build_breach_event(
         ev.outputs.insert("unit".into(), u.into());
     }
     ev
+}
+
+/// Evaluate externally-written scenario metrics against the rule set.
+///
+/// Reads all samples from the journal written in the last `window_seconds`,
+/// evaluates each numeric sample against the [`RuleSet`], and returns
+/// threshold-breach events. This catches samples written by the
+/// scenario-tester skill (e.g. `okapi_latency_p95_ms`) that the sentinel
+/// doesn't collect through its own probe registry.
+///
+/// Duplicate breaches (same probe name + value) are de-duplicated by
+/// merging with the existing breach events from the sentinel's own
+/// probe collection.
+pub fn evaluate_scenario_samples(
+    reader: &JournalReader,
+    rules: &RuleSet,
+    window_seconds: i64,
+    existing_events: &[Event],
+) -> Vec<Event> {
+    let now = russell_core::time::now_unix();
+    let since = now - window_seconds;
+    info!(since, now, "scanning for scenario metrics in journal");
+
+    let samples = match reader.host_samples_summary(since, now) {
+        Ok(s) => s,
+        Err(e) => {
+            info!(error = %e, "cannot read scenario samples");
+            return Vec::new();
+        }
+    };
+
+    info!(count = samples.len(), "samples found in window");
+
+    let existing_probes: std::collections::BTreeSet<&str> = existing_events
+        .iter()
+        .filter_map(|ev| ev.outputs.get("probe").and_then(|v| v.as_str()))
+        .collect();
+
+    let mut events = Vec::new();
+    for s in &samples {
+        if existing_probes.contains(s.probe.as_str()) {
+            continue;
+        }
+        let Some(value) = s.last else {
+            continue;
+        };
+        let sev = rules.evaluate(&s.probe, value);
+        if s.probe == "okapi_latency_p95_ms" || s.probe == "okapi_latency_p50_ms" {
+            info!(probe = %s.probe, value, severity = ?sev, "EVALUATED");
+        }
+        if sev != Severity::Info {
+            events.push(build_breach_event(&s.probe, value, None, sev));
+        }
+    }
+    info!(breaches = events.len(), "scenario breaches found");
+    events
+}
+    };
+
+    info!(count = samples.len(), "samples found in window");
+
+    // Track which probes already have breach events from the sentinel's
+    // own collection so we don't double-count.
+    let existing_probes: std::collections::BTreeSet<&str> = existing_events
+        .iter()
+        .filter_map(|ev| ev.outputs.get("probe").and_then(|v| v.as_str()))
+        .collect();
+
+    let mut events = Vec::new();
+    for s in &samples {
+        if existing_probes.contains(s.probe.as_str()) {
+            continue;
+        }
+        let Some(value) = s.last else {
+            continue;
+        };
+        let sev = rules.evaluate(&s.probe, value);
+        // Log any probe with a non-Info result or any scenario-type probe.
+        if sev != Severity::Info || s.probe.starts_with("okapi") || s.probe.starts_with("latency_regression") || s.probe.starts_with("error_rate_regression") {
+            info!(probe = %s.probe, value, severity = ?sev, "scenario metric evaluated");
+        }
+        if sev != Severity::Info {
+            events.push(build_breach_event(&s.probe, value, None, sev));
+        }
+    }
+    info!(breaches = events.len(), "scenario breaches found");
+    events
 }
 
 #[cfg(test)]

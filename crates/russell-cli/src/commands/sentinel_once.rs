@@ -34,8 +34,22 @@ pub fn run(paths: &Paths) -> Result<()> {
     let (n, threshold_events) =
         russell_sentinel::run_once_with_rules(&journal, &rules).context("running Sentinel")?;
 
-    // Write threshold breach events.
+    // 2b. Evaluate externally-written scenario metrics (from scenario-tester skill).
+    //     Scenario metrics like okapi_latency_p95_ms are journaled as samples but
+    //     not collected by the sentinel's ProbeRegistry. Re-read and evaluate them.
+    let scenario_events = russell_sentinel::evaluate_scenario_samples(
+        &reader,
+        &rules,
+        300, // last 5 minutes
+        &threshold_events,
+    );
+    let total_breaches = threshold_events.len() + scenario_events.len();
+
+    // Write all threshold breach events.
     for ev in &threshold_events {
+        journal.append(ev)?;
+    }
+    for ev in &scenario_events {
         journal.append(ev)?;
     }
 
@@ -45,7 +59,7 @@ pub fn run(paths: &Paths) -> Result<()> {
     ev.module = Some("sentinel/cycle".into());
     ev.summary = Some(format!(
         "captured {n} host samples, {} threshold breaches; proprio: age={}s stall={}s llm_p95={}ms drift={}s err_rate={}%",
-        threshold_events.len(),
+        total_breaches,
         proprio
             .age_s
             .map(|a| a.to_string())
@@ -106,7 +120,7 @@ pub fn run(paths: &Paths) -> Result<()> {
 
     println!(
         "sentinel: captured {n} samples, {} threshold breaches in {} ms; proprio: age={}s stall={}s llm_p95={}ms drift={}s err_rate={}%",
-        threshold_events.len(),
+        total_breaches,
         started.elapsed().as_millis(),
         proprio
             .age_s
