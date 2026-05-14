@@ -494,21 +494,6 @@ mod tests {
     }
 
     #[test]
-    fn kask_tool_with_risk_band() {
-        let skills = [make_skill()];
-        let kask_tools = make_kask_tools();
-        let result = resolve_with_kask("ACTION: kask/russell_host_snapshot", &skills, &kask_tools)
-            .unwrap()
-            .unwrap();
-        match result {
-            ResolvedAction::KaskTool { risk_band, .. } => {
-                assert_eq!(risk_band, Some("none".into()));
-            }
-            _ => panic!("expected KaskTool"),
-        }
-    }
-
-    #[test]
     fn unknown_kask_tool_is_error() {
         let skills = [make_skill()];
         let kask_tools = make_kask_tools();

@@ -3,6 +3,7 @@
 
 use anyhow::{Context, Result};
 use rand::seq::SliceRandom;
+use russell_core::event::{Event, Severity};
 use russell_core::journal::{HelpSessionInput, HelpSessionStatus, JournalReader, JournalWriter};
 use russell_core::paths::Paths;
 use russell_doctor::action::{self, KaskToolInfo, ResolvedAction};
@@ -12,6 +13,7 @@ use russell_doctor::oai_client::OkapiClient;
 use russell_mcp::client::KaskMcpClient;
 use russell_mcp::config::KaskMcpConfig;
 use russell_mcp::registry::ToolRegistry;
+use russell_skills::RiskBand;
 use russell_skills::Skill;
 use rustyline::DefaultEditor;
 use rustyline::error::ReadlineError;
@@ -578,13 +580,8 @@ pub async fn run(paths: &Paths) -> Result<()> {
                             Some(Ok(action)) => {
                                 if action.is_kask_tool() {
                                     // Kask MCP tool — determine consent based on risk.
-                                    let risk_str = match &action {
-                                        ResolvedAction::KaskTool { risk_band, .. } => {
-                                            risk_band.as_deref().unwrap_or("medium")
-                                        }
-                                        _ => unreachable!(),
-                                    };
-                                    if risk_str == "none" {
+                                    let risk = action.risk_band();
+                                    if risk == RiskBand::None {
                                         // Auto-execute (probe-equivalent).
                                         println!("  → Calling kask tool: {}…", action.action_id());
                                         let result = execute_kask_tool(
@@ -607,7 +604,7 @@ pub async fn run(paths: &Paths) -> Result<()> {
                                         println!(
                                             "  → Jack proposes kask tool: {} (risk: {}).",
                                             action.action_id(),
-                                            risk_str
+                                            risk.as_str()
                                         );
                                         println!("  → Say 'ok' to approve, or 'no' to refuse.");
                                         pending_action = Some(PendingAction { action });
@@ -1218,9 +1215,22 @@ fn build_kask_tool_infos(registry: &ToolRegistry) -> Vec<KaskToolInfo> {
     registry
         .tools()
         .iter()
-        .map(|t| KaskToolInfo {
-            name: t.name.clone(),
-            risk_band: registry.tool_risk_band(&t.name),
+        .map(|t| {
+            let risk_band = registry
+                .tool_risk_band(&t.name)
+                .map(|s| match s.as_str() {
+                    "none" => RiskBand::None,
+                    "low" => RiskBand::Low,
+                    "medium" => RiskBand::Medium,
+                    "high" => RiskBand::High,
+                    "critical" => RiskBand::Critical,
+                    _ => RiskBand::Medium,
+                })
+                .unwrap_or(RiskBand::Medium);
+            KaskToolInfo {
+                name: t.name.clone(),
+                risk_band,
+            }
         })
         .collect()
 }
