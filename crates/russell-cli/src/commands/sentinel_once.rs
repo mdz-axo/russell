@@ -40,7 +40,7 @@ pub fn run(paths: &Paths) -> Result<()> {
     let scenario_events = russell_sentinel::evaluate_scenario_samples(
         &reader,
         &rules,
-        300, // last 5 minutes
+        3600, // last hour — scenario metrics may be written outside the sentinel cycle
         &threshold_events,
     );
     let total_breaches = threshold_events.len() + scenario_events.len();
