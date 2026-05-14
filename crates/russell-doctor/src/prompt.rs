@@ -27,6 +27,9 @@ use crate::error::Result;
 /// specific manifest IDs per ADR-0008 (LLM ranks IDs, does not
 /// emit shell).
 ///
+/// If `kask_tool_names` is provided (ADR-0025), Jack also knows
+/// which Kask MCP tools are available via `ACTION: kask/<tool>`.
+///
 /// If any loaded skill has a `KNOWLEDGE.md` file and its
 /// `applies_when` clause matches the machine profile, that
 /// knowledge is appended to Jack's system prompt — giving him
@@ -38,6 +41,21 @@ pub fn compose(
     note: Option<&str>,
     loaded_skills: &[Skill],
     skills_base_dir: &Path,
+) -> Result<SoapPrompt> {
+    compose_with_kask(reader, profile, note, loaded_skills, skills_base_dir, &[])
+}
+
+/// Build the SOAP prompt with Kask MCP tool awareness.
+///
+/// Same as [`compose`] but additionally includes available Kask tools
+/// in the prompt's "Available actions" section.
+pub fn compose_with_kask(
+    reader: &JournalReader,
+    profile: Option<&Profile>,
+    note: Option<&str>,
+    loaded_skills: &[Skill],
+    skills_base_dir: &Path,
+    kask_tool_names: &[(String, Option<String>)],
 ) -> Result<SoapPrompt> {
     let now = russell_core::time::now_unix();
     let window_start = now - 24 * 3600;
@@ -231,6 +249,24 @@ pub fn compose(
                 }
             }
         }
+    }
+
+    // Phase 4C: Kask MCP tools (ADR-0025 §7).
+    if !kask_tool_names.is_empty() {
+        writeln!(objective, "\n### Kask MCP tools")?;
+        writeln!(objective, "| tool | risk |")?;
+        writeln!(objective, "|---|---|")?;
+        for (name, risk) in kask_tool_names {
+            let risk_str = risk.as_deref().unwrap_or("medium");
+            writeln!(objective, "| {name} | {risk_str} |")?;
+        }
+        writeln!(
+            objective,
+            "\nYou can also call Kask tools via ACTION syntax:\n\
+             ACTION: kask/<tool-name>\n\
+             (e.g. ACTION: kask/paradigm_shift_query)\n\n\
+             Tools with risk 'none' auto-execute. Others require operator consent."
+        )?;
     }
 
     writeln!(objective, "\n### Most-recent events (up to 20)")?;

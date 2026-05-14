@@ -462,10 +462,9 @@ mod tests {
     fn resolves_kask_tool() {
         let skills = [make_skill()];
         let kask_tools = make_kask_tools();
-        let result =
-            resolve_with_kask("ACTION: kask/paradigm_shift_query", &skills, &kask_tools)
-                .unwrap()
-                .unwrap();
+        let result = resolve_with_kask("ACTION: kask/paradigm_shift_query", &skills, &kask_tools)
+            .unwrap()
+            .unwrap();
         assert!(result.is_kask_tool());
         assert_eq!(result.skill_id(), "kask");
         assert_eq!(result.action_id(), "paradigm_shift_query");
@@ -475,10 +474,9 @@ mod tests {
     fn kask_tool_with_risk_band() {
         let skills = [make_skill()];
         let kask_tools = make_kask_tools();
-        let result =
-            resolve_with_kask("ACTION: kask/russell_host_snapshot", &skills, &kask_tools)
-                .unwrap()
-                .unwrap();
+        let result = resolve_with_kask("ACTION: kask/russell_host_snapshot", &skills, &kask_tools)
+            .unwrap()
+            .unwrap();
         match result {
             ResolvedAction::KaskTool { risk_band, .. } => {
                 assert_eq!(risk_band, Some("none".into()));
@@ -511,10 +509,9 @@ mod tests {
     fn local_skill_still_resolves_with_kask_tools_present() {
         let skills = [make_skill()];
         let kask_tools = make_kask_tools();
-        let result =
-            resolve_with_kask("ACTION: test-skill/probe-1", &skills, &kask_tools)
-                .unwrap()
-                .unwrap();
+        let result = resolve_with_kask("ACTION: test-skill/probe-1", &skills, &kask_tools)
+            .unwrap()
+            .unwrap();
         assert!(result.is_probe());
         assert_eq!(result.skill_id(), "test-skill");
     }

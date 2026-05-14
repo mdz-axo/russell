@@ -258,14 +258,19 @@ pub async fn run(paths: &Paths) -> Result<()> {
                 // Consent handling — must come before special commands.
                 if let Some(ref pa) = pending_action {
                     if trimmed == "/approve" || is_affirmative(trimmed) {
-                        let action_result = execute_pending_action(
-                            &journal,
-                            paths,
-                            pa,
-                            &session_id,
-                            &current_model,
-                        )
-                        .await;
+                        let action_result = if pa.action.is_kask_tool() {
+                            execute_kask_tool(
+                                &journal,
+                                &kask_client,
+                                &pa.action,
+                                &session_id,
+                                &current_model,
+                            )
+                            .await
+                        } else {
+                            execute_pending_action(&journal, paths, pa, &session_id, &current_model)
+                                .await
+                        };
                         if let Some(result_text) = action_result {
                             history.turns.push(Turn {
                                 role: "user".into(),
@@ -279,14 +284,19 @@ pub async fn run(paths: &Paths) -> Result<()> {
                     if let Some(_pw) = trimmed.strip_prefix("/approve ") {
                         println!("  → Approving. Use `/approve` without a password next time —");
                         println!("    Jack will prompt you securely if sudo is needed.");
-                        let action_result = execute_pending_action(
-                            &journal,
-                            paths,
-                            pa,
-                            &session_id,
-                            &current_model,
-                        )
-                        .await;
+                        let action_result = if pa.action.is_kask_tool() {
+                            execute_kask_tool(
+                                &journal,
+                                &kask_client,
+                                &pa.action,
+                                &session_id,
+                                &current_model,
+                            )
+                            .await
+                        } else {
+                            execute_pending_action(&journal, paths, pa, &session_id, &current_model)
+                                .await
+                        };
                         if let Some(result_text) = action_result {
                             history.turns.push(Turn {
                                 role: "user".into(),
@@ -511,7 +521,7 @@ pub async fn run(paths: &Paths) -> Result<()> {
                 });
 
                 // Build the fresh SOAP objective.
-                let objective = build_objective(&reader, &skills, profile.as_ref());
+                let objective = build_objective(&reader, &skills, profile.as_ref(), &kask_registry);
                 let system = russell_doctor::JACK_CHAT_PERSONA.to_string();
 
                 // Build the messages array for the LLM.
@@ -576,10 +586,7 @@ pub async fn run(paths: &Paths) -> Result<()> {
                                     };
                                     if risk_str == "none" {
                                         // Auto-execute (probe-equivalent).
-                                        println!(
-                                            "  → Calling kask tool: {}…",
-                                            action.action_id()
-                                        );
+                                        println!("  → Calling kask tool: {}…", action.action_id());
                                         let result = execute_kask_tool(
                                             &journal,
                                             &kask_client,
@@ -602,9 +609,7 @@ pub async fn run(paths: &Paths) -> Result<()> {
                                             action.action_id(),
                                             risk_str
                                         );
-                                        println!(
-                                            "  → Say 'ok' to approve, or 'no' to refuse."
-                                        );
+                                        println!("  → Say 'ok' to approve, or 'no' to refuse.");
                                         pending_action = Some(PendingAction { action });
                                     }
                                 } else if action.is_probe() {
@@ -728,6 +733,12 @@ async fn execute_pending_action(
             requires_human,
             ..
         } => (*risk, *needs_sudo, *max_auto_risk, *requires_human),
+        ResolvedAction::KaskTool { .. } => {
+            // KaskTool actions are handled by execute_kask_tool, not here.
+            // If we reach this point, it's a logic error in the caller.
+            println!("  → Internal error: KaskTool routed to local dispatcher.");
+            return None;
+        }
     };
 
     let mut dispatcher = Dispatcher::new(&skill_dir);
@@ -898,6 +909,7 @@ fn build_objective(
     reader: &JournalReader,
     skills: &[Skill],
     profile: Option<&russell_core::Profile>,
+    kask_registry: &ToolRegistry,
 ) -> String {
     let now = russell_core::time::now_unix();
     let window_start = now - 24 * 3600;
@@ -995,6 +1007,31 @@ fn build_objective(
                     s.id, iv.id, iv.risk
                 );
             }
+        }
+    }
+
+    // Kask MCP tools (ADR-0025).
+    if !kask_registry.is_empty() {
+        let _ = writeln!(obj, "\n### Kask MCP tools");
+        for tool in kask_registry.tools() {
+            let risk = kask_registry
+                .tool_risk_band(&tool.name)
+                .unwrap_or_else(|| "medium".into());
+            let desc = tool
+                .description
+                .as_deref()
+                .and_then(|d| d.lines().next())
+                .unwrap_or("");
+            let desc_short = if desc.len() > 60 {
+                format!("{}…", &desc[..57])
+            } else {
+                desc.to_owned()
+            };
+            let _ = writeln!(
+                obj,
+                "- `kask`/`{}` (tool, risk: {}) — {}",
+                tool.name, risk, desc_short
+            );
         }
     }
 
@@ -1172,4 +1209,107 @@ fn journal_chat_turn(
         evidence_ref: &evidence_ref,
     };
     let _ = journal.append_help_session(&input);
+}
+
+// ── Kask MCP tool support (ADR-0025 §7) ───────────────────────────
+
+/// Build a list of [`KaskToolInfo`] from the registry for the action resolver.
+fn build_kask_tool_infos(registry: &ToolRegistry) -> Vec<KaskToolInfo> {
+    registry
+        .tools()
+        .iter()
+        .map(|t| KaskToolInfo {
+            name: t.name.clone(),
+            risk_band: registry.tool_risk_band(&t.name),
+        })
+        .collect()
+}
+
+/// Execute a Kask MCP tool call. Returns a formatted result string
+/// for injection into the LLM conversation history.
+async fn execute_kask_tool(
+    journal: &JournalWriter,
+    kask_client: &Option<KaskMcpClient>,
+    action: &ResolvedAction,
+    session_id: &str,
+    model: &str,
+) -> Option<String> {
+    let tool_name = action.action_id();
+
+    let client = match kask_client {
+        Some(c) => c,
+        None => {
+            println!("  → Kask MCP client not connected. Cannot execute tool.");
+            return None;
+        }
+    };
+
+    println!("  → Calling kask/{tool_name}...");
+
+    // For now, call without arguments. Future: parse arguments from
+    // Jack's response or prompt the operator.
+    match client.call_tool(tool_name, None).await {
+        Ok(result) => {
+            // Extract text content from the tool result.
+            let text: String = result
+                .content
+                .iter()
+                .filter_map(|c| c.text.as_deref())
+                .collect::<Vec<_>>()
+                .join("\n");
+
+            let truncated = if text.len() > 3000 {
+                format!("{}… (truncated)", &text[..3000])
+            } else {
+                text.clone()
+            };
+
+            if result.is_error {
+                println!("  → kask/{tool_name} returned an error:");
+                println!("  {truncated}");
+            } else {
+                println!("  → kask/{tool_name} complete.");
+                if !truncated.is_empty() {
+                    // Print first few lines for the operator.
+                    for line in truncated.lines().take(10) {
+                        println!("  {line}");
+                    }
+                    let line_count = truncated.lines().count();
+                    if line_count > 10 {
+                        println!("  … ({} more lines)", line_count - 10);
+                    }
+                }
+            }
+
+            // Journal the tool call.
+            journal_chat_turn(
+                journal,
+                session_id,
+                model,
+                &format!("/kask-tool {tool_name}"),
+                &format!(
+                    "kask/{tool_name}: is_error={}, content_len={}",
+                    result.is_error,
+                    text.len()
+                ),
+            );
+
+            // Build result for LLM context.
+            let status = if result.is_error { "error" } else { "ok" };
+            Some(format!(
+                "[kask tool result: {tool_name}, status={status}]\n{truncated}"
+            ))
+        }
+        Err(e) => {
+            println!("  → kask/{tool_name} failed: {e}");
+            journal_chat_turn(
+                journal,
+                session_id,
+                model,
+                &format!("/kask-tool {tool_name}"),
+                &format!("kask/{tool_name}: error={e}"),
+            );
+            Some(format!("[kask tool error: {tool_name}]\n{e}"))
+        }
+    }
 }

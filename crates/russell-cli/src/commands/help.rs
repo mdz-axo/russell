@@ -58,6 +58,11 @@ pub async fn run(paths: &Paths, note: Option<&str>) -> Result<()> {
                     );
                     println!();
                 }
+                ResolvedAction::KaskTool { .. } => {
+                    println!("  → Jack proposes kask tool: {}.", action.action_id(),);
+                    println!("  → Switch to `russell chat` to execute Kask tools interactively.");
+                    println!();
+                }
             },
             Err(e) => {
                 println!("  → {e}");
