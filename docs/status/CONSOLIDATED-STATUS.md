@@ -1,9 +1,9 @@
 ---
 title: "Russell Consolidated Status"
 audience: [operators, developers, contributors, architects, agents]
-last_updated: 2026-05-12
+last_updated: 2026-05-14
 togaf_phase: "G"
-version: "2.1.0"
+version: "2.2.0"
 status: "Active"
 ---
 
@@ -24,7 +24,8 @@ of every meaningful development session.
 - **Phase 1b (install artifacts + systemd units) — SHIPPED + installed.**
 - **Phase 1c (20-day unattended soak) — CLOSED.**
 - **Phase 2 (observation sharpened) — ACTIVE.** Self-vitals (5), rule engine, EWMA baselines, process probes (7), GPU probes (5), disk probes (2), systemd probes (3). Baseline deviation integrated into Jack's SOAP objective.
-- **Phase 3 (skills and dispatch) — ACTIVE.** IDRS-gated skill dispatcher wired for production. `okapi-watcher` skill operational with `restart-okapi` intervention. Consent flow in `russell chat` — probes auto-execute, interventions accept natural-language consent ("ok", "yes", etc.) or `/approve`. `ACTION:` syntax parsed and executed by both `russell jack` and `russell chat`.
+- **Phase 3 (skills and dispatch) — COMPLETE.** Extended with skill lifecycle management: workshop REPL (`russell workshop`), registry cache (`local-cache.yaml`), safety scanner (7 rules for manifest + KNOWLEDGE.md), skill discovery pipeline, and scenario testing skill (`scenario-tester`). 11 skills loaded (4 actionable with probes, 7 knowledge). `russell skill run` now respects manifest `timeout:` field.
+- **Phase 4 (MCP surface, real skills, operational depth) — ACTIVE.** Skill lifecycle gaps documented (`docs/status/skill-lifecycle-gaps.md`). Sentinel evaluates externally-written scenario metrics against `rules.d/agent-testing.toml` (11 rule thresholds). `fetch <url>`, `adapt <name>`, `search --remote`, and `restore <name>` commands implemented in workshop. End-to-end scenario pipeline: `scenario-full` probe chains run-okapi → evaluate → journal. 166 tests pass. 21 scenario tests pass.
 - **Architecture:** JR-1 austerity maintained throughout. Seven ADRs deferred.
 
 ## 2. What exists today
@@ -37,8 +38,9 @@ of every meaningful development session.
 - Persistence catalog (`PERSISTENCE_CATALOG.md`).
 - Reuse manifest (`REUSE_MANIFEST.md`).
 - TOGAF traceability matrix.
-- 16 active ADRs + 8 deferred.
+- 17 active ADRs + 7 deferred.
 - 5 templates (ADR, skill manifest, SOAP bundle, daily log, review entry).
+- New: skill lifecycle gap analysis (`skill-lifecycle-gaps.md`).
 
 ### Code
 
@@ -56,13 +58,15 @@ of every meaningful development session.
   Includes `AutoimmuneGuard` (process-wide mutex for future meta-Doctor).
   Detects degraded internal state (slow LLM, journal stall, timer drift)
   before the operator notices. All vitals are read-only; no mutation.
-- `russell-cli` implements ten verbs: `status`, `list`,
+- `russell-cli` implements sixteen verbs: `status`, `list`,
   `profile [--init]`, `digest`, `sentinel-once`, `jack`,
-  `chat`, `skill list`, `skill run <id>`, `okapi-probe`,
-  `proprio`.
-- 159 tests passing.
-- `cargo fmt --check` ✅, `cargo clippy -- -D warnings` ✅,
-  `cargo test` ✅.
+  `chat`, `skill list`, `skill run <id>`, `workshop`,
+  `okapi-probe`, `proprio`.
+- 166 tests passing.
+- 21 scenario tests passing (`scenario-tests.sh`).
+- 11 skills loaded (okapi-watcher, web-search, skill-discovery,
+  skill-workshop, skill-maintenance, scenario-tester, sysadmin,
+  pragmatic-cybernetics, pragmatic-semantics, ubuntu-jack, oom-watcher).
 
 ### Kask Integration
 

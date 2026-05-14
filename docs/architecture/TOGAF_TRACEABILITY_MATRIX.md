@@ -1,9 +1,9 @@
 ---
 title: "TOGAF Traceability Matrix"
 audience: [architects, developers, contributors]
-last_updated: 2026-05-12
+last_updated: 2026-05-14
 togaf_phase: "C"
-version: "1.0.0"
+version: "1.1.0"
 status: "Active"
 ---
 
@@ -61,11 +61,11 @@ is not a business concern.
 | **Preliminary** — Principles, Standards | [`PRINCIPLES_CATALOG.md`](PRINCIPLES_CATALOG.md), [`../standards/*.md`](../standards/) | JR-1 … JR-7 live here; includes DOCUMENTATION_STANDARDS, CODING_RUST, COMMITS, ADR, SAFETY, WRITING_EXCELLENCE |
 | **Phase A** — Architecture Vision | [`../../cybernetic-health-harness.md`](../../cybernetic-health-harness.md), [`PRINCIPLES_CATALOG.md`](PRINCIPLES_CATALOG.md), [`overview.md`](overview.md), [`THE_JACK.md`](THE_JACK.md) | The full vision, current shape, and persona design |
 | **Phase B** — Business Architecture | *(skipped)* | Single-operator tool; no business concern |
-| **Phase C** — IS (Data + Application) | [`../specifications/PERSISTENCE_CATALOG.md`](../specifications/PERSISTENCE_CATALOG.md), [`overview.md`](overview.md) | What is persisted and how the crates fit |
-| **Phase D** — Technology | [`../adr/0009-tokio-runtime.md`](../adr/deferred/0009-tokio-runtime.md) *(deferred)*, [`../adr/0010-observability-stack.md`](../adr/deferred/0010-observability-stack.md) *(deferred)*, [`../operations/REUSE_MANIFEST.md`](../operations/REUSE_MANIFEST.md) | Tech choices + copy register |
+| **Phase C** — IS (Data + Application) | [`../specifications/PERSISTENCE_CATALOG.md`](../specifications/PERSISTENCE_CATALOG.md), [`overview.md`](overview.md), [`../adr/0024-skill-registry-workshop-lifecycle.md`](../adr/0024-skill-registry-workshop-lifecycle.md) | Data persistence, crate topology, registry schema |
+| **Phase D** — Technology | [`../adr/0009-tokio-runtime.md`](../adr/deferred/0009-tokio-runtime.md) *(deferred)*, [`../operations/REUSE_MANIFEST.md`](../operations/REUSE_MANIFEST.md), [`../../install.sh`](../../install.sh), [`../operations/INSTALL.md`](../operations/INSTALL.md) | Tech stack, reuse register, deployment |
 | **Phase E/F** — Migration | [`../../cybernetic-health-harness.md` §20](../../cybernetic-health-harness.md), [`../status/CONSOLIDATED-STATUS.md`](../status/CONSOLIDATED-STATUS.md) | Roadmap and where we are |
-| **Phase G** — Governance | [`../status/CONSOLIDATED-STATUS.md`](../status/CONSOLIDATED-STATUS.md), [`../standards/safety.md`](../standards/safety.md), [`../../AGENTS.md`](../../AGENTS.md) | The "don't break the patient" discipline |
-| **Phase H** — Change Management | [`../adr/`](../adr/) (ADRs 0001, 0002, 0004, 0006, 0008, 0011, 0013, 0015, 0016, 0017, 0018, 0019, 0020, 0021, 0022, 0023 active; 8 others deferred) | Locked decisions |
+| **Phase G** — Governance | [`../status/CONSOLIDATED-STATUS.md`](../status/CONSOLIDATED-STATUS.md), [`../standards/safety.md`](../standards/safety.md), [`../../AGENTS.md`](../../AGENTS.md), [`../../scenario-tests.sh`](../../scenario-tests.sh) | Safety contract, identity, test coverage |
+| **Phase H** — Change Management | [`../adr/`](../adr/) (17 active ADRs: 0001–0002, 0004, 0006, 0008, 0011, 0013, 0015–0024; 7 deferred: 0003, 0005, 0007, 0009–0010, 0012, 0014); [`../status/skill-lifecycle-gaps.md`](../status/skill-lifecycle-gaps.md) | Locked decisions and lifecycle gaps |
 | **Requirements Mgmt** | [`../specifications/MVP_SPEC.md`](../specifications/MVP_SPEC.md), [`../specifications/PERSISTENCE_CATALOG.md`](../specifications/PERSISTENCE_CATALOG.md) | The pinned boundary |
 
 ## 3. Principle → Phase Anchoring
@@ -81,7 +81,7 @@ has an anchor document per TOGAF phase.
 | JR-4 Doctor present |   | ●  | ● |   |   | ADR-0008, ADR-0016 |
 | JR-5 Proprioception |   |   |   |   | ● | ADR-0015 |
 | JR-6 Reuse |   |   |   | ● |   | ADR-0013, ADR-0017 |
-| JR-7 Persistence audited |   |   | ● |   |   | ADR-0004, ADR-0006 |
+| JR-7 Persistence audited |   |   | ● |   |   | ADR-0004, ADR-0006, ADR-0024 |
 
 ## 4. Coverage Gaps
 
@@ -90,9 +90,15 @@ has an anchor document per TOGAF phase.
   the design doc; deferred until Russell has enough history to
   warrant one.
 - **Phase C — Application Architecture** is currently covered
-  only by `overview.md`. A dedicated Application Architecture
-  document will be authored when MVP completes and Phase 2
-  skills begin to land.
+  by `overview.md` and `ADR-0024` (registry + workshop lifecycle).
+  A dedicated Application Architecture document will be authored
+  when the skill catalogue matures through Phase 4.
+- **Remote skill registry** — ADR-0024 defines the schema but
+  the `registry-sources.yaml` file and `fetch --remote` bridge
+  are deferred for remote registry sync.
+- **Probe telemetry feedback** — scenario metrics are journaled
+  and evaluated by the sentinel, but skill probe runs from the
+  workshop are not yet tracked in `probe_runs` counters.
 
 ## 5. Maintenance
 
