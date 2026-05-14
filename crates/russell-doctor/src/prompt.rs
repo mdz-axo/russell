@@ -265,6 +265,8 @@ pub fn compose_with_kask(
             "\nYou can also call Kask tools via ACTION syntax:\n\
              ACTION: kask/<tool-name>\n\
              (e.g. ACTION: kask/paradigm_shift_query)\n\n\
+             If the tool needs arguments, add an Arguments line:\n\
+             Arguments: {{\"prompt\": \"...\", \"depth\": \"quick\"}}\n\n\
              Tools with risk 'none' auto-execute. Others require operator consent."
         )?;
     }

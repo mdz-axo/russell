@@ -4,13 +4,22 @@
 use anyhow::{Context, Result};
 use russell_core::journal::{JournalReader, JournalWriter};
 use russell_core::paths::Paths;
+use russell_proprio::KaskHealthInput;
 
 pub async fn run(paths: &Paths) -> Result<()> {
     let journal = JournalWriter::open(&paths.journal())
         .with_context(|| format!("opening journal {}", paths.journal().display()))?;
     let reader = JournalReader::new(paths.journal());
 
-    let result = russell_proprio::run_once(&journal, &reader).context("running proprioception")?;
+    // Perform Kask MCP health probe asynchronously before the sync proprio cycle.
+    let kask_health_raw = russell_mcp::health::probe_reachability().await;
+    let kask_input = KaskHealthInput {
+        reachable: kask_health_raw.reachable,
+        latency_ms: kask_health_raw.latency_ms,
+    };
+
+    let result = russell_proprio::run_once_with_kask(&journal, &reader, kask_input)
+        .context("running proprioception")?;
 
     println!("Proprioception results:");
     if let Some(age) = result.age_s {
@@ -43,18 +52,20 @@ pub async fn run(paths: &Paths) -> Result<()> {
         );
     }
 
-    // Kask MCP reachability check (Phase 4A, ADR-0025 §5).
-    let kask_health = russell_mcp::health::probe_reachability().await;
-    if kask_health.reachable {
-        println!(
-            "  kask_mcp_reachable_ms:    {}ms (ok)",
-            kask_health.latency_ms.unwrap_or(0)
-        );
-    } else {
-        println!(
-            "  kask_mcp_reachable_ms:    unreachable ({})",
-            kask_health.error.as_deref().unwrap_or("unknown")
-        );
+    // Kask MCP reachability (Phase 4C, ADR-0025 §5 — now journaled by proprio).
+    match result.kask_mcp_reachable_ms {
+        Some(ms) => {
+            println!(
+                "  kask_mcp_reachable_ms:    {ms}ms ({:?})",
+                result.kask_mcp_reachable_severity
+            );
+        }
+        None => {
+            println!(
+                "  kask_mcp_reachable_ms:    unreachable ({:?})",
+                result.kask_mcp_reachable_severity
+            );
+        }
     }
 
     Ok(())

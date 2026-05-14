@@ -27,7 +27,7 @@ pub async fn run(paths: &Paths, note: Option<&str>) -> Result<()> {
 
     // Collect Kask MCP tool names for the SOAP prompt (ADR-0025 §7).
     // Graceful degradation: empty list if Kask is unreachable.
-    let kask_tool_names = collect_kask_tool_names().await;
+    let kask_tool_names = collect_kask_tool_names(paths).await;
     if !kask_tool_names.is_empty() {
         debug!(count = kask_tool_names.len(), "kask tools available for jack");
     }
@@ -167,7 +167,8 @@ async fn execute_probe(paths: &Paths, journal: &JournalWriter, action: &Resolved
 
 /// Collect Kask MCP tool names and risk bands for the SOAP prompt.
 /// Returns an empty list on any failure (graceful degradation per ADR-0025 §5).
-async fn collect_kask_tool_names() -> Vec<(String, Option<String>)> {
+/// Falls back to the disk cache if Kask is unreachable.
+async fn collect_kask_tool_names(paths: &Paths) -> Vec<(String, Option<String>)> {
     let kask_config = KaskMcpConfig::from_env();
     if kask_config.validate().is_err() {
         return vec![];
@@ -177,20 +178,37 @@ async fn collect_kask_tool_names() -> Vec<(String, Option<String>)> {
         Ok(c) => c,
         Err(e) => {
             debug!(error = %e, "kask MCP client construction failed");
-            return vec![];
+            return load_cached_tool_names(paths);
         }
     };
 
     if client.connect().await.is_err() {
         debug!("kask MCP connect failed — tools unavailable this session");
+        return load_cached_tool_names(paths);
+    }
+
+    let cache_path = paths.memory_dir().join("kask-tools.cache.json");
+    let mut registry = ToolRegistry::new(kask_config.tool_ttl);
+    let _ = registry.load_from_disk(&cache_path);
+
+    if let Err(e) = registry.refresh(&client).await {
+        debug!(error = %e, "kask tool registry refresh failed");
+        // Return cached if refresh failed but we have cached data.
+        if !registry.is_empty() {
+            return registry
+                .tools()
+                .iter()
+                .map(|t| {
+                    let risk = registry.tool_risk_band(&t.name);
+                    (t.name.clone(), risk)
+                })
+                .collect();
+        }
         return vec![];
     }
 
-    let mut registry = ToolRegistry::new(kask_config.tool_ttl);
-    if let Err(e) = registry.refresh(&client).await {
-        debug!(error = %e, "kask tool registry refresh failed");
-        return vec![];
-    }
+    // Persist fresh tools to disk.
+    let _ = registry.save_to_disk(&cache_path);
 
     registry
         .tools()
@@ -200,6 +218,24 @@ async fn collect_kask_tool_names() -> Vec<(String, Option<String>)> {
             (t.name.clone(), risk)
         })
         .collect()
+}
+
+/// Load cached tool names from the disk cache as a fallback.
+fn load_cached_tool_names(paths: &Paths) -> Vec<(String, Option<String>)> {
+    let cache_path = paths.memory_dir().join("kask-tools.cache.json");
+    let mut registry = ToolRegistry::new(KaskMcpConfig::from_env().tool_ttl);
+    if registry.load_from_disk(&cache_path).is_ok() && !registry.is_empty() {
+        debug!(count = registry.tool_count(), "loaded kask tools from disk cache");
+        return registry
+            .tools()
+            .iter()
+            .map(|t| {
+                let risk = registry.tool_risk_band(&t.name);
+                (t.name.clone(), risk)
+            })
+            .collect();
+    }
+    vec![]
 }
 
 /// Build [`KaskToolInfo`] list from (name, risk) tuples for the action resolver.
@@ -221,6 +257,7 @@ fn build_kask_tool_infos_from_names(names: &[(String, Option<String>)]) -> Vec<K
             KaskToolInfo {
                 name: name.clone(),
                 risk_band,
+                input_schema: None,
             }
         })
         .collect()

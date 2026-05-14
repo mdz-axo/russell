@@ -208,6 +208,12 @@ impl Default for AutoimmuneGuard {
     }
 }
 
+/// The process-wide autoimmune guard — prevents re-entrant meta-Doctor
+/// runs (a Nurse run whose subject is Russell himself). Held for the
+/// duration of any proprioception cycle.
+static AUTOIMMUNE: std::sync::LazyLock<AutoimmuneGuard> =
+    std::sync::LazyLock::new(AutoimmuneGuard::new);
+
 // ---------------------------------------------------------------------------
 // ProprioResult
 // ---------------------------------------------------------------------------
@@ -278,10 +284,14 @@ pub struct KaskHealthInput {
 /// Convenience wrapper around [`run_once_inner`] with the real
 /// [`SystemdTimerSource`] and no Kask health probe.
 ///
+/// Acquires the [`AUTOIMMUNE`] guard for the duration of the cycle
+/// to prevent re-entrant meta-Doctor runs.
+///
 /// # Errors
 ///
 /// Returns [`russell_core::CoreError`] on journal I/O failures.
 pub fn run_once(writer: &JournalWriter, reader: &JournalReader) -> Result<ProprioResult> {
+    let _guard = AUTOIMMUNE.enter();
     run_once_inner(writer, reader, &SystemdTimerSource, None)
 }
 
@@ -289,6 +299,8 @@ pub fn run_once(writer: &JournalWriter, reader: &JournalReader) -> Result<Propri
 ///
 /// Reads the journal, computes all five self-vitals, writes self-scope
 /// samples, and emits events for any breached thresholds.
+///
+/// Acquires the [`AUTOIMMUNE`] guard for the duration of the cycle.
 ///
 /// Tests should use [`FixedTimerSource`] to avoid depending on the host's
 /// systemd state.
@@ -301,6 +313,7 @@ pub fn run_once_with(
     reader: &JournalReader,
     timer: &dyn TimerSource,
 ) -> Result<ProprioResult> {
+    let _guard = AUTOIMMUNE.enter();
     run_once_inner(writer, reader, timer, None)
 }
 
@@ -313,6 +326,8 @@ pub fn run_once_with(
 /// passes the result here so the synchronous proprio cycle can
 /// journal it without depending on async runtime.
 ///
+/// Acquires the [`AUTOIMMUNE`] guard for the duration of the cycle.
+///
 /// # Errors
 ///
 /// Returns [`russell_core::CoreError`] on journal I/O failures.
@@ -321,8 +336,22 @@ pub fn run_once_with_kask(
     reader: &JournalReader,
     kask_health: KaskHealthInput,
 ) -> Result<ProprioResult> {
+    let _guard = AUTOIMMUNE.enter();
     run_once_inner(writer, reader, &SystemdTimerSource, Some(kask_health))
 }
+
+/// Core proprioception logic. Called by [`run_once`], [`run_once_with`],
+/// and [`run_once_with_kask`].
+///
+/// When `kask_health` is `Some`, also gathers and journals the
+/// `kask_mcp_reachable_ms` self-vital.
+fn run_once_inner(
+    writer: &JournalWriter,
+    reader: &JournalReader,
+    timer: &dyn TimerSource,
+    kask_health: Option<KaskHealthInput>,
+) -> Result<ProprioResult> {
+    let now = russell_core::time::now_unix();
 
     // 1. Sentinel age (existing MVP vital).
     let last_host_ts = reader.last_host_sample_ts()?;
@@ -356,6 +385,9 @@ pub fn run_once_with_kask(
 
     // 5. Help error rate.
     let (help_error_rate_pct, error_rate_severity) = gather_help_error_rate(writer, reader, now)?;
+
+    // 6. Kask MCP reachability (Phase 4C, ADR-0025 §5).
+    let (kask_mcp_ms, kask_mcp_severity) = gather_kask_mcp_reachable(writer, now, kask_health);
 
     // Emit events for any vital that breached threshold.
     // Descriptors: (severity, module, probe_name, value_f64, warn_threshold, alert_threshold, json_key)
@@ -440,6 +472,8 @@ pub fn run_once_with_kask(
         timer_drift_severity: drift_severity,
         help_error_rate_pct,
         help_error_rate_severity: error_rate_severity,
+        kask_mcp_reachable_ms: kask_mcp_ms,
+        kask_mcp_reachable_severity: kask_mcp_severity,
     })
 }
 
@@ -663,6 +697,64 @@ fn gather_help_error_rate(
     };
     debug!(rate_pct = ?rate, severity = ?sev, "proprio: {PROBE_HELP_ERROR_RATE}");
     Ok((rate, sev))
+}
+
+/// Gather the Kask MCP reachability vital (Phase 4C, ADR-0025 §5).
+///
+/// When `kask_health` is `Some`, writes the latency as a self-scope sample.
+/// When `None`, no Kask config is present — no sample is written
+/// (we don't know whether the operator intends to use Kask).
+///
+/// Thresholds:
+/// - Info: reachable and latency < 2000ms
+/// - Warn: unreachable or latency >= 2000ms
+fn gather_kask_mcp_reachable(
+    writer: &JournalWriter,
+    now: i64,
+    kask_health: Option<KaskHealthInput>,
+) -> (Option<u64>, Severity) {
+    let (kask_ms, sev) = match kask_health {
+        Some(h) => {
+            match (h.reachable, h.latency_ms) {
+                (true, Some(ms)) => {
+                    let sev = if ms > KASK_LATENCY_WARN_THRESHOLD_MS {
+                        Severity::Warn
+                    } else {
+                        Severity::Info
+                    };
+                    (Some(ms), sev)
+                }
+                (false, _) => {
+                    // Unreachable — treat as warn.
+                    (None, Severity::Warn)
+                }
+                (true, None) => {
+                    // Reachable but no latency measurement (unusual).
+                    (None, Severity::Warn)
+                }
+            }
+        }
+        None => {
+            // No kask health probe run — don't journal.
+            return (None, Severity::Info);
+        }
+    };
+
+    // Write sample: value is latency_ms when known, -1 when unreachable.
+    let sample_value = kask_ms.map(|v| v as f64).unwrap_or(-1.0);
+    if let Err(e) = writer.append_sample(
+        now,
+        Scope::Self_,
+        PROBE_KASK_MCP_REACHABLE,
+        Some(sample_value),
+        None,
+        Some("ms"),
+    ) {
+        warn!(error = %e, "proprio: failed to write {PROBE_KASK_MCP_REACHABLE} sample");
+    }
+
+    debug!(latency_ms = ?kask_ms, reachable = kask_health.map(|h| h.reachable), severity = ?sev, "proprio: {PROBE_KASK_MCP_REACHABLE}");
+    (kask_ms, sev)
 }
 
 /// Emit a self-scope event for a threshold breach.

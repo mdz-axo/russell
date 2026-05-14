@@ -174,6 +174,10 @@ pub async fn run(paths: &Paths) -> Result<()> {
     let kask_config = KaskMcpConfig::from_env();
     let mut kask_client: Option<KaskMcpClient> = None;
     let mut kask_registry = ToolRegistry::new(kask_config.tool_ttl);
+    let kask_cache_path = paths.memory_dir().join("kask-tools.cache.json");
+
+    // Load stale-but-useful tool info from disk (ADR-0025 §5, first-boot resilience).
+    let _ = kask_registry.load_from_disk(&kask_cache_path);
 
     if kask_config.validate().is_ok() {
         match KaskMcpClient::new(kask_config.clone()) {
@@ -186,6 +190,9 @@ pub async fn run(paths: &Paths) -> Result<()> {
                     // Populate tool registry.
                     if let Err(e) = kask_registry.refresh(&client).await {
                         debug!(error = %e, "kask tool registry initial refresh failed");
+                    } else {
+                        // Persist fresh tools to disk for next boot.
+                        let _ = kask_registry.save_to_disk(&kask_cache_path);
                     }
                     kask_client = Some(client);
                 } else {
@@ -1345,6 +1352,7 @@ fn build_kask_tool_infos(registry: &ToolRegistry) -> Vec<KaskToolInfo> {
             KaskToolInfo {
                 name: t.name.clone(),
                 risk_band,
+                input_schema: t.input_schema.clone(),
             }
         })
         .collect()
@@ -1356,6 +1364,9 @@ fn build_kask_tool_infos(registry: &ToolRegistry) -> Vec<KaskToolInfo> {
 /// Writes an IDRS-structured evidence bundle to
 /// `evidence/kask/<tool_name>/<ISO-ts>/` with `result.txt` and
 /// `event.json`, matching the local skill dispatcher's evidence format.
+///
+/// If the tool has required fields declared in its `inputSchema` and
+/// the LLM did not provide arguments, warns the operator and cancels.
 async fn execute_kask_tool(
     journal: &JournalWriter,
     kask_client: &Option<KaskMcpClient>,
@@ -1369,6 +1380,29 @@ async fn execute_kask_tool(
     let tool_name = action.action_id().to_string();
     let risk = action.risk_band();
 
+    // Extract arguments from the resolved action.
+    let (arguments, required_fields) = match action {
+        ResolvedAction::KaskTool {
+            arguments,
+            required_fields,
+            ..
+        } => (arguments, required_fields),
+        _ => {
+            println!("  → Internal error: non-Kask action routed to execute_kask_tool.");
+            return None;
+        }
+    };
+
+    // If required fields exist but no arguments were provided, warn and cancel.
+    if !required_fields.is_empty() && arguments.is_none() {
+        println!(
+            "  → kask/{tool_name} requires arguments: {required_fields:?}",
+        );
+        println!("  → Jack didn't provide them. Ask Jack to include arguments in the response.");
+        println!("  → Format: Arguments: {{\"field\": \"value\"}}");
+        return None;
+    }
+
     let client = match kask_client {
         Some(c) => c,
         None => {
@@ -1378,6 +1412,9 @@ async fn execute_kask_tool(
     };
 
     println!("  → Calling kask/{tool_name}…");
+    if arguments.is_some() {
+        debug!(tool = %tool_name, "kask tool call with arguments");
+    }
     let started = std::time::Instant::now();
 
     // Per-tool timeout: probes get 30s, interventions get 120s.
@@ -1387,7 +1424,7 @@ async fn execute_kask_tool(
         Duration::from_secs(120)
     };
 
-    let tool_result = tokio::time::timeout(timeout, client.call_tool(&tool_name, None)).await;
+    let tool_result = tokio::time::timeout(timeout, client.call_tool(&tool_name, arguments.clone())).await;
 
     let duration = started.elapsed();
 

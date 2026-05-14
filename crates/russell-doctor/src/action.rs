@@ -71,6 +71,11 @@ pub enum ResolvedAction {
         /// Risk band from tool annotations. Defaults to `Medium` when
         /// unset — safe default requiring operator consent.
         risk_band: RiskBand,
+        /// Arguments for the tool call, parsed from the LLM response.
+        /// `None` if the LLM did not provide any.
+        arguments: Option<serde_json::Value>,
+        /// Expected arguments (required fields from inputSchema).
+        required_fields: Vec<String>,
     },
 }
 
@@ -215,6 +220,9 @@ pub struct KaskToolInfo {
     /// when unset — safe default per IDRS. Probes should explicitly
     /// declare `RiskBand::None`.
     pub risk_band: RiskBand,
+    /// JSON Schema for the tool's input parameters (from `tools/list`).
+    /// Used to extract required field names for operator prompting.
+    pub input_schema: Option<serde_json::Value>,
 }
 
 /// A post-intervention evaluation check, resolved from the skill manifest.
@@ -291,7 +299,9 @@ pub fn resolve_with_kask(
     // Kask MCP tool path (ADR-0025 §7).
     // Only route to Kask if tools are available (registry is populated).
     if skill_id == "kask" && !kask_tools.is_empty() {
-        return resolve_kask_tool(action_id, kask_tools, skills);
+        // Strip inline arguments from the action_id (e.g. "tool --arg val" → "tool").
+        let bare_tool_name = action_id.split(' ').next().unwrap_or(action_id);
+        return resolve_kask_tool(bare_tool_name, kask_tools, skills, response);
     }
 
     let skill = match skills.iter().find(|s| s.id == skill_id) {
@@ -379,12 +389,21 @@ fn resolve_kask_tool(
     tool_name: &str,
     kask_tools: &[KaskToolInfo],
     skills: &[Skill],
+    response: &str,
 ) -> Option<std::result::Result<ResolvedAction, ActionError>> {
     // Poka-yoke: tool must exist in the registry.
     if let Some(tool) = kask_tools.iter().find(|t| t.name == tool_name) {
+        // Extract required fields from the tool's inputSchema.
+        let required_fields = extract_required_fields(&tool.input_schema);
+
+        // Extract arguments from the LLM response body.
+        let arguments = extract_arguments_from_response(response, tool_name);
+
         return Some(Ok(ResolvedAction::KaskTool {
             tool_name: tool.name.clone(),
             risk_band: tool.risk_band,
+            arguments,
+            required_fields,
         }));
     }
 
@@ -401,6 +420,136 @@ fn resolve_kask_tool(
         probes: available,
         interventions: vec![],
     }))
+}
+
+/// Extract required field names from a tool's JSON Schema `input_schema`.
+///
+/// Returns an empty vec if the schema is `None` or has no `required` array.
+fn extract_required_fields(schema: &Option<serde_json::Value>) -> Vec<String> {
+    schema
+        .as_ref()
+        .and_then(|s| s.get("required"))
+        .and_then(|r| r.as_array())
+        .map(|fields| {
+            fields
+                .iter()
+                .filter_map(|v| v.as_str().map(String::from))
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+/// Parse tool arguments from the LLM response body.
+///
+/// Supports two formats:
+/// 1. `Arguments: {"key": "value"}` line anywhere in the response
+/// 2. An inline JSON object at the end of the ACTION line:
+///    `ACTION: kask/tool --prompt "text" --depth 3`
+fn extract_arguments_from_response(response: &str, _tool_name: &str) -> Option<serde_json::Value> {
+    // Format 1: Look for "Arguments:" line with JSON payload.
+    if let Some(line) = response
+        .lines()
+        .find(|l| l.trim().starts_with("Arguments:"))
+    {
+        if let Some(json_str) = line
+            .trim()
+            .strip_prefix("Arguments:")
+            .map(|s| s.trim())
+            .filter(|s| !s.is_empty())
+        {
+            if let Ok(value) = serde_json::from_str::<serde_json::Value>(json_str) {
+                return Some(value);
+            }
+        }
+    }
+
+    // Format 2: Key=value pairs on the ACTION line after the tool name.
+    // Look for the ACTION line and parse trailing key=value pairs.
+    if let Some(action_line) = response
+        .lines()
+        .rev()
+        .find(|line| line.trim().starts_with("ACTION:"))
+    {
+        let after_prefix = action_line.trim().strip_prefix("ACTION:").unwrap_or("").trim();
+
+        // After "kask/tool-name", look for --key value pairs or key=value.
+        // Find the tool name (skip "kask/" prefix and tool name).
+        // Use the part after the first '/' that follows "kask".
+        if let Some(rest) = after_prefix.strip_prefix("kask/") {
+            // Split out the tool name.
+            if let Some(first_space) = rest.find(' ') {
+                let args_str = rest[first_space..].trim();
+                if let Some(args) = parse_key_value_args(args_str) {
+                    return Some(args);
+                }
+            }
+        }
+    }
+
+    None
+}
+
+/// Parse `--key value` or `key=value` pairs into a JSON object.
+fn parse_key_value_args(args_str: &str) -> Option<serde_json::Value> {
+    let mut map = serde_json::Map::new();
+    let mut parts = args_str.split(' ');
+    let mut pending_key: Option<&str> = None;
+
+    while let Some(token) = parts.next() {
+        let token = token.trim();
+        if token.is_empty() {
+            continue;
+        }
+
+        // Handle `--key value` format.
+        if let Some(key) = token.strip_prefix("--") {
+            if let Some(next) = parts.next() {
+                let next = next.trim();
+                let value = parse_arg_value(next);
+                map.insert(key.to_string(), value);
+            } else {
+                map.insert(key.to_string(), serde_json::Value::Bool(true));
+            }
+            continue;
+        }
+
+        // Handle `key=value` format.
+        if let Some((key, value)) = token.split_once('=') {
+            let value = parse_arg_value(value);
+            map.insert(key.to_string(), value);
+            continue;
+        }
+
+        // Floating token — treat as value for a pending key.
+        if let Some(key) = pending_key.take() {
+            let value = parse_arg_value(token);
+            map.insert(key.to_string(), value);
+        }
+    }
+
+    if map.is_empty() {
+        None
+    } else {
+        Some(serde_json::Value::Object(map))
+    }
+}
+
+/// Parse a single argument value: try JSON, then number, then string.
+fn parse_arg_value(s: &str) -> serde_json::Value {
+    // Try JSON literal first (true, false, null, numbers, quoted strings).
+    if let Ok(v) = serde_json::from_str::<serde_json::Value>(s) {
+        if !v.is_string() {
+            return v;
+        }
+    }
+    // Try number.
+    if let Ok(n) = s.parse::<i64>() {
+        return serde_json::json!(n);
+    }
+    if let Ok(n) = s.parse::<f64>() {
+        return serde_json::json!(n);
+    }
+    serde_json::Value::String(s.to_string())
 }
 
 #[cfg(test)]
@@ -525,10 +674,19 @@ mod tests {
             KaskToolInfo {
                 name: "paradigm_shift_query".into(),
                 risk_band: RiskBand::Medium,
+                input_schema: Some(serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "prompt": {"type": "string"},
+                        "depth": {"type": "string", "enum": ["quick", "thorough"]}
+                    },
+                    "required": ["prompt"]
+                })),
             },
             KaskToolInfo {
                 name: "russell_host_snapshot".into(),
                 risk_band: RiskBand::None,
+                input_schema: None,
             },
         ]
     }
@@ -574,5 +732,94 @@ mod tests {
             .unwrap();
         assert!(result.is_probe());
         assert_eq!(result.skill_id(), "test-skill");
+    }
+
+    #[test]
+    fn kask_tool_parses_required_fields_from_schema() {
+        let skills = [make_skill()];
+        let kask_tools = make_kask_tools();
+        let result = resolve_with_kask("ACTION: kask/paradigm_shift_query", &skills, &kask_tools)
+            .unwrap()
+            .unwrap();
+        match result {
+            ResolvedAction::KaskTool {
+                required_fields, ..
+            } => {
+                assert_eq!(required_fields, vec!["prompt"]);
+            }
+            _ => panic!("expected KaskTool"),
+        }
+    }
+
+    #[test]
+    fn kask_tool_parses_arguments_line() {
+        let skills = [make_skill()];
+        let kask_tools = make_kask_tools();
+        let response = "Let me query the Cascade about that.\n\nArguments: {\"prompt\": \"What is wrong?\", \"depth\": \"thorough\"}\n\nACTION: kask/paradigm_shift_query";
+        let result = resolve_with_kask(response, &skills, &kask_tools)
+            .unwrap()
+            .unwrap();
+        match result {
+            ResolvedAction::KaskTool { arguments, .. } => {
+                let args = arguments.unwrap();
+                assert_eq!(args["prompt"], "What is wrong?");
+                assert_eq!(args["depth"], "thorough");
+            }
+            _ => panic!("expected KaskTool"),
+        }
+    }
+
+    #[test]
+    fn kask_tool_parses_key_value_args() {
+        let skills = [make_skill()];
+        let kask_tools = make_kask_tools();
+        let result = resolve_with_kask(
+            "ACTION: kask/paradigm_shift_query --prompt \"check GPU\" --depth thorough",
+            &skills,
+            &kask_tools,
+        )
+        .unwrap()
+        .unwrap();
+        match result {
+            ResolvedAction::KaskTool { arguments, .. } => {
+                let args = arguments.unwrap();
+                assert_eq!(args["prompt"], "check GPU");
+                assert_eq!(args["depth"], "thorough");
+            }
+            _ => panic!("expected KaskTool"),
+        }
+    }
+
+    #[test]
+    fn kask_tool_no_required_fields() {
+        let skills = [make_skill()];
+        let kask_tools = make_kask_tools();
+        let result = resolve_with_kask("ACTION: kask/russell_host_snapshot", &skills, &kask_tools)
+            .unwrap()
+            .unwrap();
+        match result {
+            ResolvedAction::KaskTool {
+                required_fields,
+                arguments,
+                ..
+            } => {
+                assert!(required_fields.is_empty());
+                assert!(arguments.is_none());
+            }
+            _ => panic!("expected KaskTool"),
+        }
+    }
+
+    #[test]
+    fn extract_required_fields_no_schema() {
+        let fields = extract_required_fields(&None);
+        assert!(fields.is_empty());
+    }
+
+    #[test]
+    fn extract_required_fields_empty_schema() {
+        let schema = Some(serde_json::json!({"type": "object", "properties": {}}));
+        let fields = extract_required_fields(&schema);
+        assert!(fields.is_empty());
     }
 }
