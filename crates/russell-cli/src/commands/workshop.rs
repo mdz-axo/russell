@@ -133,9 +133,27 @@ async fn handle_builtin(
             print_lookup(registry, input.strip_prefix("/lookup ").unwrap_or(""));
             true
         }
+        _ if input.starts_with("search ") && input.contains("--remote") => {
+            let query = input.strip_prefix("search ").unwrap_or("").replace("--remote", "").trim().to_string();
+            do_search_remote(registry, &query).await;
+            true
+        }
         _ if input.starts_with("search ") => {
             let query = input.strip_prefix("search ").unwrap_or("");
             print_search(registry, query);
+            true
+        }
+        _ if input.starts_with("fetch ") => {
+            let rest = input.strip_prefix("fetch ").unwrap_or("");
+            let mut parts = rest.splitn(2, ' ');
+            let url = parts.next().unwrap_or("");
+            let name = parts.next().unwrap_or("");
+            do_fetch(registry, skills_dir, url, name).await;
+            true
+        }
+        _ if input.starts_with("adapt ") => {
+            let name = input.strip_prefix("adapt ").unwrap_or("");
+            do_adapt(registry, skills_dir, name);
             true
         }
         _ if input.starts_with("evaluate ") => {
