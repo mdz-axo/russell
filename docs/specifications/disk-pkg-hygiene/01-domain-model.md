@@ -263,6 +263,6 @@ connector boundary is:
 | Jack → Russell | LLM response text | Unstructured assessment (Russell does NOT parse for commands — JR-3) |
 
 The **tool** that prepares data for these connectors is the SOAP
-bundle composer (`russell-doctor::soap`). It transforms domain
+bundle composer (`russell-meta::soap`). It transforms domain
 samples into prompt text. The **connector** is the HTTP client
 that transmits it. These are never conflated in the same module.

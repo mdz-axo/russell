@@ -82,7 +82,7 @@ Before implementation begins:
 When Russell operates as part of the Kask platform:
 
 - The **MCP connector** (`russell-mcp`, currently deferred) exposes journal samples as MCP tool responses.
-- The **LLM connector** (`russell-doctor`) shares machine status with Jack for assessment via SOAP bundles sent to OpenRouter.
+- The **LLM connector** (`russell-meta`) shares machine status with Jack for assessment via SOAP bundles sent to OpenRouter.
 - Both are **connectors** in the audit-crate.md sense: they transfer formed data across boundaries without transformation logic.
 
 The disk/package probes produce the **data** that flows through these connectors. The probes themselves are unaware of Jack, Kask, or any external consumer.

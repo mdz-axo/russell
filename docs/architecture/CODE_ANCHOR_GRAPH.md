@@ -19,7 +19,7 @@ id: DIAG-ANCHOR-001
 type: ER diagram
 verified_date: 2026-05-13
 verified_against: All public types extracted from russell/crates/*/src/
-reference_sources: russell-core, russell-sentinel, russell-doctor, russell-skills, russell-proprio
+reference_sources: russell-core, russell-sentinel, russell-meta, russell-skills, russell-proprio
 status: VERIFIED
 -->
 
@@ -102,23 +102,23 @@ russell_sentinel::probes::systemd::SystemdSystemFailedCount rdf:type struct .
 ## 3. Russell Doctor — LLM Consultation
 
 ```
-russell_doctor::client::LlmClient rdf:type trait .  # chat(&SoapPrompt) -> Result<LlmResponse>
-russell_doctor::client::SoapPrompt rdf:type struct .  # system, subjective, objective, rendered
-russell_doctor::client::LlmResponse rdf:type struct .  # content, model, tokens, latency
-russell_doctor::client::Backend rdf:type enum .  # Okapi, Mock, Offline
-russell_doctor::client::EscalateMin rdf:type enum .  # Crit, Alert, Warn, Always
+russell_meta::client::LlmClient rdf:type trait .  # chat(&SoapPrompt) -> Result<LlmResponse>
+russell_meta::client::SoapPrompt rdf:type struct .  # system, subjective, objective, rendered
+russell_meta::client::LlmResponse rdf:type struct .  # content, model, tokens, latency
+russell_meta::client::Backend rdf:type enum .  # Okapi, Mock, Offline
+russell_meta::client::EscalateMin rdf:type enum .  # Crit, Alert, Warn, Always
 
-russell_doctor::oai_client::OkapiClient rdf:type struct .  # OpenAI-compatible client
-russell_doctor::mock::MockClient rdf:type struct .  # deterministic test client
+russell_meta::oai_client::OkapiClient rdf:type struct .  # OpenAI-compatible client
+russell_meta::mock::MockClient rdf:type struct .  # deterministic test client
 
-russell_doctor::help::HelpOutcome rdf:type struct .  # session_id, backend, evidence_dir, response
-russell_doctor::help::SkipReason rdf:type enum .  # OfflineFallback, ThresholdSkip
+russell_meta::help::HelpOutcome rdf:type struct .  # session_id, backend, evidence_dir, response
+russell_meta::help::SkipReason rdf:type enum .  # OfflineFallback, ThresholdSkip
 
-russell_doctor::action::ResolvedAction rdf:type enum .  # Probe, Intervention, KaskTool
-russell_doctor::action::KaskToolInfo rdf:type struct .  # name, risk_band, input_schema
-russell_doctor::action::ActionError rdf:type enum .  # MalformedPrefix, MissingSeparator, etc.
+russell_meta::action::ResolvedAction rdf:type enum .  # Probe, Intervention, KaskTool
+russell_meta::action::KaskToolInfo rdf:type struct .  # name, risk_band, input_schema
+russell_meta::action::ActionError rdf:type enum .  # MalformedPrefix, MissingSeparator, etc.
 
-russell_doctor::error::DoctorError rdf:type enum .  # Io, Json, Core, Http, Auth, etc.
+russell_meta::error::DoctorError rdf:type enum .  # Io, Json, Core, Http, Auth, etc.
 ```
 
 ## 4. Russell Skills — Playbook Execution
@@ -164,8 +164,8 @@ russell_mcp::config::KaskMcpConfig rdf:type struct .  # endpoint, tool_ttl, auth
 ## 7. Cross-Crate Dependencies
 
 ```
-russell-cli depends_on russell-core, russell-sentinel, russell-doctor, russell-skills, russell-proprio, russell-mcp
-russell-doctor depends_on russell-core
+russell-cli depends_on russell-core, russell-sentinel, russell-meta, russell-skills, russell-proprio, russell-mcp
+russell-meta depends_on russell-core
 russell-skills depends_on russell-core
 russell-proprio depends_on russell-core
 russell-sentinel depends_on russell-core

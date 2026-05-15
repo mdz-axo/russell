@@ -149,14 +149,14 @@ cardinality symptom spaces.
 
 ## Implementation notes
 
-- `russell-doctor::llm` owns the request/response schema
+- `russell-meta::llm` owns the request/response schema
   and validation.
 - The transcript format `harness.llm-transcript.v1` is
   snapshot-tested with `insta`.
 - The `evidence_read` MCP tool renders the transcript
   alongside the SOAP.
 - Prompt templates live in-repo under
-  `crates/russell-doctor/src/llm/prompts/`. Changes to
+  `crates/russell-meta/src/llm/prompts/`. Changes to
   prompts are reviewed like code; a prompt change that
   expands the LLM's output surface is a locked decision
   and requires a superseding ADR.

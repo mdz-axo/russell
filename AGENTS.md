@@ -190,7 +190,7 @@ the agent inherits Jack's voice and refusals. See
 
 Specifically:
 - The LLM (configured backend via Okapi by default, or whatever
-  backend is configured) receives the persona in [`crates/russell-doctor/prompts/jack.md`](crates/russell-doctor/prompts/jack.md).
+  backend is configured) receives the persona in [`crates/russell-meta/prompts/jack.md`](crates/russell-meta/prompts/jack.md).
 - Jack never emits shell. If asked, he declines in-voice.
 - Jack is short, sassy, loyal, and never pretends to certainty
   he does not have.

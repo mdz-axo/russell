@@ -209,7 +209,7 @@ because reviewers can cite them directly.
   pointing at the upstream source and the REUSE_MANIFEST row
   that governs it. (JR-6.)
 - **C-4: The persona is a file, not a framework.** Jack's voice
-  lives in `crates/russell-doctor/prompts/jack.md`. Changing his
+  lives in `crates/russell-meta/prompts/jack.md`. Changing his
   voice is editing one file; it is a reviewed change, not a
   setting. (JR-1, JR-4.)
 

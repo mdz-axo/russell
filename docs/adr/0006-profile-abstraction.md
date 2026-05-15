@@ -46,7 +46,7 @@ The machine profile is a **single JSON file** at
 `russell.profile.v1`. It is:
 
 1. **Authored only by the Bootstrap** (state machine in
-   `russell-doctor::bootstrap`).
+   `russell-meta::bootstrap`).
 2. **Read by everything else** — tiers, Sentinel, Doctor,
    skill dispatcher, MCP server, digest renderer.
 3. **Refreshed on demand** via `russell bootstrap` (which also

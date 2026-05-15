@@ -163,7 +163,7 @@ in voice:
 ## 6. The persona file
 
 The operational persona lives at
-`crates/russell-doctor/prompts/jack.md`. That file is what
+`crates/russell-meta/prompts/jack.md`. That file is what
 the Nurse injects as the LLM's system prompt. A separate
 `jack-chat.md` provides the chat-mode variant. Both are
 **reviewed like code**; a PR that changes Jack's voice is

@@ -209,7 +209,7 @@ the workshop REPL session starts.
 - The registry cache is `serde_yaml` serialized, matching the existing
   manifest parsing pattern.
 - The workshop REPL reuses the `russell chat` readline and LLM dispatch
-  infrastructure (russell-doctor).
+  infrastructure (russell-meta).
 - The safety scanner is a pure function: `scan(content: &str) -> Vec<Finding>`.
 - Knowledge skills follow the existing pattern (manifest.yaml + KNOWLEDGE.md,
   no probes, no interventions, loaded at session start).

@@ -79,7 +79,7 @@ against the file.
 | `events` | Structured log rows conforming to `harness.event.v1` | every mutating + observational action | `list`, `digest`, `help` |
 | `baselines` | EWMA mean/var + p50/p95/p99 per probe | `journal::compute_baselines` (daily refresh in sentinel-once) | `read_baselines`, rules, SOAP prompt |
 | `confirmations` | Consent-flow approval records for risk≥medium interventions | `russell-cli::chat` consent path | Phase 3 dispatcher audit |
-| `help_sessions` | One row per `russell jack` round-trip | `russell-doctor::help` | `digest`, future UI |
+| `help_sessions` | One row per `russell jack` round-trip | `russell-meta::help` | `digest`, future UI |
 
 Column details are in `crates/russell-core/src/journal/migrations/`.
 
@@ -134,7 +134,7 @@ file is idempotent.
 
 ### 2.3 `~/.local/state/harness/evidence/help/<session-id>/`
 
-**Owner.** `russell-doctor::help` (Phase 1+).
+**Owner.** `russell-meta::help` (Phase 1+).
 **Contents.**
 
 - `soap.md` — the rendered SOAP-shaped prompt sent to the LLM.
@@ -211,7 +211,7 @@ ships as a reference implementation.
 ### 2.9 `~/.local/state/harness/memory/` (Russell-owned Markdown memory)
 
 **Owner.** `russell-cli::commands::reflect` (planned verb) and
-`russell-doctor::help::run_help` (session log appends).
+`russell-meta::help::run_help` (session log appends).
 **Contents.**
 
 - `REVIEW.md` — Russell's self-assessment review surface.
@@ -239,7 +239,7 @@ append-only with human trimming.
 **Owner.** The operator.
 **Content.** Runtime persona customisation for Jack. If present,
 the Doctor appends its content to the compiled-in
-`JACK_PERSONA` from `crates/russell-doctor/prompts/jack.md`.
+`JACK_PERSONA` from `crates/russell-meta/prompts/jack.md`.
 **Format.** Free-form Markdown. Not parsed by Russell; read by
 the Doctor at help-session startup. Russell never writes to
 this file.

@@ -161,7 +161,7 @@ Every byte Russell writes is named. Full catalog at
 |---|---|---|---|
 | `~/.local/state/harness/journal.db` | `russell-core::journal` | `0001_init.sql` | unbounded (baselines refreshed daily in-table) |
 | `~/.local/state/harness/profile.json` | `russell-core::profile` | `russell.profile.v1` | unbounded |
-| `~/.local/state/harness/evidence/help/<session-id>/` | `russell-doctor::help` | per-session JSON | 90 days |
+| `~/.local/state/harness/evidence/help/<session-id>/` | `russell-meta::help` | per-session JSON | 90 days |
 | `~/.local/state/harness/evidence/skills/<skill>/<step>/` | `russell-skills::dispatch` | per-dispatch JSON | 90 days |
 | `~/.local/share/harness/skills/<id>/` | `russell-skills` | manifest + scripts | operator-owned |
 | `~/.local/share/harness/rules.d/*.toml` | `russell-core::rule` | TOML | operator-owned |

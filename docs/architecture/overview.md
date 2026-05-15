@@ -41,7 +41,7 @@ flowchart TB
   end
 
   subgraph CONTROL [Control]
-    DOCTOR[Doctor supervisor]
+    META[Metacognitive layer]
     PROPRIO[Meta-Doctor / self-triage]
   end
 
@@ -72,19 +72,19 @@ flowchart TB
 
   USER --> CLI & CONFIRM
   MCP <--> AGENTS((Agent frontends))
-  CLI & MCP --> DOCTOR & TIERS & SKILLS
+  CLI & MCP --> META & TIERS & SKILLS
   CLOCK --> TIERS & SENTINEL & META
   SENTINEL --> JOURNAL
   META --> JOURNAL
-  TIERS --> DOCTOR
-  DOCTOR --> SKILLS --> JOURNAL & EVIDENCE
-  DOCTOR --> LLM
-  PROPRIO --> DOCTOR
+  TIERS --> META
+  META --> SKILLS --> JOURNAL & EVIDENCE
+  META --> LLM
+  PROPRIO --> META
   BOOT --> PROFILE
-  PROFILE --> DOCTOR & TIERS & SENTINEL
+  PROFILE --> META & TIERS & SENTINEL
   RULES --> SENTINEL
   JOURNAL --> DIGEST
-  DOCTOR --> NOTIFY
+  META --> NOTIFY
 ```
 
 <!-- DIAGRAM_ALIGNMENT
@@ -103,8 +103,8 @@ a corresponding ADR and a corresponding area of the code:
 | VSM layer | Locked decision | Code home |
 |---|---|---|
 | Policy | [ADR-0005](../adr/deferred/0005-privileged-operations.md), [safety.md](../standards/safety.md) | `russell-cli` confirm flow, kill switches |
-| Intelligence | [ADR-0008](../adr/0008-llm-triage-never-emits-shell.md) | `russell-doctor::openrouter`, `russell-core::profile` |
-| Control | [ADR-0007](../adr/deferred/0007-yaml-manifest-subprocess-skill-model.md), [ADR-0015](../adr/0015-proprioception-self-health.md) | `russell-doctor`, `russell-proprio` (MVP self-vital) |
+| Intelligence | [ADR-0008](../adr/0008-llm-triage-never-emits-shell.md) | `russell-meta::openrouter`, `russell-core::profile` |
+| Control | [ADR-0007](../adr/deferred/0007-yaml-manifest-subprocess-skill-model.md), [ADR-0015](../adr/0015-proprioception-self-health.md) | `russell-meta`, `russell-proprio` (MVP self-vital) |
 | Coordination | [ADR-0009](../adr/deferred/0009-tokio-runtime.md) + systemd timers | Unit files under `packaging/systemd/`; timers are OS-level |
 | Operations | [ADR-0004](../adr/0004-sqlite-journal.md), [ADR-0006](../adr/0006-profile-abstraction.md) | `russell-sentinel`, `russell-skills` |
 
@@ -114,7 +114,7 @@ a corresponding ADR and a corresponding area of the code:
 flowchart LR
   CORE[russell-core]
   SENTINEL[russell-sentinel]
-  DOCTOR[russell-doctor]
+  META[russell-meta]
   SKILLS[russell-skills]
   MCP[russell-mcp]
   PROPRIO[russell-proprio]
@@ -122,10 +122,10 @@ flowchart LR
 
   SENTINEL --> CORE
   SKILLS --> CORE
-  DOCTOR --> CORE & SKILLS
+  META --> CORE & SKILLS
   PROPRIO --> CORE
-  MCP --> CORE & SENTINEL & DOCTOR & SKILLS & PROPRIO
-  CLI --> CORE & SENTINEL & DOCTOR & SKILLS & PROPRIO & MCP
+  MCP --> CORE & SENTINEL & META & SKILLS & PROPRIO
+  CLI --> CORE & SENTINEL & META & SKILLS & PROPRIO & MCP
 ```
 
 <!-- DIAGRAM_ALIGNMENT

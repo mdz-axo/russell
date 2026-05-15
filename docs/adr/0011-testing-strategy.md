@@ -74,7 +74,7 @@ Four test layers, each with a defined scope:
 - `russell-skills` uses a fake `SubprocessRunner` trait
   implementation to verify dispatcher behaviour without
   invoking real shell commands.
-- `russell-doctor` uses a recorded LLM transcript
+- `russell-meta` uses a recorded LLM transcript
   fixture to verify triage flow is deterministic.
 - **Gate:** every skill ships at least one integration
   test that exercises `dry_run: true` through
@@ -151,7 +151,7 @@ may be adopted later with an ADR amendment.
   Production impl wraps `tokio::process::Command`;
   test impl returns scripted results.
 - LLM fixture files live under
-  `crates/russell-doctor/tests/fixtures/llm/`; each
+  `crates/russell-meta/tests/fixtures/llm/`; each
   is named for the symptom it exercises.
 - Migration round-trip tests snapshot
   `PRAGMA table_info(...)` for every table, plus

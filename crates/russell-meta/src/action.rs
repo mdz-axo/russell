@@ -211,7 +211,7 @@ impl std::fmt::Display for ActionError {
 }
 
 /// Metadata for a Kask tool available in the registry, passed by
-/// the caller (keeps `russell-doctor` free of `russell-mcp` dependency).
+/// the caller (keeps `russell-meta` free of `russell-mcp` dependency).
 #[derive(Debug, Clone)]
 pub struct KaskToolInfo {
     /// Tool name (the callable ID).

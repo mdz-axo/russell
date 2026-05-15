@@ -39,7 +39,7 @@ russell/
 └── crates/
     ├── russell-core/          # profile, journal, IDRS runtime, event schema
     ├── russell-sentinel/      # telemetry collector, EWMA baselines
-    ├── russell-doctor/        # symptom triage, SOAP assembly, LLM client
+    ├── russell-meta/        # symptom triage, SOAP assembly, LLM client
     ├── russell-skills/        # manifest loader, dispatcher, poka-yoke
     ├── russell-mcp/           # MCP server (stdio transport)
     ├── russell-cli/           # binary entry point; ties the above together
@@ -70,7 +70,7 @@ are separate crates. Cross-crate dependencies are a DAG rooted at
 
 ## 4. `unsafe` discipline
 
-- No `unsafe` in `russell-core`, `russell-doctor`,
+- No `unsafe` in `russell-core`, `russell-meta`,
   `russell-skills`, `russell-cli` except through audited,
   well-known crates.
 - If you introduce `unsafe` anywhere, write a `// SAFETY:`
@@ -153,7 +153,7 @@ are separate crates. Cross-crate dependencies are a DAG rooted at
 
 ## 11. Documentation within code
 
-- Every public item in `russell-core`, `russell-doctor`,
+- Every public item in `russell-core`, `russell-meta`,
   `russell-skills`, and `russell-mcp` has a rustdoc comment.
 - Use `# Examples`, `# Errors`, `# Panics` sections per the
   [API Guidelines](https://rust-lang.github.io/api-guidelines/).
@@ -193,6 +193,6 @@ are separate crates. Cross-crate dependencies are a DAG rooted at
 - Do not read or write files under `~/.local/state/harness/`
   from outside `russell-core::journal` or `russell-core::paths`.
 - Do not spawn subprocesses from outside `russell-skills::dispatch`.
-- Do not call the LLM from outside `russell-doctor::llm`.
+- Do not call the LLM from outside `russell-meta::llm`.
 - Do not add a CLI subcommand without a matching MCP tool
   (or vice versa) unless an ADR justifies the asymmetry.

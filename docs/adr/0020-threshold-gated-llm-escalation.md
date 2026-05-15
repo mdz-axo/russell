@@ -148,7 +148,7 @@ configurable without code changes.
 
 ## Implementation Notes
 
-- Gate lives in `russell-doctor::help::run_help_with_config`, before the LLM
+- Gate lives in `russell-meta::help::run_help_with_config`, before the LLM
   call branch.
 - `ClientConfig` gains an optional `escalate_min` field (default:
   `Severity::Alert`).
@@ -164,6 +164,6 @@ configurable without code changes.
 
 - [`MVP_SPEC.md §2.1`](../specifications/MVP_SPEC.md) — current `jack` spec
 - [`JR-2`](docs/architecture/PRINCIPLES_CATALOG.md) — Observe > Recommend > Act
-- [`russell-doctor/src/fallback.rs`](crates/russell-doctor/src/fallback.rs) — existing `verdict()` + `summarise()`
-- [`russell-doctor/src/help.rs`](crates/russell-doctor/src/help.rs) — current `run_help_with_config`
+- [`russell-meta/src/fallback.rs`](crates/russell-meta/src/fallback.rs) — existing `verdict()` + `summarise()`
+- [`russell-meta/src/help.rs`](crates/russell-meta/src/help.rs) — current `run_help_with_config`
 - OpenClaw architecture (external) — inspiration for deterministic pre-flight pattern

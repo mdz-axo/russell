@@ -67,7 +67,7 @@ not invent a new type.
 | `core` | `russell-core` crate. |
 | `mcp` | `russell-mcp` crate or the MCP surface document. |
 | `skills` | `russell-skills` crate or the `skills/` tree. |
-| `doctor` | `russell-doctor` crate. |
+| `meta` | `russell-meta` crate (metacognitive layer). |
 | `sentinel` | `russell-sentinel` crate. |
 | `proprio` | `russell-proprio` crate and proprioception docs. |
 | `journal` | Journal schema, migrations, event format. |

@@ -47,7 +47,7 @@ russell/
     ├── russell-core/           # profile, journal, paths, IDRS primitives, event schema, telemetry init
     ├── russell-sentinel/       # host probes, EWMA baselines, rule evaluation
     ├── russell-skills/         # manifest parser, dispatcher, subprocess runner
-    ├── russell-doctor/         # supervisor loop, LLM client, SOAP composer, bootstrap state machine
+    ├── russell-meta/         # supervisor loop, LLM client, SOAP composer, bootstrap state machine
     ├── russell-proprio/        # meta-Sentinel, meta-Doctor, reflex arcs, autoimmune guard
     ├── russell-mcp/            # MCP stdio server, tool handlers, wire schemas
     └── russell-cli/            # binary crate; wires everything to the `russell` entry point
@@ -60,7 +60,7 @@ rules where feasible):
 2. Every other library crate may depend on `russell-core`.
 3. `russell-sentinel`, `russell-skills` do **not** depend
    on each other.
-4. `russell-doctor` may depend on `russell-skills` and
+4. `russell-meta` may depend on `russell-skills` and
    `russell-core`.
 5. `russell-proprio` may depend on `russell-core` and
    `russell-skills` (for meta-skills under `skills/self/`).

@@ -58,20 +58,20 @@ Capability: Host Observation
 
 ```
 Capability: LLM Consultation (Nurse)
-  Port: LlmClient (russell-doctor/src/client.rs)
-    Adapter: OkapiClientAdapter (russell-doctor/src/oai_client.rs)
+  Port: LlmClient (russell-meta/src/client.rs)
+    Adapter: OkapiClientAdapter (russell-meta/src/oai_client.rs)
       Contract: OpenAI-compatible API → /api/chat/completions
       Target: Okapi server at 127.0.0.1:11435
-    Adapter: OpenRouterClientAdapter (russell-doctor/src/oai_client.rs)
+    Adapter: OpenRouterClientAdapter (russell-meta/src/oai_client.rs)
       Contract: OpenAI-compatible API → /v1/chat/completions
       Notes: Opt-in, ZDR enabled
-    Adapter: MockClientAdapter (russell-doctor/src/mock.rs)
+    Adapter: MockClientAdapter (russell-meta/src/mock.rs)
       Contract: Deterministic responses for testing
-  Port: ActionParser (russell-doctor/src/action.rs)
+  Port: ActionParser (russell-meta/src/action.rs)
     Contract: ACTION: <skill>/<probe-or-intervention> — parse and dispatch
-  Port: HelpHandler (russell-doctor/src/help.rs)
+  Port: HelpHandler (russell-meta/src/help.rs)
     Contract: SOAP bundle assembly — Subjective, Objective, Assessment, Plan
-  Persona: jack.md (crates/russell-doctor/prompts/jack.md)
+  Persona: jack.md (crates/russell-meta/prompts/jack.md)
     Contract: Terrier + Jack McFarland + Rust/Linux/cybernetics fluency
     JR-3: Never emits shell commands
 ```
@@ -270,7 +270,7 @@ Russell Nurse ──(SOAP bundle)──▶ Okapi LLM
 | `PRINCIPLES_CATALOG.md` JR-1 | Cargo.toml (binary size), boot time benchmarks |
 | `PRINCIPLES_CATALOG.md` JR-2 | `run_and_journal()`, `run_intervention_with_rollback()` |
 | `PRINCIPLES_CATALOG.md` JR-3 | `ActionParser`, dispatcher poka-yoke |
-| `PRINCIPLES_CATALOG.md` JR-4 | `russell-doctor/prompts/jack.md` |
+| `PRINCIPLES_CATALOG.md` JR-4 | `russell-meta/prompts/jack.md` |
 | `PRINCIPLES_CATALOG.md` JR-5 | `russell-proprio/src/lib.rs` — 5 self-vitals |
 | `PRINCIPLES_CATALOG.md` JR-6 | `docs/operations/REUSE_MANIFEST.md` |
 | `PRINCIPLES_CATALOG.md` JR-7 | `docs/specifications/PERSISTENCE_CATALOG.md` |

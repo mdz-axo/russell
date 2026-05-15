@@ -24,7 +24,7 @@ status: "Draft"
 | **Orchestration** | `russell-sentinel` | `collect()` extended; `collect_extended()` for longer-cadence probes |
 | **Persistence** | `russell-core::journal` | No new tables — `samples` table already accepts arbitrary probe names |
 | **Surface (read)** | `russell-cli` | `russell digest` already summarizes samples; no new verbs |
-| **Surface (LLM)** | `russell-doctor` | SOAP Objective includes disk/pkg samples; Jack assesses them |
+| **Surface (LLM)** | `russell-meta` | SOAP Objective includes disk/pkg samples; Jack assesses them |
 
 ---
 
