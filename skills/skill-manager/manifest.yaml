@@ -59,6 +59,13 @@ interventions:
     idempotent: true
     rollback: none_needed
 
+  - id: create-manifest
+    cmd: ["russell", "skill", "put"]
+    risk: low
+    idempotent: true
+    rollback: none_needed
+    timeout: 15s
+
   - id: prune
     cmd: ["russell", "skill", "prune"]
     risk: low

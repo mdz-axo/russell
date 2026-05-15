@@ -183,6 +183,10 @@ pub struct Dispatcher {
     /// Consumed immediately via stdin; never stored after dispatch.
     /// Set to `None` if no sudo interventions are expected.
     pub sudo_password: Option<String>,
+    /// Arbitrary content to pipe to the subprocess stdin after sudo auth
+    /// (if applicable). Used for interventions like `create-manifest` where
+    /// the LLM produces content that must be piped to the CLI command.
+    pub stdin_content: Option<String>,
 }
 
 impl std::fmt::Debug for Dispatcher {
@@ -194,6 +198,7 @@ impl std::fmt::Debug for Dispatcher {
             .field("intervention_timeout", &self.intervention_timeout)
             .field("max_auto_risk", &self.max_auto_risk)
             .field("sudo_password", &self.sudo_password.as_ref().map(|_| "***"))
+            .field("stdin_content", &self.stdin_content.as_ref().map(|c| format!("{} bytes", c.len())))
             .finish()
     }
 }
@@ -209,6 +214,7 @@ impl Dispatcher {
             intervention_timeout: Duration::from_secs(120),
             max_auto_risk: RiskBand::Low,
             sudo_password: None,
+            stdin_content: None,
         }
     }
 
@@ -308,6 +314,20 @@ impl Dispatcher {
             pw_with_newline.push('\n');
             if let Err(e) = stdin.write_all(pw_with_newline.as_bytes()).await {
                 warn!(error = %e, "failed to write sudo password to stdin");
+            }
+            drop(stdin);
+        }
+
+        // Pipe arbitrary stdin content (used for interventions like
+        // create-manifest where the LLM produces content). Only used
+        // when sudo is NOT set — sudo stdin piping is exclusive.
+        if self.sudo_password.is_none()
+            && let Some(ref content) = self.stdin_content
+            && let Some(mut stdin) = child.stdin.take()
+        {
+            use tokio::io::AsyncWriteExt;
+            if let Err(e) = stdin.write_all(content.as_bytes()).await {
+                warn!(error = %e, "failed to write stdin content");
             }
             drop(stdin);
         }
@@ -680,6 +700,7 @@ mod tests {
             intervention_timeout: Duration::from_secs(5),
             max_auto_risk: RiskBand::Low,
             sudo_password: None,
+            stdin_content: None,
         };
         let outcome = d.run(&["echo".into(), "hello".into()], None).await.unwrap();
         assert!(outcome.dry_run);
@@ -713,6 +734,7 @@ mod tests {
             intervention_timeout: Duration::from_secs(1),
             max_auto_risk: RiskBand::Low,
             sudo_password: None,
+            stdin_content: None,
         };
         // Sleep longer than the timeout.
         let outcome = d
@@ -790,6 +812,7 @@ mod tests {
             intervention_timeout: Duration::from_secs(5),
             max_auto_risk: RiskBand::Low,
             sudo_password: None,
+            stdin_content: None,
         };
         let outcome = d
             .run_and_journal(
@@ -823,6 +846,7 @@ mod tests {
             intervention_timeout: Duration::from_secs(5),
             max_auto_risk: RiskBand::Low,
             sudo_password: None,
+            stdin_content: None,
         };
         assert!(d.check_risk(RiskBand::None, false).is_ok());
         assert!(d.check_risk(RiskBand::Low, false).is_ok());
@@ -840,6 +864,7 @@ mod tests {
             intervention_timeout: Duration::from_secs(5),
             max_auto_risk: RiskBand::Low,
             sudo_password: None,
+            stdin_content: None,
         };
         // High risk in dry-run mode should still pass — no mutation occurs.
         assert!(d.check_risk(RiskBand::Critical, true).is_ok());
@@ -854,6 +879,7 @@ mod tests {
             intervention_timeout: Duration::from_secs(5),
             max_auto_risk: RiskBand::Medium,
             sudo_password: None,
+            stdin_content: None,
         };
         assert!(d.check_risk(RiskBand::Medium, false).is_ok());
         assert!(d.check_risk(RiskBand::High, false).is_err());
@@ -868,6 +894,7 @@ mod tests {
             intervention_timeout: Duration::from_secs(5),
             max_auto_risk: RiskBand::Low,
             sudo_password: None,
+            stdin_content: None,
         };
         let err = d.check_risk(RiskBand::High, false).unwrap_err();
         let msg = err.to_string();

@@ -155,6 +155,11 @@ enum SkillCmd {
         /// Skill name to create.
         name: String,
     },
+    /// Write a full skill manifest from stdin.
+    Put {
+        /// Skill name (optional — extracted from YAML `id` if not given).
+        name: Option<String>,
+    },
 }
 
 #[tokio::main(flavor = "multi_thread")]
@@ -204,6 +209,7 @@ async fn main() -> Result<()> {
             SkillCmd::Restore { name } => commands::skill::restore(&paths, &name),
             SkillCmd::Retire { name } => commands::skill::retire(&paths, &name),
             SkillCmd::Build { name } => commands::skill::build(&paths, &name),
+            SkillCmd::Put { name } => commands::skill::put(&paths, name.as_deref()),
         },
         Command::Chat => commands::chat::run(&paths).await,
         Command::Workshop => commands::workshop::run(&paths).await,

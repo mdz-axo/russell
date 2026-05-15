@@ -344,26 +344,26 @@ pub struct EvalCheck {
 
 /// The raw YAML manifest as parsed from disk, before validation.
 #[derive(Debug, Deserialize)]
-struct RawManifest {
-    id: String,
+pub struct RawManifest {
+    pub id: String,
     #[serde(default)]
-    version: Option<String>,
+    pub version: Option<String>,
     #[serde(default)]
-    authored: Option<String>,
+    pub authored: Option<String>,
     #[serde(default)]
-    min_harness_version: Option<String>,
+    pub min_harness_version: Option<String>,
     #[serde(default)]
-    symptoms: Vec<String>,
+    pub symptoms: Vec<String>,
     #[serde(default)]
-    applies_when: Vec<AppliesWhen>,
+    pub applies_when: Vec<AppliesWhen>,
     #[serde(default)]
-    probes: Vec<Probe>,
+    pub probes: Vec<Probe>,
     #[serde(default)]
-    interventions: Vec<Intervention>,
+    pub interventions: Vec<Intervention>,
     #[serde(default)]
-    safety: Option<RawSafety>,
+    pub safety: Option<RawSafety>,
     #[serde(default)]
-    evaluation: Option<Evaluation>,
+    pub evaluation: Option<Evaluation>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -457,12 +457,73 @@ fn load_one(skill_dir: &Path, dir_name: &str) -> Result<Skill, LoadError> {
         source: e,
     })?;
 
-    let raw: RawManifest = serde_yaml::from_str(&yaml).map_err(|e| LoadError::InvalidManifest {
-        path: manifest_path.clone(),
-        message: e.to_string(),
-    })?;
+    parse_manifest(&yaml, dir_name)
+        .map_err(|message| LoadError::InvalidManifest {
+            path: manifest_path.clone(),
+            message,
+        })
+}
 
-    validate(&raw, dir_name, skill_dir, &manifest_path)?;
+/// Extract the `id` field from a manifest YAML string without full validation.
+///
+/// Quick parse to get the skill ID for directory naming. Returns `None`
+/// if the YAML is malformed or the `id` field is missing.
+pub fn extract_manifest_id(yaml: &str) -> Option<String> {
+    let raw: RawManifest = serde_yaml::from_str(yaml).ok()?;
+    if raw.id.is_empty() {
+        None
+    } else {
+        Some(raw.id)
+    }
+}
+
+/// Parse a manifest YAML string, validate it, and return a [`Skill`].
+///
+/// `dir_name` is the expected skill ID (directory name). Must match
+/// the YAML's `id` field.
+///
+/// # Errors
+///
+/// Returns a human-readable error string if the YAML is malformed,
+/// the id doesn't match, a symptom is unknown, or a rollback references
+/// a nonexistent intervention.
+pub fn parse_manifest(yaml: &str, dir_name: &str) -> std::result::Result<Skill, String> {
+    let raw: RawManifest = serde_yaml::from_str(yaml)
+        .map_err(|e| format!("YAML parse error: {e}"))?;
+
+    // Validate id match.
+    if raw.id != dir_name {
+        return Err(format!(
+            "manifest id '{}' does not match directory name '{}'",
+            raw.id, dir_name
+        ));
+    }
+
+    // Validate symptoms.
+    for symptom in &raw.symptoms {
+        if !SYMPTOMS.contains(&symptom.as_str()) {
+            return Err(format!(
+                "skill '{}' references unknown symptom '{}'",
+                dir_name, symptom
+            ));
+        }
+    }
+
+    // Validate rollback strategies.
+    for iv in &raw.interventions {
+        match &iv.rollback {
+            Rollback::RollbackId { rollback_id } => {
+                if !raw.interventions.iter().any(|r| r.id == *rollback_id) {
+                    return Err(format!(
+                        "rollback_id '{}' in intervention '{}' does not reference a known intervention",
+                        rollback_id, iv.id
+                    ));
+                }
+            }
+            Rollback::NoneNeeded { .. } => {}
+            Rollback::Reboot { .. } => {}
+        }
+    }
 
     let safety_raw = raw.safety.unwrap_or(RawSafety {
         max_auto_risk: RiskBand::Low,

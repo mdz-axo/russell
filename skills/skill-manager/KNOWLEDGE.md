@@ -39,6 +39,38 @@ ACTION: skill-manager/install
 Arguments --name <skill-name>
 ```
 
+### `build <name>`
+Creates a minimal skill skeleton on disk. Writes a bare manifest.yaml
+with empty probes/interventions — a starting point for further editing.
+After building, use `create-manifest` to write the full manifest, or
+install it as-is and `adapt` it in the workshop.
+```
+ACTION: skill-manager/build
+Arguments --name <skill-name>
+```
+
+### `create-manifest <name>`
+Writes a full skill manifest from content Jack provides. Include the
+manifest YAML in a `---manifest` block after the ACTION line:
+```
+ACTION: skill-manager/create-manifest
+---manifest
+id: my-skill
+version: 0.1.0
+authored: 2026-05-15
+symptoms: [gpu_temp_high, gpu_freq_throttle]
+probes:
+  - id: check-gpu
+    cmd: ["nvidia-smi", "--query-gpu=temperature.gpu", "--format=csv,noheader"]
+    risk: none
+    timeout: 10s
+interventions: []
+---
+```
+The YAML's `id` field must match the CLI argument. The content is
+safety-scanned before writing. The skill is registered as Active
+immediately — no separate `install` step needed.
+
 ### `prune <name>`
 Deprecates a skill (moves from active/stale → deprecated). Files
 stay on disk. Can be undone with `restore`.
@@ -84,9 +116,9 @@ Arguments --name <skill-name>
   removing.
 - **Ask before deleting.** `delete` is irreversible. Always confirm
   with the operator before proposing this action.
-- **Use the workshop for build/adapt.** Creating new skills and editing
-  manifests requires `russell workshop` — the `build` and `adapt`
-  commands are only available there, not through this skill.
+- **Use create-manifest to write complete skills.** You can now write full
+  skill manifests directly from chat — no workshop needed. Include the
+  YAML in a `---manifest` block after the ACTION line.
 
 ## Example workflow
 

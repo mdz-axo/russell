@@ -11,6 +11,10 @@ use russell_doctor::action::ResolvedAction;
 #[derive(Debug, Clone)]
 pub struct PendingAction {
     pub action: ResolvedAction,
+    /// Optional stdin content to pipe to the subprocess (used by
+    /// interventions like `create-manifest` where the LLM produces
+    /// content that must be piped to the CLI command).
+    pub stdin_content: Option<String>,
 }
 
 /// Returns true if the input looks like natural-language consent

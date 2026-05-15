@@ -86,6 +86,7 @@ pub async fn execute_pending_action(
     dispatcher.probe_timeout = timeout;
     dispatcher.dry_run = DryRun::Disabled;
     dispatcher.max_auto_risk = max_auto_risk;
+    dispatcher.stdin_content = pending.stdin_content.clone();
 
     // If this action requires explicit human confirmation, prompt again.
     if requires_human {

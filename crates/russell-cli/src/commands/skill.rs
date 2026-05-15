@@ -513,3 +513,119 @@ pub fn build(paths: &Paths, name: &str) -> Result<()> {
     println!("  Use 'russell skill install {name}' to activate it.");
     Ok(())
 }
+
+/// Write a full skill manifest from stdin.
+/// Reads YAML from stdin, safety-scans it, validates it against the
+/// manifest schema, writes it to `skills/<name>/manifest.yaml`, and
+/// registers the skill in the registry cache.
+///
+/// If `name` is provided, it must match the `id` field in the YAML.
+/// If `name` is `None`, the skill name is extracted from the YAML's
+/// `id` field.
+pub fn put(paths: &Paths, name: Option<&str>) -> Result<()> {
+    use russell_skills::registry::{LifecycleStatus, RegistryCache, RegistryEntry, SafetyScan, SkillSource};
+
+    // Read from stdin.
+    let mut content = String::new();
+    std::io::Read::read_to_string(&mut std::io::stdin(), &mut content)
+        .context("reading manifest from stdin")?;
+    if content.trim().is_empty() {
+        anyhow::bail!("Empty manifest received on stdin");
+    }
+
+    // Safety scan before anything else.
+    let scan = SafetyScan::scan(&content);
+    if scan.has_blocks() {
+        println!("Manifest rejected by safety scanner:");
+        for f in &scan.findings {
+            if f.severity == russell_skills::registry::ScanSeverity::Block {
+                println!("  [{}] {}", f.rule_id, f.description);
+            }
+        }
+        anyhow::bail!("Safety scan blocked manifest");
+    }
+    if scan.has_warnings() {
+        println!("Safety warnings:");
+        for f in &scan.findings {
+            if f.severity == russell_skills::registry::ScanSeverity::Warn {
+                println!("  [{}] {}", f.rule_id, f.description);
+            }
+        }
+    }
+
+    // Parse and validate the manifest using the shared validation logic.
+    // Resolve skill name — from CLI arg or from YAML's id field.
+    // Extract id from YAML first for name resolution and validation.
+    let name = if let Some(n) = name {
+        n.to_string()
+    } else {
+        // Quick parse to extract the id field for directory naming.
+        // Full validation happens next via parse_manifest.
+        let raw: russell_skills::RawManifest = serde_yaml::from_str(&content)
+            .context("parsing manifest YAML")?;
+        if raw.id.is_empty() {
+            anyhow::bail!("manifest has no 'id' field and no name was provided via CLI");
+        }
+        raw.id.clone()
+    };
+
+    let _skill = russell_skills::parse_manifest(&content, &name)
+        .context("validating manifest")?;
+
+    // Write manifest to disk.
+    let skills_dir = paths.skills();
+    let skill_dir = skills_dir.join(&name);
+    if !skill_dir.exists() {
+        std::fs::create_dir_all(&skill_dir)
+            .with_context(|| format!("creating skill directory {}", skill_dir.display()))?;
+    }
+
+    let manifest_path = skill_dir.join("manifest.yaml");
+    std::fs::write(&manifest_path, &content)
+        .with_context(|| format!("writing manifest {}", manifest_path.display()))?;
+
+    println!("Manifest written to {}", manifest_path.display());
+
+    // Register in the registry cache.
+    let version = raw.version.clone().unwrap_or_else(|| "0.1.0".into());
+    let authored = raw.authored.clone().unwrap_or_else(|| now_date_iso8601());
+    let registry_path = paths.state.join("registry").join("local-cache.yaml");
+    RegistryCache::with_update(&registry_path, |registry| {
+        let entry = RegistryEntry {
+            status: LifecycleStatus::Active,
+            version: version.clone(),
+            symptoms: raw.symptoms.clone(),
+            source: SkillSource::Manual,
+            installed: authored.clone(),
+            last_evaluated: None,
+            valid_until: None,
+            coverage_score: None,
+            superseded_by: None,
+            deprecation_reason: None,
+            probe_runs: 0,
+            recent_probe_failures: 0,
+            intervention_runs: 0,
+            recent_intervention_failures: 0,
+            last_probe_run_at: None,
+            last_error: None,
+            avg_probe_duration_ms: None,
+            bundled: false,
+        };
+        registry.upsert(&name, entry);
+    })?;
+
+    let journal = JournalWriter::open(&paths.journal())
+        .context("opening journal for audit")?;
+    RegistryCache::journal_transition(
+        &journal, &name, None,
+        LifecycleStatus::Active, Some("put via CLI (manifest from stdin)"),
+    );
+
+    let probe_count = raw.probes.len();
+    let iv_count = raw.interventions.len();
+    println!(
+        "Skill '{name}' registered (v{version}, {probe_count} probes, {iv_count} interventions)."
+    );
+    println!("  Use /reload in chat to pick it up.");
+    Ok(())
+}

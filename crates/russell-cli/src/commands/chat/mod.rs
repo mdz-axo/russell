@@ -276,6 +276,7 @@ pub async fn run(paths: &Paths) -> Result<()> {
                         let kask_tool_infos = kask::build_kask_tool_infos(&kask_registry);
                         match action::resolve_with_kask(&content, &skills, &kask_tool_infos) {
                             Some(Ok(action)) => {
+                                let manifest = extract_manifest_block(&content);
                                 handle_action_proposal(
                                     action,
                                     &journal,
@@ -286,6 +287,7 @@ pub async fn run(paths: &Paths) -> Result<()> {
                                     &mut history,
                                     &chat_path,
                                     &mut pending_action,
+                                    manifest,
                                 ).await?;
                             }
                             Some(Err(e)) => {
@@ -341,7 +343,7 @@ async fn execute_action(
     if action.is_kask_tool() {
         kask::execute_kask_tool(journal, kask_client, action, session_id, model, paths).await
     } else {
-        let pa = PendingAction { action: action.clone() };
+        let pa = PendingAction { action: action.clone(), stdin_content: None };
         execute::execute_pending_action(journal, paths, &pa, session_id, model).await
     }
 }
@@ -358,6 +360,7 @@ async fn handle_action_proposal(
     history: &mut ChatHistory,
     chat_path: &std::path::Path,
     pending_action: &mut Option<PendingAction>,
+    stdin_content: Option<String>,
 ) -> Result<()> {
     if action.is_kask_tool() {
         // Kask MCP tool — determine consent based on risk.
@@ -382,7 +385,7 @@ async fn handle_action_proposal(
                 action.action_id(), risk.as_str()
             );
             println!("  → Say 'ok' to approve, or 'no' to refuse.");
-            *pending_action = Some(PendingAction { action });
+            *pending_action = Some(PendingAction { action, stdin_content: None });
         }
     } else if action.is_probe() {
         // Probes are read-only — auto-execute immediately.
@@ -390,7 +393,7 @@ async fn handle_action_proposal(
             "  → Running probe: {}/{}…",
             action.skill_id(), action.action_id()
         );
-        let pa = PendingAction { action };
+        let pa = PendingAction { action, stdin_content: None };
         let probe_result = execute::execute_pending_action(
             journal, paths, &pa, session_id, current_model,
         ).await;
@@ -415,7 +418,7 @@ async fn handle_action_proposal(
             _ => unreachable!(),
         }
         println!("  → Say 'ok' to approve, or 'no' to refuse.");
-        *pending_action = Some(PendingAction { action });
+        *pending_action = Some(PendingAction { action, stdin_content });
     }
     Ok(())
 }
@@ -576,5 +579,48 @@ async fn handle_slash_command(
             println!("  Unknown command: {other}. Try /help.");
             true
         }
+    }
+}
+
+/// Extract a `---manifest` … `---` block from an LLM response.
+///
+/// Jack may include manifest YAML content in his response using a
+/// fenced block:
+///
+/// ```text
+/// ACTION: skill-manager/create-manifest
+/// ---manifest
+/// id: my-skill
+/// version: 0.1.0
+/// …
+/// ---
+/// ```
+///
+/// This function extracts the content between the `---manifest` and
+/// terminating `---` markers. Returns `None` if no such block is found.
+fn extract_manifest_block(response: &str) -> Option<String> {
+    let start_marker = "---manifest\n";
+    let start = response.find(start_marker)?;
+    let content_start = start + start_marker.len();
+    let remainder = &response[content_start..];
+    // Find the first line that is exactly "---" after the start marker.
+    // Must be on its own line.
+    let end = if let Some(pos) = remainder.find("\n---\n") {
+        pos + 1 // include the leading newline to trim cleanly
+    } else if remainder.starts_with("---\n") {
+        0
+    } else if remainder == "---" {
+        remainder.len()
+    } else if remainder.ends_with("\n---") {
+        remainder.len() - 3
+    } else {
+        // Can't find a clean terminating ---, return entire content.
+        return None;
+    };
+    let content = remainder[..end].trim().to_string();
+    if content.is_empty() {
+        None
+    } else {
+        Some(content)
     }
 }
