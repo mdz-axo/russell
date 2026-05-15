@@ -1578,9 +1578,9 @@ dependencies = [
  "reqwest",
  "rpassword",
  "russell-core",
- "russell-doctor",
  "russell-mcp",
  "russell-mcp-server",
+ "russell-meta",
  "russell-proprio",
  "russell-sentinel",
  "russell-skills",
@@ -1614,26 +1614,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "russell-doctor"
-version = "0.20.0"
-dependencies = [
- "insta",
- "minijinja",
- "reqwest",
- "russell-core",
- "russell-skills",
- "serde",
- "serde_json",
- "strsim",
- "tempfile",
- "thiserror",
- "time",
- "tokio",
- "tracing",
- "ulid",
-]
-
-[[package]]
 name = "russell-mcp"
 version = "0.20.0"
 dependencies = [
@@ -1662,6 +1642,26 @@ dependencies = [
  "thiserror",
  "tokio",
  "tracing",
+]
+
+[[package]]
+name = "russell-meta"
+version = "0.20.0"
+dependencies = [
+ "insta",
+ "minijinja",
+ "reqwest",
+ "russell-core",
+ "russell-skills",
+ "serde",
+ "serde_json",
+ "strsim",
+ "tempfile",
+ "thiserror",
+ "time",
+ "tokio",
+ "tracing",
+ "ulid",
 ]
 
 [[package]]

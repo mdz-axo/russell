@@ -96,7 +96,7 @@ addition to this table.
 | Term | Meaning |
 |---|---|
 | **Sentinel** | The continuous low-cost telemetry collector; writes `samples` rows. |
-| **Nurse** | The subsystem that consults the LLM (via Okapi) when the operator runs `russell jack` or `russell chat`. Jack watches over the machine; he doesn't "diagnose" — he notices, checks in, and cares. |
+| **Nurse** | The subsystem that consults the LLM (via Okapi) when the operator runs `russell jack` or `russell chat`. Jack watches over the machine; he doesn't "diagnose" — he notices, checks in, and cares. Implemented in `russell-meta` (the metacognitive layer — see ADR-0026). |
 | **Jack** | The persona: terrier + *Will & Grace* Jack McFarland + Rust/Linux/cybernetics fluency. He's a nurse, not a doctor — loyal, attentive, never pretends to hands he doesn't have. See [`docs/architecture/THE_JACK.md`](docs/architecture/THE_JACK.md). |
 | **Skill module** | YAML manifest + scripts encoding one playbook. **Active.** `russell-skills` crate with manifest parser, dispatcher, CLI verbs (`russell skill list`, `russell skill run`). First real skill: `okapi-watcher`. |
 | **IDRS** | Idempotent / Dry-run / Rollback / Structured-log contract for every mutation. **Active.** `run_and_journal` writes evidence bundles; `run_intervention_with_rollback` chains reverse interventions. |
