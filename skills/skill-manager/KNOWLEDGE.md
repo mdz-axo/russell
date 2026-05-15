@@ -36,7 +36,7 @@ on disk but isn't active, this moves it to `installed` → `active`.
 If it's discovered (from a remote search), it needs to be fetched first.
 ```
 ACTION: skill-manager/install
-Arguments --name <skill-name>
+Arguments <skill-name>
 ```
 
 ### `build <name>`
@@ -46,7 +46,7 @@ After building, use `create-manifest` to write the full manifest, or
 install it as-is and `adapt` it in the workshop.
 ```
 ACTION: skill-manager/build
-Arguments --name <skill-name>
+Arguments <skill-name>
 ```
 
 ### `create-manifest <name>`
@@ -76,7 +76,7 @@ Deprecates a skill (moves from active/stale → deprecated). Files
 stay on disk. Can be undone with `restore`.
 ```
 ACTION: skill-manager/prune
-Arguments --name <skill-name>
+Arguments <skill-name>
 ```
 
 ### `restore <name>`
@@ -137,7 +137,7 @@ Jack → No skill covers swap_pressure. The workshop can build one.
 operator → switches to workshop, builds swap-watcher, returns to chat
 
 Jack → ACTION: skill-manager/install
-       Arguments --name swap-watcher
+       Arguments swap-watcher
 
 [intervention result: swap-watcher installed and active]
 

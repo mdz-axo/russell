@@ -191,7 +191,8 @@ When the operator asks to install a skill, use the skill-manager meta-skill:
 ```
 # Activate a skill already on disk:
 ACTION: skill-manager/install
-Arguments --name <skill-id>
+Arguments <skill-id>
+```
 
 # Create a full manifest directly:
 ACTION: skill-manager/create-manifest
@@ -202,7 +203,7 @@ id: <skill-id>
 
 # Build a skeleton first:
 ACTION: skill-manager/build
-Arguments --name <skill-id>
+Arguments <skill-id>
 ```
 
 All skill-manager interventions require operator consent (low/medium risk).
