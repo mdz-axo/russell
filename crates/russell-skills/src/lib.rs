@@ -212,6 +212,100 @@ impl Skill {
     pub fn is_actionable(&self) -> bool {
         !self.is_lens()
     }
+
+    /// Returns a unified view of all probes and interventions as [`Step`]s.
+    ///
+    /// Probes become steps with `risk: None` and no rollback.
+    /// Interventions become steps with their declared risk and rollback.
+    /// This is the preferred API for new code — the separate `probes`
+    /// and `interventions` fields are retained for backward compatibility.
+    #[must_use]
+    pub fn steps(&self) -> Vec<Step> {
+        let mut steps = Vec::with_capacity(self.probes.len() + self.interventions.len());
+        for p in &self.probes {
+            steps.push(Step {
+                id: p.id.clone(),
+                cmd: p.cmd.clone(),
+                risk: RiskBand::None,
+                rollback: None,
+                timeout: p.timeout.clone(),
+                idempotent: true,
+                needs_sudo: false,
+                capture: p.capture.clone(),
+            });
+        }
+        for iv in &self.interventions {
+            steps.push(Step {
+                id: iv.id.clone(),
+                cmd: iv.cmd.clone(),
+                risk: iv.risk,
+                rollback: Some(iv.rollback.clone()),
+                timeout: iv.timeout.clone(),
+                idempotent: iv.idempotent,
+                needs_sudo: iv.needs_sudo,
+                capture: "stdout".into(),
+            });
+        }
+        steps
+    }
+
+    /// Look up a step by ID (searching both probes and interventions).
+    #[must_use]
+    pub fn find_step(&self, step_id: &str) -> Option<Step> {
+        self.steps().into_iter().find(|s| s.id == step_id)
+    }
+}
+
+/// A unified executable step within a skill — the common abstraction
+/// over probes (risk: none) and interventions (risk > none).
+///
+/// Probes are steps with `risk == RiskBand::None` and `rollback == None`.
+/// Interventions are steps with `risk > None` and a mandatory rollback strategy.
+///
+/// This struct is produced by [`Skill::steps()`] — it is not directly
+/// deserialized from YAML. The manifest format still uses separate
+/// `probes:` and `interventions:` sections for human clarity.
+#[derive(Debug, Clone)]
+pub struct Step {
+    /// Unique ID within the skill.
+    pub id: String,
+    /// Argv list to execute.
+    pub cmd: Vec<String>,
+    /// Risk band. `None` = probe (auto-executable, no consent needed).
+    pub risk: RiskBand,
+    /// Rollback strategy. `None` for probes; `Some(..)` for interventions.
+    pub rollback: Option<Rollback>,
+    /// Timeout string (e.g. "30s", "120s").
+    pub timeout: String,
+    /// Idempotent (always true for probes).
+    pub idempotent: bool,
+    /// Whether this step requires sudo.
+    pub needs_sudo: bool,
+    /// Capture mode (stdout, stderr, both, file:<path>).
+    pub capture: String,
+}
+
+impl Step {
+    /// Whether this step is a probe (risk: none, auto-executable).
+    #[must_use]
+    pub fn is_probe(&self) -> bool {
+        self.risk == RiskBand::None
+    }
+
+    /// Whether this step is an intervention (risk > none, requires consent).
+    #[must_use]
+    pub fn is_intervention(&self) -> bool {
+        self.risk > RiskBand::None
+    }
+
+    /// Whether this step requires operator consent given the auto-risk cap.
+    ///
+    /// Probes never require consent. Interventions require consent
+    /// when their risk exceeds `max_auto_risk`.
+    #[must_use]
+    pub fn consent_required(&self, max_auto_risk: RiskBand) -> bool {
+        self.risk > RiskBand::None && self.risk > max_auto_risk
+    }
 }
 
 /// A profile precondition clause.

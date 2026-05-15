@@ -132,6 +132,20 @@ impl ResolvedAction {
         }
     }
 
+    /// Whether this action requires operator consent.
+    ///
+    /// Probes never require consent (risk: none).
+    /// Interventions require consent when their risk exceeds the skill's `max_auto_risk`.
+    /// Kask tools require consent when their risk > None.
+    #[must_use]
+    pub fn consent_required(&self) -> bool {
+        match self {
+            Self::Probe { .. } => false,
+            Self::Intervention { risk, max_auto_risk, .. } => *risk > *max_auto_risk,
+            Self::KaskTool { risk_band, .. } => *risk_band > RiskBand::None,
+        }
+    }
+
     /// Append extra CLI arguments to the command argv.
     /// Only Applies to probes and interventions; no-op for Kask tools.
     pub fn append_cmd_args(&mut self, args: &[String]) {

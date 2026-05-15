@@ -58,6 +58,9 @@ pub enum DryRun {
 }
 
 /// Outcome of a single subprocess run.
+///
+/// For rollback-protected interventions, the `rollback` field
+/// contains the rollback run outcome (if rollback was triggered).
 #[derive(Debug, Clone, PartialEq)]
 pub struct RunOutcome {
     /// The command that was executed (or would have been).
@@ -74,6 +77,36 @@ pub struct RunOutcome {
     pub timed_out: bool,
     /// Wall-clock duration.
     pub duration: Duration,
+    /// Rollback outcome, if this was an intervention that failed
+    /// and rollback was triggered. `None` for probes and successful
+    /// interventions.
+    pub rollback: Option<Box<RunOutcome>>,
+}
+
+impl RunOutcome {
+    /// Whether the forward command succeeded (exit=0, no timeout).
+    #[must_use]
+    pub fn succeeded(&self) -> bool {
+        self.exit_code == Some(0) && !self.timed_out
+    }
+
+    /// Whether rollback was applied.
+    #[must_use]
+    pub fn rollback_applied(&self) -> bool {
+        self.rollback.is_some()
+    }
+
+    /// Whether the overall operation is safe — either forward succeeded,
+    /// or forward failed but rollback succeeded.
+    #[must_use]
+    pub fn is_safe(&self) -> bool {
+        if self.succeeded() {
+            return true;
+        }
+        self.rollback
+            .as_ref()
+            .is_some_and(|r| r.exit_code == Some(0) && !r.timed_out)
+    }
 }
 
 /// Rollback strategy as resolved by the manifest loader.
@@ -94,31 +127,11 @@ pub enum RollbackStrategy {
     Reboot,
 }
 
-/// Outcome of a rollback-protected intervention.
-#[derive(Debug, Clone, PartialEq)]
-pub struct RollbackOutcome {
-    /// The forward (original) run outcome.
-    pub forward: RunOutcome,
-    /// The rollback run outcome, if rollback was triggered.
-    pub rollback: Option<RunOutcome>,
-    /// Whether rollback was actually applied.
-    pub rollback_applied: bool,
-}
-
-impl RollbackOutcome {
-    /// Whether the overall operation was successful (forward succeeded
-    /// OR forward failed but rollback succeeded).
-    #[must_use]
-    pub fn is_safe(&self) -> bool {
-        if self.forward.exit_code == Some(0) && !self.forward.timed_out {
-            return true; // forward succeeded
-        }
-        // Forward failed; check rollback.
-        self.rollback
-            .as_ref()
-            .is_some_and(|r| r.exit_code == Some(0) && !r.timed_out)
-    }
-}
+/// Backward-compatibility alias for code that previously used the
+/// separate `RollbackOutcome` type. New code should use [`RunOutcome`]
+/// directly — it now carries rollback information inline.
+#[deprecated(since = "0.2.0", note = "use RunOutcome directly; rollback is now an inline field")]
+pub type RollbackOutcome = RunOutcome;
 
 /// Whether a dispatch is a probe (read-only) or intervention (mutating).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -144,6 +157,9 @@ impl StepType {
 ///
 /// Using named fields prevents positional-argument confusion at
 /// call sites with 8+ parameters.
+///
+/// Currently only consumed within this crate. External callers use
+/// `run_and_journal` or `run_intervention_with_rollback` directly.
 pub struct DispatchRequest<'a> {
     /// Journal to write evidence events to.
     pub journal: &'a JournalWriter,
@@ -274,6 +290,7 @@ impl Dispatcher {
                 stderr: String::new(),
                 timed_out: false,
                 duration: started.elapsed(),
+                rollback: None,
             });
         }
 
@@ -286,6 +303,7 @@ impl Dispatcher {
                 stderr: "empty command".into(),
                 timed_out: false,
                 duration: started.elapsed(),
+                rollback: None,
             });
         }
 
@@ -343,6 +361,7 @@ impl Dispatcher {
                 stderr: String::from_utf8_lossy(&out.stderr).into_owned(),
                 timed_out: false,
                 duration: started.elapsed(),
+                rollback: None,
             }),
             Ok(Err(e)) => Err(russell_core::CoreError::io(
                 &self.skill_dir,
@@ -358,6 +377,7 @@ impl Dispatcher {
                     stderr: format!("timed out after {timeout:?}"),
                     timed_out: true,
                     duration: started.elapsed(),
+                    rollback: None,
                 })
             }
         }
@@ -553,12 +573,12 @@ impl Dispatcher {
         rollback: RollbackStrategy,
         get_rollback_cmd: F,
         timeout_override: Option<Duration>,
-    ) -> Result<RollbackOutcome>
+    ) -> Result<RunOutcome>
     where
         F: FnOnce(&str) -> Option<Vec<String>>,
     {
         // Forward run.
-        let forward = self
+        let mut forward = self
             .run_and_journal(
                 journal,
                 evidence_base,
@@ -571,13 +591,8 @@ impl Dispatcher {
             )
             .await?;
 
-        let succeeded = forward.exit_code == Some(0) && !forward.timed_out;
-        if succeeded {
-            return Ok(RollbackOutcome {
-                forward,
-                rollback: None,
-                rollback_applied: false,
-            });
+        if forward.succeeded() {
+            return Ok(forward);
         }
 
         // Rollback needed.
@@ -587,22 +602,14 @@ impl Dispatcher {
                     skill_id,
                     step_id, "intervention failed; rollback: none_needed — no action"
                 );
-                Ok(RollbackOutcome {
-                    forward,
-                    rollback: None,
-                    rollback_applied: false,
-                })
+                Ok(forward)
             }
             RollbackStrategy::Reboot => {
                 warn!(
                     skill_id,
                     step_id, "intervention failed; rollback: reboot required"
                 );
-                Ok(RollbackOutcome {
-                    forward,
-                    rollback: None,
-                    rollback_applied: false,
-                })
+                Ok(forward)
             }
             RollbackStrategy::RollbackId { ref id } => {
                 let rollback_cmd = match get_rollback_cmd(id) {
@@ -614,11 +621,7 @@ impl Dispatcher {
                             rollback_id = %id,
                             "rollback command not found — rollback skipped"
                         );
-                        return Ok(RollbackOutcome {
-                            forward,
-                            rollback: None,
-                            rollback_applied: false,
-                        });
+                        return Ok(forward);
                     }
                 };
 
@@ -643,11 +646,8 @@ impl Dispatcher {
                     )
                     .await?;
 
-                Ok(RollbackOutcome {
-                    forward,
-                    rollback: Some(rollback_outcome),
-                    rollback_applied: true,
-                })
+                forward.rollback = Some(Box::new(rollback_outcome));
+                Ok(forward)
             }
         }
     }
@@ -933,9 +933,9 @@ mod tests {
             .unwrap();
 
         // Forward failed.
-        assert_eq!(outcome.forward.exit_code, Some(1));
+        assert_eq!(outcome.exit_code, Some(1));
         // Rollback was applied.
-        assert!(outcome.rollback_applied);
+        assert!(outcome.rollback_applied());
         let rb = outcome.rollback.unwrap();
         assert_eq!(rb.exit_code, Some(0));
         assert!(rb.stdout.contains("rolled-back"));
@@ -965,8 +965,8 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(outcome.forward.exit_code, Some(0));
-        assert!(!outcome.rollback_applied);
+        assert_eq!(outcome.exit_code, Some(0));
+        assert!(!outcome.rollback_applied());
         assert!(outcome.rollback.is_none());
         assert!(outcome.is_safe());
     }
@@ -996,8 +996,8 @@ mod tests {
             .unwrap();
 
         // Forward failed but rollback is none_needed.
-        assert_eq!(outcome.forward.exit_code, Some(2));
-        assert!(!outcome.rollback_applied);
+        assert_eq!(outcome.exit_code, Some(2));
+        assert!(!outcome.rollback_applied());
         assert!(outcome.rollback.is_none());
     }
 
@@ -1025,8 +1025,8 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(outcome.forward.exit_code, Some(3));
-        assert!(!outcome.rollback_applied);
+        assert_eq!(outcome.exit_code, Some(3));
+        assert!(!outcome.rollback_applied());
         assert!(outcome.rollback.is_none());
     }
 

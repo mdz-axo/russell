@@ -209,10 +209,9 @@ pub async fn execute_pending_action(
 
     match rollback_outcome {
         Ok(outcome) => {
-            let forward = &outcome.forward;
-            let success = forward.exit_code == Some(0) && !forward.timed_out;
+            let success = outcome.succeeded();
             let error_msg = if !success {
-                Some(format!("exit {:?}, stderr: {}", forward.exit_code, forward.stderr.trim()))
+                Some(format!("exit {:?}, stderr: {}", outcome.exit_code, outcome.stderr.trim()))
             } else {
                 None
             };
@@ -230,20 +229,20 @@ pub async fn execute_pending_action(
                     &format!("/approve {skill_id}/{action_id}"),
                     &format!(
                         "executed: exit=0, stdout_len={}, stderr_len={}",
-                        forward.stdout.len(),
-                        forward.stderr.len()
+                        outcome.stdout.len(),
+                        outcome.stderr.len()
                     ),
                 );
                 let report = format_intervention_result(&outcome, &skill_id, &action_id);
                 Some(report)
-            } else if outcome.rollback_applied {
+            } else if outcome.rollback_applied() {
                 let rb = outcome.rollback.as_ref().unwrap();
                 println!(
                     "  → {skill_id}/{action_id} failed (exit {:?}). Rollback applied: exit {:?}.",
-                    forward.exit_code, rb.exit_code
+                    outcome.exit_code, rb.exit_code
                 );
-                if !forward.stderr.is_empty() {
-                    println!("  stderr: {}", forward.stderr.trim());
+                if !outcome.stderr.is_empty() {
+                    println!("  stderr: {}", outcome.stderr.trim());
                 }
                 journal_chat_turn(
                     journal,
@@ -252,32 +251,32 @@ pub async fn execute_pending_action(
                     &format!("/approve {skill_id}/{action_id}"),
                     &format!(
                         "failed: forward_exit={:?}, rollback_exit={:?}",
-                        forward.exit_code, rb.exit_code
+                        outcome.exit_code, rb.exit_code
                     ),
                 );
                 Some(format!(
                     "[intervention result: {skill_id}/{action_id}, failed, rolled back]\n\
                      forward exit={:?}\nrollback exit={:?}",
-                    forward.exit_code, rb.exit_code
+                    outcome.exit_code, rb.exit_code
                 ))
             } else {
                 println!(
                     "  → {skill_id}/{action_id} failed (exit {:?}). No rollback available.",
-                    forward.exit_code
+                    outcome.exit_code
                 );
-                if !forward.stderr.is_empty() {
-                    println!("  stderr: {}", forward.stderr.trim());
+                if !outcome.stderr.is_empty() {
+                    println!("  stderr: {}", outcome.stderr.trim());
                 }
                 journal_chat_turn(
                     journal,
                     session_id,
                     model,
                     &format!("/approve {skill_id}/{action_id}"),
-                    &format!("failed: exit={:?}, no_rollback", forward.exit_code),
+                    &format!("failed: exit={:?}, no_rollback", outcome.exit_code),
                 );
                 Some(format!(
                     "[intervention result: {skill_id}/{action_id}, failed, exit={:?}, no rollback]",
-                    forward.exit_code
+                    outcome.exit_code
                 ))
             }
         }
@@ -347,18 +346,17 @@ pub fn format_probe_result(
 
 /// Format an intervention result for LLM context injection.
 pub fn format_intervention_result(
-    outcome: &russell_skills::dispatch::RollbackOutcome,
+    outcome: &russell_skills::dispatch::RunOutcome,
     skill_id: &str,
     action_id: &str,
 ) -> String {
-    let forward = &outcome.forward;
-    let exit_str = match forward.exit_code {
+    let exit_str = match outcome.exit_code {
         Some(code) => format!("exit={code}"),
         None => "killed/timeout".to_string(),
     };
     let mut report = format!("[intervention result: {skill_id}/{action_id}, {exit_str}]\n");
-    if !forward.stdout.is_empty() {
-        let stdout = forward.stdout.trim();
+    if !outcome.stdout.is_empty() {
+        let stdout = outcome.stdout.trim();
         if stdout.len() > 3000 {
             report.push_str(&stdout[..3000]);
             report.push_str("\n… (output truncated)\n");
@@ -367,8 +365,8 @@ pub fn format_intervention_result(
             report.push('\n');
         }
     }
-    if !forward.stderr.is_empty() {
-        let stderr = forward.stderr.trim();
+    if !outcome.stderr.is_empty() {
+        let stderr = outcome.stderr.trim();
         let stderr_truncated = if stderr.len() > 1000 {
             format!("{}… (truncated)", &stderr[..1000])
         } else {
