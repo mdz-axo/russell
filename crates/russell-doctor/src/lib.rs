@@ -20,6 +20,7 @@ pub mod help;
 pub mod mock;
 pub mod oai_client;
 pub mod prompt;
+pub mod prompt_registry;
 
 pub use client::{Backend, ClientConfig, EscalateMin, LlmClient, LlmResponse, SoapPrompt};
 pub use error::{DoctorError, Result};

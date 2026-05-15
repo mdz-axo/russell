@@ -502,6 +502,7 @@ fn error_kind_of(e: &DoctorError) -> String {
         DoctorError::Config(_) => "config".into(),
         DoctorError::BadResponse(_) => "bad_response".into(),
         DoctorError::Fmt(_) => "fmt".into(),
+        DoctorError::Prompt(_) => "prompt".into(),
         DoctorError::Other(_) => "other".into(),
     }
 }

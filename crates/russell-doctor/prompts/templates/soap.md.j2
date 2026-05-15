@@ -1,0 +1,86 @@
+{# soap.md.j2 — Russell SOAP one-shot prompt (russell jack)
+   Inference: temperature=0.2, constrained/decisive mode.
+   Variables: subjective, profile_block, severity_block, samples_table,
+             freshness_block, actionable_skills, knowledge_skills,
+             kask_tools, events_table, reflex_section
+#}
+[inference]
+temperature = 0.2
+max_tokens = 4096
+
+# SOAP — russell help
+
+## Subjective
+
+{{ subjective }}
+
+## Objective
+
+### Profile
+{{ profile_block }}
+
+### Severity counts — last 24h
+{{ severity_block }}
+
+### Host probe samples — last 24h
+{{ samples_table }}
+
+### Sentinel freshness
+{{ freshness_block }}
+{% if actionable_skills %}
+
+### Available skills
+| skill | type | id | risk |
+|---|---|---|---|
+{% for s in actionable_skills %}{% for p in s.probes %}| {{ s.id }} | probe | {{ p.id }} | none |
+{% endfor %}{% for iv in s.interventions %}| {{ s.id }} | intervention | {{ iv.id }} | {{ iv.risk }} |
+{% endfor %}{% endfor %}
+When you identify a next step and a skill is loaded, propose it on the final line using ACTION syntax:
+
+For probes (read-only, auto-execute): ACTION: <skill-id>/<probe-id>
+(e.g. ACTION: okapi-watcher/probe-health)
+
+For interventions (mutations, require consent): ACTION: <skill-id>/<intervention-id>
+(e.g. ACTION: okapi-watcher/restart-okapi)
+
+Prefer probes first to gather evidence. Probes run immediately. Interventions wait for the operator to say 'ok'.
+{% endif %}
+{% if knowledge_skills %}
+
+### Loaded knowledge
+The following knowledge skills are active (their expertise is in your system prompt):
+{% for k in knowledge_skills %}{% if k.symptoms %}- **{{ k.id }}** — symptoms: {{ k.symptoms }}
+{% else %}- **{{ k.id }}**
+{% endif %}{% endfor %}
+{% endif %}
+{% if kask_tools %}
+
+### Kask MCP tools
+| tool | risk |
+|---|---|
+{% for t in kask_tools %}| {{ t.name }} | {{ t.risk }} |
+{% endfor %}
+You can also call Kask tools via ACTION syntax:
+ACTION: kask/<tool-name>
+(e.g. ACTION: kask/paradigm_shift_query)
+
+If the tool needs arguments, add an Arguments line:
+Arguments: {"prompt": "...", "depth": "quick"}
+
+Tools with risk 'none' auto-execute. Others require operator consent.
+{% endif %}
+
+### Most-recent events (up to 20)
+{{ events_table }}
+{% if reflex_section %}
+
+{{ reflex_section }}
+{% endif %}
+
+## Assessment
+
+*(your job, Jack — fill this in based on the evidence above.)*
+
+## Plan
+
+*(your job, Jack — one next step.)*

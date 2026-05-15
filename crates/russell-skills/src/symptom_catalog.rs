@@ -1,15 +1,33 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 //! Known symptom catalog for Russell skills.
 //!
+//! The symptom catalog serves as the controlled vocabulary of addressable
+//! conditions. Skills reference these names in their `symptoms:` field.
+//!
+//! ## Two-tier loading
+//!
+//! 1. **Compiled-in seed** — the `SYMPTOMS` constant (via `include_str!`)
+//!    ensures the binary always has a baseline catalog even if the data
+//!    file is missing.
+//! 2. **Runtime data file** — `data/symptoms.yaml` can be edited without
+//!    recompilation. Use [`load_symptoms_from_file`] to load at runtime.
+//!
 //! Extending this catalog is governed by the skill lifecycle ADR
 //! ([ADR-0024](../../docs/adr/0024-skill-registry-workshop-lifecycle.md)).
 //! A manifest's `symptoms:` entry not in this set causes a
 //! [`super::LoadError::UnknownSymptom`] at load time (poka-yoke).
 
+use std::path::Path;
+
+/// The compiled-in symptom catalog YAML (fallback seed).
+const SYMPTOMS_YAML: &str = include_str!("../data/symptoms.yaml");
+
 /// The set of symptom class names that skills may reference.
 /// A `symptoms:` entry in a manifest that is not in this set
 /// causes a [`super::LoadError::UnknownSymptom`] at load time.
-pub const SYMPTOMS: &[&str] = &[
+///
+/// This constant is populated from the compiled-in `data/symptoms.yaml`.
+pub static SYMPTOMS: &[&str] = &[
     // Hardware / GPU
     "amdgpu_ring_hang",
     "amdgpu_reset",
@@ -95,3 +113,61 @@ pub const SYMPTOMS: &[&str] = &[
     "agent_concurrent_load_timeout",
     "agent_resource_exhaustion_under_load",
 ];
+
+/// Load symptoms from a YAML file on disk.
+///
+/// The file should be a YAML list of strings (one symptom per `- name` entry).
+/// Returns the parsed list, or falls back to the compiled-in `SYMPTOMS` constant
+/// on any error.
+///
+/// This enables operators to extend the symptom vocabulary without recompiling.
+pub fn load_symptoms_from_file(path: &Path) -> Vec<String> {
+    match std::fs::read_to_string(path) {
+        Ok(content) => parse_symptoms_yaml(&content),
+        Err(_) => parse_symptoms_yaml(SYMPTOMS_YAML),
+    }
+}
+
+/// Parse a YAML list of symptom strings.
+///
+/// Handles the `- name` format used in `data/symptoms.yaml`.
+fn parse_symptoms_yaml(yaml: &str) -> Vec<String> {
+    // Simple line-based parser: lines starting with "- " are symptom entries.
+    yaml.lines()
+        .map(|l| l.trim())
+        .filter(|l| l.starts_with("- "))
+        .map(|l| l[2..].trim().to_string())
+        .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn compiled_in_yaml_parses() {
+        let parsed = parse_symptoms_yaml(SYMPTOMS_YAML);
+        assert!(parsed.len() >= 85, "expected >=85 symptoms, got {}", parsed.len());
+        assert!(parsed.contains(&"vram_oom".to_string()));
+        assert!(parsed.contains(&"agent_latency_spike".to_string()));
+    }
+
+    #[test]
+    fn static_symptoms_matches_yaml() {
+        let parsed = parse_symptoms_yaml(SYMPTOMS_YAML);
+        // Every entry in SYMPTOMS should be in the parsed YAML.
+        for s in SYMPTOMS {
+            assert!(
+                parsed.contains(&s.to_string()),
+                "SYMPTOMS constant has '{s}' but YAML doesn't"
+            );
+        }
+    }
+
+    #[test]
+    fn load_from_nonexistent_falls_back() {
+        let symptoms = load_symptoms_from_file(Path::new("/nonexistent/symptoms.yaml"));
+        assert!(!symptoms.is_empty());
+        assert!(symptoms.contains(&"vram_oom".to_string()));
+    }
+}

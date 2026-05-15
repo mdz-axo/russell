@@ -68,6 +68,10 @@ pub enum DoctorError {
     #[error("fmt error: {0}")]
     Fmt(#[from] std::fmt::Error),
 
+    /// Prompt template error (compilation, rendering, or loading).
+    #[error("prompt template error: {0}")]
+    Prompt(String),
+
     /// Catch-all for rare conditions.
     #[error("{0}")]
     Other(String),

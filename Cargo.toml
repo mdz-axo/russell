@@ -53,6 +53,7 @@ tempfile = "3"
 reqwest = { version = "0.13", default-features = false, features = ["json", "rustls", "gzip", "blocking"] }
 strsim = "0.11"
 rand = "0.8"
+minijinja = "2"
 
 [profile.dev]
 opt-level = 0

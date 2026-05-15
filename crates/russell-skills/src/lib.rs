@@ -24,7 +24,6 @@
 #![deny(rust_2018_idioms)]
 #![warn(missing_docs)]
 
-use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
 use serde::Deserialize;
@@ -154,11 +153,30 @@ pub enum LoadError {
     },
 }
 
+/// The kind of skill — determines how it integrates with the harness.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SkillKind {
+    /// Has probes and/or interventions — executable runbook.
+    Actionable,
+    /// Knowledge-only — KNOWLEDGE.md injected into system prompt.
+    /// No probes, no interventions.
+    Lens,
+}
+
+impl Default for SkillKind {
+    fn default() -> Self {
+        Self::Actionable
+    }
+}
+
 /// A single skill, fully loaded and validated.
 #[derive(Debug, Clone)]
 pub struct Skill {
     /// Unique identifier (kebab-case).
     pub id: String,
+    /// The kind of skill (actionable vs lens).
+    pub kind: SkillKind,
     /// Semver version.
     pub version: String,
     /// Date authored (ISO 8601 date).
@@ -177,6 +195,20 @@ pub struct Skill {
     pub safety: Safety,
     /// Post-intervention evaluation checks.
     pub evaluation: Option<Evaluation>,
+}
+
+impl Skill {
+    /// Whether this skill is a knowledge-only lens (no probes/interventions).
+    #[must_use]
+    pub fn is_lens(&self) -> bool {
+        self.kind == SkillKind::Lens || (self.probes.is_empty() && self.interventions.is_empty())
+    }
+
+    /// Whether this skill is actionable (has probes or interventions).
+    #[must_use]
+    pub fn is_actionable(&self) -> bool {
+        !self.is_lens()
+    }
 }
 
 /// A profile precondition clause.
@@ -344,8 +376,13 @@ pub struct EvalCheck {
 
 /// The raw YAML manifest as parsed from disk, before validation.
 #[derive(Debug, Deserialize)]
+#[allow(missing_docs)]
 pub struct RawManifest {
     pub id: String,
+    /// Optional `kind` field. Defaults to `actionable`; if set to `lens`,
+    /// the skill is treated as knowledge-only.
+    #[serde(default)]
+    pub kind: Option<SkillKind>,
     #[serde(default)]
     pub version: Option<String>,
     #[serde(default)]
@@ -367,7 +404,8 @@ pub struct RawManifest {
 }
 
 #[derive(Debug, Deserialize)]
-struct RawSafety {
+#[allow(missing_docs)]
+pub struct RawSafety {
     #[serde(default = "max_auto_risk_default")]
     max_auto_risk: RiskBand,
     #[serde(default)]
@@ -457,11 +495,108 @@ fn load_one(skill_dir: &Path, dir_name: &str) -> Result<Skill, LoadError> {
         source: e,
     })?;
 
-    parse_manifest(&yaml, dir_name)
+    let skill = parse_manifest(&yaml, dir_name)
         .map_err(|message| LoadError::InvalidManifest {
             path: manifest_path.clone(),
             message,
-        })
+        })?;
+
+    // Additional check that only applies when loading from disk:
+    // every script file in scripts/ must be referenced by a probe or
+    // intervention cmd.
+    check_unreferenced_scripts(skill_dir, &skill, &manifest_path)?;
+
+    Ok(skill)
+}
+
+/// Check that every executable file in `scripts/` is referenced by
+/// at least one probe or intervention `cmd`.
+fn check_unreferenced_scripts(
+    skill_dir: &Path,
+    skill: &Skill,
+    _manifest_path: &Path,
+) -> Result<(), LoadError> {
+    use std::collections::BTreeSet;
+
+    let scripts_dir = skill_dir.join("scripts");
+    if !scripts_dir.exists() {
+        return Ok(());
+    }
+
+    let mut referenced: BTreeSet<String> = BTreeSet::new();
+    for probe in &skill.probes {
+        collect_script_names(&probe.cmd, &mut referenced);
+    }
+    for iv in &skill.interventions {
+        collect_script_names(&iv.cmd, &mut referenced);
+    }
+    if let Some(ref eval) = skill.evaluation {
+        for check in &eval.after_intervention {
+            collect_script_names(&check.cmd, &mut referenced);
+        }
+    }
+
+    let entries = std::fs::read_dir(&scripts_dir).map_err(|e| LoadError::SkillDir {
+        path: scripts_dir.clone(),
+        source: e,
+    })?;
+
+    for entry in entries {
+        let entry = entry.map_err(|e| LoadError::SkillDir {
+            path: scripts_dir.clone(),
+            source: e,
+        })?;
+        let path = entry.path();
+        if !path.is_file() {
+            continue;
+        }
+        let name = path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or_default();
+        if name.contains('.') {
+            let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
+            if !matches!(ext, "sh" | "py" | "bash" | "pl" | "rb") {
+                continue;
+            }
+        }
+        if !referenced.contains(name) {
+            return Err(LoadError::UnreferencedScript {
+                skill_id: skill.id.clone(),
+                script: path.clone(),
+            });
+        }
+    }
+
+    Ok(())
+}
+
+/// Extract script filenames from a command argv.
+fn collect_script_names(cmd: &[String], out: &mut std::collections::BTreeSet<String>) {
+    for arg in cmd {
+        let name = if let Some(stripped) = arg.strip_prefix("./scripts/") {
+            stripped
+        } else if let Some(stripped) = arg.strip_prefix("./") {
+            stripped
+        } else if let Some(stripped) = arg.strip_prefix("scripts/") {
+            stripped
+        } else if !arg.contains('/') && !arg.contains(' ') {
+            arg.as_str()
+        } else {
+            continue;
+        };
+        if name.contains('.') {
+            let ext = std::path::Path::new(name)
+                .extension()
+                .and_then(|e| e.to_str())
+                .unwrap_or("");
+            if matches!(ext, "sh" | "py" | "bash" | "pl" | "rb") {
+                out.insert(name.to_string());
+            }
+        } else {
+            out.insert(name.to_string());
+        }
+    }
 }
 
 /// Extract the `id` field from a manifest YAML string without full validation.
@@ -530,8 +665,18 @@ pub fn parse_manifest(yaml: &str, dir_name: &str) -> std::result::Result<Skill, 
         require_human_for: Vec::new(),
     });
 
+    // Determine kind: explicit from manifest, or inferred from content.
+    let kind = raw.kind.unwrap_or_else(|| {
+        if raw.probes.is_empty() && raw.interventions.is_empty() {
+            SkillKind::Lens
+        } else {
+            SkillKind::Actionable
+        }
+    });
+
     Ok(Skill {
         id: raw.id,
+        kind,
         version: raw.version.unwrap_or_else(|| "0.0.0".into()),
         authored: raw.authored.unwrap_or_else(|| "unknown".into()),
         min_harness_version: raw.min_harness_version.unwrap_or_else(|| "0.1.0".into()),
@@ -545,155 +690,6 @@ pub fn parse_manifest(yaml: &str, dir_name: &str) -> std::result::Result<Skill, 
         },
         evaluation: raw.evaluation,
     })
-}
-
-/// Run all validation checks. Returns Err on the first failure.
-fn validate(
-    raw: &RawManifest,
-    dir_name: &str,
-    skill_dir: &Path,
-    manifest_path: &Path,
-) -> Result<(), LoadError> {
-    // 1. ID matches directory name.
-    if raw.id != dir_name {
-        return Err(LoadError::IdMismatch {
-            manifest_id: raw.id.clone(),
-            dir_name: dir_name.to_string(),
-        });
-    }
-
-    // 2. All symptoms are known.
-    for symptom in &raw.symptoms {
-        if !SYMPTOMS.contains(&symptom.as_str()) {
-            return Err(LoadError::UnknownSymptom {
-                skill_id: raw.id.clone(),
-                symptom: symptom.clone(),
-            });
-        }
-    }
-
-    // 3. Probes have risk: none (enforced via struct — probes don't
-    //    have a risk field by design; if one sneaks through YAML,
-    //    serde will reject it at parse time).
-
-    // 4. Every intervention has a valid rollback strategy.
-    //    This is enforced by the Rollback enum deserialization — if
-    //    none of the three variants parses, serde rejects the YAML.
-    //    But we also check that rollback_ids reference real interventions.
-    let intervention_ids: BTreeSet<&str> =
-        raw.interventions.iter().map(|i| i.id.as_str()).collect();
-
-    for iv in &raw.interventions {
-        if let Rollback::RollbackId { ref rollback_id } = iv.rollback
-            && !intervention_ids.contains(rollback_id.as_str())
-        {
-            return Err(LoadError::RollbackIdNotFound {
-                path: manifest_path.to_path_buf(),
-                intervention_id: iv.id.clone(),
-                rollback_id: rollback_id.clone(),
-            });
-        }
-    }
-
-    // 5. Unreferenced scripts check.
-    check_unreferenced_scripts(skill_dir, raw, manifest_path)?;
-
-    Ok(())
-}
-
-/// Check that every executable file in `scripts/` is referenced by
-/// at least one probe or intervention `cmd`.
-fn check_unreferenced_scripts(
-    skill_dir: &Path,
-    raw: &RawManifest,
-    _manifest_path: &Path,
-) -> Result<(), LoadError> {
-    let scripts_dir = skill_dir.join("scripts");
-    if !scripts_dir.exists() {
-        return Ok(());
-    }
-
-    // Collect all referenced script names.
-    let mut referenced: BTreeSet<String> = BTreeSet::new();
-    for probe in &raw.probes {
-        collect_script_names(&probe.cmd, &mut referenced);
-    }
-    for iv in &raw.interventions {
-        collect_script_names(&iv.cmd, &mut referenced);
-    }
-    if let Some(ref eval) = raw.evaluation {
-        for check in &eval.after_intervention {
-            collect_script_names(&check.cmd, &mut referenced);
-        }
-    }
-
-    // Walk scripts/ and check each file.
-    let entries = std::fs::read_dir(&scripts_dir).map_err(|e| LoadError::SkillDir {
-        path: scripts_dir.clone(),
-        source: e,
-    })?;
-
-    for entry in entries {
-        let entry = entry.map_err(|e| LoadError::SkillDir {
-            path: scripts_dir.clone(),
-            source: e,
-        })?;
-        let path = entry.path();
-        if !path.is_file() {
-            continue;
-        }
-        let name = path
-            .file_name()
-            .and_then(|n| n.to_str())
-            .unwrap_or_default();
-        // Only flag files that look like scripts (have no extension or
-        // common script extensions).
-        if name.contains('.') {
-            let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
-            if !matches!(ext, "sh" | "py" | "bash" | "pl" | "rb") {
-                continue;
-            }
-        }
-        if !referenced.contains(name) {
-            return Err(LoadError::UnreferencedScript {
-                skill_id: raw.id.clone(),
-                script: path.clone(),
-            });
-        }
-    }
-
-    Ok(())
-}
-
-/// Extract script filenames from a command argv.
-fn collect_script_names(cmd: &[String], out: &mut BTreeSet<String>) {
-    for arg in cmd {
-        // Heuristic: script names appear as bare filenames or
-        // paths starting with `./` or `scripts/`.
-        let name = if let Some(stripped) = arg.strip_prefix("./scripts/") {
-            stripped
-        } else if let Some(stripped) = arg.strip_prefix("./") {
-            stripped
-        } else if let Some(stripped) = arg.strip_prefix("scripts/") {
-            stripped
-        } else if !arg.contains('/') && !arg.contains(' ') {
-            arg.as_str()
-        } else {
-            continue;
-        };
-        if name.contains('.') {
-            let ext = std::path::Path::new(name)
-                .extension()
-                .and_then(|e| e.to_str())
-                .unwrap_or("");
-            if matches!(ext, "sh" | "py" | "bash" | "pl" | "rb") {
-                out.insert(name.to_string());
-            }
-        } else {
-            // Extensionless — could be a binary script.
-            out.insert(name.to_string());
-        }
-    }
 }
 
 #[cfg(test)]

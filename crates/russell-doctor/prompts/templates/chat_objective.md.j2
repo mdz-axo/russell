@@ -1,0 +1,53 @@
+{# chat_objective.md.j2 — Russell chat mode journal snapshot
+   Used by `russell chat` to provide the current state each turn.
+   Inference: temperature=0.4, conversational mode.
+   Variables: profile_block, severity_block, samples_table,
+             freshness_block, actionable_skills, knowledge_skills,
+             kask_tools, events_table, skill_telemetry
+#}
+[inference]
+temperature = 0.4
+max_tokens = 2048
+
+# Current journal snapshot
+{% if profile_block %}
+
+### Profile
+{{ profile_block }}
+{% endif %}
+
+### Severity counts — last 24h
+{{ severity_block }}
+
+### Host probe samples — last 24h
+{{ samples_table }}
+
+### Sentinel freshness
+{{ freshness_block }}
+{% if actionable_skills %}
+
+### Available skills
+{% for s in actionable_skills %}{% for p in s.probes %}- `{{ s.id }}`/`{{ p.id }}` (probe, risk: none)
+{% endfor %}{% for iv in s.interventions %}- `{{ s.id }}`/`{{ iv.id }}` (intervention, risk: {{ iv.risk }})
+{% endfor %}{% endfor %}
+{% endif %}
+{% if kask_tools %}
+
+### Kask MCP tools
+{% for t in kask_tools %}- `kask`/`{{ t.name }}` (tool, risk: {{ t.risk }}){% if t.description %} — {{ t.description }}{% endif %}
+
+{% endfor %}
+{% endif %}
+{% if skill_telemetry %}
+
+### Skill Performance
+| skill | probes | fails | last run |
+|---|---|---|---|
+{% for st in skill_telemetry %}| {{ st.id }} | {{ st.probe_runs }} | {{ st.failures }} | {{ st.last_run }} |
+{% endfor %}
+{% endif %}
+{% if events_table %}
+
+### Recent events (last 5)
+{{ events_table }}
+{% endif %}

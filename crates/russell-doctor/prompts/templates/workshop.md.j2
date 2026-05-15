@@ -1,0 +1,29 @@
+{# workshop.md.j2 — Russell workshop mode context
+   Used by `russell workshop` for skill creation/management.
+   Inference: temperature=0.6, creative/generative mode.
+   Variables: skill_list, coverage_gaps, registry_stats
+#}
+[inference]
+temperature = 0.6
+max_tokens = 4096
+
+# Skill Workshop Context
+
+You are in **workshop mode** — helping the operator discover, build, evaluate, and maintain skills.
+{% if skill_list %}
+
+### Installed Skills
+{{ skill_list }}
+{% endif %}
+{% if coverage_gaps %}
+
+### Coverage Gaps
+Symptoms with no installed skill:
+{% for gap in coverage_gaps %}- `{{ gap }}`
+{% endfor %}
+{% endif %}
+{% if registry_stats %}
+
+### Registry Statistics
+{{ registry_stats }}
+{% endif %}

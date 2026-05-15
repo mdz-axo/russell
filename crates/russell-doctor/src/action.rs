@@ -606,6 +606,7 @@ mod tests {
     fn make_skill() -> Skill {
         Skill {
             id: "test-skill".into(),
+            kind: russell_skills::SkillKind::Actionable,
             version: "0.1.0".into(),
             authored: "2026-01-01".into(),
             min_harness_version: "0.1.0".into(),

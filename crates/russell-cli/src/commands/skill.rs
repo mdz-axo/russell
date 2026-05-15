@@ -555,21 +555,15 @@ pub fn put(paths: &Paths, name: Option<&str>) -> Result<()> {
 
     // Parse and validate the manifest using the shared validation logic.
     // Resolve skill name — from CLI arg or from YAML's id field.
-    // Extract id from YAML first for name resolution and validation.
     let name = if let Some(n) = name {
         n.to_string()
     } else {
-        // Quick parse to extract the id field for directory naming.
-        // Full validation happens next via parse_manifest.
-        let raw: russell_skills::RawManifest = serde_yaml::from_str(&content)
-            .context("parsing manifest YAML")?;
-        if raw.id.is_empty() {
-            anyhow::bail!("manifest has no 'id' field and no name was provided via CLI");
-        }
-        raw.id.clone()
+        russell_skills::extract_manifest_id(&content)
+            .ok_or_else(|| anyhow::anyhow!("manifest has no 'id' field and no name was provided via CLI"))?
     };
 
     let _skill = russell_skills::parse_manifest(&content, &name)
+        .map_err(|e| anyhow::anyhow!("{e}"))
         .context("validating manifest")?;
 
     // Write manifest to disk.
@@ -587,14 +581,15 @@ pub fn put(paths: &Paths, name: Option<&str>) -> Result<()> {
     println!("Manifest written to {}", manifest_path.display());
 
     // Register in the registry cache.
-    let version = raw.version.clone().unwrap_or_else(|| "0.1.0".into());
-    let authored = raw.authored.clone().unwrap_or_else(|| now_date_iso8601());
+    let version = _skill.version.clone();
+    let authored = _skill.authored.clone();
+    let symptoms = _skill.symptoms.clone();
     let registry_path = paths.state.join("registry").join("local-cache.yaml");
     RegistryCache::with_update(&registry_path, |registry| {
         let entry = RegistryEntry {
             status: LifecycleStatus::Active,
             version: version.clone(),
-            symptoms: raw.symptoms.clone(),
+            symptoms: symptoms.clone(),
             source: SkillSource::Manual,
             installed: authored.clone(),
             last_evaluated: None,
@@ -621,8 +616,8 @@ pub fn put(paths: &Paths, name: Option<&str>) -> Result<()> {
         LifecycleStatus::Active, Some("put via CLI (manifest from stdin)"),
     );
 
-    let probe_count = raw.probes.len();
-    let iv_count = raw.interventions.len();
+    let probe_count = _skill.probes.len();
+    let iv_count = _skill.interventions.len();
     println!(
         "Skill '{name}' registered (v{version}, {probe_count} probes, {iv_count} interventions)."
     );
