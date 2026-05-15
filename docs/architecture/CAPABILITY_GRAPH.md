@@ -25,7 +25,7 @@ status: VERIFIED
 
 ## 1. Russell Capability Graph
 
-### 1.1 Sentinel (Phase B — Business)
+### 1.1 Sentinel (Phase C — Data Architecture / Phase G — Governance)
 
 ```
 Capability: Host Observation
@@ -54,7 +54,7 @@ Capability: Host Observation
     Contract: harness.event.v1 — structured log record
 ```
 
-### 1.2 Doctor (Phase C — Application)
+### 1.2 Metacognitive Layer / Nurse (Phase C — Application)
 
 ```
 Capability: LLM Consultation (Nurse)
@@ -108,7 +108,7 @@ Capability: Playbook Execution
 Capability: Operator Interface
   Port: ClapCommands (russell-cli/src/main.rs)
     Verbs: jack, chat, sentinel-once, skill list, skill run, digest
-  Port: ChatREPL (russell-cli/src/repl.rs)
+  Port: ChatREPL (russell-cli/src/commands/chat/mod.rs)
     Contract: Interactive readline, token budgeting, consent gate
     Consent: /approve, /deny, natural language ("ok", "yes", "do it")
 ```
@@ -244,7 +244,7 @@ Capability: Model Persistence
 ## 4. Cross-Repo Integration Points
 
 ```
-Russell Doctor ──(OpenAI API)──▶ Okapi Server (127.0.0.1:11435)
+Russell Nurse ──(OpenAI API)──▶ Okapi Server (127.0.0.1:11435)
   Contract: /api/chat/completions with LoRA adapter context
 
 Kask Arsenal ──(MCP)──▶ Russell Journal (SQLite)

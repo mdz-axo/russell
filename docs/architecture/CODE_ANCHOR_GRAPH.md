@@ -99,7 +99,7 @@ russell_sentinel::probes::systemd::SystemdUserFailedCount rdf:type struct .
 russell_sentinel::probes::systemd::SystemdSystemFailedCount rdf:type struct .
 ```
 
-## 3. Russell Doctor — LLM Consultation
+## 3. Russell Meta — Metacognitive Layer (Nurse)
 
 ```
 russell_meta::client::LlmClient rdf:type trait .  # chat(&SoapPrompt) -> Result<LlmResponse>

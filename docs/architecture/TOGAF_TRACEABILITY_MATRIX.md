@@ -61,11 +61,11 @@ is not a business concern.
 | **Preliminary** — Principles, Standards | [`PRINCIPLES_CATALOG.md`](PRINCIPLES_CATALOG.md), [`../standards/*.md`](../standards/) | JR-1 … JR-7 live here; includes DOCUMENTATION_STANDARDS, CODING_RUST, COMMITS, ADR, SAFETY, WRITING_EXCELLENCE |
 | **Phase A** — Architecture Vision | [`../../cybernetic-health-harness.md`](../../cybernetic-health-harness.md), [`PRINCIPLES_CATALOG.md`](PRINCIPLES_CATALOG.md), [`overview.md`](overview.md), [`THE_JACK.md`](THE_JACK.md) | The full vision, current shape, and persona design |
 | **Phase B** — Business Architecture | *(skipped)* | Single-operator tool; no business concern |
-| **Phase C** — IS (Data + Application) | [`../specifications/PERSISTENCE_CATALOG.md`](../specifications/PERSISTENCE_CATALOG.md), [`overview.md`](overview.md), [`CODE_ANCHOR_GRAPH.md`](CODE_ANCHOR_GRAPH.md), [`../adr/0024-skill-registry-workshop-lifecycle.md`](../adr/0024-skill-registry-workshop-lifecycle.md) | Data persistence, crate topology, registry schema, public type registry |
+| **Phase C** — IS (Data + Application) | [`../specifications/PERSISTENCE_CATALOG.md`](../specifications/PERSISTENCE_CATALOG.md), [`overview.md`](overview.md), [`CODE_ANCHOR_GRAPH.md`](CODE_ANCHOR_GRAPH.md), [`skill-ports-adapters.md`](skill-ports-adapters.md) | Data persistence, crate topology, hexagonal ports/adapters, public type registry |
 | **Phase D** — Technology | [`../adr/0009-tokio-runtime.md`](../adr/deferred/0009-tokio-runtime.md) *(deferred)*, [`../operations/REUSE_MANIFEST.md`](../operations/REUSE_MANIFEST.md), [`../../install.sh`](../../install.sh), [`../operations/INSTALL.md`](../operations/INSTALL.md) | Tech stack, reuse register, deployment |
 | **Phase E/F** — Migration | [`../../cybernetic-health-harness.md` §20](../../cybernetic-health-harness.md), [`../status/CONSOLIDATED-STATUS.md`](../status/CONSOLIDATED-STATUS.md) | Roadmap and where we are |
 | **Phase G** — Governance | [`../status/CONSOLIDATED-STATUS.md`](../status/CONSOLIDATED-STATUS.md), [`../standards/safety.md`](../standards/safety.md), [`../../AGENTS.md`](../../AGENTS.md), [`../../scenario-tests.sh`](../../scenario-tests.sh) | Safety contract, identity, test coverage |
-| **Phase H** — Change Management | [`../adr/`](../adr/) (18 active ADRs: 0001–0002, 0004, 0006, 0008, 0011, 0013, 0015–0025; 7 deferred: 0003, 0005, 0007, 0009–0010, 0012, 0014); [`../status/skill-lifecycle-gaps.md`](../status/skill-lifecycle-gaps.md), [`skill-self-management-strategy.md`](skill-self-management-strategy.md) | Locked decisions, lifecycle gaps, self-management plan |
+| **Phase H** — Change Management | [`../adr/`](../adr/) (19 active ADRs: 0001–0002, 0004, 0006, 0008, 0011, 0013, 0015–0026; 7 deferred: 0003, 0005, 0007, 0009–0010, 0012, 0014); [`../status/skill-lifecycle-gaps.md`](../status/skill-lifecycle-gaps.md), [`skill-self-management-strategy.md`](skill-self-management-strategy.md) | Locked decisions, lifecycle gaps, self-management plan |
 | **Requirements Mgmt** | [`../specifications/MVP_SPEC.md`](../specifications/MVP_SPEC.md), [`../specifications/PERSISTENCE_CATALOG.md`](../specifications/PERSISTENCE_CATALOG.md) | The pinned boundary |
 
 ## 3. Principle → Phase Anchoring
@@ -78,7 +78,7 @@ has an anchor document per TOGAF phase.
 | JR-1 Jack Russell | ● | ● |   |   |   | ADR-0001, ADR-0013 |
 | JR-2 Observe first |   |   |   |   | ● | ADR-0008, ADR-0011 |
 | JR-3 No shell |   |   |   |   |   | ADR-0008 |
-| JR-4 Doctor present |   | ●  | ● |   |   | ADR-0008, ADR-0016 |
+| JR-4 Nurse present |   | ●  | ● |   |   | ADR-0008, ADR-0016 |
 | JR-5 Proprioception |   |   |   |   | ● | ADR-0015 |
 | JR-6 Reuse |   |   |   | ● |   | ADR-0013, ADR-0017 |
 | JR-7 Persistence audited |   |   | ● |   |   | ADR-0004, ADR-0006, ADR-0024 |
