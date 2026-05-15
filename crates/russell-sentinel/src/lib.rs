@@ -2,7 +2,11 @@
 //! `russell-sentinel` — host probe collection and rule evaluation.
 //!
 //! Collects host probes and evaluates them against the rule engine.
-//! Thresholds are configurable via `rules.d/*.toml` (ADR-0012).
+//! Thresholds are configurable via `rules.d/*.toml`.
+//!
+//! The sentinel is the "Observe" phase from the Observe > Recommend >
+//! Act posture (JR-2, [`PRINCIPLES_CATALOG.md`](../../docs/architecture/PRINCIPLES_CATALOG.md)).
+//! It reads the host; it does not mutate.
 
 #![forbid(unsafe_code)]
 #![deny(rust_2018_idioms)]

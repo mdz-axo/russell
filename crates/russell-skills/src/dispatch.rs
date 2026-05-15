@@ -6,9 +6,21 @@
 //!
 //! ## IDRS integration
 //!
-//! Every dispatch via [`Dispatcher::run_and_journal`] writes a
-//! `harness.event.v1` record to the journal and an evidence bundle
-//! to disk. The dry-run path writes the event but does not execute
+//! Every dispatch via [`Dispatcher::run_and_journal`] satisfies the
+//! IDRS contract defined in
+//! [`docs/standards/safety.md`](../../../docs/standards/safety.md):
+//!
+//! - **I (Idempotent):** Enforced per-intervention via manifest
+//!   `idempotent: true` field.
+//! - **D (Dry-run):** `--dry-run` flag writes `would_*` actions,
+//!   never executes subprocess.
+//! - **R (Rollback):** [`Dispatcher::run_intervention_with_rollback`]
+//!   supports `rollback_id` (reverse intervention), `none_needed`,
+//!   and `reboot` strategies.
+//! - **S (Structured log):** Every dispatch writes a `harness.event.v1`
+//!   record to the journal and an evidence bundle to disk.
+//!
+//! The dry-run path writes the event but does not execute
 //! the subprocess. Rollback pre-state capture is the caller's
 //! responsibility (dispatchers can't know what state to snapshot).
 
@@ -353,15 +365,16 @@ impl Dispatcher {
 
     /// Run a command and journal the result.
     ///
-    /// This is the IDRS-compliant entry point. It:
+    /// This is the IDRS-compliant entry point for skill execution.
+    /// See [`docs/standards/safety.md`](../../../docs/standards/safety.md)
+    /// for the full IDRS contract.
     ///
     /// 1. Calls [`run`] to execute the command (or dry-run).
     /// 2. Writes a `harness.event.v1` event to the journal with
     ///    action `"skill_probe"` (risk=none) or `"skill_intervention"`
     ///    (risk from manifest).
     /// 3. Writes an evidence bundle to
-    ///    `evidence/skills/<skill_id>/<step_id>/<ts>/` containing
-    ///    stdout, stderr, and the event JSON.
+    ///    `evidence/skills/<skill_id>/<step_id>/<ts>/`.
     ///
     /// `step_type` distinguishes probes from interventions for the
     /// event action field. `risk_band` is the risk level from the
@@ -492,7 +505,8 @@ impl Dispatcher {
 
     /// Run an intervention with automatic rollback on failure.
     ///
-    /// This is the IDRS-compliant entry point for mutating steps:
+    /// This is the IDRS-compliant entry point for mutating steps
+    /// (see [`docs/standards/safety.md`](../../../docs/standards/safety.md)):
     ///
     /// 1. Runs the forward intervention via [`run_and_journal`].
     /// 2. If it succeeds (exit=0), returns the outcome.

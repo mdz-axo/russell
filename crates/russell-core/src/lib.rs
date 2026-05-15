@@ -6,13 +6,16 @@
 //! - [`paths`] — XDG-aware state / config / data paths. The one place that
 //!   answers "where does Russell's data live?"
 //! - [`event`] — `harness.event.v1` record type (see
-//!   `cybernetic-health-harness.md` §14).
+//!   `cybernetic-health-harness.md` §14 and
+//!   [`docs/standards/safety.md`](../../docs/standards/safety.md) for the
+//!   IDRS structured-log requirement).
 //! - [`profile`] — `russell.profile.v1` machine chart
 //!   ([ADR-0006](../../docs/adr/0006-profile-abstraction.md)).
 //! - [`journal`] — SQLite journal behind a typed API
 //!   ([ADR-0004](../../docs/adr/0004-sqlite-journal.md)).
-//! - [`telemetry`] — `tracing` subscriber setup
-//!   ([ADR-0010](../../docs/adr/0010-observability-stack.md)).
+//! - [`telemetry`] — `tracing` subscriber setup (logging only in MVP;
+//!   full observability stack is deferred per
+//!   [ADR-0010](../../docs/adr/deferred/0010-observability-stack.md)).
 //!
 //! All I/O into `~/.local/state/harness/` routes through this crate.
 //! No other crate opens the journal DB directly.

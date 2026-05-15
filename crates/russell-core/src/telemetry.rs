@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
-//! `tracing` subscriber setup per [ADR-0010](../../../docs/adr/0010-observability-stack.md).
+//! `tracing` subscriber setup (basic logging only in MVP).
 //!
 //! Phase 0 wires up only the terminal `fmt` subscriber; the
-//! journald bridge (`tracing-journald`) lands when the binary
-//! ships as a systemd unit.
+//! journald bridge (`tracing-journald`) and full OpenTelemetry
+//! observability stack are deferred per
+//! [ADR-0010](../../../docs/adr/deferred/0010-observability-stack.md).
 
 use tracing_subscriber::{EnvFilter, fmt};
 

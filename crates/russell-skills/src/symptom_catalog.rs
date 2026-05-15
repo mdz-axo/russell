@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 //! Known symptom catalog for Russell skills.
 //!
-//! Extending this catalog requires a short ADR per ADR-0007.
+//! Extending this catalog is governed by the skill lifecycle ADR
+//! ([ADR-0024](../../docs/adr/0024-skill-registry-workshop-lifecycle.md)).
+//! A manifest's `symptoms:` entry not in this set causes a
+//! [`super::LoadError::UnknownSymptom`] at load time (poka-yoke).
 
 /// The set of symptom class names that skills may reference.
 /// A `symptoms:` entry in a manifest that is not in this set

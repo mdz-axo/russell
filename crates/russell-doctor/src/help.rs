@@ -1,5 +1,24 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
-//! `run_help` orchestrator: SOAP → LLM → fallback → journal.
+//! `run_help` orchestrator — the Nurse pipeline.
+//!
+//! Implements the three-stage Nurse flow from
+//! [`docs/architecture/CAPABILITY_GRAPH.md`](../../../docs/architecture/CAPABILITY_GRAPH.md) §1.2:
+//!
+//! 1. **Compose** — builds a SOAP bundle (Subjective, Objective,
+//!    Assessment, Plan) from journal state, machine profile,
+//!    loaded skills, and Kask tools. Augments with operator
+//!    PERSONA.md / USER.md files per
+//!    [ADR-0022](../../../docs/adr/0022-markdown-memory-layer.md).
+//! 2. **Dispatch** — threshold-gated LLM call per
+//!    [ADR-0020](../../../docs/adr/0020-threshold-gated-llm-escalation.md).
+//!    Falls back to rule-based offline summariser on failure.
+//! 3. **Persist** — writes request/response/transcript to evidence
+//!    bundle, appends `harness.event.v1` to journal, records
+//!    help session row, and generates daily memory note.
+//!
+//! The Nurse never emits shell (JR-3, ADR-0008). Action IDs are
+//! selected from loaded manifests and rejected by a poka-yoke
+//! dispatcher if unknown.
 
 use std::path::PathBuf;
 

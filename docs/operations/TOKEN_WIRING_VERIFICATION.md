@@ -1,3 +1,17 @@
+---
+title: "Russell Kask Token Wiring Verification"
+audience: [operators, developers, architects]
+last_updated: 2026-05-14
+togaf_phase: "G"
+version: "1.0.0"
+status: "Active"
+---
+
+<!-- TOGAF_DOMAIN: Governance -->
+<!-- VERSION: 1.0.0 -->
+<!-- STATUS: Active -->
+<!-- LAST_UPDATED: 2026-05-14 -->
+
 # Russell Kask Token Wiring Verification
 
 **Date:** 2026-05-14  

@@ -3,7 +3,12 @@
 //!
 //! Rules map probe names to severity thresholds. The operator
 //! can override built-in defaults by dropping TOML files into
-//! `~/.config/harness/rules.d/`. See ADR-0012 and ADR-0018 (deferred).
+//! `~/.config/harness/rules.d/`.
+//!
+//! The rules engine was originally deferred (ADR-0012) and is now
+//! active per the MVP spec. Built-in defaults live in
+//! [`defaults.toml`](defaults.toml); operator overrides take
+//! precedence via [`RuleSet::load_from_dir`].
 //!
 //! ## Schema
 //!

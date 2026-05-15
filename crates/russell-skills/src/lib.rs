@@ -1,10 +1,16 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 //! `russell-skills` — skill manifest loader (Phase 3).
 //!
-//! Loads and validates YAML skill manifests per ADR-0007.
+//! Loads and validates YAML skill manifests. The skill model was
+//! originally deferred (ADR-0007) and is now active per
+//! [ADR-0023](../../docs/adr/0023-lift-adr-0007-phase3-skills.md).
+//! The full lifecycle (discovery → retirement) is governed by
+//! [ADR-0024](../../docs/adr/0024-skill-registry-workshop-lifecycle.md).
+//!
 //! Each skill lives under `skills/<id>/` with a `manifest.yaml`
 //! file that declares probes (read-only) and interventions
-//! (mutating, governed by the IDRS contract).
+//! (mutating, governed by the IDRS contract — see
+//! [`docs/standards/safety.md`](../../../docs/standards/safety.md)).
 //!
 //! ## Poka-yoke
 //!
@@ -13,8 +19,6 @@
 //! in its `scripts/` directory. These are hard errors, not
 //! warnings — the dispatcher must never operate with a partial
 //! skill set.
-//!
-//! See [`docs/adr/deferred/0007-yaml-manifest-subprocess-skill-model.md`](../../../docs/adr/deferred/0007-yaml-manifest-subprocess-skill-model.md).
 
 #![forbid(unsafe_code)]
 #![deny(rust_2018_idioms)]

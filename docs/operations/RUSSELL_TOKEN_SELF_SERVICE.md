@@ -1,3 +1,17 @@
+---
+title: "Russell Token Self-Service"
+audience: [operators, developers]
+last_updated: 2026-05-14
+togaf_phase: "G"
+version: "1.0.0"
+status: "Active"
+---
+
+<!-- TOGAF_DOMAIN: Governance -->
+<!-- VERSION: 1.0.0 -->
+<!-- STATUS: Active -->
+<!-- LAST_UPDATED: 2026-05-14 -->
+
 # Russell Token Self-Service
 
 ## Overview
