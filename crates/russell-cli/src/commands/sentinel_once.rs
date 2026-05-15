@@ -179,6 +179,9 @@ pub fn run(paths: &Paths) -> Result<()> {
     // 5. Refresh EWMA baselines once per 24h.
     maybe_refresh_baselines(&journal, &reader);
 
+    // 6. Reconcile skill registry against disk.
+    reconcile_registry(paths);
+
     println!(
         "sentinel: captured {n} samples, {} threshold breaches in {} ms; proprio: age={}s stall={}s llm_p95={}ms drift={}s err_rate={}%",
         total_breaches,
@@ -205,6 +208,23 @@ pub fn run(paths: &Paths) -> Result<()> {
             .unwrap_or_else(|| "?".into()),
     );
     Ok(())
+}
+
+/// Reconcile the skill registry cache against disk-loaded skills.
+/// Removes orphan entries, adds missing ones, updates stale metadata.
+/// Cheap enough to run every sentinel cycle (5 min).
+fn reconcile_registry(paths: &Paths) {
+    let skills = russell_skills::load_all(&paths.skills()).unwrap_or_default();
+    let registry_path = paths.state.join("registry").join("local-cache.yaml");
+    let mut registry = russell_skills::registry::RegistryCache::load(&registry_path)
+        .unwrap_or_default();
+    if registry.reconcile(&skills) {
+        if let Err(e) = registry.save(&registry_path) {
+            tracing::warn!(error = %e, "registry reconcile save failed");
+        } else {
+            tracing::debug!("registry reconciled");
+        }
+    }
 }
 
 /// Compute and persist EWMA baselines if 24h have elapsed since
