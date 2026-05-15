@@ -83,16 +83,16 @@ Arguments --name <skill-name>
 Restores a deprecated skill back to active.
 ```
 ACTION: skill-manager/restore
-Arguments --name <skill-name>
+Arguments <skill-name>
 ```
-
-### `delete <name>`
-Permanently retires a skill: removes it from the registry cache and
-deletes the directory from disk. Cannot be undone (no restore).
-Use only after pruning and confirming the skill is no longer needed.
+### `build <name>`
+Creates a minimal skill skeleton on disk. Writes a bare manifest.yaml
+with empty probes/interventions — a starting point for further editing.
+After building, use `create-manifest` to write the full manifest, or
+install it as-is and `adapt` it in the workshop.
 ```
-ACTION: skill-manager/delete
-Arguments --name <skill-name>
+ACTION: skill-manager/build
+Arguments <skill-name>
 ```
 
 ## When to use each verb

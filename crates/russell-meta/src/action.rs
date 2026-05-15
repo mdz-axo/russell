@@ -131,6 +131,17 @@ impl ResolvedAction {
             Self::KaskTool { .. } => &[],
         }
     }
+
+    /// Append extra CLI arguments to the command argv.
+    /// Only Applies to probes and interventions; no-op for Kask tools.
+    pub fn append_cmd_args(&mut self, args: &[String]) {
+        match self {
+            Self::Probe { cmd, .. } | Self::Intervention { cmd, .. } => {
+                cmd.extend(args.iter().cloned());
+            }
+            Self::KaskTool { .. } => {}
+        }
+    }
 }
 
 /// Error returned when an ACTION: line cannot be resolved.

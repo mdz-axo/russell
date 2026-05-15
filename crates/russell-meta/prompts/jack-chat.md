@@ -120,7 +120,7 @@ remember what's normal. Loyalty is the whole job.
     | `delete <name>` | intervention | medium | Permanently remove a skill |
 
     Probes auto-execute. Interventions require operator consent.
-    Arguments are inline: `ACTION: skill-manager/install\nArguments --name swap-watcher`.
+    Arguments are inline: `ACTION: skill-manager/install\nArguments swap-watcher`.
     Use `list-skills` first before building or installing.
 
 6. **Call Kask MCP tools.** When the Kask stack-api gateway is

@@ -151,6 +151,11 @@ pub async fn run(paths: &Paths) -> Result<()> {
                 // Consent handling — must come before special commands.
                 if let Some(ref pa) = pending_action {
                     if trimmed == "/approve" || is_affirmative(trimmed) {
+                        let is_skill_mgr_mutation = pa.action.skill_id() == "skill-manager"
+                            && matches!(
+                                pa.action.action_id(),
+                                "install" | "build" | "create-manifest" | "delete"
+                            );
                         let action_result = execute_action(
                             &journal, &kask_client, &pa.action, &session_id,
                             &current_model, paths,
@@ -162,12 +167,29 @@ pub async fn run(paths: &Paths) -> Result<()> {
                             });
                             save_history(&chat_path, &history)?;
                         }
+                        if is_skill_mgr_mutation {
+                            match russell_skills::load_all(&paths.skills()) {
+                                Ok(fresh) => {
+                                    skills = fresh;
+                                    match russell_skills::registry::RegistryCache::load(&registry_path) {
+                                        Ok(fresh_reg) => registry = fresh_reg,
+                                        Err(e) => warn!(error = %e, "registry reload failed"),
+                                    }
+                                }
+                                Err(e) => warn!(error = %e, "skills reload after skill-manager intervention failed"),
+                            }
+                        }
                         pending_action = None;
                         continue;
                     }
                     if let Some(_pw) = trimmed.strip_prefix("/approve ") {
                         println!("  → Approving. Use `/approve` without a password next time —");
                         println!("    Jack will prompt you securely if sudo is needed.");
+                        let is_skill_mgr_mutation = pa.action.skill_id() == "skill-manager"
+                            && matches!(
+                                pa.action.action_id(),
+                                "install" | "build" | "create-manifest" | "delete"
+                            );
                         let action_result = execute_action(
                             &journal, &kask_client, &pa.action, &session_id,
                             &current_model, paths,
@@ -178,6 +200,18 @@ pub async fn run(paths: &Paths) -> Result<()> {
                                 content: result_text,
                             });
                             save_history(&chat_path, &history)?;
+                        }
+                        if is_skill_mgr_mutation {
+                            match russell_skills::load_all(&paths.skills()) {
+                                Ok(fresh) => {
+                                    skills = fresh;
+                                    match russell_skills::registry::RegistryCache::load(&registry_path) {
+                                        Ok(fresh_reg) => registry = fresh_reg,
+                                        Err(e) => warn!(error = %e, "registry reload failed"),
+                                    }
+                                }
+                                Err(e) => warn!(error = %e, "skills reload after skill-manager intervention failed"),
+                            }
                         }
                         pending_action = None;
                         continue;
@@ -580,14 +614,68 @@ async fn call_jack(
     // Build the fresh SOAP objective.
     let objective = objective::build_objective(reader, skills, profile, kask_registry, registry);
 
-    // Build system prompt: persona + skill-manager KNOWLEDGE.md injected
-    // so Jack knows he has hands to manage the skill lifecycle.
+    // Build system prompt: persona + relevance-scored KNOWLEDGE.md injection.
+    // All applicable skill knowledge is injected (within token budget),
+    // giving Jack full domain expertise in chat mode — matching what
+    // `russell jack` receives in one-shot mode.
     let mut system = russell_meta::JACK_CHAT_PERSONA.to_string();
-    let knowledge_path = paths.skills().join("skill-manager").join("KNOWLEDGE.md");
-    if let Ok(content) = std::fs::read_to_string(&knowledge_path) {
-        if !content.trim().is_empty() {
-            system.push_str("\n\n---\n\n# Skill Manager Knowledge\n\n");
-            system.push_str(&content);
+    {
+        use russell_meta::prompt_registry::{
+            KnowledgeSlot, select_knowledge, score_knowledge_relevance,
+        };
+        // Derive active symptoms from recent events (same as compose_templated).
+        let recent_events = reader.recent(20).unwrap_or_default();
+        let active_symptoms: Vec<String> = recent_events
+            .iter()
+            .filter(|r| {
+                let s = r.severity.as_str();
+                s == "warn" || s == "alert" || s == "crit"
+            })
+            .filter_map(|r| r.module.as_ref())
+            .flat_map(|m| {
+                let mut syms = vec![];
+                if let Some(probe) = m.strip_prefix("sentinel/threshold/") {
+                    syms.push(probe.to_string());
+                    for kw in probe.split('_') {
+                        if kw.len() >= 3 { syms.push(kw.to_string()); }
+                    }
+                } else if let Some(probe) = m.strip_prefix("sentinel/rate/") {
+                    syms.push(probe.to_string());
+                }
+                syms
+            })
+            .collect();
+
+        const KNOWLEDGE_BUDGET_TOKENS: usize = 3000;
+        let mut slots: Vec<KnowledgeSlot> = Vec::new();
+        for skill in skills {
+            let applies = skill.applies_when.iter().any(|clause| {
+                matches!(clause, russell_skills::AppliesWhen::Scalar { os_family: Some(os), .. } if os == "linux")
+            });
+            if !applies && !skill.applies_when.is_empty() {
+                continue;
+            }
+            let knowledge_path = paths.skills().join(&skill.id).join("KNOWLEDGE.md");
+            if let Ok(content) = std::fs::read_to_string(&knowledge_path) {
+                if content.trim().is_empty() {
+                    continue;
+                }
+                let relevance = score_knowledge_relevance(&skill.symptoms, &active_symptoms);
+                let token_estimate = content.len() / 4;
+                slots.push(KnowledgeSlot {
+                    skill_id: skill.id.clone(),
+                    content,
+                    relevance,
+                    token_estimate,
+                });
+            }
+        }
+        let selected = select_knowledge(&mut slots, KNOWLEDGE_BUDGET_TOKENS);
+        for slot in selected {
+            system.push_str("\n\n---\n\n# Knowledge: ");
+            system.push_str(&slot.skill_id);
+            system.push_str("\n\n");
+            system.push_str(&slot.content);
         }
     }
 
@@ -668,7 +756,16 @@ async fn call_jack(
             // Check for ACTION: proposal.
             let kask_tool_infos = kask::build_kask_tool_infos(kask_registry);
             match action::resolve_with_kask(&content, skills, &kask_tool_infos) {
-                Some(Ok(action)) => {
+                Some(Ok(mut action)) => {
+                    // Append inline CLI arguments from the LLM response to
+                    // the subprocess cmd (e.g. `Arguments --name swap-watcher`
+                    // → appends `--name swap-watcher` to the manifest's cmd).
+                    if !action.is_kask_tool() {
+                        let inline_args = extract_inline_args(&content);
+                        if !inline_args.is_empty() {
+                            action.append_cmd_args(&inline_args);
+                        }
+                    }
                     let manifest = extract_manifest_block(&content);
                     handle_action_proposal(
                         action,
@@ -723,22 +820,16 @@ fn estimate_message_tokens(messages: &[serde_json::Value]) -> usize {
 /// ACTION: skill-manager/create-manifest
 /// ---manifest
 /// id: my-skill
-/// version: 0.1.0
-/// …
+/// ...
 /// ---
 /// ```
-///
-/// This function extracts the content between the `---manifest` and
-/// terminating `---` markers. Returns `None` if no such block is found.
 fn extract_manifest_block(response: &str) -> Option<String> {
     let start_marker = "---manifest\n";
     let start = response.find(start_marker)?;
     let content_start = start + start_marker.len();
     let remainder = &response[content_start..];
-    // Find the first line that is exactly "---" after the start marker.
-    // Must be on its own line.
     let end = if let Some(pos) = remainder.find("\n---\n") {
-        pos + 1 // include the leading newline to trim cleanly
+        pos + 1
     } else if remainder.starts_with("---\n") {
         0
     } else if remainder == "---" {
@@ -746,7 +837,6 @@ fn extract_manifest_block(response: &str) -> Option<String> {
     } else if remainder.ends_with("\n---") {
         remainder.len() - 3
     } else {
-        // Can't find a clean terminating ---, return entire content.
         return None;
     };
     let content = remainder[..end].trim().to_string();
@@ -755,4 +845,45 @@ fn extract_manifest_block(response: &str) -> Option<String> {
     } else {
         Some(content)
     }
+}
+
+/// Extract inline CLI arguments from an `Arguments` line in the LLM response.
+///
+/// Parses lines like `Arguments --name swap-watcher` or
+/// `Arguments --name swap-watcher --flag value` into a Vec of individual
+/// argument tokens. Handles quoted values.
+///
+/// Searches the entire response for the first `Arguments` line.
+fn extract_inline_args(response: &str) -> Vec<String> {
+    let args_line = response
+        .lines()
+        .find(|l| l.trim().starts_with("Arguments"))
+        .map(|l| l.trim().strip_prefix("Arguments").unwrap_or(l).trim().to_string());
+
+    let line = match args_line {
+        Some(ref l) if !l.is_empty() => l,
+        _ => return Vec::new(),
+    };
+
+    let mut args = Vec::new();
+    let mut chars = line.chars().peekable();
+    let mut current = String::new();
+    let mut in_quote = false;
+
+    while let Some(ch) = chars.next() {
+        if ch == '"' || ch == '\'' {
+            in_quote = !in_quote;
+        } else if ch == ' ' && !in_quote {
+            if !current.is_empty() {
+                args.push(current.clone());
+                current.clear();
+            }
+        } else {
+            current.push(ch);
+        }
+    }
+    if !current.is_empty() {
+        args.push(current);
+    }
+    args
 }

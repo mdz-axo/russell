@@ -673,6 +673,74 @@ impl JournalReader {
         Ok(summaries)
     }
 
+    /// Self-scope sample summary — Russell's own proprioceptive vitals.
+    ///
+    /// Same structure as [`host_samples_summary`] but for `scope = 'self'`.
+    /// Returns per-probe min/avg/max/last/count for self-vital samples.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`CoreError::Sqlite`] on DB errors.
+    pub fn self_samples_summary(
+        &self,
+        since_unix: i64,
+        until_unix: i64,
+    ) -> Result<Vec<SampleSummary>> {
+        let conn = self.open_ro()?;
+        let mut stmt = conn.prepare(
+            r"SELECT
+                probe,
+                unit,
+                MIN(value_num),
+                AVG(value_num),
+                MAX(value_num),
+                COUNT(*)
+              FROM samples
+              WHERE scope = 'self'
+                AND ts >= ?1 AND ts < ?2
+                AND value_num IS NOT NULL
+              GROUP BY probe
+              ORDER BY probe",
+        )?;
+        let rows = stmt
+            .query_map(params![since_unix, until_unix], |r| {
+                let probe: String = r.get(0)?;
+                let unit: Option<String> = r.get(1)?;
+                let min: Option<f64> = r.get(2)?;
+                let avg: Option<f64> = r.get(3)?;
+                let max: Option<f64> = r.get(4)?;
+                let count: i64 = r.get(5)?;
+                Ok((probe, unit, min, avg, max, count))
+            })?
+            .collect::<std::result::Result<Vec<_>, _>>()?;
+
+        let mut summaries = Vec::with_capacity(rows.len());
+        for (probe, unit, min, avg, max, count) in rows {
+            let (last, last_ts) = conn
+                .query_row(
+                    "SELECT value_num, ts FROM samples
+                     WHERE scope = 'self' AND probe = ?1
+                       AND ts >= ?2 AND ts < ?3
+                       AND value_num IS NOT NULL
+                     ORDER BY ts DESC LIMIT 1",
+                    params![&probe, since_unix, until_unix],
+                    |r| Ok((r.get::<_, Option<f64>>(0)?, r.get::<_, Option<i64>>(1)?)),
+                )
+                .unwrap_or((None, None));
+            summaries.push(SampleSummary {
+                probe,
+                unit,
+                min,
+                avg,
+                max,
+                last,
+                last_ts,
+                count,
+            });
+        }
+        Ok(summaries)
+    }
+
     /// Compute percentiles (p50, p95, p99) for the last `window_days`
     /// days of host-scope samples, grouped by probe. Returns a list
     /// of (probe, p50, p95, p99, count).
