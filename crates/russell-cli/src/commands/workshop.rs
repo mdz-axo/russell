@@ -10,9 +10,9 @@
 use anyhow::{Context, Result};
 use russell_core::paths::Paths;
 use russell_core::time::{approx_days_between, now_date_iso8601};
-use russell_doctor::client::LlmClient;
-use russell_doctor::client::SoapPrompt;
-use russell_doctor::oai_client::OkapiClient;
+use russell_meta::client::LlmClient;
+use russell_meta::client::SoapPrompt;
+use russell_meta::oai_client::OkapiClient;
 use russell_skills::Skill;
 use russell_skills::registry::{
     LifecycleStatus, RegistryCache, RegistryEntry, SafetyScan, SkillSource,
@@ -34,7 +34,7 @@ pub async fn run(paths: &Paths) -> Result<()> {
     // Sync registry from installed skills (rebuildable — JR-7).
     sync_registry_from_skills(&mut registry, &skills);
 
-    let client_cfg = russell_doctor::client::ClientConfig::from_env();
+    let client_cfg = russell_meta::client::ClientConfig::from_env();
     let fallback_model = client_cfg.model.clone();
 
     println!(
@@ -143,7 +143,7 @@ async fn handle_builtin(
     skills: &[Skill],
     workshop_knowledge: &str,
     maintenance_knowledge: &str,
-    client_cfg: &russell_doctor::client::ClientConfig,
+    client_cfg: &russell_meta::client::ClientConfig,
     fallback_model: &str,
     quit: &mut bool,
 ) -> bool {
@@ -728,7 +728,7 @@ async fn do_adapt(
     registry: &mut RegistryCache,
     skills_dir: &std::path::Path,
     name: &str,
-    client_cfg: &russell_doctor::client::ClientConfig,
+    client_cfg: &russell_meta::client::ClientConfig,
     fallback_model: &str,
 ) {
     let manifest_path = skills_dir.join(name).join("manifest.yaml");
@@ -786,7 +786,7 @@ async fn do_adapt(
 
 /// Try adapting a manifest via Jack. Returns (content, success).
 async fn adapt_via_llm(
-    client_cfg: &russell_doctor::client::ClientConfig,
+    client_cfg: &russell_meta::client::ClientConfig,
     fallback_model: &str,
     name: &str,
     current: &str,
@@ -826,15 +826,15 @@ fn extract_yaml_block(response: &str) -> String {
 
 /// Simple LLM call for adaptation. Returns response text or empty on failure.
 async fn llm_call(
-    cfg: &russell_doctor::client::ClientConfig,
+    cfg: &russell_meta::client::ClientConfig,
     _fallback_model: &str,
     prompt: &str,
 ) -> Result<String> {
-    use russell_doctor::oai_client::OkapiClient;
+    use russell_meta::oai_client::OkapiClient;
 
     let mut chat_cfg = cfg.clone();
     if chat_cfg.base_url.is_none() {
-        chat_cfg.base_url = Some(russell_doctor::health::DEFAULT_BASE_URL.to_string());
+        chat_cfg.base_url = Some(russell_meta::health::DEFAULT_BASE_URL.to_string());
     }
     if chat_cfg.api_key.is_none() {
         chat_cfg.api_key = Some("okapi".into());
@@ -843,8 +843,8 @@ async fn llm_call(
     let base = chat_cfg
         .base_url
         .as_deref()
-        .unwrap_or(russell_doctor::health::DEFAULT_BASE_URL);
-    if !russell_doctor::health::ensure_ready(base).await {
+        .unwrap_or(russell_meta::health::DEFAULT_BASE_URL);
+    if !russell_meta::health::ensure_ready(base).await {
         return Err(anyhow::anyhow!("Okapi not reachable"));
     }
 
@@ -1072,7 +1072,7 @@ async fn do_build(
     workshop_knowledge: &str,
     maintenance_knowledge: &str,
     skills: &[Skill],
-    client_cfg: &russell_doctor::client::ClientConfig,
+    client_cfg: &russell_meta::client::ClientConfig,
     _fallback_model: &str,
 ) {
     if registry.skills.contains_key(name) {
@@ -1194,7 +1194,7 @@ async fn jack_workshop_turn(
     workshop_knowledge: &str,
     maintenance_knowledge: &str,
     skills: &[Skill],
-    client_cfg: &russell_doctor::client::ClientConfig,
+    client_cfg: &russell_meta::client::ClientConfig,
 ) -> Result<()> {
     let mut system = String::new();
     system.push_str("You are Jack, in the skill workshop.\n\n");
@@ -1243,7 +1243,7 @@ async fn jack_workshop_turn(
 
     let mut chat_cfg = client_cfg.clone();
     if chat_cfg.base_url.is_none() {
-        chat_cfg.base_url = Some(russell_doctor::health::DEFAULT_BASE_URL.to_string());
+        chat_cfg.base_url = Some(russell_meta::health::DEFAULT_BASE_URL.to_string());
     }
     if chat_cfg.api_key.is_none() {
         chat_cfg.api_key = Some("okapi".into());
@@ -1252,8 +1252,8 @@ async fn jack_workshop_turn(
     let base = chat_cfg
         .base_url
         .as_deref()
-        .unwrap_or(russell_doctor::health::DEFAULT_BASE_URL);
-    if !russell_doctor::health::ensure_ready(base).await {
+        .unwrap_or(russell_meta::health::DEFAULT_BASE_URL);
+    if !russell_meta::health::ensure_ready(base).await {
         println!("  (Okapi not reachable — workshop running offline)");
         return Ok(());
     }

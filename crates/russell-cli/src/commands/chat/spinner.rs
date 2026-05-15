@@ -2,9 +2,9 @@
 //! LLM call with animated thinking spinner.
 
 use rand::seq::SliceRandom;
-use russell_doctor::client::LlmClient;
-use russell_doctor::client::SoapPrompt;
-use russell_doctor::oai_client::OkapiClient;
+use russell_meta::client::LlmClient;
+use russell_meta::client::SoapPrompt;
+use russell_meta::oai_client::OkapiClient;
 use std::io::Write;
 use tokio::sync::oneshot;
 
@@ -23,7 +23,7 @@ const THINKING_EXPRESSIONS: &[&str] = &[
 /// Call the LLM via Okapi with an animated thinking spinner on stdout.
 /// Routes through the [`LlmClient`] port rather than raw HTTP.
 pub async fn call_okapi_with_spinner(
-    cfg: &russell_doctor::client::ClientConfig,
+    cfg: &russell_meta::client::ClientConfig,
     model: &str,
     messages: &[serde_json::Value],
 ) -> std::result::Result<String, String> {
@@ -75,7 +75,7 @@ pub async fn call_okapi_with_spinner(
 /// [`OkapiClient::chat`]. This replaces the old `call_okapi_direct`
 /// which bypassed the hexagonal port with raw `reqwest` calls.
 async fn call_llm_via_port(
-    cfg: &russell_doctor::client::ClientConfig,
+    cfg: &russell_meta::client::ClientConfig,
     model: &str,
     messages: &[serde_json::Value],
 ) -> std::result::Result<String, String> {
@@ -108,7 +108,7 @@ async fn call_llm_via_port(
     chat_cfg.model = model.to_string();
     // Ensure we always point at Okapi.
     if chat_cfg.base_url.is_none() {
-        chat_cfg.base_url = Some(russell_doctor::health::DEFAULT_BASE_URL.to_string());
+        chat_cfg.base_url = Some(russell_meta::health::DEFAULT_BASE_URL.to_string());
     }
     if chat_cfg.api_key.is_none() {
         chat_cfg.api_key = Some("okapi".into());
@@ -118,8 +118,8 @@ async fn call_llm_via_port(
     let base = chat_cfg
         .base_url
         .as_deref()
-        .unwrap_or(russell_doctor::health::DEFAULT_BASE_URL);
-    if !russell_doctor::health::ensure_ready(base).await {
+        .unwrap_or(russell_meta::health::DEFAULT_BASE_URL);
+    if !russell_meta::health::ensure_ready(base).await {
         return Err("can't reach Okapi (tried auto-start)".into());
     }
 

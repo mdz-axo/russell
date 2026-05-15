@@ -6,7 +6,7 @@
 
 use russell_core::journal::{HelpSessionInput, HelpSessionStatus, JournalWriter};
 use russell_core::paths::Paths;
-use russell_doctor::action::ResolvedAction;
+use russell_meta::action::ResolvedAction;
 use russell_skills::RiskBand;
 
 use super::consent::PendingAction;

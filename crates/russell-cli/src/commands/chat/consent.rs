@@ -4,7 +4,7 @@
 //! Manages pending actions (probes/interventions) and operator
 //! consent via natural language affirmation or refusal.
 
-use russell_doctor::action::ResolvedAction;
+use russell_meta::action::ResolvedAction;
 
 /// A pending action (probe or intervention) awaiting operator consent.
 /// Derived from [`ResolvedAction`] with UI-specific fields.

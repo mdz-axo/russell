@@ -21,7 +21,7 @@ pub mod spinner;
 use anyhow::{Context, Result};
 use russell_core::journal::JournalWriter;
 use russell_core::paths::Paths;
-use russell_doctor::action::{self, ResolvedAction};
+use russell_meta::action::{self, ResolvedAction};
 use russell_mcp::client::KaskMcpClient;
 use russell_mcp::config::KaskMcpConfig;
 use russell_mcp::registry::ToolRegistry;
@@ -98,7 +98,7 @@ pub async fn run(paths: &Paths) -> Result<()> {
         .unwrap_or_default();
 
     // Load model config from the shared ClientConfig.
-    let client_cfg = russell_doctor::client::ClientConfig::from_env();
+    let client_cfg = russell_meta::client::ClientConfig::from_env();
     let base_url = client_cfg
         .base_url
         .clone()
@@ -106,7 +106,7 @@ pub async fn run(paths: &Paths) -> Result<()> {
 
     // Resolve the configured model name against Okapi's actual model list.
     let resolved =
-        russell_doctor::oai_client::resolve_and_correct_model(&client_cfg, &paths.config).await;
+        russell_meta::oai_client::resolve_and_correct_model(&client_cfg, &paths.config).await;
     if resolved != client_cfg.model {
         println!(
             "  Corrected: model \"{}\" → \"{}\" (env file updated)",
@@ -223,7 +223,7 @@ pub async fn run(paths: &Paths) -> Result<()> {
 
                 // Build the fresh SOAP objective.
                 let objective = objective::build_objective(&reader, &skills, profile.as_ref(), &kask_registry, &registry);
-                let system = russell_doctor::JACK_CHAT_PERSONA.to_string();
+                let system = russell_meta::JACK_CHAT_PERSONA.to_string();
 
                 // Build the messages array for the LLM.
                 let mut messages: Vec<serde_json::Value> = Vec::new();
@@ -254,7 +254,7 @@ pub async fn run(paths: &Paths) -> Result<()> {
                 save_history(&chat_path, &history)?;
 
                 // Call the LLM with an animated thinking spinner.
-                let cfg = russell_doctor::client::ClientConfig::from_env();
+                let cfg = russell_meta::client::ClientConfig::from_env();
                 let response = spinner::call_okapi_with_spinner(&cfg, &current_model, &messages).await;
 
                 match response {
@@ -564,7 +564,7 @@ async fn handle_slash_command(
                     }
                 };
                 // We need to block on the async resolve — use a nested block.
-                let resolved = russell_doctor::oai_client::resolve_model_name(
+                let resolved = russell_meta::oai_client::resolve_model_name(
                     base_url, name, &http,
                 ).await;
                 if resolved == name {

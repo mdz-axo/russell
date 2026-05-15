@@ -4,7 +4,7 @@
 use anyhow::{Context, Result};
 use russell_core::journal::JournalWriter;
 use russell_core::paths::Paths;
-use russell_doctor::action::{self, KaskToolInfo, ResolvedAction};
+use russell_meta::action::{self, KaskToolInfo, ResolvedAction};
 use russell_mcp::client::KaskMcpClient;
 use russell_mcp::config::KaskMcpConfig;
 use russell_mcp::registry::ToolRegistry;
@@ -16,8 +16,8 @@ pub async fn run(paths: &Paths, note: Option<&str>) -> Result<()> {
         .with_context(|| format!("opening journal {}", paths.journal().display()))?;
 
     // Resolve and correct the model name before the help flow starts.
-    let cfg = russell_doctor::client::ClientConfig::from_env();
-    let resolved = russell_doctor::oai_client::resolve_and_correct_model(&cfg, &paths.config).await;
+    let cfg = russell_meta::client::ClientConfig::from_env();
+    let resolved = russell_meta::oai_client::resolve_and_correct_model(&cfg, &paths.config).await;
     if resolved != cfg.model {
         println!(
             "  Corrected: model \"{}\" → \"{}\" (env file updated)",
@@ -50,7 +50,7 @@ pub async fn run(paths: &Paths, note: Option<&str>) -> Result<()> {
 
     let skills = russell_skills::load_all(&paths.skills()).unwrap_or_default();
 
-    let outcome = russell_doctor::run_help(paths, &writer, note, &kask_tool_names)
+    let outcome = russell_meta::run_help(paths, &writer, note, &kask_tool_names)
         .await
         .context("running Doctor help flow")?;
 
@@ -123,10 +123,10 @@ pub async fn run(paths: &Paths, note: Option<&str>) -> Result<()> {
 
     if let Some(sr) = outcome.skip_reason {
         let msg = match sr {
-            russell_doctor::help::SkipReason::OfflineFallback => {
+            russell_meta::help::SkipReason::OfflineFallback => {
                 "  [offline fallback engaged — Ollama unreachable or LLM call failed]"
             }
-            russell_doctor::help::SkipReason::ThresholdSkip => {
+            russell_meta::help::SkipReason::ThresholdSkip => {
                 "  [below escalation threshold — rule-based summary returned]"
             }
         };
@@ -204,12 +204,12 @@ async fn analyze_probe_result(
     probe_output: &ProbeOutput,
     _kask_tool_names: &[(String, Option<String>)],
 ) -> Result<String> {
-    use russell_doctor::client::{ClientConfig, LlmClient, SoapPrompt};
-    use russell_doctor::oai_client;
+    use russell_meta::client::{ClientConfig, LlmClient, SoapPrompt};
+    use russell_meta::oai_client;
 
     let cfg = ClientConfig::from_env();
     let client = match cfg.backend {
-        russell_doctor::client::Backend::Okapi => {
+        russell_meta::client::Backend::Okapi => {
             let mut okapi_cfg = cfg.clone();
             if okapi_cfg.base_url.is_none() {
                 okapi_cfg.base_url = Some("http://127.0.0.1:11435/v1".into());
@@ -219,13 +219,13 @@ async fn analyze_probe_result(
             }
             oai_client::OkapiClient::new(&okapi_cfg).await?
         }
-        russell_doctor::client::Backend::Mock => {
+        russell_meta::client::Backend::Mock => {
             return Ok(format!(
                 "[mock backend] Probe result: {}\nAnalysis would happen here.",
                 probe_output.stdout.trim()
             ));
         }
-        russell_doctor::client::Backend::Offline => {
+        russell_meta::client::Backend::Offline => {
             return Ok(format!(
                 "[offline] Probe returned: {}",
                 probe_output.stdout.trim()

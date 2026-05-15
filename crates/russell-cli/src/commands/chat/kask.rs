@@ -7,7 +7,7 @@
 use russell_core::event::{Event, Severity};
 use russell_core::journal::JournalWriter;
 use russell_core::paths::Paths;
-use russell_doctor::action::{KaskToolInfo, ResolvedAction};
+use russell_meta::action::{KaskToolInfo, ResolvedAction};
 use russell_mcp::client::KaskMcpClient;
 use russell_mcp::registry::ToolRegistry;
 use russell_skills::RiskBand;
