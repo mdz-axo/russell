@@ -254,96 +254,31 @@ pub async fn run(paths: &Paths) -> Result<()> {
                     content: trimmed.to_string(),
                 });
 
-                // Reload skill registry to capture fresh telemetry.
+                // Call Jack with the user's message as input.
+                call_jack(
+                    &mut history,
+                    &chat_path,
+                    &journal,
+                    &session_id,
+                    &current_model,
+                    &reader,
+                    &skills,
+                    profile.as_ref(),
+                    &kask_registry,
+                    &registry,
+                    paths,
+                    &mut pending_action,
+                    &kask_client,
+                    &client_cfg,
+                )
+                .await?;
+
+                // Reload skill registry to capture fresh telemetry (post-Jack execution).
                 if let Ok(fresh) = russell_skills::registry::RegistryCache::load(&registry_path) {
                     registry = fresh;
                 }
-
-                // Build the fresh SOAP objective.
-                let objective = objective::build_objective(&reader, &skills, profile.as_ref(), &kask_registry, &registry);
-                let system = russell_meta::JACK_CHAT_PERSONA.to_string();
-
-                // Build the messages array for the LLM.
-                let mut messages: Vec<serde_json::Value> = Vec::new();
-                messages.push(serde_json::json!({
-                    "role": "system",
-                    "content": system,
-                }));
-
-                // Insert the current journal state as a "user" message.
-                if !objective.is_empty() {
-                    messages.push(serde_json::json!({
-                        "role": "user",
-                        "content": format!(
-                            "# Current journal snapshot\n\n{objective}\n\n---\n\nContinue the conversation with the operator."
-                        ),
-                    }));
-                }
-
-                // Add conversation history.
-                for turn in &history.turns {
-                    messages.push(serde_json::json!({
-                        "role": turn.role,
-                        "content": turn.content,
-                    }));
-                }
-
-                // Persist history before calling LLM (user message is saved).
-                save_history(&chat_path, &history)?;
-
-                // Call the LLM with an animated thinking spinner.
-                let cfg = russell_meta::client::ClientConfig::from_env();
-                let response = spinner::call_okapi_with_spinner(&cfg, &current_model, &messages).await;
-
-                match response {
-                    Ok(content) => {
-                        // Clear the spinner line and print the response.
-                        print!("\r\x1b[K");
-                        std::io::stdout().flush().unwrap();
-                        println!("Jack → {content}\n");
-                        history.turns.push(Turn {
-                            role: "assistant".into(),
-                            content: content.clone(),
-                        });
-                        save_history(&chat_path, &history)?;
-
-                        // Also journal the chat turn as a help-session event.
-                        journal_chat_turn(&journal, &session_id, &current_model, trimmed, &content);
-
-                        // Check for ACTION: proposal.
-                        let kask_tool_infos = kask::build_kask_tool_infos(&kask_registry);
-                        match action::resolve_with_kask(&content, &skills, &kask_tool_infos) {
-                            Some(Ok(action)) => {
-                                let manifest = extract_manifest_block(&content);
-                                handle_action_proposal(
-                                    action,
-                                    &journal,
-                                    &kask_client,
-                                    &session_id,
-                                    &current_model,
-                                    paths,
-                                    &mut history,
-                                    &chat_path,
-                                    &mut pending_action,
-                                    manifest,
-                                ).await?;
-                            }
-                            Some(Err(e)) => {
-                                println!("  → {e}");
-                            }
-                            None => { /* normal, no action proposed */ }
-                        }
-                    }
-                    Err(e) => {
-                        let msg = format!("(can't reach the LLM right now — {e})");
-                        println!("{msg}\n");
-                        history.turns.push(Turn {
-                            role: "assistant".into(),
-                            content: msg.clone(),
-                        });
-                        save_history(&chat_path, &history)?;
-                    }
-                }
+            }
+            Err(ReadlineError::Interrupted) => {
             }
             Err(ReadlineError::Interrupted) => {
                 println!("^C");
