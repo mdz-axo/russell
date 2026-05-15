@@ -432,6 +432,81 @@ impl RegistryCache {
     pub fn is_stale(authored_date: &str, today: &str) -> bool {
         health::is_stale(authored_date, today)
     }
+
+    /// Reconcile the registry cache against the ground-truth skill set
+    /// loaded from disk. This:
+    ///
+    /// 1. Removes entries whose skill directories no longer exist on disk.
+    /// 2. Adds entries for skills on disk that are missing from the registry.
+    /// 3. Updates `version`, `symptoms`, and `authored` when the manifest
+    ///    has diverged from the cached entry.
+    /// 4. Promotes `Installed` → `Active` for skills that loaded successfully.
+    ///
+    /// Returns `true` if any changes were made (caller should save).
+    pub fn reconcile(&mut self, disk_skills: &[crate::Skill]) -> bool {
+        let today = now_date_iso8601();
+        let mut changed = false;
+
+        // Build a set of skill IDs present on disk.
+        let disk_ids: std::collections::BTreeSet<&str> =
+            disk_skills.iter().map(|s| s.id.as_str()).collect();
+
+        // 1. Remove orphan entries (skill no longer on disk).
+        let orphans: Vec<String> = self
+            .skills
+            .keys()
+            .filter(|id| !disk_ids.contains(id.as_str()))
+            .cloned()
+            .collect();
+        for id in orphans {
+            self.skills.remove(&id);
+            changed = true;
+        }
+
+        // 2 & 3. Add missing entries / update stale metadata.
+        for skill in disk_skills {
+            match self.skills.get_mut(&skill.id) {
+                Some(entry) => {
+                    // Update version if manifest changed.
+                    if entry.version != skill.version {
+                        entry.version = skill.version.clone();
+                        changed = true;
+                    }
+                    // Update symptoms if manifest changed.
+                    if entry.symptoms != skill.symptoms {
+                        entry.symptoms = skill.symptoms.clone();
+                        changed = true;
+                    }
+                    // Update authored date if manifest changed.
+                    if entry.authored != skill.authored {
+                        entry.authored = skill.authored.clone();
+                        changed = true;
+                    }
+                    // Promote Installed → Active (it loaded, so it's active).
+                    if entry.status == LifecycleStatus::Installed {
+                        entry.status = LifecycleStatus::Active;
+                        changed = true;
+                    }
+                }
+                None => {
+                    // Skill on disk but not in registry — add it.
+                    let entry = RegistryEntry::new_default(
+                        LifecycleStatus::Active,
+                        &skill.version,
+                        &skill.authored,
+                        skill.symptoms.clone(),
+                        SkillSource::Manual,
+                        &today,
+                        false,
+                    );
+                    self.skills.insert(skill.id.clone(), entry);
+                    changed = true;
+                }
+            }
+        }
+
+        changed
+    }
 }
 
 // Scoring and staleness functions are now in health.rs.

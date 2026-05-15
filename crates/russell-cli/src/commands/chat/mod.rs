@@ -97,6 +97,13 @@ pub async fn run(paths: &Paths) -> Result<()> {
     let mut registry = russell_skills::registry::RegistryCache::load(&registry_path)
         .unwrap_or_default();
 
+    // Reconcile registry against disk (fix stale/orphan entries).
+    if registry.reconcile(&skills) {
+        if let Err(e) = registry.save(&registry_path) {
+            tracing::warn!(error = %e, "registry reconcile save failed");
+        }
+    }
+
     // Load model config from the shared ClientConfig.
     let client_cfg = russell_meta::client::ClientConfig::from_env();
     let base_url = client_cfg
