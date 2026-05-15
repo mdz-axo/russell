@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
-//! `russell skill` — list and run skill probes.
+//! `russell skill` — manage installed skills: list, run, stats, check,
+//! install, prune, restore, and retire.
 //!
-//! Phase 3A per ADR-0023.
+//! Phase 3/4 per ADR-0023 and skill self-management strategy.
 
 use anyhow::{Context, Result};
 use russell_core::paths::Paths;
+use russell_core::time::now_date_iso8601;
 use russell_skills::registry::{RegistryCache, RegistryEntry};
 use russell_skills::{Skill, load_all};
 use std::time::Duration;
@@ -397,9 +399,19 @@ pub fn restore(paths: &Paths, name: &str) -> Result<()> {
 }
 
 /// Permanently retire a skill: remove from disk and registry.
+/// Refuses bundled skills — use `prune` to deprecate them instead.
 pub fn retire(paths: &Paths, name: &str) -> Result<()> {
     let registry_path = paths.state.join("registry").join("local-cache.yaml");
     let skill_dir = paths.skills().join(name);
+
+    // Guard: refuse to delete bundled skills.
+    let bundled = RegistryCache::load(&registry_path)
+        .ok()
+        .and_then(|r| r.skills.get(name).map(|e| e.bundled))
+        .unwrap_or(false);
+    if bundled {
+        anyhow::bail!("{name} is a bundled skill and cannot be retired. Use 'russell skill prune {name}' to deprecate it instead.");
+    }
 
     RegistryCache::with_update(&registry_path, |registry| {
         if registry.remove_entry(name).is_some() {

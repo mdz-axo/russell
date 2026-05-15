@@ -78,7 +78,7 @@ enum Command {
         #[arg(long)]
         note: Option<String>,
     },
-    /// List or run skill probes and interventions.
+    /// Manage skills: list, run, stats, check, install, prune, restore, retire.
     Skill {
         #[command(subcommand)]
         cmd: SkillCmd,

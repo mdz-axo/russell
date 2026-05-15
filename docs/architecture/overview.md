@@ -249,7 +249,7 @@ aggressive intervention.
 | Kind of change | Code home | Docs to update |
 |---|---|---|
 | New probe | `russell-sentinel::probes` | `overview.md` §3.2 if schema changes; ADR if new hardware class |
-| New skill | `skills/<id>/` | `AGENTS.md` §6; new symptom-class ADR if introducing one |
+| New skill | `skills/<id>/` | `AGENTS.md` §6; `skill-self-management-strategy.md` for meta-skills |
 | New MCP tool | `russell-mcp::tools` | [`../archive/mcp-surface.md`](../archive/mcp-surface.md); ADR |
 | New CLI subcommand | `russell-cli::commands` | `CONTRIBUTING.md` §9; mirror in MCP if user-facing |
 | New self-health vital | `russell-proprio::probes` | [`../archive/proprioception.md`](../archive/proprioception.md); ADR if new failure class |

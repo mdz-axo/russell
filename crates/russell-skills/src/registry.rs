@@ -8,6 +8,7 @@
 //! Persisted at `~/.local/share/harness/registry/local-cache.yaml`.
 //! See ADR-0024.
 
+use russell_core::time::now_date_iso8601;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -71,6 +72,44 @@ pub struct RegistryEntry {
     /// Whether this is a bundled skill (resistant to pruning).
     #[serde(default)]
     pub bundled: bool,
+}
+
+impl RegistryEntry {
+    /// Create a new entry with the given key fields and sensible defaults
+    /// for all telemetry / lifecycle metadata.
+    ///
+    /// This eliminates the repeated 18-field struct literals scattered
+    /// across workshop commands and skill sync code.
+    #[must_use]
+    pub fn new_default(
+        status: LifecycleStatus,
+        version: impl Into<String>,
+        symptoms: Vec<String>,
+        source: SkillSource,
+        installed: impl Into<String>,
+        bundled: bool,
+    ) -> Self {
+        Self {
+            status,
+            version: version.into(),
+            symptoms,
+            source,
+            installed: installed.into(),
+            last_evaluated: None,
+            valid_until: None,
+            coverage_score: None,
+            superseded_by: None,
+            deprecation_reason: None,
+            probe_runs: 0,
+            recent_probe_failures: 0,
+            intervention_runs: 0,
+            recent_intervention_failures: 0,
+            last_probe_run_at: None,
+            last_error: None,
+            avg_probe_duration_ms: None,
+            bundled,
+        }
+    }
 }
 
 /// Lifecycle states per ADR-0024.
@@ -270,7 +309,7 @@ impl RegistryCache {
     ) {
         if let Some(entry) = self.skills.get_mut(skill_id) {
             entry.probe_runs = entry.probe_runs.saturating_add(1);
-            let now = Self::chrono_now();
+            let now = now_date_iso8601();
             entry.last_probe_run_at = Some(now);
             if !success {
                 entry.recent_probe_failures =
@@ -300,19 +339,6 @@ impl RegistryCache {
                     entry.last_error = Some(msg.to_string());
                 }
             }
-        }
-    }
-
-    /// Current UTC date as ISO 8601 string.
-    fn chrono_now() -> String {
-        use std::time::{SystemTime, UNIX_EPOCH};
-        if let Ok(dur) = SystemTime::now().duration_since(UNIX_EPOCH) {
-            let secs = dur.as_secs();
-            let days_since_epoch = secs / 86400;
-            let (y, m, d) = civil_from_days(days_since_epoch as i64 + 719_468);
-            format!("{y:04}-{m:02}-{d:02}")
-        } else {
-            "2026-05-14".to_string()
         }
     }
 
@@ -373,48 +399,88 @@ impl RegistryCache {
     }
 
     fn score_manifest(content: &str) -> f64 {
-        let fields = ["id:", "version:", "authored:", "symptoms:"];
-        let present = fields
+        // Check for top-level unindented keys — not substrings buried in comments.
+        let required = ["id:", "version:", "authored:", "symptoms:"];
+        let present = required
             .iter()
-            .filter(|f| content.contains(*f))
+            .filter(|k| content.lines().any(|l| l.starts_with(*k)))
             .count();
-        present as f64 / fields.len() as f64
+        present as f64 / required.len() as f64
     }
 
     fn score_probe_coverage(content: &str) -> f64 {
-        let has_probes = content.contains("probes:") && content.lines().any(|l| l.trim().starts_with("- id:"));
-        if !has_probes {
+        let count = Self::count_section_entries(content, "probes:");
+        if count == 0 {
             return 0.0;
         }
         1.0
     }
 
     fn score_intervention_coverage(content: &str) -> f64 {
-        let has_interventions = content.contains("interventions:")
-            && content.lines().any(|l| l.trim().starts_with("- id:"));
-        if !has_interventions {
+        let count = Self::count_section_entries(content, "interventions:");
+        if count == 0 {
             return 0.5;
         }
         1.0
     }
 
     fn score_rollback_quality(content: &str) -> f64 {
-        if !content.contains("rollback:") {
+        // Check for rollback lines within the interventions section.
+        let sections = Self::section_lines(content, "interventions:");
+        if sections.is_empty() {
             return 0.3;
         }
-        if content.contains("none_needed") || content.contains("reboot") {
+        if sections.iter().any(|l| l.contains("none_needed") || l.contains("reboot")) {
             return 0.8;
         }
-        1.0
+        if sections.iter().any(|l| l.starts_with("    rollback:")) {
+            return 1.0;
+        }
+        0.3
     }
 
     fn score_script_quality(content: &str) -> f64 {
         let lower = content.to_lowercase();
-        let has_shebang = content.contains("#!/");
+        let has_shebang = content.lines().any(|l| l.starts_with("#!/"));
         let has_set_e = lower.contains("set -e") || lower.contains("set -eu") || lower.contains("set -euo pipefail");
-        let has_probe = content.lines().any(|l| l.trim().starts_with("- cmd:"));
-        let checks = [has_shebang, has_set_e, has_probe];
+        // Count cmd entries within both probes and interventions sections.
+        let probe_cmds = Self::count_section_entries_pattern(content, "probes:", "- cmd:");
+        let intervention_cmds = Self::count_section_entries_pattern(content, "interventions:", "- cmd:");
+        let has_cmd = probe_cmds > 0 || intervention_cmds > 0;
+        let checks = [has_shebang, has_set_e, has_cmd];
         checks.iter().filter(|&&c| c).count() as f64 / checks.len() as f64
+    }
+
+    /// Count `- id:` entries within a YAML section (e.g., "probes:" or "interventions:").
+    fn count_section_entries(content: &str, section_header: &str) -> usize {
+        count_entries_in_section(content, section_header, "- id:")
+    }
+
+    /// Count entries matching `entry_pattern` within a YAML section.
+    fn count_section_entries_pattern(content: &str, section_header: &str, entry_pattern: &str) -> usize {
+        count_entries_in_section(content, section_header, entry_pattern)
+    }
+
+    /// Return lines belonging to a named top-level YAML section.
+    fn section_lines<'a>(content: &'a str, section_header: &str) -> Vec<&'a str> {
+        let mut result = Vec::new();
+        let mut in_section = false;
+        for line in content.lines() {
+            if line.trim_start() == section_header {
+                in_section = true;
+                continue;
+            }
+            if in_section {
+                if line.is_empty() {
+                    continue;
+                }
+                if !line.starts_with(' ') && !line.starts_with('\t') {
+                    break;
+                }
+                result.push(line);
+            }
+        }
+        result
     }
 
     fn score_documentation(entry: &RegistryEntry, knowledge_exists: bool) -> f64 {
@@ -440,6 +506,30 @@ impl RegistryCache {
     }
 }
 
+/// Count entries matching `entry_pattern` within a named top-level YAML section.
+fn count_entries_in_section(content: &str, section_header: &str, entry_pattern: &str) -> usize {
+    let mut count = 0;
+    let mut in_section = false;
+    for line in content.lines() {
+        if line.trim_start() == section_header {
+            in_section = true;
+            continue;
+        }
+        if in_section {
+            if line.is_empty() {
+                continue;
+            }
+            if !line.starts_with(' ') && !line.starts_with('\t') {
+                break;
+            }
+            if line.trim_start().starts_with(entry_pattern) {
+                count += 1;
+            }
+        }
+    }
+    count
+}
+
 /// Compute the staleness threshold (today minus 180 days) as an ISO 8601 string.
 fn staleness_threshold(today: &str) -> String {
     let parts: Vec<&str> = today.split('-').collect();
@@ -457,21 +547,6 @@ fn staleness_threshold(today: &str) -> String {
     let tm = (rem / 30).clamp(1, 12);
     let td = (rem % 30).clamp(1, 28);
     format!("{ty:04}-{tm:02}-{td:02}")
-}
-
-/// Convert days since 0000-03-01 to civil date (algorithm from Howard Hinnant).
-fn civil_from_days(z: i64) -> (i64, i64, i64) {
-    let z = z - 719_468; // shift epoch to 1970-01-01
-    let era = if z >= 0 { z } else { z - 146096 } / 146_097;
-    let doe = (z - era * 146_097) as u64;
-    let yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
-    let y = yoe as i64 + era * 400;
-    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
-    let mp = (5 * doy + 2) / 153;
-    let d = doy - (153 * mp + 2) / 5 + 1;
-    let m = if mp < 10 { mp + 3 } else { mp - 9 };
-    let y = if m <= 2 { y + 1 } else { y };
-    (y, m as i64, d as i64)
 }
 
 /// Errors from registry operations.

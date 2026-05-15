@@ -65,7 +65,7 @@ is not a business concern.
 | **Phase D** — Technology | [`../adr/0009-tokio-runtime.md`](../adr/deferred/0009-tokio-runtime.md) *(deferred)*, [`../operations/REUSE_MANIFEST.md`](../operations/REUSE_MANIFEST.md), [`../../install.sh`](../../install.sh), [`../operations/INSTALL.md`](../operations/INSTALL.md) | Tech stack, reuse register, deployment |
 | **Phase E/F** — Migration | [`../../cybernetic-health-harness.md` §20](../../cybernetic-health-harness.md), [`../status/CONSOLIDATED-STATUS.md`](../status/CONSOLIDATED-STATUS.md) | Roadmap and where we are |
 | **Phase G** — Governance | [`../status/CONSOLIDATED-STATUS.md`](../status/CONSOLIDATED-STATUS.md), [`../standards/safety.md`](../standards/safety.md), [`../../AGENTS.md`](../../AGENTS.md), [`../../scenario-tests.sh`](../../scenario-tests.sh) | Safety contract, identity, test coverage |
-| **Phase H** — Change Management | [`../adr/`](../adr/) (18 active ADRs: 0001–0002, 0004, 0006, 0008, 0011, 0013, 0015–0025; 7 deferred: 0003, 0005, 0007, 0009–0010, 0012, 0014); [`../status/skill-lifecycle-gaps.md`](../status/skill-lifecycle-gaps.md) | Locked decisions and lifecycle gaps |
+| **Phase H** — Change Management | [`../adr/`](../adr/) (18 active ADRs: 0001–0002, 0004, 0006, 0008, 0011, 0013, 0015–0025; 7 deferred: 0003, 0005, 0007, 0009–0010, 0012, 0014); [`../status/skill-lifecycle-gaps.md`](../status/skill-lifecycle-gaps.md), [`skill-self-management-strategy.md`](skill-self-management-strategy.md) | Locked decisions, lifecycle gaps, self-management plan |
 | **Requirements Mgmt** | [`../specifications/MVP_SPEC.md`](../specifications/MVP_SPEC.md), [`../specifications/PERSISTENCE_CATALOG.md`](../specifications/PERSISTENCE_CATALOG.md) | The pinned boundary |
 
 ## 3. Principle → Phase Anchoring
@@ -96,9 +96,8 @@ has an anchor document per TOGAF phase.
 - **Remote skill registry** — ADR-0024 defines the schema but
   the `registry-sources.yaml` file and `fetch --remote` bridge
   are deferred for remote registry sync.
-- **Probe telemetry feedback** — scenario metrics are journaled
-  and evaluated by the sentinel, but skill probe runs from the
-  workshop are not yet tracked in `probe_runs` counters.
+- **Probe telemetry feedback** — resolved 2026-05-14. `RegistryCache::record_execution()`
+  wired into chat dispatch and CLI paths; counters visible via `russell skill stats`.
 
 ## 5. Maintenance
 

@@ -4,7 +4,7 @@ audience: [architects, developers]
 last_updated: 2026-05-14
 togaf_phase: "H"
 version: "1.0.0"
-status: "Draft"
+status: "Active"
 ---
 
 <!-- TOGAF_DOMAIN: Architecture -->

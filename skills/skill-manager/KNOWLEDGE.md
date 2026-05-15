@@ -75,14 +75,18 @@ Arguments --name <skill-name>
 
 ## Guardrails
 
-- **Never prune bundled skills** (okapi-watcher, web-search, sysadmin,
-  skill-manager itself). These ship with Russell and are maintained
-  by the Russell team.
+- **Never prune bundled skills** (okapi-watcher, web-search, skill-discovery,
+  skill-workshop, skill-maintenance, skill-manager, scenario-tester,
+  pragmatic-cybernetics, pragmatic-semantics, ubuntu-jack).
+  These ship with Russell and are maintained by the Russell team.
 - **Check stats before pruning.** If `stats` shows recent failures,
   investigate rather than prune. The skill might need fixing, not
   removing.
 - **Ask before deleting.** `delete` is irreversible. Always confirm
   with the operator before proposing this action.
+- **Use the workshop for build/adapt.** Creating new skills and editing
+  manifests requires `russell workshop` — the `build` and `adapt`
+  commands are only available there, not through this skill.
 
 ## Example workflow
 
@@ -94,21 +98,18 @@ Jack → Let me check what's already installed first.
 
 [probe result shows no swap-watcher]
 
-Jack → No skill covers swap_pressure. I can build one.
-     Want me to create a swap-watcher skill?
+Jack → No skill covers swap_pressure. The workshop can build one.
+     Start 'russell workshop' and use 'build swap-watcher' to create it.
+     Then I can install it from here with 'install swap-watcher'.
 
-operator → yes, go ahead
+operator → switches to workshop, builds swap-watcher, returns to chat
 
-Jack → ACTION: skill-manager/build
+Jack → ACTION: skill-manager/install
        Arguments --name swap-watcher
 
-[intervention result: Created skills/swap-watcher/manifest.yaml]
-[Operator approves]
+[intervention result: swap-watcher installed and active]
 
-Jack → The skeleton is ready. The manifest needs editing to add
-     a swap usage probe. I'll adapt it now.
-     ACTION: skill-manager/adapt
-     Arguments --name swap-watcher
+Jack → swap-watcher is now loaded. Want me to run a health check?
 ```
 
 ## Registry Telemetry

@@ -104,7 +104,7 @@ operator runs `russell skill search <query>`.
 
 ### 2. Workshop: interactive skill lifecycle REPL
 
-**Command:** `russell skill workshop`
+**Command:** `russell workshop`
 
 A readline REPL where Jack (the Nurse) helps the operator with the
 full skill lifecycle. Jack's knowledge of the lifecycle comes from

@@ -9,6 +9,7 @@
 
 use anyhow::{Context, Result};
 use russell_core::paths::Paths;
+use russell_core::time::{approx_days_between, now_date_iso8601};
 use russell_doctor::client::LlmClient;
 use russell_doctor::client::SoapPrompt;
 use russell_doctor::oai_client::OkapiClient;
@@ -20,7 +21,6 @@ use rustyline::DefaultEditor;
 use rustyline::error::ReadlineError;
 use std::fmt::Write as _;
 use std::io::Write;
-use std::time::{SystemTime, UNIX_EPOCH};
 use tracing::warn;
 
 /// Run the interactive skill workshop REPL.
@@ -262,28 +262,17 @@ fn sync_registry_from_skills(registry: &mut RegistryCache, skills: &[Skill]) {
                 // Check if it was created via workshop (has a KNOWLEDGE.md in the skills dir).
                 SkillSource::Manual
             };
+            let bundled = is_bundled_skill(&skill.id);
             registry.upsert(
                 &skill.id,
-                RegistryEntry {
-                    status: LifecycleStatus::Active,
-                    version: skill.version.clone(),
-                    symptoms: skill.symptoms.clone(),
+                RegistryEntry::new_default(
+                    LifecycleStatus::Active,
+                    skill.version.clone(),
+                    skill.symptoms.clone(),
                     source,
-                    installed: skill.authored.clone(),
-                    last_evaluated: None,
-                    valid_until: None,
-                    coverage_score: None,
-                    superseded_by: None,
-                    deprecation_reason: None,
-                    probe_runs: 0,
-                    recent_probe_failures: 0,
-                    intervention_runs: 0,
-                    recent_intervention_failures: 0,
-                    last_probe_run_at: None,
-                    last_error: None,
-                    avg_probe_duration_ms: None,
-                    bundled: is_bundled_skill(&skill.id),
-                },
+                    skill.authored.clone(),
+                    bundled,
+                ),
             );
         }
     }
@@ -298,6 +287,7 @@ fn is_bundled_skill(id: &str) -> bool {
             | "skill-discovery"
             | "skill-workshop"
             | "skill-maintenance"
+            | "skill-manager"
             | "scenario-tester"
             | "pragmatic-cybernetics"
             | "pragmatic-semantics"
@@ -576,8 +566,8 @@ fn do_install(registry: &mut RegistryCache, skills_dir: &std::path::Path, name: 
         }
         println!("Installing {name} (v{})...", entry.version);
         entry.status = LifecycleStatus::Installed;
-        entry.installed = chrono_now();
-        entry.last_evaluated = Some(chrono_now());
+        entry.installed = now_date_iso8601();
+        entry.last_evaluated = Some(now_date_iso8601());
         println!("  Status: → installed");
         println!("  Skill will be available on next load.");
         println!("  Run: russell skill list  to verify.");
@@ -589,29 +579,16 @@ fn do_install(registry: &mut RegistryCache, skills_dir: &std::path::Path, name: 
             let version =
                 extract_yaml_field(&manifest, "version").unwrap_or_else(|| "0.1.0".into());
             let symptoms = extract_yaml_list(&manifest, "symptoms");
-            registry.upsert(
-                &id,
-                RegistryEntry {
-                    status: LifecycleStatus::Installed,
-                    version,
-                    symptoms,
-                    source: SkillSource::Manual,
-                    installed: chrono_now(),
-                    last_evaluated: Some(chrono_now()),
-                    valid_until: None,
-                    coverage_score: None,
-                    superseded_by: None,
-                    deprecation_reason: None,
-                    probe_runs: 0,
-                    recent_probe_failures: 0,
-                    intervention_runs: 0,
-                    recent_intervention_failures: 0,
-                    last_probe_run_at: None,
-                    last_error: None,
-                    avg_probe_duration_ms: None,
-                    bundled: false,
-                },
+            let mut entry = RegistryEntry::new_default(
+                LifecycleStatus::Installed,
+                version,
+                symptoms,
+                SkillSource::Manual,
+                now_date_iso8601(),
+                false,
             );
+            entry.last_evaluated = Some(now_date_iso8601());
+            registry.upsert(&id, entry);
             println!("{name} installed and registered.");
         } else {
             println!("Cannot read manifest for {name}.");
@@ -720,7 +697,7 @@ async fn do_fetch(
                 return;
             }
 
-            let today = chrono_now();
+            let today = now_date_iso8601();
             registry.upsert(
                 name,
                 RegistryEntry {
@@ -813,7 +790,7 @@ fn do_adapt(registry: &mut RegistryCache, skills_dir: &std::path::Path, name: &s
                 if let Some(entry) = registry.skills.get_mut(name) {
                     entry.version = version;
                     entry.symptoms = symptoms;
-                    entry.last_evaluated = Some(chrono_now());
+                    entry.last_evaluated = Some(now_date_iso8601());
                     println!("  Updated registry entry.");
                 }
             }
@@ -880,7 +857,7 @@ async fn do_search_remote(registry: &mut RegistryCache, query: &str) {
                     version: "unknown".into(),
                     symptoms: vec![],
                     source: SkillSource::Remote { url: url.clone() },
-                    installed: chrono_now(),
+                    installed: now_date_iso8601(),
                     last_evaluated: None,
                     valid_until: None,
                     coverage_score: None,
@@ -1037,7 +1014,7 @@ async fn do_build(
     }
 
     let manifest_path = skill_dir.join("manifest.yaml");
-    let today = chrono_now();
+    let today = now_date_iso8601();
     let manifest_content = format!(
         r#"# {name} — TODO: describe what this skill does.
 id: {name}
@@ -1107,11 +1084,11 @@ safety:
 }
 
 fn print_check(registry: &RegistryCache) {
-    println!("Skill audit — {}", chrono_now());
+    println!("Skill audit — {}", now_date_iso8601());
     println!();
 
     // Check staleness.
-    let today = chrono_now().split_at(10).0.to_string(); // YYYY-MM-DD
+    let today = now_date_iso8601().split_at(10).0.to_string(); // YYYY-MM-DD
     for (id, entry) in &registry.skills {
         if !entry.status.is_loadable() {
             continue;
@@ -1120,7 +1097,7 @@ fn print_check(registry: &RegistryCache) {
             if vu < &today {
                 format!("EXPIRED ({vu})")
             } else {
-                let remaining = days_between(&today, vu);
+                let remaining = approx_days_between(&today, vu);
                 format!("{vu} ({remaining}d remaining)")
             }
         } else {
@@ -1141,50 +1118,6 @@ fn print_check(registry: &RegistryCache) {
 
     println!();
     print_coverage_gaps(registry);
-}
-
-/// Get current date as ISO 8601 string using real system time.
-fn chrono_now() -> String {
-    if let Ok(dur) = SystemTime::now().duration_since(UNIX_EPOCH) {
-        let secs = dur.as_secs();
-        // Convert Unix timestamp to YYYY-MM-DD (UTC).
-        let days_since_epoch = secs / 86400;
-        // Days since 1970-01-01. Compute year/month/day.
-        let (y, m, d) = civil_from_days(days_since_epoch as i64 + 719_468); // 719_468 = days from 0000-01-01 to 1970-01-01
-        format!("{y:04}-{m:02}-{d:02}")
-    } else {
-        "2026-05-13".to_string()
-    }
-}
-
-/// Convert days since 0000-03-01 to civil date (algorithm from Howard Hinnant).
-fn civil_from_days(z: i64) -> (i64, i64, i64) {
-    let z = z - 719_468; // shift epoch to 1970-01-01
-    let era = if z >= 0 { z } else { z - 146096 } / 146_097;
-    let doe = (z - era * 146_097) as u64;
-    let yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
-    let y = yoe as i64 + era * 400;
-    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
-    let mp = (5 * doy + 2) / 153;
-    let d = doy - (153 * mp + 2) / 5 + 1;
-    let m = if mp < 10 { mp + 3 } else { mp - 9 };
-    let y = if m <= 2 { y + 1 } else { y };
-    (y, m as i64, d as i64)
-}
-
-/// Rough days between two ISO 8601 date strings.
-fn days_between(a: &str, b: &str) -> i64 {
-    let pa = parse_date_parts(a);
-    let pb = parse_date_parts(b);
-    (pb.0 * 365 + pb.1 * 30 + pb.2 as i64) - (pa.0 * 365 + pa.1 * 30 + pa.2 as i64)
-}
-
-fn parse_date_parts(d: &str) -> (i64, i64, i32) {
-    let parts: Vec<&str> = d.split('-').collect();
-    let y = parts.first().and_then(|s| s.parse().ok()).unwrap_or(0);
-    let m = parts.get(1).and_then(|s| s.parse().ok()).unwrap_or(0);
-    let d = parts.get(2).and_then(|s| s.parse().ok()).unwrap_or(1);
-    (y, m, d)
 }
 
 /// Send a turn to Jack for free-form workshop interaction.

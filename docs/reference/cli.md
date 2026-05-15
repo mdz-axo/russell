@@ -98,7 +98,13 @@ interventions await consent (`/approve`, "yes", "ok", "go ahead").
 russell chat
 ```
 
-Commands during chat: `/help`, `/exit`, `/skills`, `/models`.
+Commands during chat: `/help`, `/exit`, `/quit`, `/skills`, `/models`,
+`/refresh`, `/reload`, `/history`, `/approve`, `/deny`.
+
+Skill management during chat: `ACTION: skill-manager/list-skills`,
+`ACTION: skill-manager/stats`, `ACTION: skill-manager/check`,
+`ACTION: skill-manager/install`, `ACTION: skill-manager/prune`,
+`ACTION: skill-manager/restore`, `ACTION: skill-manager/delete`.
 
 ### `russell okapi-probe`
 
@@ -143,7 +149,61 @@ Options:
 - `--dry-run` — print what would run without executing
 
 The dispatcher respects the probe's `timeout:` field from the
-manifest (e.g. `180s`, `5m`, `1h`). Default is 30s.
+manifest (e.g. `180s`, `5m`, `1h`). Default is 30s. Probe telemetry
+(run counts, failures, duration EWMA) is recorded in the registry cache.
+
+### `russell skill stats`
+
+Show performance telemetry for all skills in the registry: probe runs,
+failures, intervention counts, average duration (EWMA), and last run time.
+
+```
+russell skill stats
+```
+
+### `russell skill check`
+
+Audit all installed skills for staleness (180-day threshold), coverage gaps
+against the symptom catalog, and quality scores.
+
+```
+russell skill check
+```
+
+### `russell skill install <name>`
+
+Install or activate a skill by name. Moves the skill to installed/active
+status. Idempotent — safe to run on already-active skills.
+
+```
+russell skill install swap-watcher
+```
+
+### `russell skill prune <name>`
+
+Deprecate a skill. Marks as deprecated; files remain on disk.
+Reversible with `restore`.
+
+```
+russell skill prune swap-watcher
+```
+
+### `russell skill restore <name>`
+
+Restore a deprecated skill back to active status.
+
+```
+russell skill restore swap-watcher
+```
+
+### `russell skill retire <name>`
+
+Permanently retire a skill: removes from the registry cache and
+deletes the skill directory from disk. Irreversible.
+
+```
+russell skill retire swap-watcher
+```
 
 ### `russell workshop`
 
@@ -198,6 +258,7 @@ persistence is auditable).
 | `sysadmin` | 8 (systemd-failed, degraded, clock, zombies, journal, coredumps, swap, stale-mounts) | 8 (reset-failed, force-clock-sync, reap-zombies, journal-vacuum, etc.) | Low–Medium |
 | `scenario-tester` | 7 (run-okapi, run-chat, run-sentinel, evaluate, report, journal, full) | 0 | None |
 | `oom-watcher` | 1 (check-oom-kills) | 0 | None |
+| `skill-manager` | 3 (list-skills, stats, check) | 4 (install, prune, restore, delete) | Low |
 
 ### Knowledge Skills (data interpretation only, no probes)
 

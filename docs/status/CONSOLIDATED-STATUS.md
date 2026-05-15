@@ -3,16 +3,16 @@ title: "Russell Consolidated Status"
 audience: [operators, developers, contributors, architects, agents]
 last_updated: 2026-05-14
 togaf_phase: "G"
-version: "2.2.0"
+version: "2.3.0"
 status: "Active"
 ---
 
 # Russell Consolidated Status
 
 <!-- TOGAF_DOMAIN: Governance -->
-<!-- VERSION: 2.1.0 -->
+<!-- VERSION: 2.3.0 -->
 <!-- STATUS: Active -->
-<!-- LAST_UPDATED: 2026-05-12 -->
+<!-- LAST_UPDATED: 2026-05-14 -->
 
 **Single source of truth for "where is the project?"** Updated at the end
 of every meaningful development session.
@@ -24,8 +24,8 @@ of every meaningful development session.
 - **Phase 1b (install artifacts + systemd units) — SHIPPED + installed.**
 - **Phase 1c (20-day unattended soak) — CLOSED.**
 - **Phase 2 (observation sharpened) — ACTIVE.** Self-vitals (5), rule engine, EWMA baselines, process probes (7), GPU probes (5), disk probes (2), systemd probes (3). Baseline deviation integrated into Jack's SOAP objective.
-- **Phase 3 (skills and dispatch) — COMPLETE.** Extended with skill lifecycle management: workshop REPL (`russell workshop`), registry cache (`local-cache.yaml`), safety scanner (7 rules for manifest + KNOWLEDGE.md), skill discovery pipeline, and scenario testing skill (`scenario-tester`). 11 skills loaded (4 actionable with probes, 7 knowledge). `russell skill run` now respects manifest `timeout:` field.
-- **Phase 4 (MCP surface, real skills, operational depth) — ACTIVE.** Skill lifecycle gaps documented (`docs/status/skill-lifecycle-gaps.md`). Sentinel evaluates externally-written scenario metrics against `rules.d/agent-testing.toml` (11 rule thresholds). `fetch <url>`, `adapt <name>`, `search --remote`, and `restore <name>` commands implemented in workshop. End-to-end scenario pipeline: `scenario-full` probe chains run-okapi → evaluate → journal. 166 tests pass. 21 scenario tests pass.
+- **Phase 3 (skills and dispatch) — COMPLETE.** Extended with skill lifecycle management: workshop REPL (`russell workshop`), registry cache (`local-cache.yaml`), safety scanner (7 rules for manifest + KNOWLEDGE.md), skill discovery pipeline, and scenario testing skill (`scenario-tester`). 12 skills loaded (5 actionable with probes, 7 knowledge). `russell skill run` respects manifest `timeout:` field.
+- **Phase 4 (MCP surface, real skills, operational depth) — ACTIVE.** Skill lifecycle gaps documented (`docs/status/skill-lifecycle-gaps.md`). Sentinel evaluates externally-written scenario metrics against `rules.d/agent-testing.toml` (11 rule thresholds). `fetch <url>`, `adapt <name>`, `search --remote`, and `restore <name>` commands implemented in workshop. `skill-manager` bundled meta-skill enables Jack to build, install, prune, restore, and delete skills from chat via ACTION syntax. Registry telemetry wired: `probe_runs`, `intervention_runs`, `avg_probe_duration_ms`, and `last_probe_run_at` updated on every execution. Quality scoring (`compute_score()`) operational. End-to-end scenario pipeline: `scenario-full` probe chains run-okapi → evaluate → journal. 166 tests pass. 21 scenario tests pass.
 - **Architecture:** JR-1 austerity maintained throughout. Seven ADRs deferred.
 
 ## 2. What exists today
@@ -58,15 +58,22 @@ of every meaningful development session.
   Includes `AutoimmuneGuard` (process-wide mutex for future meta-Doctor).
   Detects degraded internal state (slow LLM, journal stall, timer drift)
   before the operator notices. All vitals are read-only; no mutation.
-- `russell-cli` implements sixteen verbs: `status`, `list`,
+- `russell-cli` implements seventeen verbs: `status`, `list`,
   `profile [--init]`, `digest`, `sentinel-once`, `jack`,
-  `chat`, `skill list`, `skill run <id>`, `workshop`,
-  `okapi-probe`, `proprio`.
+  `chat`, `skill` (subcommands: `list`, `run`, `stats`, `check`,
+  `install`, `prune`, `restore`, `retire`), `workshop`,
+  `okapi-probe`, `proprio`, `mcp-tools`.
 - 166 tests passing.
 - 21 scenario tests passing (`scenario-tests.sh`).
-- 11 skills loaded (okapi-watcher, web-search, skill-discovery,
+- 12 skills loaded (okapi-watcher, web-search, skill-discovery,
   skill-workshop, skill-maintenance, scenario-tester, sysadmin,
-  pragmatic-cybernetics, pragmatic-semantics, ubuntu-jack, oom-watcher).
+  pragmatic-cybernetics, pragmatic-semantics, ubuntu-jack,
+  oom-watcher, **skill-manager**). 5 actionable (okapi-watcher,
+  sysadmin, scenario-tester, oom-watcher, skill-manager), 7 knowledge.
+- Skill registry telemetry active: `probe_runs`,
+  `intervention_runs`, `avg_probe_duration_ms` (EWMA), and
+  `last_probe_run_at` updated on every execution in chat and CLI.
+- Quality scoring operational via `compute_score()`.
 
 ### Kask Integration
 
@@ -98,7 +105,7 @@ of every meaningful development session.
 - Corrective reflex arcs — require mutation and IDRS.
 - Tier I / II / III separate cadences.
 - Remote skill registry sync (`registry-sources.yaml` schema defined, `fetch --remote` deferred).
-- Skill probe telemetry (`probe_runs` counters not wired to Dispatcher).
+- Skill probe telemetry (`probe_runs` counters wired to Dispatcher — resolved 2026-05-14).
 - Chaos probes (deferred).
 
 ## 3. Phase-by-phase plan
@@ -201,11 +208,14 @@ ADR-0007 deferral lifted per ADR-0023.
 Kask's `stack-api` gateway. Russell has access to 193 tools across
 16 MCP servers registered in the Kask mcp-registry. Skill lifecycle
 is operational with registry cache, workshop REPL, safety scanner,
-and scenario testing pipeline. The skill catalogue covers 11
-symptoms with installed skills (up from 3 at Phase 3 close).
-Scenario metrics feed into the sentinel rule engine. The
-`oom-watcher` skill demonstrates end-to-end build→install→test→sentinel
-flow.
+and scenario testing pipeline. The `skill-manager` bundled meta-skill
+enables in-chat skill management (build, install, prune, restore,
+delete) via ACTION syntax. Registry telemetry (`probe_runs`,
+`intervention_runs`, EWMA duration, last-run timestamps) is wired into
+the dispatch path. The skill catalogue covers 12+ symptoms with installed
+skills (up from 3 at Phase 3 close). Scenario metrics feed into the
+sentinel rule engine. The `oom-watcher` skill demonstrates end-to-end
+build→install→test→sentinel flow.
 
 - [x] **EWMA statistics**: `ewma_mean`/`ewma_var` in `BaselineRow`, computed with
   7-day half-life over timestamp-ordered series. Stored via `upsert_baseline()`

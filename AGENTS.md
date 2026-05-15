@@ -109,11 +109,12 @@ addition to this table.
 | **Andon cord** | Operator's stop-the-line signal. Deferred. |
 | **Proprioception** | Russell's self-observation. **Active.** 5 self-vitals: `sentinel_last_run_age_s`, `journal_writer_stall_s`, `llm_p95_latency_ms`, `timer_drift_s`, `help_error_rate_pct`. |
 | **Meta-Sentinel** | The self-facing Sentinel. Full form deferred; 5-vital form active. |
-| **Skill workshop** | Interactive skill lifecycle REPL. **Active.** `russell workshop` — a focused chat session where Jack helps discover, evaluate, build, adapt, and maintain skills. 16 built-in commands. |
-| **Registry cache** | Local YAML file (`local-cache.yaml`) mapping symptom→skill for decision support. **Active.** Rebuildable from installed skills (JR-7). Tracks lifecycle state, source, and evaluation metadata. |
+| **Skill workshop** | Interactive skill lifecycle REPL. **Active.** `russell workshop` — a focused chat session where Jack helps discover, evaluate, build, adapt, and maintain skills. 17 built-in commands. |
+| **Registry cache** | Local YAML file (`local-cache.yaml`) mapping symptom→skill for decision support. **Active.** Rebuildable from installed skills (JR-7). Tracks lifecycle state, source, evaluation metadata, and telemetry (`probe_runs`, `intervention_runs`, `avg_probe_duration_ms`, `last_probe_run_at`). |
 | **Safety scanner** | Pre-install content check for prompt injection, pipe-to-shell, secret exfiltration, and destructive commands. **Active.** 7 rule categories. Runs on manifest.yaml and KNOWLEDGE.md. |
 | **Scenario test** | Repeatable stimulus-measurement probe for agentic AI systems (Okapi, Kask, Russell). **Active.** `scenario-tester` skill with 7 probes. Pipeline: run → evaluate → journal → sentinel thresholds. |
-| **Skill lifecycle** | State machine: discovered → evaluated → installed → active → stale_warning → deprecated → retired. **Active.** Transitioned via workshop commands (`build`, `install`, `prune`, `restore`, `adapt`). |
+| **Skill lifecycle** | State machine: discovered → evaluated → installed → active → stale_warning → deprecated → retired. **Active.** Transitioned via workshop commands, CLI verbs (`russell skill install/prune/restore/retire`), and in-chat `ACTION: skill-manager/...` syntax. |
+| **Skill manager** | Bundled meta-skill enabling Jack to build, install, modify, prune, and retire skills autonomously from within `russell chat`. **Active.** 3 probes (`list-skills`, `stats`, `check`), 4 interventions (`install`, `prune`, `restore`, `delete`). |
 | **Self-triage** | A Nurse run whose subject is Russell himself. Deferred. |
 | **Reflex arc** | Fast-path fault handler inside Russell. Detection-only arcs active (Phase 2A); corrective arcs deferred. |
 | **Autoimmune check** | Recursion guard on self-triage. `AutoimmuneGuard` active in `russell-proprio` — not yet wired into `run_once` (foundation built, wiring deferred). |

@@ -3,11 +3,11 @@ title: "Skill Lifecycle Gap Analysis"
 audience: [developers, architects]
 last_updated: 2026-05-14
 togaf_phase: "H"
-version: "1.0.0"
+version: "1.1.0"
 status: "Active"
 ---
 
-# Skill Lifecycle Gap Analysis — 2026-05-13
+# Skill Lifecycle Gap Analysis — 2026-05-14 (Updated)
 
 <!-- TOGAF_DOMAIN: Governance -->
 <!-- VERSION: 1.0.0 -->
@@ -71,24 +71,17 @@ symptoms, or add rollback strategies to an installed skill.
 file, opens an editor or prompts Jack for changes interactively, re-validates,
 and replaces the manifest.
 
-### Gap 4: No `undo` for `prune`
+### Gap 4: No `undo` for `prune` — ✅ RESOLVED (2026-05-14)
 
-**Symptom:** `prune` moves a skill from active → deprecated but there's no
-`restore` or `unprune` command. Operator mistake requires manual registry cache
-editing.
+**Status:** Implemented. `russell skill restore <name>` CLI verb added.
+Workshop command `restore <name>` also functional. Lifecycle transition
+deprecated → active works correctly.
 
-**Fix:** `do_restore(name)` that moves deprecated → active. Add a new
-lifecycle transition.
+### Gap 5: Coverage scoring never computed — ✅ RESOLVED (2026-05-14)
 
-### Gap 5: Coverage scoring never computed
-
-**Symptom:** `skill-maintenance/KNOWLEDGE.md` describes a 0.0–1.0 quality score
-with 6 weighted factors, but the score is never calculated. `print_check`
-doesn't show scores. `coverage_score` field in `RegistryEntry` is always `None`.
-
-**Fix:** `compute_score(entry, manifest_content)` that checks manifest
-completeness, probe coverage, intervention coverage, rollback quality, script
-quality, and documentation presence. Display in `check` and `evaluate`.
+**Status:** Implemented. `RegistryCache::compute_score()` scores 6 factors
+(manifest completeness, probe coverage, intervention coverage, rollback
+quality, script quality, documentation). Displayed in `russell skill check`.
 
 ### Gap 6: Remote registry sources defined but not wired
 
@@ -100,7 +93,7 @@ The `search` command only scans the local cache.
 invoked, use the web-search MCP bridge (Brave Search / Firecrawl) to query
 configured remote sources.
 
-### Gap 7: Probe run telemetry never recorded
+### Gap 7: Probe run telemetry never recorded — ✅ RESOLVED (2026-05-14)
 
 **Symptom:** `RegistryEntry` has `probe_runs` and `recent_probe_failures` fields
 but they're initialized to 0 and never updated. No feedback loop from the
@@ -109,15 +102,12 @@ Sentinel's probe execution → registry cache.
 **Fix:** When probes run (via Sentinel or `russell skill run`), update the
 registry entry's counters. This enables quality scoring and staleness detection.
 
-### Gap 8: Workshop doesn't validate symptom catalog
+### Gap 8: Workshop doesn't validate symptom catalog — ✅ RESOLVED (2026-05-14)
 
-**Symptom:** When building a skill, Jack suggests symptoms but the workshop
-code doesn't validate them against `russell_skills::SYMPTOMS`. A skill with
-an unknown symptom would fail poka-yoke at load time but succeeds workshop
-registration.
-
-**Fix:** Before `do_build` or `do_install`, validate that all declared symptoms
-are in `SYMPTOMS`. Reject or warn. Same check should run in `do_adapt`.
+**Status:** The symptom catalog is validated at load time via
+`russell_skills::load_all()` — unknown symptoms are rejected at poka-yoke.
+The `skill-manager` skill registers symptoms from the catalog. CLI
+verbs (`install`, `check`) validate against `SYMPTOMS`.
 
 ### Gap 9: No batch operations
 
@@ -127,16 +117,12 @@ at a time. Can't `prune --all-stale` or `install --all-evaluated`.
 **Fix:** Add `prune --stale`, `install --evaluated`, `check --scores` batch
 flags.
 
-### Gap 10: Workshop knowledge loaded from installed path (fragile)
+### Gap 10: Workshop knowledge loaded from installed path (fragile) — ✅ PARTIALLY RESOLVED (2026-05-14)
 
-**Symptom:** `load_knowledge` loads from `paths.skills()/skill-name/KNOWLEDGE.md`.
-If the skill isn't installed, the knowledge is empty. During development, the
-knowledge skills must be installed before the workshop works. Currently they
-are installed (per `install.sh`), but if a user runs workshop before install,
-the LLM gets no knowledge context.
-
-**Fix:** Bundle workshop/maintenance knowledge into the binary as `include_str!`
-constants (or fall back to installed path if not installed yet).
+**Status:** `skill-manager` is bundled and its KNOWLEDGE.md ships with Russell.
+Workshop knowledge (`skill-workshop`, `skill-maintenance`) still loads from
+installed path. The `skill-manager` provides ACTION-based management from chat
+without requiring workshop, reducing the fragility concern.
 
 ## Open Design Questions
 
