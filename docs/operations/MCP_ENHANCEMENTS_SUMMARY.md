@@ -3,7 +3,7 @@ title: "MCP Enhancements Implementation Summary"
 audience: [developers, operators]
 last_updated: 2026-05-14
 togaf_phase: "G"
-version: "1.0.0"
+version: "1.1.0"
 status: "Active"
 ---
 
@@ -100,8 +100,7 @@ stack-admin key create --for russell --type service \
 
 # Grant MCP capabilities
 stack-admin key grant --for russell --capability mcp:tools/list --scope "*"
-stack-admin key grant --for russell --capability mcp:tools/call --scope "russell_*"
-stack-admin key grant --for russell --capability mcp:tools/call --scope "okapi_*"
+stack-admin key grant --for russell --capability mcp:tools/call --scope "*"
 
 # Install initial token
 stack-admin key get --for russell --format json \

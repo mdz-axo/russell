@@ -316,7 +316,7 @@ let needs_rotation = hours_until_rotation <= 0;
 | `file_provider_reads_token` | auth.rs:298 | ✅ Passing |
 | `file_provider_detects_expiry` | auth.rs:307 | ✅ Passing |
 | `file_provider_refreshes_near_expiry` | auth.rs:316 | ✅ Passing |
-| End-to-end MCP tools | Manual | ✅ 15 tools working |
+| End-to-end MCP tools | Manual | ✅ 193 tools working |
 
 ---
 

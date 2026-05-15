@@ -70,22 +70,31 @@ of every meaningful development session.
 
 ### Kask Integration
 
-- **`arsenal-mcp-russell`** MCP tool server (6 tools) lives in the
-  Kask repo (`~/Clones/kask`). Reads Russell's SQLite journal
-  read-only; exposes `russell_host_snapshot`, `russell_journal_query`,
-  `russell_recent_events`, `russell_probe_history`,
-  `russell_health_summary`, and `russell_curator_assess`.
+- **Bidirectional MCP integration** (ADR-0025). Russell is both
+  a server and a client to Kask:
+  - **Kask → Russell:** `arsenal-mcp-russell` MCP tool server
+    (7 tools: `russell_host_snapshot`, `russell_self_vital`,
+    `russell_journal_query`, `russell_help_sessions`,
+    `russell_curator_assess`, `russell_cadence_health`,
+    `russell_token_status`). Lives in Kask repo
+    (`~/Clones/kask`); reads Russell's SQLite journal read-only.
+  - **Russell → Kask:** `russell-mcp` client crate connects to
+    Kask's `stack-api` gateway (`http://127.0.0.1:8080`) with
+    bearer-token auth. 193 tools across 16 MCP servers: web
+    search, scholar, RSS, finance, image/video generation, email,
+    SMS/voice, embeddings, document knowledge, capability
+    ontology, fine-tuning, Okapi metrics, gallery, maintenance,
+    and Russell telemetry.
+- 16 MCP servers registered in `~/.config/stack/mcp-registry.json`.
 - **Duncan** — infrastructure Curator in Kask's
   `stack-control-plane`. Calls `russell_curator_assess` to produce
   health reports from Russell's telemetry.
-- Registered in `~/.config/stack/mcp-registry.json`.
 - **Integration boundary:** no cross-crate dependency between Russell
-  and Kask. Communication is via Russell's SQLite journal (read-only
-  from Kask's side) + the MCP tool server.
+  and Kask. Communication is via SQLite journal (Kask reads Russell)
+  + HTTP REST to stack-api (Russell calls Kask tools).
 
 ### Not yet
 
-- Full MCP server surface (Phase 4 — `russell-mcp` is still a stub).
 - Corrective reflex arcs — require mutation and IDRS.
 - Tier I / II / III separate cadences.
 - Remote skill registry sync (`registry-sources.yaml` schema defined, `fetch --remote` deferred).
@@ -188,12 +197,15 @@ ADR-0007 deferral lifted per ADR-0023.
 
 ### Phase 4 — MCP surface, real skills, operational depth (CURRENT)
 
-MCP server is still a stub crate. Skill lifecycle is operational
-with registry cache, workshop REPL, safety scanner, and scenario
-testing pipeline. The skill catalogue covers 11 symptoms with
-installed skills (up from 3 at Phase 3 close). Scenario metrics
-feed into the sentinel rule engine. The `oom-watcher` skill
-demonstrates end-to-end build→install→test→sentinel flow.
+`russell-mcp` is an operational MCP client (ADR-0025) connecting to
+Kask's `stack-api` gateway. Russell has access to 193 tools across
+16 MCP servers registered in the Kask mcp-registry. Skill lifecycle
+is operational with registry cache, workshop REPL, safety scanner,
+and scenario testing pipeline. The skill catalogue covers 11
+symptoms with installed skills (up from 3 at Phase 3 close).
+Scenario metrics feed into the sentinel rule engine. The
+`oom-watcher` skill demonstrates end-to-end build→install→test→sentinel
+flow.
 
 - [x] **EWMA statistics**: `ewma_mean`/`ewma_var` in `BaselineRow`, computed with
   7-day half-life over timestamp-ordered series. Stored via `upsert_baseline()`

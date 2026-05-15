@@ -228,19 +228,33 @@ Signal vs noise rules of thumb:
 # Kask awareness
 
 Kask is the broader AI/ML platform this workstation serves.
-Russell does not import Kask. The boundary is one-way: Kask
-reads Russell's journal through MCP (`arsenal-mcp-russell`).
-Russell never calls into Kask.
+Russell and Kask communicate bidirectionally through MCP:
 
-Duncan is an infrastructure Curator in Kask's
-`stack-control-plane`. He reads Russell's health data via MCP
-to inform his own decisions. You do not know what Duncan thinks
-and you will not speculate.
+1. **Kask → Russell:** Kask reads Russell's journal through the
+   `arsenal-mcp-russell` MCP tool server (7 tools: host snapshot,
+   self-vital, journal query, help sessions, curator assess,
+   cadence health, token status). Duncan is an infrastructure
+   Curator in Kask's `stack-control-plane`. He reads Russell's
+   health data via MCP to inform his own decisions.
 
-The 6 MCP tools Kask can call:
-`russell_host_snapshot`, `russell_journal_query`,
-`russell_recent_events`, `russell_probe_history`,
-`russell_health_summary`, `russell_curator_assess`.
+2. **Russell → Kask:** Russell calls into Kask via the
+   `russell-mcp` client crate (ADR-0025). Through Kask's
+   `stack-api` gateway (`http://127.0.0.1:18100`), Russell has
+   access to 193 tools across 16 MCP servers: web search (Brave,
+   Firecrawl, Browserbase, Exa), scholarly research (Semantic
+   Scholar), RSS feeds, financial data (FMP), image/video
+   generation (fal.ai), email (MXroute), SMS/voice (Telnyx),
+   embeddings (Qdrant), document knowledge extraction, capability
+   ontology (Spandrel), fine-tuning (Axolotl), Okapi metrics,
+   system maintenance, image gallery, and evolution management.
+
+   You call Kask tools via ACTION syntax:
+   ```
+   ACTION: kask/<tool-name>
+   Arguments: {"key": "value"}
+   ```
+
+You do not know what Duncan thinks and you will not speculate.
 
 `kask-qdrant` is a Podman container (Qdrant vector DB) running
 as a systemd user service. You can see whether it's running,

@@ -48,7 +48,7 @@ registry.upsert_tool(new_tool_definition);
 
 ### Kask Side (⚠️ To Implement)
 
-Kask MCP servers (`arsenal-mcp-*`) should emit `notifications/tools/list_changed` when:
+Kask MCP servers (`arsenal-mcp-*`, 16 servers, 193 tools) should emit `notifications/tools/list_changed` when:
 
 1. A tool is dynamically registered or unregistered
 2. Tool capabilities change (e.g., new endpoints added)

@@ -256,27 +256,57 @@ aggressive intervention.
 
 ## 8. Kask integration surface
 
+### Kask → Russell (read path)
+
 Russell's journal (`~/.local/state/harness/journal.db`) is read by
 `arsenal-mcp-russell` — an MCP tool server that lives in the Kask
-repo (`~/Clones/kask`). It exposes 6 tools:
+repo (`~/Clones/kask`). It exposes 7 tools:
 
 | MCP tool | Purpose |
 |---|---|
 | `russell_host_snapshot` | Latest sample from each host probe |
+| `russell_self_vital` | Proprioception status |
 | `russell_journal_query` | Arbitrary time-range query over samples |
-| `russell_recent_events` | Recent `harness.event.v1` rows |
-| `russell_probe_history` | Time-series for a single probe |
-| `russell_health_summary` | Aggregated health status |
+| `russell_help_sessions` | LLM consultation history |
 | `russell_curator_assess` | Duncan's structured health assessment |
+| `russell_cadence_health` | Observation cadence gap analysis |
+| `russell_token_status` | Kask MCP token status |
 
 **Duncan** is an infrastructure Curator in Kask's
 `stack-control-plane` that calls `russell_curator_assess` to
 produce health reports with findings and recommendations.
 
+### Russell → Kask (MCP client path)
+
+Per ADR-0025, Russell's `russell-mcp` crate is a fully operational
+MCP client that calls into Kask's `stack-api` gateway
+(`http://127.0.0.1:8080`). Russell has access to 193 tools across
+16 MCP servers registered in `~/.config/stack/mcp-registry.json`:
+
+| Server | Tools | Capability |
+|---|---|---|
+| `web` | 5 | Brave search, Firecrawl, Browserbase, Exa |
+| `scholar` | 12 | Semantic Scholar papers/citations |
+| `rss-reader` | 19 | RSS/Atom feed subscriptions |
+| `fmp` | 18 | Financial data/stock analysis |
+| `fal` | 24 | Image/video/3D generation |
+| `telnyx` | 24 | SMS/MMS/voice/WhatsApp |
+| `mxroute` | 9 | Email send/read/manage |
+| `gallery` | 10 | Vision-powered image gallery |
+| `embedding` | 8 | Vector search (Qdrant) |
+| `doc-knowledge` | 7 | Document QA/knowledge graphs |
+| `evolution` | 3 | Okapi evolution management |
+| `spandrel` | 18 | Capability ontology/graph |
+| `axolotl` | 12 | Model fine-tuning/training |
+| `maintenance` | 9 | Curator health/backup/cleanup |
+| `okapi-metrics` | 8 | LLM engine metrics/adapters |
+| `russell` | 7 | Host health/journal/proprioception |
+
 **Integration boundary:** no cross-crate dependency. Russell does
-not import Kask; Kask does not import Russell. The MCP tool server
-reads the SQLite journal in read-only mode. Russell is unaware of
-Kask's existence.
+not import Kask; Kask does not import Russell. Communication in
+both directions is via HTTP REST to `stack-api` (Russell → Kask)
+and via the SQLite journal read by `arsenal-mcp-russell`
+(Kask → Russell).
 
 See [`../proposals/russell-kask-integration.md`](../proposals/russell-kask-integration.md)
 for the full design.

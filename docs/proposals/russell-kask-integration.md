@@ -366,9 +366,10 @@ All Phase A steps are done:
 2. ✅ `russell-sentinel.timer` firing every 5 minutes (20-day soak
    completed, 2 062 cycles).
 3. ✅ `arsenal-mcp-russell` MCP tool server built in Kask repo
-   (6 tools: `russell_host_snapshot`, `russell_journal_query`,
-   `russell_recent_events`, `russell_probe_history`,
-   `russell_health_summary`, `russell_curator_assess`).
+    (7 tools: `russell_host_snapshot`, `russell_self_vital`,
+    `russell_journal_query`, `russell_help_sessions`,
+    `russell_curator_assess`, `russell_cadence_health`,
+    `russell_token_status`).
 4. ✅ Registered in `~/.config/stack/mcp-registry.json`.
 5. ✅ `russell jack` operational for operators.
 

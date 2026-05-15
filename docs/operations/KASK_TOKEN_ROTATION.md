@@ -85,8 +85,7 @@ stack-admin key create --for russell --type service \
 
 ```bash
 stack-admin key grant --for russell --capability mcp:tools/list --scope "*"
-stack-admin key grant --for russell --capability mcp:tools/call --scope "russell_*"
-stack-admin key grant --for russell --capability mcp:tools/call --scope "okapi_*"
+stack-admin key grant --for russell --capability mcp:tools/call --scope "*"
 ```
 
 ### 3. Install Token File
