@@ -19,6 +19,7 @@ use russell_skills::registry::{
 use rustyline::DefaultEditor;
 use rustyline::error::ReadlineError;
 use std::fmt::Write as _;
+use std::io::Write;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tracing::warn;
 
@@ -55,6 +56,8 @@ pub async fn run(paths: &Paths) -> Result<()> {
            prune <name>      deprecate a stale skill\n\
            restore <name>    move a deprecated skill back to active\n\
            install <name>    move a discovered skill to installed/active\n\
+           delete <name>     retire skill — remove directory and cache entry\n\
+           retire <name>     alias for delete\n\
            /quit             exit the workshop\n\
          \n\
          Or just describe what you need and Jack will help.\n"
@@ -221,6 +224,14 @@ async fn handle_builtin(
             do_install(registry, skills_dir, name);
             true
         }
+        _ if input.starts_with("delete ") || input.starts_with("retire ") => {
+            let name = input
+                .strip_prefix("delete ")
+                .or_else(|| input.strip_prefix("retire "))
+                .unwrap_or("");
+            do_delete(registry, skills_dir, name);
+            true
+        }
         _ if input.starts_with("build ") => {
             let name = input.strip_prefix("build ").unwrap_or("");
             do_build(
@@ -266,6 +277,12 @@ fn sync_registry_from_skills(registry: &mut RegistryCache, skills: &[Skill]) {
                     deprecation_reason: None,
                     probe_runs: 0,
                     recent_probe_failures: 0,
+                    intervention_runs: 0,
+                    recent_intervention_failures: 0,
+                    last_probe_run_at: None,
+                    last_error: None,
+                    avg_probe_duration_ms: None,
+                    bundled: is_bundled_skill(&skill.id),
                 },
             );
         }
@@ -313,6 +330,8 @@ fn print_help() {
            prune <name>      deprecate a stale skill\n\
            restore <name>    move a deprecated skill back to active\n\
            install <name>    move a discovered skill to installed/active\n\
+           delete <name>     retire skill — remove directory and cache entry\n\
+           retire <name>     alias for delete\n\
            /quit             exit the workshop\n\
          \n\
          Or just describe what you need and Jack will help.\n"
@@ -359,10 +378,10 @@ fn print_skill_list(registry: &RegistryCache) {
         return;
     }
     println!(
-        "{:<30} {:<10} {:<14} symptoms",
-        "skill", "version", "status"
+        "{:<28} {:<8} {:<12} {:>5} {:>6}  symptoms",
+        "skill", "version", "status", "score", "runs"
     );
-    println!("{}", "-".repeat(80));
+    println!("{}", "-".repeat(85));
     for (id, entry) in &registry.skills {
         let status_mark = match entry.status {
             LifecycleStatus::Active => "✓",
@@ -371,12 +390,17 @@ fn print_skill_list(registry: &RegistryCache) {
             LifecycleStatus::Installed => "•",
             _ => " ",
         };
+        let score = entry
+            .coverage_score
+            .map_or("--".into(), |s| format!("{s:.2}"));
         println!(
-            "{:<30} {:<10} {} {:<13} {}",
+            "{:<28} {:<8} {} {:<11} {:>5} {:>6} {}",
             id,
             entry.version,
             status_mark,
             entry.status.as_str(),
+            score,
+            entry.probe_runs,
             entry.symptoms.join(", "),
         );
     }
@@ -428,8 +452,23 @@ fn print_evaluate(registry: &RegistryCache, skills_dir: &std::path::Path, name: 
         if let Some(ref vu) = entry.valid_until {
             println!("  Valid until: {vu}");
         }
-        if let Some(cs) = entry.coverage_score {
-            println!("  Score: {cs:.2}");
+        if entry.probe_runs > 0 {
+            println!("  Probes run: {} ({} failures)", entry.probe_runs, entry.recent_probe_failures);
+        }
+        if let Some(ref last) = entry.last_probe_run_at {
+            println!("  Last probe: {last}");
+        }
+        // Compute score from manifest content if available.
+        let manifest_path = skills_dir.join(name).join("manifest.yaml");
+        if let Ok(manifest) = std::fs::read_to_string(&manifest_path) {
+            let knowledge_exists = skills_dir.join(name).join("KNOWLEDGE.md").exists();
+            let score = RegistryCache::compute_score(entry, &manifest, knowledge_exists);
+            let fresh = RegistryCache::freshness_score(entry);
+            if entry.coverage_score.is_some() {
+                println!("  Score: {score:.2} (quality), {fresh:.2} (freshness)");
+            } else {
+                println!("  Score: {score:.2} (quality), {fresh:.2} (freshness) — not yet stored");
+            }
         }
     } else {
         println!("Skill '{name}' not found in registry cache.");
@@ -565,6 +604,12 @@ fn do_install(registry: &mut RegistryCache, skills_dir: &std::path::Path, name: 
                     deprecation_reason: None,
                     probe_runs: 0,
                     recent_probe_failures: 0,
+                    intervention_runs: 0,
+                    recent_intervention_failures: 0,
+                    last_probe_run_at: None,
+                    last_error: None,
+                    avg_probe_duration_ms: None,
+                    bundled: false,
                 },
             );
             println!("{name} installed and registered.");
@@ -693,6 +738,12 @@ async fn do_fetch(
                     deprecation_reason: None,
                     probe_runs: 0,
                     recent_probe_failures: 0,
+                    intervention_runs: 0,
+                    recent_intervention_failures: 0,
+                    last_probe_run_at: None,
+                    last_error: None,
+                    avg_probe_duration_ms: None,
+                    bundled: false,
                 },
             );
 
@@ -837,6 +888,12 @@ async fn do_search_remote(registry: &mut RegistryCache, query: &str) {
                     deprecation_reason: None,
                     probe_runs: 0,
                     recent_probe_failures: 0,
+                    intervention_runs: 0,
+                    recent_intervention_failures: 0,
+                    last_probe_run_at: None,
+                    last_error: None,
+                    avg_probe_duration_ms: None,
+                    bundled: false,
                 },
             );
         }
@@ -898,6 +955,54 @@ fn do_restore(registry: &mut RegistryCache, name: &str) {
         println!("  Done. Skill will be loaded on next restart.");
     } else {
         println!("Skill '{name}' not found in registry.");
+    }
+}
+
+/// Delete a skill: remove directory, mark as retired in cache.
+fn do_delete(registry: &mut RegistryCache, skills_dir: &std::path::Path, name: &str) {
+    if let Some(entry) = registry.skills.get(name) {
+        if entry.bundled {
+            println!("{name} is a bundled skill and cannot be deleted.");
+            println!("  Use 'prune {name}' to deprecate it instead.");
+            return;
+        }
+    }
+
+    let skill_dir = skills_dir.join(name);
+    if !skill_dir.exists() {
+        println!("Skill directory for '{name}' does not exist at {}", skill_dir.display());
+        // Still remove from cache if present.
+        if registry.remove_entry(name).is_some() {
+            println!("  Removed from registry cache.");
+        }
+        return;
+    }
+
+    println!("Deleting {name}...");
+    println!("  Directory: {}", skill_dir.display());
+    print!("  Confirm deletion? This cannot be undone with restore. [y/N]: ");
+    let _ = std::io::stdout().flush();
+    let mut buf = String::new();
+    if std::io::stdin().read_line(&mut buf).is_err() {
+        println!("\n  Could not read input. Aborting.");
+        return;
+    }
+    let answer = buf.trim().to_lowercase();
+    if answer != "y" && answer != "yes" {
+        println!("  Aborted.");
+        return;
+    }
+
+    match std::fs::remove_dir_all(&skill_dir) {
+        Ok(()) => {
+            println!("  Directory removed.");
+            registry.remove_entry(name);
+            println!("  Removed from registry cache.");
+        }
+        Err(e) => {
+            println!("  Cannot remove directory: {e}");
+            println!("  Remove manually: {}", skill_dir.display());
+        }
     }
 }
 
@@ -973,6 +1078,12 @@ safety:
             deprecation_reason: None,
             probe_runs: 0,
             recent_probe_failures: 0,
+            intervention_runs: 0,
+            recent_intervention_failures: 0,
+            last_probe_run_at: None,
+            last_error: None,
+            avg_probe_duration_ms: None,
+            bundled: false,
         },
     );
 
@@ -1018,9 +1129,13 @@ fn print_check(registry: &RegistryCache) {
 
         let stale = RegistryCache::is_stale(&entry.installed, &today);
         let mark = if stale { "⚠ stale" } else { "✓" };
+        let score = entry
+            .coverage_score
+            .map_or("--".into(), |s| format!("{s:.2}"));
+        let fresh = RegistryCache::freshness_score(entry);
         println!(
-            "{mark} {id:<30} v{} — installed: {}, valid: {age_text}",
-            entry.version, entry.installed,
+            "{mark} {id:<28} v{} score={score} fresh={fresh:.2} runs={} fails={} — installed: {}, valid: {age_text}",
+            entry.version, entry.probe_runs, entry.recent_probe_failures, entry.installed,
         );
     }
 

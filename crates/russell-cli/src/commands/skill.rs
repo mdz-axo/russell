@@ -5,6 +5,7 @@
 
 use anyhow::{Context, Result};
 use russell_core::paths::Paths;
+use russell_skills::registry::{RegistryCache, RegistryEntry};
 use russell_skills::{Skill, load_all};
 use std::time::Duration;
 
@@ -89,6 +90,15 @@ pub async fn run(paths: &Paths, id: &str, dry_run: bool) -> Result<()> {
         .await
         .with_context(|| format!("running {}/{}", skill_id, step_id))?;
 
+    // Update registry telemetry.
+    let probe_success = outcome.exit_code == Some(0) && !outcome.timed_out;
+    let probe_duration_ms = outcome.duration.as_millis() as u64;
+    let probe_error = if !probe_success { Some(outcome.stderr.clone()) } else { None };
+    let registry_path = paths.state.join("registry").join("local-cache.yaml");
+    let _ = RegistryCache::with_update(&registry_path, |cache| {
+        cache.record_execution(skill_id, probe_success, probe_duration_ms, probe_error.as_deref());
+    });
+
     println!("--- stdout ---");
     print!("{}", outcome.stdout);
     if !outcome.stderr.is_empty() {
@@ -144,4 +154,263 @@ fn step_timeout(skill: &Skill, step_id: &str) -> Option<Duration> {
     } else {
         None
     }
+}
+
+// ── Skill lifecycle management verbs ───────────────────────────────────────
+
+/// Print performance telemetry for all skills in the registry.
+pub fn stats(paths: &Paths) -> Result<()> {
+    let registry_path = paths.state.join("registry").join("local-cache.yaml");
+    let registry = RegistryCache::load(&registry_path).unwrap_or_default();
+
+    if registry.skills.is_empty() {
+        println!("No skills in registry.");
+        return Ok(());
+    }
+
+    println!(
+        "{:<25} {:>8} {:>8} {:>12} {:>10} {:>12} last run",
+        "skill", "probes", "fails", "interv.", "iv fails", "avg dur"
+    );
+    println!("{}", "-".repeat(100));
+    for (id, entry) in &registry.skills {
+        let avg_dur = entry
+            .avg_probe_duration_ms
+            .map_or("--".into(), |d| format!("{d:.0}ms"));
+        let last_run = entry.last_probe_run_at.as_deref().unwrap_or("never");
+        println!(
+            "{:<25} {:>8} {:>8} {:>12} {:>10} {:>12} {}",
+            id,
+            entry.probe_runs,
+            entry.recent_probe_failures,
+            entry.intervention_runs,
+            entry.recent_intervention_failures,
+            avg_dur,
+            last_run,
+        );
+    }
+    Ok(())
+}
+
+/// Audit all installed skills for staleness and coverage.
+pub fn check(paths: &Paths) -> Result<()> {
+    let registry_path = paths.state.join("registry").join("local-cache.yaml");
+    let registry = RegistryCache::load(&registry_path).unwrap_or_default();
+    let skills = load_all(&paths.skills()).unwrap_or_default();
+
+    println!("Skill audit — {}", chrono_now());
+    println!();
+
+    // Sync registry from current skills on disk.
+    let mut registry = registry;
+    for skill in &skills {
+        if !registry.skills.contains_key(&skill.id) {
+            registry.upsert(
+                &skill.id,
+                RegistryEntry {
+                    status: russell_skills::registry::LifecycleStatus::Active,
+                    version: skill.version.clone(),
+                    symptoms: skill.symptoms.clone(),
+                    source: russell_skills::registry::SkillSource::Manual,
+                    installed: skill.authored.clone(),
+                    last_evaluated: None,
+                    valid_until: None,
+                    coverage_score: None,
+                    superseded_by: None,
+                    deprecation_reason: None,
+                    probe_runs: 0,
+                    recent_probe_failures: 0,
+                    intervention_runs: 0,
+                    recent_intervention_failures: 0,
+                    last_probe_run_at: None,
+                    last_error: None,
+                    avg_probe_duration_ms: None,
+                    bundled: false,
+                },
+            );
+        }
+    }
+
+    let today = chrono_now();
+    for (id, entry) in &registry.skills {
+        let stale = RegistryCache::is_stale(&entry.installed, &today);
+        let mark = if stale { "⚠ stale" } else { "✓" };
+        let score = entry.coverage_score.map_or("--".into(), |s| format!("{s:.2}"));
+        let cluster = classify_skill(&entry.symptoms);
+        println!(
+            "{mark} {id:<30} v{} ({cluster}) — score: {score}, probes: {} runs, {} failures",
+            entry.version, entry.probe_runs, entry.recent_probe_failures,
+        );
+    }
+
+    println!();
+    let gaps = registry.coverage_gaps(russell_skills::SYMPTOMS);
+    if gaps.is_empty() {
+        println!("All catalogue symptoms covered.");
+    } else {
+        println!("{} symptoms uncovered:", gaps.len());
+        for gap in &gaps {
+            println!("  - {gap}");
+        }
+    }
+    Ok(())
+}
+
+fn classify_skill(symptoms: &[String]) -> &'static str {
+    if symptoms.iter().any(|s| s.contains("skill_")) {
+        "meta"
+    } else if symptoms.iter().any(|s| s.contains("gpu") || s.contains("vram") || s.contains("amdgpu")) {
+        "gpu"
+    } else if symptoms.iter().any(|s| s.contains("memory") || s.contains("swap") || s.contains("oom")) {
+        "memory"
+    } else if symptoms.iter().any(|s| s.contains("disk") || s.contains("io")) {
+        "storage"
+    } else if symptoms.iter().any(|s| s.contains("cpu") || s.contains("load") || s.contains("zombie")) {
+        "cpu"
+    } else {
+        "general"
+    }
+}
+
+fn chrono_now() -> String {
+    use std::time::{SystemTime, UNIX_EPOCH};
+    if let Ok(dur) = SystemTime::now().duration_since(UNIX_EPOCH) {
+        let secs = dur.as_secs();
+        let days = secs / 86400;
+        let (y, m, d) = civil_from_days(days as i64 + 719_468);
+        format!("{y:04}-{m:02}-{d:02}")
+    } else {
+        "2026-05-14".to_string()
+    }
+}
+
+fn civil_from_days(z: i64) -> (i64, i64, i64) {
+    let z = z - 719_468;
+    let era = if z >= 0 { z } else { z - 146096 } / 146_097;
+    let doe = (z - era * 146_097) as u64;
+    let yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
+    let y = yoe as i64 + era * 400;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let d = doy - (153 * mp + 2) / 5 + 1;
+    let m = if mp < 10 { mp + 3 } else { mp - 9 };
+    let y = if m <= 2 { y + 1 } else { y };
+    (y, m as i64, d as i64)
+}
+
+/// Install or activate a skill by name.
+pub fn install(paths: &Paths, name: &str) -> Result<()> {
+    use russell_skills::registry::{LifecycleStatus, SkillSource};
+
+    let skills_dir = paths.skills();
+    let registry_path = paths.state.join("registry").join("local-cache.yaml");
+
+    let skill_dir = skills_dir.join(name);
+    if !skill_dir.exists() || !skill_dir.join("manifest.yaml").exists() {
+        anyhow::bail!("Skill '{name}' not found on disk. Use 'russell workshop build {name}' to create it.");
+    }
+
+    RegistryCache::with_update(&registry_path, |registry| {
+        if let Some(entry) = registry.skills.get_mut(name) {
+            if entry.status.is_loadable() {
+                println!("{name} is already {} (v{}).", entry.status.as_str(), entry.version);
+                return;
+            }
+            entry.status = LifecycleStatus::Installed;
+            entry.installed = chrono_now();
+            println!("{name} installed (v{}).", entry.version);
+        } else {
+            let version = "0.1.0".to_string();
+            registry.upsert(
+                name,
+                RegistryEntry {
+                    status: LifecycleStatus::Installed,
+                    version: version.clone(),
+                    symptoms: vec![],
+                    source: SkillSource::Manual,
+                    installed: chrono_now(),
+                    last_evaluated: None,
+                    valid_until: None,
+                    coverage_score: None,
+                    superseded_by: None,
+                    deprecation_reason: None,
+                    probe_runs: 0,
+                    recent_probe_failures: 0,
+                    intervention_runs: 0,
+                    recent_intervention_failures: 0,
+                    last_probe_run_at: None,
+                    last_error: None,
+                    avg_probe_duration_ms: None,
+                    bundled: false,
+                },
+            );
+            println!("{name} registered (v{version}).");
+        }
+    })?;
+    Ok(())
+}
+
+/// Deprecate a skill.
+pub fn prune(paths: &Paths, name: &str) -> Result<()> {
+    use russell_skills::registry::LifecycleStatus;
+
+    let registry_path = paths.state.join("registry").join("local-cache.yaml");
+
+    RegistryCache::with_update(&registry_path, |registry| {
+        if let Some(entry) = registry.skills.get_mut(name) {
+            if entry.status == LifecycleStatus::Deprecated {
+                println!("{name} is already deprecated.");
+                return;
+            }
+            println!("Deprecating {name} (v{})...", entry.version);
+            entry.status = LifecycleStatus::Deprecated;
+            entry.deprecation_reason = Some("pruned via CLI".into());
+            println!("Done. Files kept on disk. Use 'restore' to undo.");
+        } else {
+            println!("Skill '{name}' not found in registry.");
+        }
+    })?;
+    Ok(())
+}
+
+/// Restore a deprecated skill to active.
+pub fn restore(paths: &Paths, name: &str) -> Result<()> {
+    use russell_skills::registry::LifecycleStatus;
+
+    let registry_path = paths.state.join("registry").join("local-cache.yaml");
+
+    RegistryCache::with_update(&registry_path, |registry| {
+        if let Some(entry) = registry.skills.get_mut(name) {
+            if entry.status != LifecycleStatus::Deprecated {
+                println!("{name} is {} — restore only applies to deprecated skills.", entry.status.as_str());
+                return;
+            }
+            println!("Restoring {name} (v{})...", entry.version);
+            entry.status = LifecycleStatus::Active;
+            entry.deprecation_reason = None;
+            println!("Done.");
+        } else {
+            println!("Skill '{name}' not found in registry.");
+        }
+    })?;
+    Ok(())
+}
+
+/// Permanently retire a skill: remove from disk and registry.
+pub fn retire(paths: &Paths, name: &str) -> Result<()> {
+    let registry_path = paths.state.join("registry").join("local-cache.yaml");
+    let skill_dir = paths.skills().join(name);
+
+    RegistryCache::with_update(&registry_path, |registry| {
+        if registry.remove_entry(name).is_some() {
+            println!("Removed {name} from registry.");
+        }
+    })?;
+
+    if skill_dir.exists() {
+        std::fs::remove_dir_all(&skill_dir).with_context(|| format!("removing skill directory for {name}"))?;
+        println!("Deleted {}.", skill_dir.display());
+    }
+
+    Ok(())
 }

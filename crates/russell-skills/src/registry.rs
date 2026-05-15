@@ -53,6 +53,24 @@ pub struct RegistryEntry {
     /// Number of recent probe failures.
     #[serde(default)]
     pub recent_probe_failures: u64,
+    /// Number of times interventions from this skill have run.
+    #[serde(default)]
+    pub intervention_runs: u64,
+    /// Number of recent intervention failures.
+    #[serde(default)]
+    pub recent_intervention_failures: u64,
+    /// ISO 8601 timestamp of most recent probe run.
+    #[serde(default)]
+    pub last_probe_run_at: Option<String>,
+    /// Error message from the most recent failure, if any.
+    #[serde(default)]
+    pub last_error: Option<String>,
+    /// EWMA of probe run durations in milliseconds.
+    #[serde(default)]
+    pub avg_probe_duration_ms: Option<f64>,
+    /// Whether this is a bundled skill (resistant to pruning).
+    #[serde(default)]
+    pub bundled: bool,
 }
 
 /// Lifecycle states per ADR-0024.
@@ -239,17 +257,186 @@ impl RegistryCache {
         self.skills.insert(skill_id.to_string(), entry);
     }
 
+    /// Record a probe or intervention execution in the registry cache.
+    /// Increments `probe_runs` and, if failed, `recent_probe_failures`.
+    /// Also updates `last_probe_run_at`, `last_error`, and
+    /// `avg_probe_duration_ms` with an EWMA.
+    pub fn record_execution(
+        &mut self,
+        skill_id: &str,
+        success: bool,
+        duration_ms: u64,
+        error_message: Option<&str>,
+    ) {
+        if let Some(entry) = self.skills.get_mut(skill_id) {
+            entry.probe_runs = entry.probe_runs.saturating_add(1);
+            let now = Self::chrono_now();
+            entry.last_probe_run_at = Some(now);
+            if !success {
+                entry.recent_probe_failures =
+                    entry.recent_probe_failures.saturating_add(1);
+                if let Some(msg) = error_message {
+                    entry.last_error = Some(msg.to_string());
+                }
+            }
+            // EWMA update: alpha = 0.2 gives ~5 sample effective window.
+            const ALPHA: f64 = 0.2;
+            let current = duration_ms as f64;
+            entry.avg_probe_duration_ms = Some(match entry.avg_probe_duration_ms {
+                Some(prev) => ALPHA * current + (1.0 - ALPHA) * prev,
+                None => current,
+            });
+        }
+    }
+
+    /// Record an intervention execution.
+    pub fn record_intervention(&mut self, skill_id: &str, success: bool, error_message: Option<&str>) {
+        if let Some(entry) = self.skills.get_mut(skill_id) {
+            entry.intervention_runs = entry.intervention_runs.saturating_add(1);
+            if !success {
+                entry.recent_intervention_failures =
+                    entry.recent_intervention_failures.saturating_add(1);
+                if let Some(msg) = error_message {
+                    entry.last_error = Some(msg.to_string());
+                }
+            }
+        }
+    }
+
+    /// Current UTC date as ISO 8601 string.
+    fn chrono_now() -> String {
+        use std::time::{SystemTime, UNIX_EPOCH};
+        if let Ok(dur) = SystemTime::now().duration_since(UNIX_EPOCH) {
+            let secs = dur.as_secs();
+            let days_since_epoch = secs / 86400;
+            let (y, m, d) = civil_from_days(days_since_epoch as i64 + 719_468);
+            format!("{y:04}-{m:02}-{d:02}")
+        } else {
+            "2026-05-14".to_string()
+        }
+    }
+
     /// Check if a skill's authored date makes it stale (> 180 days).
     #[must_use]
     pub fn is_stale(authored_date: &str, today: &str) -> bool {
-        // ISO 8601 dates sort lexicographically.
         if authored_date.len() < 10 || today.len() < 10 {
             return false;
         }
-        // authored less than 180 days before today.
-        // Simple string comparison: dates like "2025-11-01" < "2026-05-13"
-        // would be more than 180 days. Use rough heuristic.
         authored_date < staleness_threshold(today).as_str()
+    }
+
+    /// Remove a skill entry from the cache entirely (for retired skills).
+    pub fn remove_entry(&mut self, skill_id: &str) -> Option<RegistryEntry> {
+        self.skills.remove(skill_id)
+    }
+
+    /// Load, mutate, save — safe concurrent update pattern.
+    /// The closure receives `&mut self` so any mutation is committed
+    /// atomically. Concurrent saves are best-effort (last writer wins),
+    /// acceptable since the registry is rebuildable per JR-7.
+    ///
+    /// # Errors
+    /// Returns a [`RegistryError`] if the cache cannot be loaded or saved.
+    pub fn with_update(
+        path: &Path,
+        f: impl FnOnce(&mut Self),
+    ) -> Result<(), RegistryError> {
+        let mut cache = Self::load(path)?;
+        f(&mut cache);
+        cache.save(path)
+    }
+
+    /// Compute a quality score 0.0–1.0 for a skill entry.
+    ///
+    /// Weights follow the algorithm in `skill-maintenance/KNOWLEDGE.md` §2.4:
+    /// - Manifest completeness: 0.20
+    /// - Probe coverage: 0.25
+    /// - Intervention coverage: 0.20
+    /// - Rollback quality: 0.15
+    /// - Script quality: 0.10
+    /// - Documentation: 0.10
+    #[must_use]
+    pub fn compute_score(
+        entry: &RegistryEntry,
+        manifest_content: &str,
+        knowledge_exists: bool,
+    ) -> f64 {
+        let weights: [(f64, f64); 6] = [
+            (0.20, Self::score_manifest(manifest_content)),
+            (0.25, Self::score_probe_coverage(manifest_content)),
+            (0.20, Self::score_intervention_coverage(manifest_content)),
+            (0.15, Self::score_rollback_quality(manifest_content)),
+            (0.10, Self::score_script_quality(manifest_content)),
+            (0.10, Self::score_documentation(entry, knowledge_exists)),
+        ];
+        weights.iter().map(|(w, s)| w * s).sum()
+    }
+
+    fn score_manifest(content: &str) -> f64 {
+        let fields = ["id:", "version:", "authored:", "symptoms:"];
+        let present = fields
+            .iter()
+            .filter(|f| content.contains(*f))
+            .count();
+        present as f64 / fields.len() as f64
+    }
+
+    fn score_probe_coverage(content: &str) -> f64 {
+        let has_probes = content.contains("probes:") && content.lines().any(|l| l.trim().starts_with("- id:"));
+        if !has_probes {
+            return 0.0;
+        }
+        1.0
+    }
+
+    fn score_intervention_coverage(content: &str) -> f64 {
+        let has_interventions = content.contains("interventions:")
+            && content.lines().any(|l| l.trim().starts_with("- id:"));
+        if !has_interventions {
+            return 0.5;
+        }
+        1.0
+    }
+
+    fn score_rollback_quality(content: &str) -> f64 {
+        if !content.contains("rollback:") {
+            return 0.3;
+        }
+        if content.contains("none_needed") || content.contains("reboot") {
+            return 0.8;
+        }
+        1.0
+    }
+
+    fn score_script_quality(content: &str) -> f64 {
+        let lower = content.to_lowercase();
+        let has_shebang = content.contains("#!/");
+        let has_set_e = lower.contains("set -e") || lower.contains("set -eu") || lower.contains("set -euo pipefail");
+        let has_probe = content.lines().any(|l| l.trim().starts_with("- cmd:"));
+        let checks = [has_shebang, has_set_e, has_probe];
+        checks.iter().filter(|&&c| c).count() as f64 / checks.len() as f64
+    }
+
+    fn score_documentation(entry: &RegistryEntry, knowledge_exists: bool) -> f64 {
+        let mut score = 0.0;
+        if knowledge_exists {
+            score += 0.6;
+        }
+        if !entry.symptoms.is_empty() {
+            score += 0.4;
+        }
+        score
+    }
+
+    /// Freshness score: how recently and reliably the skill has run.
+    #[must_use]
+    pub fn freshness_score(entry: &RegistryEntry) -> f64 {
+        if entry.probe_runs == 0 {
+            return 0.0;
+        }
+        let failure_rate =
+            entry.recent_probe_failures as f64 / entry.probe_runs as f64;
+        (1.0 - failure_rate).max(0.0)
     }
 }
 
@@ -270,6 +457,21 @@ fn staleness_threshold(today: &str) -> String {
     let tm = (rem / 30).clamp(1, 12);
     let td = (rem % 30).clamp(1, 28);
     format!("{ty:04}-{tm:02}-{td:02}")
+}
+
+/// Convert days since 0000-03-01 to civil date (algorithm from Howard Hinnant).
+fn civil_from_days(z: i64) -> (i64, i64, i64) {
+    let z = z - 719_468; // shift epoch to 1970-01-01
+    let era = if z >= 0 { z } else { z - 146096 } / 146_097;
+    let doe = (z - era * 146_097) as u64;
+    let yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
+    let y = yoe as i64 + era * 400;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let d = doy - (153 * mp + 2) / 5 + 1;
+    let m = if mp < 10 { mp + 3 } else { mp - 9 };
+    let y = if m <= 2 { y + 1 } else { y };
+    (y, m as i64, d as i64)
 }
 
 /// Errors from registry operations.
@@ -527,6 +729,30 @@ fn find_snippet(content: &str, keyword: &str) -> Option<String> {
 mod tests {
     use super::*;
 
+    fn test_entry(status: LifecycleStatus, version: &str, symptoms: Vec<&str>, source: SkillSource) -> RegistryEntry {
+        let bundled = matches!(source, SkillSource::Bundled);
+        RegistryEntry {
+            status,
+            version: version.into(),
+            symptoms: symptoms.into_iter().map(String::from).collect(),
+            source,
+            installed: "2026-05-01".into(),
+            last_evaluated: None,
+            valid_until: None,
+            coverage_score: None,
+            superseded_by: None,
+            deprecation_reason: None,
+            probe_runs: 0,
+            recent_probe_failures: 0,
+            intervention_runs: 0,
+            recent_intervention_failures: 0,
+            last_probe_run_at: None,
+            last_error: None,
+            avg_probe_duration_ms: None,
+            bundled,
+        }
+    }
+
     #[test]
     fn empty_cache_has_no_gaps() {
         let cache = RegistryCache::new();
@@ -538,23 +764,7 @@ mod tests {
     #[test]
     fn cache_detects_coverage() {
         let mut cache = RegistryCache::new();
-        cache.upsert(
-            "test-skill",
-            RegistryEntry {
-                status: LifecycleStatus::Active,
-                version: "0.1.0".into(),
-                symptoms: vec!["vram_oom".into()],
-                source: SkillSource::Bundled,
-                installed: "2026-05-01".into(),
-                last_evaluated: None,
-                valid_until: None,
-                coverage_score: None,
-                superseded_by: None,
-                deprecation_reason: None,
-                probe_runs: 0,
-                recent_probe_failures: 0,
-            },
-        );
+        cache.upsert("test-skill", test_entry(LifecycleStatus::Active, "0.1.0", vec!["vram_oom"], SkillSource::Bundled));
         let gaps = cache.coverage_gaps(&["vram_oom", "swap_pressure"]);
         assert_eq!(gaps, vec!["swap_pressure"]);
     }
@@ -562,40 +772,8 @@ mod tests {
     #[test]
     fn lookup_symptom_finds_active() {
         let mut cache = RegistryCache::new();
-        cache.upsert(
-            "active-skill",
-            RegistryEntry {
-                status: LifecycleStatus::Active,
-                version: "1.0.0".into(),
-                symptoms: vec!["vram_oom".into()],
-                source: SkillSource::Bundled,
-                installed: "2026-05-01".into(),
-                last_evaluated: None,
-                valid_until: None,
-                coverage_score: None,
-                superseded_by: None,
-                deprecation_reason: None,
-                probe_runs: 0,
-                recent_probe_failures: 0,
-            },
-        );
-        cache.upsert(
-            "retired-skill",
-            RegistryEntry {
-                status: LifecycleStatus::Retired,
-                version: "0.0.1".into(),
-                symptoms: vec!["vram_oom".into()],
-                source: SkillSource::Manual,
-                installed: "2025-01-01".into(),
-                last_evaluated: None,
-                valid_until: None,
-                coverage_score: None,
-                superseded_by: None,
-                deprecation_reason: None,
-                probe_runs: 0,
-                recent_probe_failures: 0,
-            },
-        );
+        cache.upsert("active-skill", test_entry(LifecycleStatus::Active, "1.0.0", vec!["vram_oom"], SkillSource::Bundled));
+        cache.upsert("retired-skill", test_entry(LifecycleStatus::Retired, "0.0.1", vec!["vram_oom"], SkillSource::Manual));
         let results = cache.lookup_symptom("vram_oom");
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].version, "1.0.0");
@@ -628,7 +806,123 @@ mod tests {
     #[test]
     fn safety_scanner_detects_destructive_rm() {
         let scan = SafetyScan::scan("rm -rf /tmp/cleanup");
-        // "rm -rf /" with a subpath after should NOT match the destructive pattern
         assert!(!scan.has_blocks());
+    }
+
+    #[test]
+    fn record_execution_increments_probe_runs() {
+        let mut cache = RegistryCache::new();
+        cache.upsert("test-skill", test_entry(LifecycleStatus::Active, "0.1.0", vec!["vram_oom"], SkillSource::Bundled));
+        cache.record_execution("test-skill", true, 50, None);
+        assert_eq!(cache.skills["test-skill"].probe_runs, 1);
+        assert_eq!(cache.skills["test-skill"].recent_probe_failures, 0);
+        assert!(cache.skills["test-skill"].last_probe_run_at.is_some());
+        assert!(cache.skills["test-skill"].avg_probe_duration_ms.is_some());
+    }
+
+    #[test]
+    fn record_execution_tracks_failures() {
+        let mut cache = RegistryCache::new();
+        let mut entry = test_entry(LifecycleStatus::Active, "0.1.0", vec!["vram_oom"], SkillSource::Bundled);
+        entry.probe_runs = 5;
+        entry.recent_probe_failures = 1;
+        cache.upsert("test-skill", entry);
+        cache.record_execution("test-skill", false, 120, Some("connection refused"));
+        assert_eq!(cache.skills["test-skill"].probe_runs, 6);
+        assert_eq!(cache.skills["test-skill"].recent_probe_failures, 2);
+        assert_eq!(cache.skills["test-skill"].last_error.as_deref(), Some("connection refused"));
+    }
+
+    #[test]
+    fn record_execution_updates_ewma() {
+        let mut cache = RegistryCache::new();
+        let mut entry = test_entry(LifecycleStatus::Active, "0.1.0", vec!["vram_oom"], SkillSource::Bundled);
+        entry.probe_runs = 1;
+        entry.avg_probe_duration_ms = Some(100.0);
+        cache.upsert("test-skill", entry);
+        cache.record_execution("test-skill", true, 200, None);
+        let ewma = cache.skills["test-skill"].avg_probe_duration_ms.unwrap();
+        assert!((ewma - 120.0).abs() < 0.01, "EWMA should be ~120 (0.2*200 + 0.8*100), got {ewma}");
+    }
+
+    #[test]
+    fn record_execution_noop_on_missing_skill() {
+        let mut cache = RegistryCache::new();
+        cache.record_execution("nonexistent", false, 0, None);
+        assert!(cache.skills.is_empty());
+        cache.record_execution("nonexistent", true, 10, None);
+        assert!(cache.skills.is_empty());
+    }
+
+    #[test]
+    fn record_intervention_increments() {
+        let mut cache = RegistryCache::new();
+        cache.upsert("test-skill", test_entry(LifecycleStatus::Active, "0.1.0", vec!["vram_oom"], SkillSource::Bundled));
+        cache.record_intervention("test-skill", true, None);
+        assert_eq!(cache.skills["test-skill"].intervention_runs, 1);
+        assert_eq!(cache.skills["test-skill"].recent_intervention_failures, 0);
+        cache.record_intervention("test-skill", false, Some("timeout"));
+        assert_eq!(cache.skills["test-skill"].intervention_runs, 2);
+        assert_eq!(cache.skills["test-skill"].recent_intervention_failures, 1);
+        assert_eq!(cache.skills["test-skill"].last_error.as_deref(), Some("timeout"));
+    }
+
+    #[test]
+    fn remove_entry_returns_entry() {
+        let mut cache = RegistryCache::new();
+        cache.upsert("test-skill", test_entry(LifecycleStatus::Active, "0.1.0", vec![], SkillSource::Workshop));
+        let removed = cache.remove_entry("test-skill");
+        assert!(removed.is_some());
+        assert!(!cache.skills.contains_key("test-skill"));
+    }
+
+    #[test]
+    fn compute_score_full_skill() {
+        let entry = test_entry(LifecycleStatus::Active, "1.0.0", vec!["vram_oom"], SkillSource::Bundled);
+        let manifest = "id: test-skill\nversion: 0.1.0\nauthored: 2026-05-01\nsymptoms:\n  - vram_oom\nprobes:\n  - id: probe-vram\n    cmd:\n      - check-vram.sh\ninterventions:\n  - id: restart\n    cmd:\n      - restart.sh\n    rollback: none_needed";
+        let score = RegistryCache::compute_score(&entry, manifest, true);
+        assert!(score > 0.7, "expected >0.7 got {score}");
+    }
+
+    #[test]
+    fn compute_score_skeleton() {
+        let entry = test_entry(LifecycleStatus::Discovered, "0.1.0", vec![], SkillSource::Workshop);
+        let manifest = "id: skeleton\nversion: 0.1.0\nauthored: 2026-05-01\nsymptoms: []\nprobes: []\ninterventions: []";
+        let score = RegistryCache::compute_score(&entry, manifest, false);
+        assert!(score < 0.5, "expected <0.5 got {score}");
+    }
+
+    #[test]
+    fn freshness_score_zero_for_no_runs() {
+        let entry = test_entry(LifecycleStatus::Active, "0.1.0", vec![], SkillSource::Bundled);
+        assert!((RegistryCache::freshness_score(&entry)).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn freshness_score_perfect() {
+        let mut entry = test_entry(LifecycleStatus::Active, "0.1.0", vec![], SkillSource::Bundled);
+        entry.probe_runs = 100;
+        entry.recent_probe_failures = 0;
+        assert!((RegistryCache::freshness_score(&entry) - 1.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn freshness_score_with_failures() {
+        let mut entry = test_entry(LifecycleStatus::Active, "0.1.0", vec![], SkillSource::Bundled);
+        entry.probe_runs = 100;
+        entry.recent_probe_failures = 30;
+        assert!((RegistryCache::freshness_score(&entry) - 0.7).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn with_update_persists_changes() {
+        let tmp = tempfile::tempdir().unwrap();
+        let path = tmp.path().join("local-cache.yaml");
+        RegistryCache::with_update(&path, |cache| {
+            cache.upsert("test-skill", test_entry(LifecycleStatus::Active, "0.1.0", vec!["test"], SkillSource::Workshop));
+        }).unwrap();
+        let loaded = RegistryCache::load(&path).unwrap();
+        assert!(loaded.skills.contains_key("test-skill"));
+        assert_eq!(loaded.skills["test-skill"].probe_runs, 0);
     }
 }

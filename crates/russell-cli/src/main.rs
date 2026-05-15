@@ -122,6 +122,30 @@ enum SkillCmd {
         #[arg(long)]
         dry_run: bool,
     },
+    /// Show skill registry stats: run counts, failures, last runs, scores.
+    Stats,
+    /// Audit all skills: staleness, coverage gaps, quality scores.
+    Check,
+    /// Install or activate a skill (idempotent).
+    Install {
+        /// Skill name or directory path.
+        name: String,
+    },
+    /// Deprecate a skill (moves to deprecated, files kept).
+    Prune {
+        /// Skill name to deprecate.
+        name: String,
+    },
+    /// Restore a deprecated skill back to active.
+    Restore {
+        /// Skill name to restore.
+        name: String,
+    },
+    /// Permanently retire a skill (removes from disk and registry).
+    Retire {
+        /// Skill name to retire.
+        name: String,
+    },
 }
 
 #[tokio::main(flavor = "multi_thread")]
@@ -164,6 +188,12 @@ async fn main() -> Result<()> {
         Command::Skill { cmd } => match cmd {
             SkillCmd::List => commands::skill::list(&paths),
             SkillCmd::Run { id, dry_run } => commands::skill::run(&paths, &id, dry_run).await,
+            SkillCmd::Stats => commands::skill::stats(&paths),
+            SkillCmd::Check => commands::skill::check(&paths),
+            SkillCmd::Install { name } => commands::skill::install(&paths, &name),
+            SkillCmd::Prune { name } => commands::skill::prune(&paths, &name),
+            SkillCmd::Restore { name } => commands::skill::restore(&paths, &name),
+            SkillCmd::Retire { name } => commands::skill::retire(&paths, &name),
         },
         Command::Chat => commands::chat::run(&paths).await,
         Command::Workshop => commands::workshop::run(&paths).await,

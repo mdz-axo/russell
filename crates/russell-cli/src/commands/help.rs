@@ -143,6 +143,7 @@ async fn execute_probe_capture(
     action: &ResolvedAction,
 ) -> ProbeOutput {
     use russell_skills::dispatch::{Dispatcher, DryRun, StepType};
+    use russell_skills::registry::RegistryCache;
     use std::time::Duration;
 
     let skill_dir = paths.skills().join(action.skill_id());
@@ -169,6 +170,15 @@ async fn execute_probe_capture(
             Some(timeout),
         )
         .await;
+
+    // Update registry telemetry.
+    let probe_success = result.as_ref().is_ok_and(|o| o.exit_code == Some(0));
+    let probe_duration_ms = result.as_ref().map(|o| o.duration.as_millis() as u64).unwrap_or(0);
+    let probe_error = result.as_ref().err().map(|e| e.to_string());
+    let registry_path = paths.state.join("registry").join("local-cache.yaml");
+    let _ = RegistryCache::with_update(&registry_path, |cache| {
+        cache.record_execution(action.skill_id(), probe_success, probe_duration_ms, probe_error.as_deref());
+    });
 
     match result {
         Ok(outcome) => ProbeOutput {

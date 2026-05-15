@@ -1,0 +1,81 @@
+# SPDX-License-Identifier: MIT
+# skill-manager — enables Jack to build, install, modify, prune, and
+# measure skills autonomously from within `russell chat`.
+#
+# This is a bundled meta-skill: its probes and interventions wrap
+# `russell skill` CLI subcommands, giving Jack hands-on management
+# of the skill lifecycle without operator workshop interaction.
+#
+# This skill pairs with:
+#   - skill-workshop (for composition guidance)
+#   - skill-maintenance (for staleness/coverage auditing)
+#   - skill-discovery (for web-based searching)
+#   - web-search (for the MCP bridge)
+#
+# Install: shipped with Russell; copied by install.sh.
+
+id: skill-manager
+version: 1.0.0
+authored: 2026-05-14
+min_harness_version: 0.1.0
+
+symptoms:
+  - skill_not_in_catalog
+  - skill_version_stale
+  - skill_install_failed
+  - skill_manifest_invalid
+  - skill_probe_script_missing
+  - skill_coverage_gap
+
+applies_when:
+  - os_family: linux
+
+probes:
+  - id: list-skills
+    cmd: ["russell", "skill", "list"]
+    risk: none
+    timeout: 10s
+
+  - id: stats
+    cmd: ["russell", "skill", "stats"]
+    risk: none
+    timeout: 10s
+
+  - id: check
+    cmd: ["russell", "skill", "check"]
+    risk: none
+    timeout: 10s
+
+interventions:
+  - id: install
+    cmd: ["russell", "skill", "install"]
+    risk: low
+    idempotent: true
+    rollback: none_needed
+
+  - id: prune
+    cmd: ["russell", "skill", "prune"]
+    risk: low
+    idempotent: true
+    rollback_id: restore
+
+  - id: restore
+    cmd: ["russell", "skill", "restore"]
+    risk: low
+    idempotent: true
+    rollback: none_needed
+
+  - id: delete
+    cmd: ["russell", "skill", "retire"]
+    risk: medium
+    idempotent: true
+    rollback: none_needed
+
+safety:
+  max_auto_risk: low
+
+references:
+  - docs/architecture/skill-self-management-strategy.md
+  - docs/adr/0024-skill-registry-workshop-lifecycle.md
+  - skills/skill-workshop/KNOWLEDGE.md
+  - skills/skill-maintenance/KNOWLEDGE.md
