@@ -9,8 +9,8 @@ use std::time::Duration;
 
 use crate::error::Result;
 
-/// Default Kask MCP endpoint (kask-surface default bind).
-pub const DEFAULT_ENDPOINT: &str = "http://127.0.0.1:9500/mcp";
+/// Default Kask API endpoint (stack-api default bind).
+pub const DEFAULT_ENDPOINT: &str = "http://127.0.0.1:18100";
 
 /// Default tools/list cache TTL in seconds.
 pub const DEFAULT_TOOL_TTL_SECS: u64 = 300;

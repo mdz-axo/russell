@@ -1,20 +1,21 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
-//! MCP JSON-RPC client over HTTP POST.
+//! Kask REST API client.
 //!
-//! Connects to Kask's MCP endpoint on localhost. Enforces the
+//! Connects to Kask's stack-api on localhost. Enforces the
 //! loopback constraint (ADR-0025 §4) at connect time.
+//!
+//! Uses Kask's REST API endpoints:
+//! - `GET /api/v1/tools` — list all MCP tools
+//! - `POST /api/v1/tools/{name}` — invoke a tool
+//! - `GET /health` — health check
 
-use std::sync::atomic::{AtomicU64, Ordering};
-
+use serde::Deserialize;
 use serde_json::json;
-use tracing::{debug, warn};
+use tracing::debug;
 
 use crate::config::KaskMcpConfig;
 use crate::error::{McpError, Result};
-use crate::types::{
-    InitializeResult, JsonRpcNotification, JsonRpcRequest, JsonRpcResponse, McpToolDefinition,
-    PROTOCOL_VERSION, ToolCallParams, ToolCallResult, ToolsListResult,
-};
+use crate::types::{McpToolDefinition, ToolCallResult};
 
 /// Validate that a URL points to a loopback address.
 ///
@@ -68,17 +69,16 @@ pub fn validate_endpoint(url: &str) -> Result<()> {
     }
 }
 
-/// MCP client for the trusted Kask relationship.
+/// Kask API client for the trusted relationship.
 ///
-/// Speaks MCP JSON-RPC 2.0 over HTTP POST. Authenticated via bearer
+/// Speaks Kask's REST API for MCP tool access. Authenticated via bearer
 /// token. Connects only to loopback addresses.
 pub struct KaskMcpClient {
     config: KaskMcpConfig,
     http: reqwest::Client,
-    request_id: AtomicU64,
-    /// Server name from the last successful `initialize`.
+    /// Server name from the last successful connection.
     server_name: Option<String>,
-    /// Whether the client has completed the `initialize` handshake.
+    /// Whether the client has completed the health check.
     initialized: bool,
 }
 
@@ -103,65 +103,130 @@ impl KaskMcpClient {
         Ok(Self {
             config,
             http,
-            request_id: AtomicU64::new(1),
             server_name: None,
             initialized: false,
         })
     }
 
-    /// Perform the MCP `initialize` handshake.
-    ///
-    /// Sends `initialize` with Russell's client info and receives the
-    /// server's capabilities. Follows up with `notifications/initialized`.
+    /// Perform a health check to verify Kask API is reachable.
     ///
     /// # Errors
-    /// Transport, protocol, or authentication errors.
-    pub async fn connect(&mut self) -> Result<InitializeResult> {
-        let params = json!({
-            "protocolVersion": PROTOCOL_VERSION,
-            "capabilities": {},
-            "clientInfo": {
-                "name": "russell-mcp",
-                "version": env!("CARGO_PKG_VERSION"),
-            }
-        });
+    /// Transport or authentication errors.
+    pub async fn connect(&mut self) -> Result<()> {
+        let health_url = format!("{}/health", self.config.endpoint.trim_end_matches('/'));
+        
+        let mut req = self
+            .http
+            .get(&health_url)
+            .header("Accept", "application/json");
 
-        let response = self.request("initialize", Some(params)).await?;
+        if let Some(ref token) = self.config.token {
+            req = req.bearer_auth(token);
+        }
 
-        let init_result: InitializeResult = serde_json::from_value(response)
-            .map_err(|e| McpError::InvalidResponse(format!("initialize response: {e}")))?;
+        let resp = req
+            .send()
+            .await
+            .map_err(|e| map_reqwest_error(&e))?;
 
-        self.server_name = init_result
-            .server_info
-            .as_ref()
-            .and_then(|s| s.name.clone());
+        let status = resp.status();
 
-        // Send initialized notification.
-        self.notify("notifications/initialized", None).await?;
+        if status == reqwest::StatusCode::UNAUTHORIZED {
+            return Err(McpError::Unauthenticated);
+        }
+        if status == reqwest::StatusCode::FORBIDDEN {
+            return Err(McpError::Forbidden);
+        }
+        if !status.is_success() {
+            let body = resp.text().await.unwrap_or_default();
+            return Err(McpError::HttpStatus {
+                status: status.as_u16(),
+                body,
+            });
+        }
 
+        // Parse health response to extract server info.
+        #[derive(Debug, Deserialize)]
+        struct HealthResponse {
+            #[serde(default)]
+            version: Option<String>,
+        }
+
+        let health: HealthResponse = resp.json().await.map_err(|e| McpError::InvalidResponse(
+            format!("health response parse: {e}"),
+        ))?;
+
+        self.server_name = Some(format!("kask-api-{}", health.version.unwrap_or_else(|| "unknown".into())));
         self.initialized = true;
 
-        debug!(
-            server = ?self.server_name,
-            protocol = ?init_result.protocol_version,
-            "MCP handshake complete"
-        );
-
-        Ok(init_result)
+        debug!(server = ?self.server_name, "Kask API connection established");
+        Ok(())
     }
 
-    /// Discover available tools from the server.
+    /// Discover available tools from Kask.
     ///
     /// # Errors
     /// Transport, protocol, or authentication errors.
     pub async fn list_tools(&self) -> Result<Vec<McpToolDefinition>> {
-        let response = self.request("tools/list", Some(json!({}))).await?;
+        let tools_url = format!("{}/api/v1/tools", self.config.endpoint.trim_end_matches('/'));
+        
+        let mut req = self
+            .http
+            .get(&tools_url)
+            .header("Accept", "application/json");
 
-        let result: ToolsListResult = serde_json::from_value(response)
-            .map_err(|e| McpError::InvalidResponse(format!("tools/list response: {e}")))?;
+        if let Some(ref token) = self.config.token {
+            req = req.bearer_auth(token);
+        }
 
-        debug!(count = result.tools.len(), "tools/list complete");
-        Ok(result.tools)
+        let resp = req
+            .send()
+            .await
+            .map_err(|e| map_reqwest_error(&e))?;
+
+        let status = resp.status();
+
+        if status == reqwest::StatusCode::UNAUTHORIZED {
+            return Err(McpError::Unauthenticated);
+        }
+        if !status.is_success() {
+            let body = resp.text().await.unwrap_or_default();
+            return Err(McpError::HttpStatus {
+                status: status.as_u16(),
+                body,
+            });
+        }
+
+        // Parse the REST API response format.
+        #[derive(Debug, Deserialize)]
+        struct ToolInfo {
+            name: String,
+            #[serde(default)]
+            description: Option<String>,
+            #[serde(default, rename = "inputSchema")]
+            input_schema: Option<serde_json::Value>,
+            #[serde(default)]
+            server: Option<String>,
+        }
+
+        let tools: Vec<ToolInfo> = resp.json().await.map_err(|e| McpError::InvalidResponse(
+            format!("tools response parse: {e}"),
+        ))?;
+
+        // Convert to McpToolDefinition format.
+        let definitions: Vec<McpToolDefinition> = tools
+            .into_iter()
+            .map(|t| McpToolDefinition {
+                name: t.name,
+                description: t.description,
+                input_schema: t.input_schema,
+                annotations: None,
+                server: t.server,
+            })
+            .collect();
+
+        debug!(count = definitions.len(), "tools/list complete");
+        Ok(definitions)
     }
 
     /// Invoke a tool by name with the given arguments.
@@ -173,32 +238,110 @@ impl KaskMcpClient {
         name: impl Into<String>,
         arguments: Option<serde_json::Value>,
     ) -> Result<ToolCallResult> {
-        let params = ToolCallParams {
-            name: name.into(),
-            arguments,
+        let tool_name = name.into();
+        let call_url = format!(
+            "{}/api/v1/tools/{}",
+            self.config.endpoint.trim_end_matches('/'),
+            urlencoding::encode(&tool_name)
+        );
+
+        let mut req = self
+            .http
+            .post(&call_url)
+            .header("Content-Type", "application/json")
+            .header("Accept", "application/json");
+
+        if let Some(ref token) = self.config.token {
+            req = req.bearer_auth(token);
+        }
+
+        let body = if let Some(args) = arguments {
+            args
+        } else {
+            json!({})
         };
 
-        let response = self
-            .request(
-                "tools/call",
-                Some(serde_json::to_value(&params).map_err(|e| {
-                    McpError::InvalidResponse(format!("failed to serialize tool call: {e}"))
-                })?),
-            )
-            .await?;
+        let resp = req
+            .json(&body)
+            .send()
+            .await
+            .map_err(|e| map_reqwest_error(&e))?;
 
-        let result: ToolCallResult = serde_json::from_value(response)
-            .map_err(|e| McpError::InvalidResponse(format!("tools/call response: {e}")))?;
+        let status = resp.status();
 
-        Ok(result)
+        if status == reqwest::StatusCode::UNAUTHORIZED {
+            return Err(McpError::Unauthenticated);
+        }
+        if !status.is_success() {
+            let body = resp.text().await.unwrap_or_default();
+            return Err(McpError::HttpStatus {
+                status: status.as_u16(),
+                body,
+            });
+        }
+
+        // Parse the REST API response format.
+        #[derive(Debug, Deserialize)]
+        struct ToolResponse {
+            #[serde(default)]
+            content: Vec<ToolContent>,
+            #[serde(default, rename = "isError")]
+            is_error: bool,
+        }
+
+        #[derive(Debug, Deserialize)]
+        struct ToolContent {
+            #[serde(rename = "type")]
+            content_type: String,
+            #[serde(default)]
+            text: Option<String>,
+            #[serde(flatten)]
+            extra: serde_json::Value,
+        }
+
+        let tool_resp: ToolResponse = resp.json().await.map_err(|e| McpError::InvalidResponse(
+            format!("tool call response parse: {e}"),
+        ))?;
+
+        // Convert to ToolCallResult format.
+        Ok(ToolCallResult {
+            content: tool_resp.content
+                .into_iter()
+                .map(|c| crate::types::ToolContent {
+                    content_type: c.content_type,
+                    text: c.text,
+                    extra: c.extra,
+                })
+                .collect(),
+            is_error: tool_resp.is_error,
+        })
     }
 
     /// Ping the server (keepalive / health check).
     ///
-    /// Returns `Ok(())` if the server responds to ping.
+    /// Returns `Ok(())` if the server responds.
     pub async fn ping(&self) -> Result<()> {
-        let _response = self.request("ping", None).await?;
-        Ok(())
+        let health_url = format!("{}/health", self.config.endpoint.trim_end_matches('/'));
+        
+        let mut req = self
+            .http
+            .get(&health_url)
+            .header("Accept", "application/json");
+
+        if let Some(ref token) = self.config.token {
+            req = req.bearer_auth(token);
+        }
+
+        let resp = req.send().await.map_err(|e| map_reqwest_error(&e))?;
+
+        if resp.status().is_success() {
+            Ok(())
+        } else {
+            Err(McpError::HttpStatus {
+                status: resp.status().as_u16(),
+                body: resp.text().await.unwrap_or_default(),
+            })
+        }
     }
 
     /// Whether the client has completed initialization.
@@ -214,104 +357,6 @@ impl KaskMcpClient {
     /// The configured endpoint URL.
     pub fn endpoint(&self) -> &str {
         &self.config.endpoint
-    }
-
-    // ── Private helpers ────────────────────────────────────────────
-
-    /// Send a JSON-RPC request and return the result value.
-    async fn request(
-        &self,
-        method: &str,
-        params: Option<serde_json::Value>,
-    ) -> Result<serde_json::Value> {
-        let id = self.request_id.fetch_add(1, Ordering::Relaxed);
-
-        let rpc_request = JsonRpcRequest::new(id, method, params);
-
-        let mut req = self
-            .http
-            .post(&self.config.endpoint)
-            .header("Content-Type", "application/json");
-
-        // Attach bearer token if configured.
-        if let Some(ref token) = self.config.token {
-            req = req.bearer_auth(token);
-        }
-
-        let resp = req
-            .json(&rpc_request)
-            .send()
-            .await
-            .map_err(|e| map_reqwest_error(&e))?;
-
-        let status = resp.status();
-
-        // Handle HTTP-level errors before parsing JSON-RPC.
-        if status == reqwest::StatusCode::UNAUTHORIZED {
-            return Err(McpError::Unauthenticated);
-        }
-        if status == reqwest::StatusCode::FORBIDDEN {
-            return Err(McpError::Forbidden);
-        }
-        if !status.is_success() {
-            let body = resp.text().await.unwrap_or_default();
-            let body_truncated = if body.len() > 500 {
-                format!("{}...", &body[..500])
-            } else {
-                body
-            };
-            return Err(McpError::HttpStatus {
-                status: status.as_u16(),
-                body: body_truncated,
-            });
-        }
-
-        // Parse JSON-RPC response.
-        let body = resp.text().await.map_err(|e| McpError::Transport {
-            message: format!("failed to read response body: {e}"),
-            is_connect: false,
-            is_timeout: false,
-        })?;
-
-        let rpc_response: JsonRpcResponse = serde_json::from_str(&body)
-            .map_err(|e| McpError::InvalidResponse(format!("JSON-RPC parse: {e}: {body}")))?;
-
-        // Check for JSON-RPC error.
-        if let Some(err) = rpc_response.error {
-            return Err(McpError::Protocol {
-                code: err.code,
-                message: err.message,
-            });
-        }
-
-        // Return the result (default to empty object if absent).
-        Ok(rpc_response.result.unwrap_or(json!({})))
-    }
-
-    /// Send a JSON-RPC notification (no response expected).
-    async fn notify(&self, method: &str, params: Option<serde_json::Value>) -> Result<()> {
-        let notification = JsonRpcNotification {
-            jsonrpc: "2.0",
-            method: method.to_owned(),
-            params,
-        };
-
-        let mut req = self
-            .http
-            .post(&self.config.endpoint)
-            .header("Content-Type", "application/json");
-
-        if let Some(ref token) = self.config.token {
-            req = req.bearer_auth(token);
-        }
-
-        // Fire and forget — notifications don't expect a response.
-        let result = req.json(&notification).send().await;
-        if let Err(e) = result {
-            warn!(method, error = %e, "notification send failed (non-fatal)");
-        }
-
-        Ok(())
     }
 }
 
@@ -332,40 +377,40 @@ mod tests {
 
     #[test]
     fn loopback_ipv4_accepted() {
-        assert!(validate_endpoint("http://127.0.0.1:9500/mcp").is_ok());
+        assert!(validate_endpoint("http://127.0.0.1:18100").is_ok());
     }
 
     #[test]
     fn loopback_ipv6_accepted() {
-        assert!(validate_endpoint("http://[::1]:9500/mcp").is_ok());
+        assert!(validate_endpoint("http://[::1]:18100").is_ok());
     }
 
     #[test]
     fn localhost_accepted() {
-        assert!(validate_endpoint("http://localhost:9500/mcp").is_ok());
+        assert!(validate_endpoint("http://localhost:18100").is_ok());
     }
 
     #[test]
     fn remote_ipv4_rejected() {
-        assert!(validate_endpoint("http://192.168.1.100:9500/mcp").is_err());
-        assert!(validate_endpoint("http://10.0.0.1:9500/mcp").is_err());
-        assert!(validate_endpoint("http://8.8.8.8:9500/mcp").is_err());
+        assert!(validate_endpoint("http://192.168.1.100:18100").is_err());
+        assert!(validate_endpoint("http://10.0.0.1:18100").is_err());
+        assert!(validate_endpoint("http://8.8.8.8:18100").is_err());
     }
 
     #[test]
     fn remote_hostname_rejected() {
-        assert!(validate_endpoint("http://kask.example.com:9500/mcp").is_err());
+        assert!(validate_endpoint("http://kask.example.com:18100").is_err());
     }
 
     #[test]
     fn https_loopback_accepted() {
-        assert!(validate_endpoint("https://127.0.0.1:9500/mcp").is_ok());
+        assert!(validate_endpoint("https://127.0.0.1:18100").is_ok());
     }
 
     #[test]
     fn client_construction_validates_endpoint() {
         let cfg = KaskMcpConfig {
-            endpoint: "http://192.168.1.1:9500/mcp".into(),
+            endpoint: "http://192.168.1.1:18100".into(),
             token: None,
             tool_ttl: std::time::Duration::from_secs(300),
             timeout: std::time::Duration::from_secs(30),
@@ -376,13 +421,13 @@ mod tests {
     #[test]
     fn client_construction_succeeds_for_loopback() {
         let cfg = KaskMcpConfig {
-            endpoint: "http://127.0.0.1:9500/mcp".into(),
+            endpoint: "http://127.0.0.1:18100".into(),
             token: Some("test-token".into()),
             tool_ttl: std::time::Duration::from_secs(300),
             timeout: std::time::Duration::from_secs(30),
         };
         let client = KaskMcpClient::new(cfg).unwrap();
         assert!(!client.is_initialized());
-        assert_eq!(client.endpoint(), "http://127.0.0.1:9500/mcp");
+        assert_eq!(client.endpoint(), "http://127.0.0.1:18100");
     }
 }

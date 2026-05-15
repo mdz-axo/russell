@@ -41,21 +41,14 @@ pub async fn run() -> Result<()> {
 
     // Perform handshake.
     println!("Connecting...");
-    let init_result = client
+    client
         .connect()
         .await
-        .context("MCP initialize handshake failed — is Kask running?")?;
+        .context("MCP connection failed — is Kask running?")?;
 
     println!(
         "  server:    {}",
         client.server_name().unwrap_or("<unknown>")
-    );
-    println!(
-        "  protocol:  {}",
-        init_result
-            .protocol_version
-            .as_deref()
-            .unwrap_or("<unknown>")
     );
     println!();
 
