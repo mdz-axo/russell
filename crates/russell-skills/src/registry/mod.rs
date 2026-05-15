@@ -486,6 +486,7 @@ mod tests {
     use super::*;
 
     fn test_entry(status: LifecycleStatus, version: &str, symptoms: Vec<&str>, source: SkillSource) -> RegistryEntry {
+        let bundled = matches!(source, SkillSource::Bundled);
         RegistryEntry::new_default(
             status,
             version,
@@ -493,7 +494,7 @@ mod tests {
             symptoms.into_iter().map(String::from).collect(),
             source,
             "2026-05-01",
-            matches!(source, SkillSource::Bundled),
+            bundled,
         )
     }
 
