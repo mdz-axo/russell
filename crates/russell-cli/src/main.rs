@@ -3,7 +3,7 @@
 //!
 //! Phase 1 (`cybernetic-health-harness.md` §20,
 //! `docs/specifications/MVP_SPEC.md` §2) ships the six read-only
-//! verbs plus the Doctor's `help` cry-for-help channel.
+//! verbs plus the Nurse's `help` cry-for-help channel.
 
 #![deny(unsafe_code)]
 #![deny(rust_2018_idioms)]

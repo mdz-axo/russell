@@ -69,7 +69,7 @@ pub struct HelpOutcome {
 ///
 /// # Errors
 ///
-/// Returns `DoctorError` if the filesystem write or journal write fails.
+/// Returns a crate error if the filesystem write or journal write fails.
 /// Provider errors are *caught* — the fallback handles them and
 /// the function returns success with `skip_reason` set.
 pub async fn run_help(

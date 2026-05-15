@@ -29,7 +29,7 @@ not belong in the corpus (yet).
 | Section | Contents | TOGAF Phase | Audience |
 |---|---|---|---|
 | [`architecture/`](architecture/) | System architecture & principles | A / Preliminary | All |
-| [`architecture/adr/`](adr/) | Architecture Decision Records (17 active, 7 deferred) | H | Developers |
+| [`architecture/adr/`](adr/) | Architecture Decision Records (19 active, 7 deferred) | H | Developers |
 | [`specifications/`](specifications/) | MVP boundary, persistence catalog, integration refs | Requirements | All |
 | [`standards/`](standards/) | Documentation, coding, commits, safety, ADR, writing excellence | Preliminary | Contributors |
 | [`operations/`](operations/) | Reuse manifest, operator runbooks | D / G | Developers, Operators |
@@ -129,6 +129,7 @@ may exist but must not contradict these.
 - [`adr/0023-lift-adr-0007-phase3-skills.md`](adr/0023-lift-adr-0007-phase3-skills.md)
 - [`adr/0024-skill-registry-workshop-lifecycle.md`](adr/0024-skill-registry-workshop-lifecycle.md)
 - [`adr/0025-kask-mcp-client-trusted-relationship.md`](adr/0025-kask-mcp-client-trusted-relationship.md)
+- [`adr/0026-metacognitive-layer.md`](adr/0026-metacognitive-layer.md)
 
 ### 2.8 ADRs (deferred — not MVP-load-bearing but retained)
 
@@ -192,7 +193,7 @@ They live under [`adr/deferred/`](adr/deferred/):
 | Bucket | Count |
 |---|---|---|
 | Active authoritative docs | 92 |
-| Active ADRs | 18 |
+| Active ADRs | 19 |
 | Deferred ADRs | 7 |
 | Archived docs | 7 |
 | Templates | 5 |

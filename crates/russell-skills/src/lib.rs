@@ -441,7 +441,7 @@ impl RiskBand {
 /// Safety constraints for a skill.
 #[derive(Debug, Clone, Deserialize)]
 pub struct Safety {
-    /// Maximum risk band the Doctor may auto-run.
+    /// Maximum risk band the Nurse may auto-run.
     #[serde(default = "max_auto_risk_default")]
     pub max_auto_risk: RiskBand,
     /// Intervention IDs that always require human confirmation.

@@ -168,7 +168,7 @@ impl Paths {
     }
 
     /// Path to the operator-owned persona customisation file.
-    /// If present, the Doctor appends it to the compiled-in
+    /// If present, the Nurse appends it to the compiled-in
     /// Jack persona. Russell reads it; never writes it.
     #[must_use]
     pub fn persona_md(&self) -> PathBuf {

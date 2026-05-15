@@ -96,7 +96,7 @@ pub struct GpuInfo {
 /// Network-egress opt-ins.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct NetworkOptIns {
-    /// Whether the Doctor may reach a non-local LLM backend.
+    /// Whether the Nurse may reach a non-local LLM backend.
     #[serde(default)]
     pub llm_egress: bool,
     /// Whether the skill registry may be fetched over the network.

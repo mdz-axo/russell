@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 //! `harness.event.v1` — the canonical structured log record.
 //!
-//! Every mutating action, every Sentinel cycle, every Doctor
+//! Every mutating action, every Sentinel cycle, every Nurse
 //! run emits one of these. Human-readable output derives from
 //! this type, never the reverse. See
 //! [`docs/standards/safety.md`](../../../docs/standards/safety.md)
@@ -158,11 +158,11 @@ pub struct Event {
     /// versions rather than downgrade.
     #[serde(default = "default_schema")]
     pub schema: String,
-    /// Correlation ID scoping a multi-step run (e.g. a Doctor
+    /// Correlation ID scoping a multi-step run (e.g. a Nurse
     /// triage). Optional because Sentinel samples are standalone.
     pub run_id: Option<String>,
     /// Tier, if this event originates from a tiered module.
-    /// One of `"daily" | "weekly" | "monthly" | "quarterly" | "sentinel" | "doctor" | "proprio"`.
+    /// One of `"daily" | "weekly" | "monthly" | "quarterly" | "sentinel" | "nurse" | "proprio"`.
     pub tier: Option<String>,
     /// Module / skill / probe name.
     pub module: Option<String>,

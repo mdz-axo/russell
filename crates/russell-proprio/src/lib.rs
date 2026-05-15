@@ -22,8 +22,8 @@
 //! ## AutoimmuneGuard
 //!
 //! The [`AutoimmuneGuard`] struct is a process-wide mutex that prevents
-//! re-entrant meta-Doctor runs. It is built here (Phase 2A) as a foundation
-//! for future meta-Doctor use but is not yet wired into `run_once`.
+//! re-entrant metacognitive-layer (russell-meta) runs. It is built here (Phase 2A) as a foundation
+//! for future self-triage use but is not yet wired into `run_once`.
 //!
 //! See [ADR-0015](../../../docs/adr/0015-proprioception-self-health.md) and
 //! [ADR-0021](../../../docs/adr/0021-proprioception-phase2-reflex-arcs.md).
@@ -187,15 +187,15 @@ pub const REMOTE_DISCOVERY_ALERT_THRESHOLD_S: i64 = 86_400;
 // AutoimmuneGuard
 // ---------------------------------------------------------------------------
 
-/// Process-wide guard preventing re-entrant meta-Doctor runs.
+/// Process-wide guard preventing re-entrant metacognitive-layer runs.
 ///
-/// When held, any attempt to re-enter meta-Doctor should be refused.
+/// When held, any attempt to re-enter the metacognitive layer should be refused.
 /// Wired into [`run_once`], [`run_once_with`], and [`run_once_with_kask`]
 /// (Phase 2A, ADR-0015).
 ///
 /// Uses [`std::sync::Mutex`] because the current proprioception cycle is
 /// synchronous. Can be upgraded to `tokio::sync::Mutex` if needed for async
-/// meta-Doctor calls.
+/// metacognitive-layer calls.
 #[derive(Debug)]
 pub struct AutoimmuneGuard(Mutex<()>);
 
@@ -234,7 +234,7 @@ impl Default for AutoimmuneGuard {
     }
 }
 
-/// The process-wide autoimmune guard — prevents re-entrant meta-Doctor
+/// The process-wide autoimmune guard — prevents re-entrant metacognitive-layer
 /// runs (a Nurse run whose subject is Russell himself). Held for the
 /// duration of any proprioception cycle.
 static AUTOIMMUNE: std::sync::LazyLock<AutoimmuneGuard> =
@@ -318,7 +318,7 @@ pub struct KaskHealthInput {
 /// [`SystemdTimerSource`] and no Kask health probe.
 ///
 /// Acquires the [`AUTOIMMUNE`] guard for the duration of the cycle
-/// to prevent re-entrant meta-Doctor runs.
+/// to prevent re-entrant metacognitive-layer runs.
 ///
 /// # Errors
 ///
