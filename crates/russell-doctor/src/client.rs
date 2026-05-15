@@ -120,6 +120,15 @@ pub struct SoapPrompt {
     pub subjective: String,
     pub objective: String,
     pub rendered: String,
+    /// Temperature from the prompt template's `[inference]` header.
+    /// If `None`, the client uses its default (0.2).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
+    pub temperature: Option<f64>,
+    /// Max tokens hint from the prompt template.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
+    pub max_tokens: Option<u32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

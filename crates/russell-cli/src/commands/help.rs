@@ -254,6 +254,8 @@ async fn analyze_probe_result(
             subjective: "Probe results".into(),
             objective: probe_summary.clone(),
             rendered: format!("Probe results:\n\n{}", probe_summary),
+            temperature: None,
+            max_tokens: None,
         })
         .await?;
 

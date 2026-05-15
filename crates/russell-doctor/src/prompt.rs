@@ -8,6 +8,13 @@
 //! F-2 (Phase 2): includes a per-probe sample summary table
 //! (min, avg, max, last, count) so Jack can reason about trends,
 //! not just event counts.
+//!
+//! ## Template integration
+//!
+//! The `compose_with_kask_templated` function uses the prompt registry
+//! to render templates from `.md.j2` files. The legacy `compose_with_kask`
+//! function retains the original `writeln!()` approach for backward
+//! compatibility while callers migrate.
 
 use std::fmt::Write as _;
 use std::path::Path;
@@ -20,6 +27,7 @@ use russell_skills::Skill;
 
 use crate::client::SoapPrompt;
 use crate::error::Result;
+use crate::prompt_registry::{PromptRegistry, KnowledgeSlot, score_knowledge_relevance, select_knowledge};
 
 /// Build the SOAP prompt. The system prompt is always the
 /// embedded Jack persona.
@@ -327,7 +335,291 @@ pub fn compose_with_kask(
         subjective,
         objective,
         rendered,
+        temperature: None,
+        max_tokens: None,
     })
+}
+
+/// Build the SOAP prompt using the MiniJinja template registry.
+///
+/// This is the modern path that uses `.md.j2` templates and
+/// relevance-scored knowledge injection. It produces the same
+/// output shape as [`compose_with_kask`] but is data-driven.
+///
+/// The `registry` should be created once at startup via
+/// [`PromptRegistry::with_defaults()`] and optionally loaded
+/// with disk overrides.
+pub fn compose_templated(
+    registry: &PromptRegistry,
+    reader: &JournalReader,
+    profile: Option<&Profile>,
+    note: Option<&str>,
+    loaded_skills: &[Skill],
+    skills_base_dir: &Path,
+    kask_tool_names: &[(String, Option<String>)],
+) -> Result<SoapPrompt> {
+    use std::collections::HashMap;
+
+    let now = russell_core::time::now_unix();
+    let window_start = now - 24 * 3600;
+
+    // ── Build context blocks (same data as the legacy path) ──────────
+    let subjective = match note {
+        Some(n) if !n.trim().is_empty() => n.trim().to_string(),
+        _ => "(no operator note)".to_string(),
+    };
+
+    let profile_block = build_profile_block(profile);
+    let severity_block = build_severity_block(reader, window_start)?;
+    let samples_table = build_samples_table(reader, window_start)?;
+    let freshness_block = build_freshness_block(reader);
+    let events_table = build_events_table(reader)?;
+    let reflex_section = build_reflex_block(reader)?;
+
+    // ── Skill context ───────────────────────────────────────────────
+    let actionable: Vec<serde_json::Value> = loaded_skills
+        .iter()
+        .filter(|s| s.is_actionable())
+        .map(|s| {
+            serde_json::json!({
+                "id": s.id,
+                "probes": s.probes.iter().map(|p| serde_json::json!({"id": p.id})).collect::<Vec<_>>(),
+                "interventions": s.interventions.iter().map(|iv| serde_json::json!({"id": iv.id, "risk": format!("{:?}", iv.risk)})).collect::<Vec<_>>(),
+            })
+        })
+        .collect();
+
+    let knowledge: Vec<serde_json::Value> = loaded_skills
+        .iter()
+        .filter(|s| s.is_lens())
+        .map(|s| {
+            let symptoms = s.symptoms.join(", ");
+            serde_json::json!({"id": s.id, "symptoms": symptoms})
+        })
+        .collect();
+
+    let kask_tools: Vec<serde_json::Value> = kask_tool_names
+        .iter()
+        .map(|(name, risk)| {
+            serde_json::json!({
+                "name": name,
+                "risk": risk.as_deref().unwrap_or("medium"),
+            })
+        })
+        .collect();
+
+    // ── Render template ─────────────────────────────────────────────
+    let mut ctx = HashMap::new();
+    ctx.insert("subjective".to_string(), serde_json::json!(subjective));
+    ctx.insert("profile_block".to_string(), serde_json::json!(profile_block));
+    ctx.insert("severity_block".to_string(), serde_json::json!(severity_block));
+    ctx.insert("samples_table".to_string(), serde_json::json!(samples_table));
+    ctx.insert("freshness_block".to_string(), serde_json::json!(freshness_block));
+    ctx.insert("events_table".to_string(), serde_json::json!(events_table));
+    if !reflex_section.is_empty() {
+        ctx.insert("reflex_section".to_string(), serde_json::json!(reflex_section));
+    }
+    if !actionable.is_empty() {
+        ctx.insert("actionable_skills".to_string(), serde_json::json!(actionable));
+    }
+    if !knowledge.is_empty() {
+        ctx.insert("knowledge_skills".to_string(), serde_json::json!(knowledge));
+    }
+    if !kask_tools.is_empty() {
+        ctx.insert("kask_tools".to_string(), serde_json::json!(kask_tools));
+    }
+
+    let (rendered, hint) = registry.render_with_hint("soap", &ctx)?;
+
+    // ── System prompt: persona + relevance-scored knowledge ──────────
+    let mut system_prompt = crate::JACK_PERSONA.to_string();
+    append_skill_knowledge_scored(&mut system_prompt, loaded_skills, skills_base_dir, reader, window_start);
+
+    // ── Extract inference parameters from hint ──────────────────────
+    let temperature = hint.as_ref().and_then(|h| h.temperature);
+    let max_tokens = hint.as_ref().and_then(|h| h.max_tokens);
+
+    Ok(SoapPrompt {
+        system: system_prompt,
+        subjective,
+        objective: String::new(), // Embedded in rendered via template
+        rendered,
+        temperature,
+        max_tokens,
+    })
+}
+
+// ─── Block builders (shared between legacy and templated paths) ───────────
+
+fn build_profile_block(profile: Option<&Profile>) -> String {
+    let mut block = String::new();
+    match profile {
+        Some(p) => {
+            let _ = writeln!(block, "- profile_id: `{}`", p.profile_id);
+            let _ = writeln!(block, "- authored_at: `{}`", p.authored_at);
+            if !p.host.os.distro.is_empty() {
+                let _ = writeln!(block, "- host.os: `{}/{}` kernel `{}`", p.host.os.distro, p.host.os.version, p.host.os.kernel);
+            }
+            if !p.host.cpu.model.is_empty() {
+                let _ = writeln!(block, "- host.cpu: `{}` ({} cores / {} threads)", p.host.cpu.model, p.host.cpu.cores, p.host.cpu.threads);
+            }
+            if !p.gpus.is_empty() {
+                let _ = writeln!(block, "- gpus:");
+                for g in &p.gpus {
+                    let _ = writeln!(block, "  - `{}` @ `{}` (role: {})", g.name, g.pci, g.role);
+                }
+            }
+        }
+        None => { let _ = writeln!(block, "- (no profile.json)"); }
+    }
+    block.trim_end().to_string()
+}
+
+fn build_severity_block(reader: &JournalReader, window_start: i64) -> Result<String> {
+    let counts = reader.severity_counts(window_start, i64::MAX)?;
+    Ok(format!("- info: {} | warn: {} | alert: {} | crit: {}", counts.info, counts.warn, counts.alert, counts.crit))
+}
+
+fn build_samples_table(reader: &JournalReader, window_start: i64) -> Result<String> {
+    let summaries = reader.host_samples_summary(window_start, i64::MAX).unwrap_or_default();
+    if summaries.is_empty() {
+        return Ok("(no samples recorded)".to_string());
+    }
+    let baselines: std::collections::BTreeMap<String, (Option<f64>, Option<f64>)> = reader
+        .read_baselines()
+        .unwrap_or_default()
+        .into_iter()
+        .map(|b| (b.probe, (b.p95, b.ewma_mean)))
+        .collect();
+    let has_baselines = !baselines.is_empty();
+
+    let mut table = String::new();
+    if has_baselines {
+        let _ = writeln!(table, "| probe | count | min | avg | max | last | p95 (30d) | ewma (7d) | unit |");
+        let _ = writeln!(table, "|---|---|---|---|---|---|---|---|---|");
+    } else {
+        let _ = writeln!(table, "| probe | count | min | avg | max | last | unit |");
+        let _ = writeln!(table, "|---|---|---|---|---|---|---|");
+    }
+    for s in &summaries {
+        let unit = s.unit.as_deref().unwrap_or("");
+        if has_baselines {
+            let (p95, ewma) = baselines.get(&s.probe).map(|(p, e)| (*p, *e)).unwrap_or((None, None));
+            let p95_str = p95.map(fmt_f64_baseline).unwrap_or_else(|| "—".to_string());
+            let ewma_str = ewma.map(fmt_f64_baseline).unwrap_or_else(|| "—".to_string());
+            let _ = writeln!(table, "| {} | {} | {} | {} | {} | {} | {} | {} | {} |", s.probe, s.count, fmt_opt_f64(s.min), fmt_opt_f64(s.avg), fmt_opt_f64(s.max), fmt_opt_f64(s.last), p95_str, ewma_str, unit);
+        } else {
+            let _ = writeln!(table, "| {} | {} | {} | {} | {} | {} | {} |", s.probe, s.count, fmt_opt_f64(s.min), fmt_opt_f64(s.avg), fmt_opt_f64(s.max), fmt_opt_f64(s.last), unit);
+        }
+    }
+    Ok(table.trim_end().to_string())
+}
+
+fn build_freshness_block(reader: &JournalReader) -> String {
+    let age = last_sample_age(reader).unwrap_or(-1);
+    if age >= 0 {
+        format!("- Last sample {} seconds ago.", age)
+    } else {
+        "- No samples recorded.".to_string()
+    }
+}
+
+fn build_events_table(reader: &JournalReader) -> Result<String> {
+    let rows = reader.recent(20)?;
+    if rows.is_empty() {
+        return Ok("- (no events recorded)".to_string());
+    }
+    let mut table = String::new();
+    let _ = writeln!(table, "| ts | severity | scope | module | action | summary |");
+    let _ = writeln!(table, "|---|---|---|---|---|---|");
+    for r in rows {
+        let _ = writeln!(table, "| {} | {} | {} | {} | {} | {} |", r.ts, r.severity.as_str(), r.scope.as_str(), r.module.as_deref().unwrap_or("-"), r.action, r.summary.as_deref().unwrap_or(""));
+    }
+    Ok(table.trim_end().to_string())
+}
+
+fn build_reflex_block(reader: &JournalReader) -> Result<String> {
+    let now = russell_core::time::now_unix();
+    let since = now - 7 * 86_400;
+    let rows = reader.list_reflex_events(since, now)?;
+    if rows.is_empty() {
+        return Ok(String::new());
+    }
+    let mut block = String::new();
+    let _ = writeln!(block, "### Reflex arcs — proposed interventions");
+    let _ = writeln!(block, "| ts | severity | intervention | summary |");
+    let _ = writeln!(block, "|---|---|---|---|");
+    for (sev, intervention, summary, ts) in &rows {
+        let _ = writeln!(block, "| {ts} | {sev} | `{intervention}` | {summary} |");
+    }
+    let _ = writeln!(block, "- If any reflex arc above is within the risk cap, propose it via ACTION: <intervention>.");
+    Ok(block.trim_end().to_string())
+}
+
+/// Append KNOWLEDGE.md with relevance scoring and token budgeting.
+///
+/// Uses the prompt registry's relevance scoring to select which
+/// knowledge skills to include based on current alert state.
+fn append_skill_knowledge_scored(
+    system: &mut String,
+    skills: &[Skill],
+    skills_base_dir: &Path,
+    reader: &JournalReader,
+    window_start: i64,
+) {
+    // Determine active symptoms from recent events.
+    let active_symptoms: Vec<String> = reader
+        .recent(20)
+        .unwrap_or_default()
+        .iter()
+        .filter(|r| r.severity.as_str() == "warn" || r.severity.as_str() == "alert" || r.severity.as_str() == "crit")
+        .filter_map(|r| r.module.as_ref())
+        .map(|m| m.to_string())
+        .collect();
+
+    let _ = window_start; // used by caller context
+
+    // Budget: ~3000 tokens for knowledge injection.
+    const KNOWLEDGE_BUDGET_TOKENS: usize = 3000;
+
+    let mut slots: Vec<KnowledgeSlot> = Vec::new();
+    for skill in skills {
+        let applies = skill.applies_when.iter().any(|clause| {
+            matches!(clause, russell_skills::AppliesWhen::Scalar { os_family: Some(os), .. } if os == "linux")
+        });
+        if !applies && !skill.applies_when.is_empty() {
+            continue;
+        }
+        let knowledge_path = skills_base_dir.join(&skill.id).join("KNOWLEDGE.md");
+        if let Ok(content) = std::fs::read_to_string(&knowledge_path) {
+            if content.trim().is_empty() {
+                continue;
+            }
+            let relevance = score_knowledge_relevance(&skill.symptoms, &active_symptoms);
+            let token_estimate = content.len() / 4;
+            slots.push(KnowledgeSlot {
+                skill_id: skill.id.clone(),
+                content,
+                relevance,
+                token_estimate,
+            });
+        }
+    }
+
+    let selected = select_knowledge(&mut slots, KNOWLEDGE_BUDGET_TOKENS);
+    for slot in selected {
+        system.push_str("\n\n---\n\n");
+        system.push_str("# Knowledge: ");
+        system.push_str(&slot.skill_id);
+        system.push_str("\n\n");
+        system.push_str(&slot.content);
+        tracing::debug!(
+            skill = %slot.skill_id,
+            relevance = slot.relevance,
+            tokens_est = slot.token_estimate,
+            "appended knowledge (relevance-scored)",
+        );
+    }
 }
 
 /// Append KNOWLEDGE.md content from any loaded skill that has one.

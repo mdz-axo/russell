@@ -87,14 +87,18 @@ impl OkapiClient {
 
 impl LlmClient for OkapiClient {
     async fn chat(&self, prompt: &SoapPrompt) -> Result<LlmResponse> {
-        let body = json!({
+        let temperature = prompt.temperature.unwrap_or(0.2);
+        let mut body = json!({
             "model": self.model,
             "messages": [
                 { "role": "system", "content": prompt.system },
                 { "role": "user",   "content": prompt.rendered },
             ],
-            "temperature": 0.2,
+            "temperature": temperature,
         });
+        if let Some(max_tokens) = prompt.max_tokens {
+            body["max_tokens"] = json!(max_tokens);
+        }
 
         let url = self.endpoint();
         let started = Instant::now();

@@ -100,6 +100,8 @@ async fn call_llm_via_port(
         subjective: String::new(),
         objective: String::new(),
         rendered: rendered.trim_end().to_string(),
+        temperature: None,
+        max_tokens: None,
     };
 
     let mut chat_cfg = cfg.clone();

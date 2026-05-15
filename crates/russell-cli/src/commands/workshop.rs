@@ -855,6 +855,8 @@ async fn llm_call(
         subjective: String::new(),
         objective: String::new(),
         rendered: prompt.to_string(),
+        temperature: Some(0.6),
+        max_tokens: None,
     };
 
     Ok(client.chat(&soap).await?.content)
@@ -1235,6 +1237,8 @@ async fn jack_workshop_turn(
         subjective: String::new(),
         objective: String::new(),
         rendered: format!("**User:** {input}"),
+        temperature: Some(0.6),
+        max_tokens: None,
     };
 
     let mut chat_cfg = client_cfg.clone();
