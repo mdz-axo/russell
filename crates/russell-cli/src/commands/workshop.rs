@@ -724,7 +724,7 @@ async fn do_fetch(
 }
 
 /// Adapt an existing skill: open in editor, re-scan, update cache.
-fn do_adapt(
+async fn do_adapt(
     registry: &mut RegistryCache,
     skills_dir: &std::path::Path,
     name: &str,
@@ -806,7 +806,8 @@ async fn adapt_via_llm(
         return (String::new(), false);
     }
     let yaml = extract_yaml_block(&adapted);
-    (yaml, !yaml.is_empty())
+    let is_empty = yaml.is_empty();
+    (yaml, !is_empty)
 }
 
 /// Extract the first ```yaml...``` block from LLM output.
@@ -826,7 +827,7 @@ fn extract_yaml_block(response: &str) -> String {
 /// Simple LLM call for adaptation. Returns response text or empty on failure.
 async fn llm_call(
     cfg: &russell_doctor::client::ClientConfig,
-    fallback_model: &str,
+    _fallback_model: &str,
     prompt: &str,
 ) -> Result<String> {
     use russell_doctor::oai_client::OkapiClient;
@@ -847,7 +848,6 @@ async fn llm_call(
         return Err(anyhow::anyhow!("Okapi not reachable"));
     }
 
-    let model = chat_cfg.model.clone();
     let client = OkapiClient::new(&chat_cfg).await?;
 
     let soap = SoapPrompt {

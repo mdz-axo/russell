@@ -150,6 +150,11 @@ enum SkillCmd {
         /// Skill name to retire.
         name: String,
     },
+    /// Create a new skill skeleton on disk.
+    Build {
+        /// Skill name to create.
+        name: String,
+    },
 }
 
 #[tokio::main(flavor = "multi_thread")]
@@ -198,6 +203,7 @@ async fn main() -> Result<()> {
             SkillCmd::Prune { name } => commands::skill::prune(&paths, &name),
             SkillCmd::Restore { name } => commands::skill::restore(&paths, &name),
             SkillCmd::Retire { name } => commands::skill::retire(&paths, &name),
+            SkillCmd::Build { name } => commands::skill::build(&paths, &name),
         },
         Command::Chat => commands::chat::run(&paths).await,
         Command::Workshop => commands::workshop::run(&paths).await,

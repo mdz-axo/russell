@@ -53,6 +53,12 @@ interventions:
     idempotent: true
     rollback: none_needed
 
+  - id: build
+    cmd: ["russell", "skill", "build"]
+    risk: low
+    idempotent: true
+    rollback: none_needed
+
   - id: prune
     cmd: ["russell", "skill", "prune"]
     risk: low

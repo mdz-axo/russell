@@ -7,6 +7,7 @@
 use russell_core::journal::JournalReader;
 use russell_mcp::registry::ToolRegistry;
 use russell_skills::Skill;
+use russell_skills::registry::RegistryCache;
 use std::fmt::Write as _;
 
 /// Build the SOAP objective Markdown from journal state and skills.
@@ -15,6 +16,7 @@ pub fn build_objective(
     skills: &[Skill],
     profile: Option<&russell_core::Profile>,
     kask_registry: &ToolRegistry,
+    registry: &RegistryCache,
 ) -> String {
     let now = russell_core::time::now_unix();
     let window_start = now - 24 * 3600;
@@ -94,6 +96,21 @@ pub fn build_objective(
                 summary = r.summary.as_deref().unwrap_or("(no summary)"),
                 sev = r.severity,
                 action = r.action,
+            );
+        }
+    }
+
+    // Skill telemetry from registry cache.
+    if !registry.skills.is_empty() {
+        let _ = writeln!(obj, "\n### Skill Performance");
+        let _ = writeln!(obj, "| skill | probes | fails | last run |");
+        let _ = writeln!(obj, "|---|---|---|---|");
+        for (id, entry) in &registry.skills {
+            let last = entry.last_probe_run_at.as_deref().unwrap_or("never");
+            let _ = writeln!(
+                obj,
+                "| {} | {} | {} | {} |",
+                id, entry.probe_runs, entry.recent_probe_failures, last,
             );
         }
     }

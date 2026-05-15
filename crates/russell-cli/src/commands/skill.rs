@@ -483,3 +483,33 @@ pub fn retire(paths: &Paths, name: &str) -> Result<()> {
 
     Ok(())
 }
+
+/// Create a new skill skeleton on disk.
+/// Writes a minimal `manifest.yaml` to `skills/<name>/`.
+pub fn build(paths: &Paths, name: &str) -> Result<()> {
+    let skills_dir = paths.skills();
+    let skill_dir = skills_dir.join(name);
+    if skill_dir.exists() {
+        anyhow::bail!("Skill directory already exists: {}", skill_dir.display());
+    }
+    std::fs::create_dir_all(&skill_dir)
+        .with_context(|| format!("creating skill directory {}", skill_dir.display()))?;
+
+    let today = now_date_iso8601();
+    let manifest = format!(
+        "id: {name}\n\
+         version: 0.1.0\n\
+         authored: {today}\n\
+         symptoms: []\n\
+         probes: []\n\
+         interventions: []\n"
+    );
+    let manifest_path = skill_dir.join("manifest.yaml");
+    std::fs::write(&manifest_path, &manifest)
+        .with_context(|| format!("writing manifest {}", manifest_path.display()))?;
+
+    println!("Created {}/", skill_dir.display());
+    println!("  Use 'russell workshop adapt {name}' to edit the manifest.");
+    println!("  Use 'russell skill install {name}' to activate it.");
+    Ok(())
+}

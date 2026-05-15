@@ -94,7 +94,8 @@ pub async fn run(paths: &Paths) -> Result<()> {
 
     // Load skill registry cache for telemetry display and lifecycle management.
     let registry_path = paths.state.join("registry").join("local-cache.yaml");
-    let _ = russell_skills::registry::RegistryCache::load(&registry_path);
+    let mut registry = russell_skills::registry::RegistryCache::load(&registry_path)
+        .unwrap_or_default();
 
     // Load model config from the shared ClientConfig.
     let client_cfg = russell_doctor::client::ClientConfig::from_env();
@@ -215,8 +216,13 @@ pub async fn run(paths: &Paths) -> Result<()> {
                     content: trimmed.to_string(),
                 });
 
+                // Reload skill registry to capture fresh telemetry.
+                if let Ok(fresh) = russell_skills::registry::RegistryCache::load(&registry_path) {
+                    registry = fresh;
+                }
+
                 // Build the fresh SOAP objective.
-                let objective = objective::build_objective(&reader, &skills, profile.as_ref(), &kask_registry);
+                let objective = objective::build_objective(&reader, &skills, profile.as_ref(), &kask_registry, &registry);
                 let system = russell_doctor::JACK_CHAT_PERSONA.to_string();
 
                 // Build the messages array for the LLM.
