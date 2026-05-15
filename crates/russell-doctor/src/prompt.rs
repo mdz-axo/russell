@@ -13,7 +13,9 @@ use std::fmt::Write as _;
 use std::path::Path;
 
 use russell_core::journal::JournalReader;
-use russell_core::{Profile, event::Scope};
+use russell_core::Profile;
+#[cfg(test)]
+use russell_core::event::Scope;
 use russell_skills::Skill;
 
 use crate::client::SoapPrompt;
@@ -289,22 +291,12 @@ pub fn compose_with_kask(
         )?;
         writeln!(objective, "|---|---|---|---|---|---|")?;
         for r in rows {
-            let sev = match r.severity {
-                russell_core::event::Severity::Info => "info",
-                russell_core::event::Severity::Warn => "warn",
-                russell_core::event::Severity::Alert => "alert",
-                russell_core::event::Severity::Crit => "crit",
-            };
-            let scope = match r.scope {
-                Scope::Host => "host",
-                Scope::Self_ => "self",
-            };
             writeln!(
                 objective,
                 "| {} | {} | {} | {} | {} | {} |",
                 r.ts,
-                sev,
-                scope,
+                r.severity.as_str(),
+                r.scope.as_str(),
                 r.module.as_deref().unwrap_or("-"),
                 r.action,
                 r.summary.as_deref().unwrap_or("")

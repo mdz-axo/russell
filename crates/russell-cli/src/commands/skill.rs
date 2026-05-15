@@ -5,9 +5,10 @@
 //! Phase 3/4 per ADR-0023 and skill self-management strategy.
 
 use anyhow::{Context, Result};
+use russell_core::journal::JournalWriter;
 use russell_core::paths::Paths;
 use russell_core::time::now_date_iso8601;
-use russell_skills::registry::{RegistryCache, RegistryEntry};
+use russell_skills::registry::{LifecycleStatus, RegistryCache, RegistryEntry};
 use russell_skills::{Skill, load_all};
 use std::time::Duration;
 
@@ -161,12 +162,51 @@ fn step_timeout(skill: &Skill, step_id: &str) -> Option<Duration> {
 // ── Skill lifecycle management verbs ───────────────────────────────────────
 
 /// Print performance telemetry for all skills in the registry.
-pub fn stats(paths: &Paths) -> Result<()> {
+/// Set `json` to true for scriptable JSON output.
+pub fn stats(paths: &Paths, json: bool) -> Result<()> {
     let registry_path = paths.state.join("registry").join("local-cache.yaml");
     let registry = RegistryCache::load(&registry_path).unwrap_or_default();
 
     if registry.skills.is_empty() {
-        println!("No skills in registry.");
+        if json {
+            println!("[]");
+        } else {
+            println!("No skills in registry.");
+        }
+        return Ok(());
+    }
+
+    if json {
+        #[derive(serde::Serialize)]
+        struct SkillStat {
+            skill: String,
+            status: String,
+            version: String,
+            probe_runs: u64,
+            recent_probe_failures: u64,
+            intervention_runs: u64,
+            recent_intervention_failures: u64,
+            avg_duration_ms: Option<f64>,
+            last_probe_run_at: Option<String>,
+            last_error: Option<String>,
+            coverage_score: Option<f64>,
+        }
+        let stats: Vec<SkillStat> = registry.skills.iter().map(|(id, entry)| {
+            SkillStat {
+                skill: id.clone(),
+                status: entry.status.as_str().to_string(),
+                version: entry.version.clone(),
+                probe_runs: entry.probe_runs,
+                recent_probe_failures: entry.recent_probe_failures,
+                intervention_runs: entry.intervention_runs,
+                recent_intervention_failures: entry.recent_intervention_failures,
+                avg_duration_ms: entry.avg_probe_duration_ms,
+                last_probe_run_at: entry.last_probe_run_at.clone(),
+                last_error: entry.last_error.clone(),
+                coverage_score: entry.coverage_score,
+            }
+        }).collect();
+        println!("{}", serde_json::to_string_pretty(&stats)?);
         return Ok(());
     }
 
@@ -275,29 +315,7 @@ fn classify_skill(symptoms: &[String]) -> &'static str {
 }
 
 fn chrono_now() -> String {
-    use std::time::{SystemTime, UNIX_EPOCH};
-    if let Ok(dur) = SystemTime::now().duration_since(UNIX_EPOCH) {
-        let secs = dur.as_secs();
-        let days = secs / 86400;
-        let (y, m, d) = civil_from_days(days as i64 + 719_468);
-        format!("{y:04}-{m:02}-{d:02}")
-    } else {
-        "2026-05-14".to_string()
-    }
-}
-
-fn civil_from_days(z: i64) -> (i64, i64, i64) {
-    let z = z - 719_468;
-    let era = if z >= 0 { z } else { z - 146096 } / 146_097;
-    let doe = (z - era * 146_097) as u64;
-    let yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
-    let y = yoe as i64 + era * 400;
-    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
-    let mp = (5 * doy + 2) / 153;
-    let d = doy - (153 * mp + 2) / 5 + 1;
-    let m = if mp < 10 { mp + 3 } else { mp - 9 };
-    let y = if m <= 2 { y + 1 } else { y };
-    (y, m as i64, d as i64)
+    now_date_iso8601()
 }
 
 /// Install or activate a skill by name.
@@ -312,16 +330,19 @@ pub fn install(paths: &Paths, name: &str) -> Result<()> {
         anyhow::bail!("Skill '{name}' not found on disk. Use 'russell workshop build {name}' to create it.");
     }
 
+    let mut from_status: Option<LifecycleStatus> = None;
     RegistryCache::with_update(&registry_path, |registry| {
         if let Some(entry) = registry.skills.get_mut(name) {
             if entry.status.is_loadable() {
                 println!("{name} is already {} (v{}).", entry.status.as_str(), entry.version);
                 return;
             }
+            from_status = Some(entry.status);
             entry.status = LifecycleStatus::Installed;
             entry.installed = chrono_now();
             println!("{name} installed (v{}).", entry.version);
         } else {
+            from_status = None;
             let version = "0.1.0".to_string();
             registry.upsert(
                 name,
@@ -349,6 +370,13 @@ pub fn install(paths: &Paths, name: &str) -> Result<()> {
             println!("{name} registered (v{version}).");
         }
     })?;
+
+    let journal = JournalWriter::open(&paths.journal())
+        .context("opening journal for audit")?;
+    RegistryCache::journal_transition(
+        &journal, name, from_status,
+        LifecycleStatus::Installed, Some("install via CLI"),
+    );
     Ok(())
 }
 
@@ -358,12 +386,14 @@ pub fn prune(paths: &Paths, name: &str) -> Result<()> {
 
     let registry_path = paths.state.join("registry").join("local-cache.yaml");
 
+    let mut from_status: Option<LifecycleStatus> = None;
     RegistryCache::with_update(&registry_path, |registry| {
         if let Some(entry) = registry.skills.get_mut(name) {
             if entry.status == LifecycleStatus::Deprecated {
                 println!("{name} is already deprecated.");
                 return;
             }
+            from_status = Some(entry.status);
             println!("Deprecating {name} (v{})...", entry.version);
             entry.status = LifecycleStatus::Deprecated;
             entry.deprecation_reason = Some("pruned via CLI".into());
@@ -372,6 +402,13 @@ pub fn prune(paths: &Paths, name: &str) -> Result<()> {
             println!("Skill '{name}' not found in registry.");
         }
     })?;
+
+    let journal = JournalWriter::open(&paths.journal())
+        .context("opening journal for audit")?;
+    RegistryCache::journal_transition(
+        &journal, name, from_status,
+        LifecycleStatus::Deprecated, Some("pruned via CLI"),
+    );
     Ok(())
 }
 
@@ -395,6 +432,13 @@ pub fn restore(paths: &Paths, name: &str) -> Result<()> {
             println!("Skill '{name}' not found in registry.");
         }
     })?;
+
+    let journal = JournalWriter::open(&paths.journal())
+        .context("opening journal for audit")?;
+    RegistryCache::journal_transition(
+        &journal, name, Some(LifecycleStatus::Deprecated),
+        LifecycleStatus::Active, Some("restore via CLI"),
+    );
     Ok(())
 }
 
@@ -404,24 +448,37 @@ pub fn retire(paths: &Paths, name: &str) -> Result<()> {
     let registry_path = paths.state.join("registry").join("local-cache.yaml");
     let skill_dir = paths.skills().join(name);
 
-    // Guard: refuse to delete bundled skills.
-    let bundled = RegistryCache::load(&registry_path)
+    // Guard: refuse to delete bundled skills. Also capture old status for journal.
+    let old = RegistryCache::load(&registry_path)
         .ok()
-        .and_then(|r| r.skills.get(name).map(|e| e.bundled))
-        .unwrap_or(false);
-    if bundled {
-        anyhow::bail!("{name} is a bundled skill and cannot be retired. Use 'russell skill prune {name}' to deprecate it instead.");
+        .and_then(|r| r.skills.get(name).cloned());
+    if let Some(ref entry) = old {
+        if entry.bundled {
+            anyhow::bail!("{name} is a bundled skill and cannot be retired. Use 'russell skill prune {name}' to deprecate it instead.");
+        }
     }
 
+    let mut removed = false;
     RegistryCache::with_update(&registry_path, |registry| {
         if registry.remove_entry(name).is_some() {
             println!("Removed {name} from registry.");
+            removed = true;
         }
     })?;
 
     if skill_dir.exists() {
         std::fs::remove_dir_all(&skill_dir).with_context(|| format!("removing skill directory for {name}"))?;
         println!("Deleted {}.", skill_dir.display());
+    }
+
+    if removed {
+        let journal = JournalWriter::open(&paths.journal())
+            .context("opening journal for audit")?;
+        let from_status = old.map(|e| e.status);
+        RegistryCache::journal_transition(
+            &journal, name, from_status,
+            LifecycleStatus::Retired, Some("retire via CLI"),
+        );
     }
 
     Ok(())

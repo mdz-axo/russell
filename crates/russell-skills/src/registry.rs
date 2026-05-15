@@ -8,6 +8,8 @@
 //! Persisted at `~/.local/share/harness/registry/local-cache.yaml`.
 //! See ADR-0024.
 
+use russell_core::event::{Event, Severity};
+use russell_core::journal::JournalWriter;
 use russell_core::time::now_date_iso8601;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -296,10 +298,11 @@ impl RegistryCache {
         self.skills.insert(skill_id.to_string(), entry);
     }
 
-    /// Record a probe or intervention execution in the registry cache.
+    /// Record a probe execution in the registry cache.
     /// Increments `probe_runs` and, if failed, `recent_probe_failures`.
     /// Also updates `last_probe_run_at`, `last_error`, and
     /// `avg_probe_duration_ms` with an EWMA.
+    /// For interventions, use [`record_intervention`](Self::record_intervention).
     pub fn record_execution(
         &mut self,
         skill_id: &str,
@@ -370,6 +373,35 @@ impl RegistryCache {
         let mut cache = Self::load(path)?;
         f(&mut cache);
         cache.save(path)
+    }
+
+    /// Write a lifecycle transition event to the journal.
+    ///
+    /// Produces a `harness.event.v1` record with action
+    /// `"skill.lifecycle.transition"` and severity `Info`, satisfying
+    /// JR-7 (persistence is auditable).
+    pub fn journal_transition(
+        journal: &JournalWriter,
+        skill_id: &str,
+        from_status: Option<LifecycleStatus>,
+        to_status: LifecycleStatus,
+        reason: Option<&str>,
+    ) {
+        let from_str = from_status.map_or("none", |s| s.as_str());
+        let mut ev = Event::new("skill.lifecycle.transition", Severity::Info);
+        ev.tier = Some("skill".into());
+        ev.module = Some(format!("skill/{skill_id}"));
+        ev.summary = Some(format!("{skill_id}: {from_str} → {}", to_status.as_str()));
+        ev.outputs.insert("skill_id".into(), skill_id.into());
+        ev.outputs.insert("from_status".into(), from_str.into());
+        ev.outputs
+            .insert("to_status".into(), to_status.as_str().into());
+        if let Some(r) = reason {
+            ev.outputs.insert("reason".into(), r.into());
+        }
+        if let Err(e) = journal.append(&ev) {
+            tracing::warn!(skill = %skill_id, error = %e, "failed to journal lifecycle transition");
+        }
     }
 
     /// Compute a quality score 0.0–1.0 for a skill entry.
@@ -618,6 +650,18 @@ pub enum ScanSeverity {
     Warn,
     /// Blocking — must be fixed before install.
     Block,
+}
+
+impl ScanSeverity {
+    /// Uppercase string representation for display.
+    #[must_use]
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Info => "INFO",
+            Self::Warn => "WARN",
+            Self::Block => "BLOCK",
+        }
+    }
 }
 
 impl SafetyScan {

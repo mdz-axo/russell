@@ -92,6 +92,10 @@ pub async fn run(paths: &Paths) -> Result<()> {
     let mut editor = DefaultEditor::new().context("initialising readline")?;
     let mut pending_action: Option<PendingAction> = None;
 
+    // Load skill registry cache for telemetry display and lifecycle management.
+    let registry_path = paths.state.join("registry").join("local-cache.yaml");
+    let _ = russell_skills::registry::RegistryCache::load(&registry_path);
+
     // Load model config from the shared ClientConfig.
     let client_cfg = russell_doctor::client::ClientConfig::from_env();
     let base_url = client_cfg
@@ -309,6 +313,12 @@ pub async fn run(paths: &Paths) -> Result<()> {
             }
         }
     }
+
+    // Safety flush: re-save registry on exit (dispatch already saves per-action).
+    let _ = russell_skills::registry::RegistryCache::with_update(
+        &registry_path,
+        |_cache| { /* no-op — load+save for durability */ },
+    );
 
     Ok(())
 }

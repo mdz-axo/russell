@@ -46,16 +46,10 @@ pub fn summarise(reader: &JournalReader, note: Option<&str>) -> Result<String> {
     if !rows.is_empty() {
         writeln!(out, "\nMost recent:")?;
         for r in rows {
-            let sev = match r.severity {
-                russell_core::event::Severity::Info => "info",
-                russell_core::event::Severity::Warn => "warn",
-                russell_core::event::Severity::Alert => "alert",
-                russell_core::event::Severity::Crit => "crit",
-            };
             writeln!(
                 out,
                 "- [{}] {} · {} · {}",
-                sev,
+                r.severity.as_str(),
                 r.ts,
                 r.module.as_deref().unwrap_or("-"),
                 r.summary.as_deref().unwrap_or(&r.action)

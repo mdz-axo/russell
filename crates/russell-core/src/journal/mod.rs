@@ -185,16 +185,8 @@ impl JournalWriter {
     /// if the event cannot be serialised.
     pub fn append(&self, event: &Event) -> Result<()> {
         let payload = serde_json::to_string(event)?;
-        let severity = match event.severity {
-            Severity::Info => "info",
-            Severity::Warn => "warn",
-            Severity::Alert => "alert",
-            Severity::Crit => "crit",
-        };
-        let scope = match event.scope {
-            Scope::Host => "host",
-            Scope::Self_ => "self",
-        };
+        let severity = event.severity.as_str();
+        let scope = event.scope.as_str();
 
         self.conn.execute(
             r"INSERT INTO events (
@@ -240,10 +232,7 @@ impl JournalWriter {
         value_text: Option<&str>,
         unit: Option<&str>,
     ) -> Result<()> {
-        let scope_s = match scope {
-            Scope::Host => "host",
-            Scope::Self_ => "self",
-        };
+        let scope_s = scope.as_str();
         self.conn.execute(
             r"INSERT OR REPLACE INTO samples
                   (ts, scope, probe, value_num, value_text, unit)
@@ -257,8 +246,7 @@ impl JournalWriter {
 
     /// Append a `help_sessions` row using a structured input.
     ///
-    /// Prefer this over [`append_help_session_row`](Self::append_help_session_row)
-    /// for new code — the named fields prevent positional argument errors.
+    /// Uses named fields to prevent positional argument errors.
     ///
     /// # Errors
     ///
@@ -291,45 +279,6 @@ impl JournalWriter {
         Ok(())
     }
 
-    /// Append a `help_sessions` row produced by the Doctor.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`CoreError::Sqlite`] on DB errors.
-    ///
-    /// #[deprecated(since = "0.4.0", note = "use append_help_session with HelpSessionInput")]
-    #[allow(clippy::too_many_arguments)]
-    pub fn append_help_session_row(
-        &self,
-        id: &str,
-        ts_unix: i64,
-        ts: &str,
-        backend: &str,
-        model: Option<&str>,
-        note: Option<&str>,
-        prompt_chars: i64,
-        response_chars: i64,
-        latency_ms: Option<i64>,
-        status: HelpSessionStatus,
-        error_kind: Option<&str>,
-        evidence_ref: &str,
-    ) -> Result<()> {
-        self.append_help_session(&HelpSessionInput {
-            id,
-            ts_unix,
-            ts,
-            backend,
-            model,
-            note,
-            prompt_chars,
-            response_chars,
-            latency_ms,
-            status,
-            error_kind,
-            evidence_ref,
-        })
-    }
-
     /// Return a cloneable read-only handle anchored at the same
     /// file.
     #[must_use]
@@ -339,7 +288,7 @@ impl JournalWriter {
         }
     }
 
-    /// Unix timestamp of the most recent write (append / append_sample / append_help_session_row).
+    /// Unix timestamp of the most recent write (append / append_sample / append_help_session).
     ///
     /// Used by proprioception to compute `journal_writer_stall_s`.
     #[must_use]
@@ -371,10 +320,7 @@ impl JournalWriter {
         p95: Option<f64>,
         p99: Option<f64>,
     ) -> Result<()> {
-        let scope_s = match scope {
-            Scope::Host => "host",
-            Scope::Self_ => "self",
-        };
+        let scope_s = scope.as_str();
         let now = crate::time::now_unix();
         self.conn.execute(
             r"INSERT OR REPLACE INTO baselines
@@ -410,10 +356,7 @@ impl JournalReader {
         let conn = self.open_ro()?;
         let count: i64 = match scope {
             Some(s) => {
-                let scope_s = match s {
-                    Scope::Host => "host",
-                    Scope::Self_ => "self",
-                };
+                let scope_s = s.as_str();
                 conn.query_row(
                     "SELECT COUNT(*) FROM events
                      WHERE ts_unix >= ?1 AND ts_unix < ?2 AND scope = ?3",
@@ -451,18 +394,8 @@ impl JournalReader {
                 Ok(EventRow {
                     id: r.get(0)?,
                     ts: r.get(1)?,
-                    severity: match severity.as_str() {
-                        "info" => Severity::Info,
-                        "warn" => Severity::Warn,
-                        "alert" => Severity::Alert,
-                        "crit" => Severity::Crit,
-                        _ => Severity::Info,
-                    },
-                    scope: if scope == "self" {
-                        Scope::Self_
-                    } else {
-                        Scope::Host
-                    },
+                    severity: severity.parse().unwrap_or(Severity::Info),
+                    scope: scope.parse().unwrap_or(Scope::Host),
                     tier: r.get(4)?,
                     module: r.get(5)?,
                     action: r.get(6)?,
@@ -838,15 +771,7 @@ impl JournalReader {
         .ok()
     }
 
-    /// Legacy alias: returns just the value (for rate-of-change).
-    pub fn previous_sample_value(&self, probe: &str, before_ts: i64) -> Option<f64> {
-        self.previous_sample(probe, before_ts).map(|(v, _)| v)
-    }
 
-    /// Legacy alias: returns just the timestamp.
-    pub fn previous_sample_ts(&self, probe: &str, before_ts: i64) -> Option<i64> {
-        self.previous_sample(probe, before_ts).map(|(_, ts)| ts)
-    }
 
     /// Count reflex_proposed events for a probe within a time window.
     /// Used for reflex arc cooldown enforcement.

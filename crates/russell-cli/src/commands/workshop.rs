@@ -193,7 +193,14 @@ async fn handle_builtin(
         }
         _ if input.starts_with("adapt ") => {
             let name = input.strip_prefix("adapt ").unwrap_or("");
-            do_adapt(registry, skills_dir, name);
+            do_adapt(
+                registry,
+                skills_dir,
+                name,
+                client_cfg,
+                fallback_model,
+            )
+            .await;
             true
         }
         _ if input.starts_with("evaluate ") => {
@@ -493,13 +500,9 @@ fn scan_file(skills_dir: &std::path::Path, name: &str, filename: &str, label: &s
         } else {
             println!("  {label}:");
             for f in &scan.findings {
-                let severity = match f.severity {
-                    russell_skills::registry::ScanSeverity::Info => "INFO",
-                    russell_skills::registry::ScanSeverity::Warn => "WARN",
-                    russell_skills::registry::ScanSeverity::Block => "BLOCK",
-                };
                 println!(
-                    "    [{severity}] {id}: {desc}",
+                    "    [{}] {id}: {desc}",
+                    f.severity.as_str(),
                     id = f.rule_id,
                     desc = f.description
                 );
@@ -665,13 +668,9 @@ async fn do_fetch(
                 println!("    ✓ No findings.");
             } else {
                 for f in &scan.findings {
-                    let severity = match f.severity {
-                        russell_skills::registry::ScanSeverity::Info => "INFO",
-                        russell_skills::registry::ScanSeverity::Warn => "WARN",
-                        russell_skills::registry::ScanSeverity::Block => "BLOCK",
-                    };
                     println!(
-                        "    [{severity}] {id}: {desc}",
+                        "    [{}] {id}: {desc}",
+                        f.severity.as_str(),
                         id = f.rule_id,
                         desc = f.description
                     );
@@ -698,31 +697,16 @@ async fn do_fetch(
             }
 
             let today = now_date_iso8601();
-            registry.upsert(
-                name,
-                RegistryEntry {
-                    status: LifecycleStatus::Discovered,
-                    version,
-                    symptoms,
-                    source: SkillSource::Remote {
-                        url: url.to_string(),
-                    },
-                    installed: today.clone(),
-                    last_evaluated: Some(today),
-                    valid_until: None,
-                    coverage_score: None,
-                    superseded_by: None,
-                    deprecation_reason: None,
-                    probe_runs: 0,
-                    recent_probe_failures: 0,
-                    intervention_runs: 0,
-                    recent_intervention_failures: 0,
-                    last_probe_run_at: None,
-                    last_error: None,
-                    avg_probe_duration_ms: None,
-                    bundled: false,
-                },
+            let mut entry = RegistryEntry::new_default(
+                LifecycleStatus::Discovered,
+                version,
+                symptoms,
+                SkillSource::Remote { url: url.to_string() },
+                today.clone(),
+                false,
             );
+            entry.last_evaluated = Some(today);
+            registry.upsert(name, entry);
 
             println!("  Saved to {}", manifest_path.display());
             println!(
@@ -740,14 +724,18 @@ async fn do_fetch(
 }
 
 /// Adapt an existing skill: open in editor, re-scan, update cache.
-fn do_adapt(registry: &mut RegistryCache, skills_dir: &std::path::Path, name: &str) {
+fn do_adapt(
+    registry: &mut RegistryCache,
+    skills_dir: &std::path::Path,
+    name: &str,
+    client_cfg: &russell_doctor::client::ClientConfig,
+    fallback_model: &str,
+) {
     let manifest_path = skills_dir.join(name).join("manifest.yaml");
     if !manifest_path.exists() {
         println!("Skill '{name}' not found at {}", manifest_path.display());
         return;
     }
-
-    let editor = std::env::var("EDITOR").unwrap_or_else(|_| "vim".into());
 
     // Show current state.
     if let Some(entry) = registry.skills.get(name) {
@@ -759,17 +747,138 @@ fn do_adapt(registry: &mut RegistryCache, skills_dir: &std::path::Path, name: &s
         );
     }
 
+    // Try programmatic adaptation via Jack. Fall back to editor on failure.
+    let curr = match std::fs::read_to_string(&manifest_path) {
+        Ok(c) => c,
+        Err(e) => {
+            println!("Cannot read manifest: {e}");
+            return;
+        }
+    };
+
+    let (adapted, programmatic) = adapt_via_llm(client_cfg, fallback_model, name, &curr).await;
+    if programmatic && !adapted.is_empty() {
+        let scan = SafetyScan::scan(&adapted);
+        if scan.has_blocks() {
+            println!("  ⚠ Jack's adapted manifest has safety issues:");
+            for f in &scan.findings {
+                if f.severity == russell_skills::registry::ScanSeverity::Block {
+                    println!("    [{id}]: {desc}", id = f.rule_id, desc = f.description);
+                }
+            }
+            println!("  Opening editor instead...");
+            open_editor_for_manifest(&manifest_path, &curr, registry, name);
+            return;
+        }
+
+        if let Err(e) = std::fs::write(&manifest_path, &adapted) {
+            println!("  Cannot write adapted manifest: {e}");
+            return;
+        }
+        println!("  ✓ Jack adapted the manifest. Safety scan clean.");
+        apply_manifest_update(registry, name, &adapted);
+        return;
+    }
+
+    // Fallback: open editor.
+    open_editor_for_manifest(&manifest_path, &curr, registry, name);
+}
+
+/// Try adapting a manifest via Jack. Returns (content, success).
+async fn adapt_via_llm(
+    client_cfg: &russell_doctor::client::ClientConfig,
+    fallback_model: &str,
+    name: &str,
+    current: &str,
+) -> (String, bool) {
+    let prompt = format!(
+        "The operator wants to adapt the skill '{name}'. Here is the current manifest:\n\n```yaml\n{current}\n```\n\n\
+         Produce an improved version of this manifest YAML. Keep the 'id', 'version', 'authored', \
+         'symptoms', 'probes', and 'interventions' sections. Improve probe command arguments, \
+         add timeout values, or refine symptom coverage. Output ONLY the complete YAML manifest \
+         in a ```yaml code block. Do not explain the changes."
+    );
+    let adapted = match llm_call(client_cfg, fallback_model, &prompt).await {
+        Ok(resp) => resp,
+        Err(_) => String::new(),
+    };
+    if adapted.is_empty() {
+        return (String::new(), false);
+    }
+    let yaml = extract_yaml_block(&adapted);
+    (yaml, !yaml.is_empty())
+}
+
+/// Extract the first ```yaml...``` block from LLM output.
+fn extract_yaml_block(response: &str) -> String {
+    let start = response.find("```yaml");
+    let body_start = match start {
+        Some(s) => s + 7,
+        None => return String::new(),
+    };
+    let end = match response[body_start..].find("```") {
+        Some(e) => body_start + e,
+        None => return response[body_start..].to_string(),
+    };
+    response[body_start..end].trim().to_string()
+}
+
+/// Simple LLM call for adaptation. Returns response text or empty on failure.
+async fn llm_call(
+    cfg: &russell_doctor::client::ClientConfig,
+    fallback_model: &str,
+    prompt: &str,
+) -> Result<String> {
+    use russell_doctor::oai_client::OkapiClient;
+
+    let mut chat_cfg = cfg.clone();
+    if chat_cfg.base_url.is_none() {
+        chat_cfg.base_url = Some(russell_doctor::health::DEFAULT_BASE_URL.to_string());
+    }
+    if chat_cfg.api_key.is_none() {
+        chat_cfg.api_key = Some("okapi".into());
+    }
+
+    let base = chat_cfg
+        .base_url
+        .as_deref()
+        .unwrap_or(russell_doctor::health::DEFAULT_BASE_URL);
+    if !russell_doctor::health::ensure_ready(base).await {
+        return Err(anyhow::anyhow!("Okapi not reachable"));
+    }
+
+    let model = chat_cfg.model.clone();
+    let client = OkapiClient::new(&chat_cfg).await?;
+
+    let soap = SoapPrompt {
+        system: "You are a YAML editor for Russell skill manifests. Output ONLY the YAML in a code block.".into(),
+        subjective: String::new(),
+        objective: String::new(),
+        rendered: prompt.to_string(),
+    };
+
+    Ok(client.chat(&soap).await?.content)
+}
+
+/// Open EDITOR for manifest, then safety-scan and update registry.
+fn open_editor_for_manifest(
+    manifest_path: &std::path::Path,
+    current: &str,
+    registry: &mut RegistryCache,
+    name: &str,
+) {
+    let editor = std::env::var("EDITOR").unwrap_or_else(|_| "vim".into());
     println!("Opening {} with {}...", manifest_path.display(), editor);
-    println!("(Edit the manifest, save, and exit the editor.)");
-
     let status = std::process::Command::new(&editor)
-        .arg(&manifest_path)
+        .arg(manifest_path)
         .status();
-
     match status {
         Ok(s) if s.success() => {
-            // Re-read and safety-scan the edited manifest.
-            if let Ok(content) = std::fs::read_to_string(&manifest_path) {
+            if let Ok(content) = std::fs::read_to_string(manifest_path) {
+                if content == current {
+                    println!("  No changes.");
+                    return;
+                }
                 let scan = SafetyScan::scan(&content);
                 if scan.has_blocks() {
                     println!("  ⚠ Safety scan found blocking issues:");
@@ -778,30 +887,26 @@ fn do_adapt(registry: &mut RegistryCache, skills_dir: &std::path::Path, name: &s
                             println!("    [{id}]: {desc}", id = f.rule_id, desc = f.description);
                         }
                     }
-                    println!("  Fix these before installing.");
                 } else {
                     println!("  ✓ Safety scan clean.");
                 }
-
-                let version =
-                    extract_yaml_field(&content, "version").unwrap_or_else(|| "0.1.0".into());
-                let symptoms = extract_yaml_list(&content, "symptoms");
-
-                if let Some(entry) = registry.skills.get_mut(name) {
-                    entry.version = version;
-                    entry.symptoms = symptoms;
-                    entry.last_evaluated = Some(now_date_iso8601());
-                    println!("  Updated registry entry.");
-                }
+                apply_manifest_update(registry, name, &content);
             }
         }
-        Ok(s) => {
-            println!("  Editor exited with status: {}", s);
-        }
-        Err(e) => {
-            println!("  Cannot run editor '{}': {}", editor, e);
-            println!("  Edit manually: {}", manifest_path.display());
-        }
+        Ok(s) => println!("  Editor exited with status: {}", s),
+        Err(e) => println!("  Cannot run editor '{}': {}", editor, e),
+    }
+}
+
+/// Update registry entry from manifest content.
+fn apply_manifest_update(registry: &mut RegistryCache, name: &str, content: &str) {
+    let version = extract_yaml_field(content, "version").unwrap_or_else(|| "0.1.0".into());
+    let symptoms = extract_yaml_list(content, "symptoms");
+    if let Some(entry) = registry.skills.get_mut(name) {
+        entry.version = version;
+        entry.symptoms = symptoms;
+        entry.last_evaluated = Some(now_date_iso8601());
+        println!("  Updated registry entry.");
     }
 }
 
@@ -852,26 +957,14 @@ async fn do_search_remote(registry: &mut RegistryCache, query: &str) {
         if !registry.skills.contains_key(&slug) {
             registry.upsert(
                 &slug,
-                RegistryEntry {
-                    status: LifecycleStatus::Discovered,
-                    version: "unknown".into(),
-                    symptoms: vec![],
-                    source: SkillSource::Remote { url: url.clone() },
-                    installed: now_date_iso8601(),
-                    last_evaluated: None,
-                    valid_until: None,
-                    coverage_score: None,
-                    superseded_by: None,
-                    deprecation_reason: None,
-                    probe_runs: 0,
-                    recent_probe_failures: 0,
-                    intervention_runs: 0,
-                    recent_intervention_failures: 0,
-                    last_probe_run_at: None,
-                    last_error: None,
-                    avg_probe_duration_ms: None,
-                    bundled: false,
-                },
+                RegistryEntry::new_default(
+                    LifecycleStatus::Discovered,
+                    "unknown",
+                    vec![],
+                    SkillSource::Remote { url: url.clone() },
+                    now_date_iso8601(),
+                    false,
+                ),
             );
         }
     }
@@ -881,35 +974,20 @@ async fn do_search_remote(registry: &mut RegistryCache, query: &str) {
 
 /// Parse Brave Search API JSON results into (title, url) pairs.
 fn parse_brave_results(json: &str) -> Vec<(String, String)> {
-    let mut results = Vec::new();
-    let web_start = match json.find("\"web\"") {
-        Some(pos) => pos,
-        None => return results,
+    let parsed: serde_json::Value = match serde_json::from_str(json) {
+        Ok(v) => v,
+        Err(_) => return Vec::new(),
     };
-    let results_start = match json[web_start..].find("\"results\"") {
-        Some(pos) => pos,
-        None => return results,
-    };
-    let rest = &json[web_start + results_start..];
-    let mut search_pos = 0;
-    while let Some(title_pos) = rest[search_pos..].find("\"title\":\"") {
-        let abs_title = search_pos + title_pos + 9;
-        let title_end = match rest[abs_title..].find('"') {
-            Some(pos) => pos,
-            None => break,
-        };
-        let title = rest[abs_title..abs_title + title_end].to_string();
-        let url_pos = rest[abs_title + title_end..].find("\"url\":\"");
-        if let Some(url_abs) = url_pos {
-            let abs_url = abs_title + title_end + url_abs + 7;
-            if let Some(url_end) = rest[abs_url..].find('"') {
-                let url = rest[abs_url..abs_url + url_end].to_string();
-                results.push((title, url));
-            }
-        }
-        search_pos = abs_title + title_end + 1;
-    }
-    results
+    parsed["web"]["results"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|item| {
+            let title = item["title"].as_str()?.to_string();
+            let url = item["url"].as_str()?.to_string();
+            Some((title, url))
+        })
+        .collect()
 }
 
 /// Restore a deprecated skill back to active.
@@ -1042,26 +1120,14 @@ safety:
     // Register as discovered in the cache.
     registry.upsert(
         name,
-        RegistryEntry {
-            status: LifecycleStatus::Discovered,
-            version: "0.1.0".into(),
-            symptoms: vec![],
-            source: SkillSource::Workshop,
-            installed: today,
-            last_evaluated: None,
-            valid_until: None,
-            coverage_score: None,
-            superseded_by: None,
-            deprecation_reason: None,
-            probe_runs: 0,
-            recent_probe_failures: 0,
-            intervention_runs: 0,
-            recent_intervention_failures: 0,
-            last_probe_run_at: None,
-            last_error: None,
-            avg_probe_duration_ms: None,
-            bundled: false,
-        },
+        RegistryEntry::new_default(
+            LifecycleStatus::Discovered,
+            "0.1.0",
+            vec![],
+            SkillSource::Workshop,
+            today,
+            false,
+        ),
     );
 
     // Invoke Jack to help compose the skill interactively.

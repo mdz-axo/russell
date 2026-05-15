@@ -77,22 +77,12 @@ fn render_stdout(paths: &Paths, since_hours: u32) -> Result<()> {
         writeln!(out, "| ts | severity | scope | module | action | summary |")?;
         writeln!(out, "|---|---|---|---|---|---|")?;
         for r in rows {
-            let sev = match r.severity {
-                russell_core::event::Severity::Info => "info",
-                russell_core::event::Severity::Warn => "warn",
-                russell_core::event::Severity::Alert => "alert",
-                russell_core::event::Severity::Crit => "crit",
-            };
-            let scope = match r.scope {
-                russell_core::event::Scope::Host => "host",
-                russell_core::event::Scope::Self_ => "self",
-            };
             writeln!(
                 out,
                 "| {} | {} | {} | {} | {} | {} |",
                 r.ts,
-                sev,
-                scope,
+                r.severity.as_str(),
+                r.scope.as_str(),
                 r.module.as_deref().unwrap_or("-"),
                 r.action,
                 r.summary.as_deref().unwrap_or("")
@@ -269,20 +259,20 @@ mod tests {
         let writer = JournalWriter::open(&paths.journal()).unwrap();
 
         writer
-            .append_help_session_row(
-                "01JQ-abc",
-                time::now_unix(),
-                "2026-05-09T12:00:00Z",
-                "mock",
-                None,
-                Some("ollama is slow"),
-                100,
-                200,
-                Some(1234),
-                HelpSessionStatus::Ok,
-                None,
-                "/tmp/evidence/01JQ-abc",
-            )
+            .append_help_session(&russell_core::journal::HelpSessionInput {
+                id: "01JQ-abc",
+                ts_unix: time::now_unix(),
+                ts: "2026-05-09T12:00:00Z",
+                backend: "mock",
+                model: None,
+                note: Some("ollama is slow"),
+                prompt_chars: 100,
+                response_chars: 200,
+                latency_ms: Some(1234),
+                status: HelpSessionStatus::Ok,
+                error_kind: None,
+                evidence_ref: "/tmp/evidence/01JQ-abc",
+            })
             .unwrap();
 
         writer

@@ -123,7 +123,11 @@ enum SkillCmd {
         dry_run: bool,
     },
     /// Show skill registry stats: run counts, failures, last runs, scores.
-    Stats,
+    Stats {
+        /// Output as JSON instead of table.
+        #[arg(long)]
+        json: bool,
+    },
     /// Audit all skills: staleness, coverage gaps, quality scores.
     Check,
     /// Install or activate a skill (idempotent).
@@ -188,7 +192,7 @@ async fn main() -> Result<()> {
         Command::Skill { cmd } => match cmd {
             SkillCmd::List => commands::skill::list(&paths),
             SkillCmd::Run { id, dry_run } => commands::skill::run(&paths, &id, dry_run).await,
-            SkillCmd::Stats => commands::skill::stats(&paths),
+            SkillCmd::Stats { json } => commands::skill::stats(&paths, json),
             SkillCmd::Check => commands::skill::check(&paths),
             SkillCmd::Install { name } => commands::skill::install(&paths, &name),
             SkillCmd::Prune { name } => commands::skill::prune(&paths, &name),

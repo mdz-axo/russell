@@ -24,21 +24,11 @@ pub fn run(paths: &Paths, limit: usize) -> Result<()> {
         "ts", "sev", "scope", "module", "action"
     );
     for r in rows {
-        let sev = match r.severity {
-            russell_core::event::Severity::Info => "info",
-            russell_core::event::Severity::Warn => "warn",
-            russell_core::event::Severity::Alert => "alert",
-            russell_core::event::Severity::Crit => "crit",
-        };
-        let scope = match r.scope {
-            russell_core::event::Scope::Host => "host",
-            russell_core::event::Scope::Self_ => "self",
-        };
         println!(
             "{:<26} {:<8} {:<5} {:<24} {:<14} {}",
             r.ts,
-            sev,
-            scope,
+            r.severity.as_str(),
+            r.scope.as_str(),
             r.module.as_deref().unwrap_or("-"),
             r.action,
             r.summary.as_deref().unwrap_or("")

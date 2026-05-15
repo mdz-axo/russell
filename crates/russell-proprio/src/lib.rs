@@ -785,7 +785,7 @@ fn emit_event(
 mod tests {
     use super::*;
     use russell_core::event::Scope;
-    use russell_core::journal::{HelpSessionStatus, JournalWriter};
+    use russell_core::journal::{HelpSessionInput, HelpSessionStatus, JournalWriter};
 
     // -----------------------------------------------------------------------
     // Test TimerSource
@@ -833,6 +833,33 @@ mod tests {
         let p = tmp.path().join("journal.db");
         let w = JournalWriter::open(&p).unwrap();
         (tmp, w)
+    }
+
+    /// Insert a test help session with the given latency and status.
+    /// Uses the structured `HelpSessionInput` (preferred over the
+    /// deprecated 12-parameter positional call).
+    fn insert_help_session(
+        w: &JournalWriter,
+        id: &str,
+        ts_unix: i64,
+        latency_ms: Option<i64>,
+        status: HelpSessionStatus,
+    ) {
+        w.append_help_session(&HelpSessionInput {
+            id,
+            ts_unix,
+            ts: "2026-01-01T00:00:00Z",
+            backend: "okapi",
+            model: Some("llama3"),
+            note: None,
+            prompt_chars: 100,
+            response_chars: 200,
+            latency_ms,
+            status,
+            error_kind: None,
+            evidence_ref: "ev",
+        })
+        .unwrap();
     }
 
     // -- Sentinel age --
@@ -994,21 +1021,7 @@ mod tests {
         let now = russell_core::time::now_unix();
         // Insert 10 sessions with latencies 100, 200, ..., 1000
         for i in 0..10 {
-            w.append_help_session_row(
-                &format!("id_{i}"),
-                now,
-                "2026-01-01T00:00:00Z",
-                "okapi",
-                Some("llama3"),
-                None,
-                100,
-                200,
-                Some((i + 1) * 100),
-                HelpSessionStatus::Ok,
-                None,
-                "ev",
-            )
-            .unwrap();
+            insert_help_session(&w, &format!("id_{i}"), now, Some((i + 1) * 100), HelpSessionStatus::Ok);
         }
         let r = w.reader();
         let result = run_once_with(&w, &r, &no_timer()).unwrap();
@@ -1023,21 +1036,7 @@ mod tests {
         let now = russell_core::time::now_unix();
         // Insert 4 sessions with high latencies to trigger warn (>8000 ms)
         for i in 0..4 {
-            w.append_help_session_row(
-                &format!("id_{i}"),
-                now,
-                "2026-01-01T00:00:00Z",
-                "okapi",
-                Some("llama3"),
-                None,
-                100,
-                200,
-                Some(9_000 + i * 100),
-                HelpSessionStatus::Ok,
-                None,
-                "ev",
-            )
-            .unwrap();
+            insert_help_session(&w, &format!("id_{i}"), now, Some(9_000 + i * 100), HelpSessionStatus::Ok);
         }
         let r = w.reader();
         let result = run_once_with(&w, &r, &no_timer()).unwrap();
@@ -1063,21 +1062,7 @@ mod tests {
             HelpSessionStatus::ThresholdSkip,
         ];
         for (i, status) in statuses.iter().enumerate() {
-            w.append_help_session_row(
-                &format!("id_{i}"),
-                now,
-                "2026-01-01T00:00:00Z",
-                "okapi",
-                Some("llama3"),
-                None,
-                100,
-                200,
-                Some(500),
-                *status,
-                None,
-                "ev",
-            )
-            .unwrap();
+            insert_help_session(&w, &format!("id_{i}"), now, Some(500), *status);
         }
         let r = w.reader();
         let result = run_once_with(&w, &r, &no_timer()).unwrap();
@@ -1101,21 +1086,7 @@ mod tests {
             HelpSessionStatus::Error,
         ];
         for (i, status) in statuses.iter().enumerate() {
-            w.append_help_session_row(
-                &format!("id_{i}"),
-                now,
-                "2026-01-01T00:00:00Z",
-                "okapi",
-                Some("llama3"),
-                None,
-                100,
-                200,
-                Some(500),
-                *status,
-                None,
-                "ev",
-            )
-            .unwrap();
+            insert_help_session(&w, &format!("id_{i}"), now, Some(500), *status);
         }
         let r = w.reader();
         let result = run_once_with(&w, &r, &no_timer()).unwrap();

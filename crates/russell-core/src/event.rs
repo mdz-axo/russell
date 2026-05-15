@@ -62,6 +62,39 @@ pub enum Severity {
     Crit,
 }
 
+impl Severity {
+    /// Lowercase string representation for journal persistence and display.
+    #[must_use]
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Info => "info",
+            Self::Warn => "warn",
+            Self::Alert => "alert",
+            Self::Crit => "crit",
+        }
+    }
+}
+
+impl std::fmt::Display for Severity {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+impl std::str::FromStr for Severity {
+    type Err = String;
+
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        match s {
+            "info" => Ok(Self::Info),
+            "warn" => Ok(Self::Warn),
+            "alert" => Ok(Self::Alert),
+            "crit" => Ok(Self::Crit),
+            other => Err(format!("unknown severity: {other}")),
+        }
+    }
+}
+
 /// Event scope. Host-observation rows land with `Host`;
 /// proprioception rows land with `Self_`
 /// (see [ADR-0015](../../../docs/adr/0015-proprioception-self-health.md)).
@@ -74,6 +107,35 @@ pub enum Scope {
     /// Event is about Russell itself.
     #[serde(rename = "self")]
     Self_,
+}
+
+impl Scope {
+    /// Lowercase string representation for journal persistence and display.
+    #[must_use]
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Host => "host",
+            Self::Self_ => "self",
+        }
+    }
+}
+
+impl std::fmt::Display for Scope {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+impl std::str::FromStr for Scope {
+    type Err = String;
+
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        match s {
+            "host" => Ok(Self::Host),
+            "self" => Ok(Self::Self_),
+            other => Err(format!("unknown scope: {other}")),
+        }
+    }
 }
 
 fn default_schema() -> String {

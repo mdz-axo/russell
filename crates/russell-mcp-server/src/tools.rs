@@ -161,11 +161,8 @@ impl RussellServer {
                 serde_json::json!({
                     "id": r.id,
                     "ts": r.ts,
-                    "severity": format!("{:?}", r.severity).to_lowercase(),
-                    "scope": match r.scope {
-                        russell_core::event::Scope::Host => "host",
-                        russell_core::event::Scope::Self_ => "self",
-                    },
+                    "severity": r.severity.as_str(),
+                    "scope": r.scope.as_str(),
                     "module": r.module,
                     "action": r.action,
                     "summary": r.summary,
@@ -207,18 +204,16 @@ impl RussellServer {
         // Get recent events (up to 200) and filter by severity/scope.
         let rows = reader.recent(200).unwrap_or_default();
 
-        let min_sev = match params.min_severity.as_deref() {
-            Some("crit") => russell_core::event::Severity::Crit,
-            Some("alert") => russell_core::event::Severity::Alert,
-            Some("warn") => russell_core::event::Severity::Warn,
-            _ => russell_core::event::Severity::Info,
-        };
+        let min_sev = params
+            .min_severity
+            .as_deref()
+            .and_then(|s| s.parse::<russell_core::event::Severity>().ok())
+            .unwrap_or(russell_core::event::Severity::Info);
 
-        let scope_filter = match params.scope.as_deref() {
-            Some("host") => Some(russell_core::event::Scope::Host),
-            Some("self") => Some(russell_core::event::Scope::Self_),
-            _ => None,
-        };
+        let scope_filter = params
+            .scope
+            .as_deref()
+            .and_then(|s| s.parse::<russell_core::event::Scope>().ok());
 
         let events: Vec<serde_json::Value> = rows
             .iter()
@@ -229,11 +224,8 @@ impl RussellServer {
                 serde_json::json!({
                     "id": r.id,
                     "ts": r.ts,
-                    "severity": format!("{:?}", r.severity).to_lowercase(),
-                    "scope": match r.scope {
-                        russell_core::event::Scope::Host => "host",
-                        russell_core::event::Scope::Self_ => "self",
-                    },
+                    "severity": r.severity.as_str(),
+                    "scope": r.scope.as_str(),
                     "module": r.module,
                     "action": r.action,
                     "summary": r.summary,
