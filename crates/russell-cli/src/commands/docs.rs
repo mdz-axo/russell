@@ -22,7 +22,7 @@ use std::process::Command;
 /// for frontmatter, metadata, diagram, and freshness checks.
 /// Future work: integrate link checking, metric integrity,
 /// and citation density as native Rust checks.
-pub fn run(paths: &Paths, strict: bool) -> Result<()> {
+pub fn run(_paths: &Paths, strict: bool) -> Result<()> {
     let project_root = std::env::current_dir()
         .unwrap_or_else(|_| std::path::PathBuf::from("."));
 
