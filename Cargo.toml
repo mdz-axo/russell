@@ -7,7 +7,7 @@ members = [
     "crates/russell-core",
     "crates/russell-sentinel",
     "crates/russell-skills",
-    "crates/russell-doctor",
+    "crates/russell-meta",
     "crates/russell-proprio",
     "crates/russell-mcp",
     "crates/russell-mcp-server",
@@ -27,7 +27,7 @@ authors = ["Russell contributors"]
 russell-core     = { path = "crates/russell-core" }
 russell-sentinel = { path = "crates/russell-sentinel" }
 russell-skills   = { path = "crates/russell-skills" }
-russell-doctor   = { path = "crates/russell-doctor" }
+russell-meta     = { path = "crates/russell-meta" }
 russell-proprio  = { path = "crates/russell-proprio" }
 russell-mcp      = { path = "crates/russell-mcp" }
 russell-mcp-server = { path = "crates/russell-mcp-server" }
