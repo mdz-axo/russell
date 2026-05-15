@@ -579,7 +579,17 @@ async fn call_jack(
 ) -> Result<()> {
     // Build the fresh SOAP objective.
     let objective = objective::build_objective(reader, skills, profile, kask_registry, registry);
-    let system = russell_meta::JACK_CHAT_PERSONA.to_string();
+
+    // Build system prompt: persona + skill-manager KNOWLEDGE.md injected
+    // so Jack knows he has hands to manage the skill lifecycle.
+    let mut system = russell_meta::JACK_CHAT_PERSONA.to_string();
+    let knowledge_path = paths.skills().join("skill-manager").join("KNOWLEDGE.md");
+    if let Ok(content) = std::fs::read_to_string(&knowledge_path) {
+        if !content.trim().is_empty() {
+            system.push_str("\n\n---\n\n# Skill Manager Knowledge\n\n");
+            system.push_str(&content);
+        }
+    }
 
     // Build the messages array for the LLM.
     let mut messages: Vec<serde_json::Value> = Vec::new();

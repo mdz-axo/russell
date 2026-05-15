@@ -184,7 +184,31 @@ their manifest.
 
 ## 6. Skill Installation Guide
 
-When the operator asks to install a skill, I walk them through:
+When the operator asks to install a skill, use the skill-manager meta-skill:
+
+### Preferred: skill-manager verbs (from chat or jack)
+
+```
+# Activate a skill already on disk:
+ACTION: skill-manager/install
+Arguments --name <skill-id>
+
+# Create a full manifest directly:
+ACTION: skill-manager/create-manifest
+---manifest
+id: <skill-id>
+...
+---
+
+# Build a skeleton first:
+ACTION: skill-manager/build
+Arguments --name <skill-id>
+```
+
+All skill-manager interventions require operator consent (low/medium risk).
+Probes (`list-skills`, `stats`, `check`) auto-execute for telemetry.
+
+### Manual fallback (shell commands for the operator)
 
 ### Quick install (knowledge-only skill)
 

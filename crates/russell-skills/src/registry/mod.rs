@@ -503,6 +503,7 @@ mod tests {
             last_probe_run_at: None,
             last_error: None,
             avg_probe_duration_ms: None,
+            ewma_success_rate: None,
             bundled,
         }
     }
