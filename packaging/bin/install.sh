@@ -172,17 +172,12 @@ MCPREG
     systemctl --user daemon-reload
     systemctl --user enable kask-token-rotate.timer
     say "✓ Token rotation timer enabled (runs weekly)"
-  fi
-    fi
   else
     say "WARNING: arsenal-mcp-russell build failed, MCP tools unavailable"
   fi
 else
   say "Kask repo not found at $KASK_REPO — skipping MCP server build"
   say "Note: Russell's MCP client requires Kask for advanced tool access"
-fi
-else
-  say "Kask repo not found at $KASK_REPO — skipping MCP server build"
 fi
 
 if [ ! -f "$HOME/.config/harness/russell.env" ]; then

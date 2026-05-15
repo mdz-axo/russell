@@ -3,11 +3,16 @@ title: "Russell Documentation Portal"
 audience: [operators, developers, contributors, architects, agents]
 last_updated: 2026-05-14
 togaf_phase: "C"
-version: "1.1.0"
+version: "1.2.0"
 status: "Active"
 ---
 
 # Russell Documentation Portal
+
+<!-- TOGAF_DOMAIN: Cross-cutting — Documentation Governance -->
+<!-- VERSION: 1.2.0 -->
+<!-- STATUS: Active -->
+<!-- LAST_UPDATED: 2026-05-14 -->
 
 <!-- TOGAF_DOMAIN: Cross-cutting — Documentation Governance -->
 <!-- VERSION: 1.0.0 -->
@@ -57,6 +62,10 @@ may exist but must not contradict these.
   current crate topology + VSM mapping.
 - [`architecture/TOGAF_TRACEABILITY_MATRIX.md`](architecture/TOGAF_TRACEABILITY_MATRIX.md)
   — ADM phase coverage.
+- [`architecture/CAPABILITY_GRAPH.md`](architecture/CAPABILITY_GRAPH.md)
+  — cross-repository capability, port, adapter, and contract mapping.
+- [`architecture/CODE_ANCHOR_GRAPH.md`](architecture/CODE_ANCHOR_GRAPH.md)
+  — public type registry with crate dependency graph.
 
 ### 2.3 Specifications
 
@@ -77,6 +86,8 @@ may exist but must not contradict these.
   — voice, style, and discipline protocol.
 - [`standards/TOGAF_LITE_FOR_OPEN_SOURCE.md`](standards/TOGAF_LITE_FOR_OPEN_SOURCE.md)
   — the documentation architecture pattern.
+- [`standards/VALIDATION_RUBRIC.md`](standards/VALIDATION_RUBRIC.md)
+  — documentation excellence validation checks.
 - [`standards/coding-rust.md`](standards/coding-rust.md) — Rust
   conventions.
 - [`standards/commits.md`](standards/commits.md) —
@@ -117,6 +128,7 @@ may exist but must not contradict these.
 - [`adr/0022-markdown-memory-layer.md`](adr/0022-markdown-memory-layer.md)
 - [`adr/0023-lift-adr-0007-phase3-skills.md`](adr/0023-lift-adr-0007-phase3-skills.md)
 - [`adr/0024-skill-registry-workshop-lifecycle.md`](adr/0024-skill-registry-workshop-lifecycle.md)
+- [`adr/0025-kask-mcp-client-trusted-relationship.md`](adr/0025-kask-mcp-client-trusted-relationship.md)
 
 ### 2.8 ADRs (deferred — not MVP-load-bearing but retained)
 
@@ -127,6 +139,7 @@ They live under [`adr/deferred/`](adr/deferred/):
 
 - 0003 MCP transport
 - 0005 Privileged operations (PolKit)
+- 0007 YAML skill manifests + subprocess dispatch (lifted by ADR-0023)
 - 0009 Tokio runtime
 - 0010 Observability stack
 - 0012 Config formats
