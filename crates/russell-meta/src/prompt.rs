@@ -27,7 +27,7 @@ use russell_skills::Skill;
 
 use crate::client::SoapPrompt;
 use crate::error::Result;
-use crate::prompt_registry::{PromptRegistry, KnowledgeSlot, score_knowledge_relevance, select_knowledge};
+use crate::prompt_registry::{PromptRegistry, KnowledgeSlot, SkillTelemetry, score_knowledge_relevance, score_knowledge_relevance_with_telemetry, select_knowledge};
 
 /// Build the SOAP prompt. The system prompt is always the
 /// embedded Jack persona.
@@ -349,6 +349,11 @@ pub fn compose_with_kask(
 /// The `registry` should be created once at startup via
 /// [`PromptRegistry::with_defaults()`] and optionally loaded
 /// with disk overrides.
+///
+/// If `skill_registry` is provided, inter-session telemetry (execution
+/// success/failure rates) is used to modulate knowledge relevance —
+/// closing the feedback loop between past action outcomes and future
+/// attention allocation.
 pub fn compose_templated(
     registry: &PromptRegistry,
     reader: &JournalReader,
@@ -357,6 +362,7 @@ pub fn compose_templated(
     loaded_skills: &[Skill],
     skills_base_dir: &Path,
     kask_tool_names: &[(String, Option<String>)],
+    skill_registry: Option<&russell_skills::registry::RegistryCache>,
 ) -> Result<SoapPrompt> {
     use std::collections::HashMap;
 
@@ -433,7 +439,7 @@ pub fn compose_templated(
 
     // ── System prompt: persona + relevance-scored knowledge ──────────
     let mut system_prompt = crate::JACK_PERSONA.to_string();
-    append_skill_knowledge_scored(&mut system_prompt, loaded_skills, skills_base_dir, reader, window_start);
+    append_skill_knowledge_scored(&mut system_prompt, loaded_skills, skills_base_dir, reader, window_start, skill_registry);
 
     // ── Extract inference parameters from hint ──────────────────────
     let temperature = hint.as_ref().and_then(|h| h.temperature);
@@ -560,12 +566,19 @@ fn build_reflex_block(reader: &JournalReader) -> Result<String> {
 ///
 /// Uses the prompt registry's relevance scoring to select which
 /// knowledge skills to include based on current alert state.
+///
+/// **Inter-session feedback loop:** When `skill_registry` is provided,
+/// execution telemetry (success/failure rates) modulates relevance —
+/// skills that have been reliable get boosted, skills that have been
+/// failing get deprioritized. This closes the loop between action
+/// outcomes and future attention allocation.
 fn append_skill_knowledge_scored(
     system: &mut String,
     skills: &[Skill],
     skills_base_dir: &Path,
     reader: &JournalReader,
     window_start: i64,
+    skill_registry: Option<&russell_skills::registry::RegistryCache>,
 ) {
     // Determine active symptoms from recent events.
     let active_symptoms: Vec<String> = reader
@@ -595,7 +608,26 @@ fn append_skill_knowledge_scored(
             if content.trim().is_empty() {
                 continue;
             }
-            let relevance = score_knowledge_relevance(&skill.symptoms, &active_symptoms);
+
+            // Score with telemetry feedback if registry is available.
+            let relevance = match skill_registry.and_then(|reg| reg.skills.get(&skill.id)) {
+                Some(entry) => {
+                    let telemetry = SkillTelemetry {
+                        freshness: russell_skills::registry::freshness_score(entry),
+                        probe_runs: entry.probe_runs,
+                        recent_failures: entry.recent_probe_failures,
+                        intervention_runs: entry.intervention_runs,
+                        recent_intervention_failures: entry.recent_intervention_failures,
+                    };
+                    score_knowledge_relevance_with_telemetry(
+                        &skill.symptoms,
+                        &active_symptoms,
+                        &telemetry,
+                    )
+                }
+                None => score_knowledge_relevance(&skill.symptoms, &active_symptoms),
+            };
+
             let token_estimate = content.len() / 4;
             slots.push(KnowledgeSlot {
                 skill_id: skill.id.clone(),
@@ -617,7 +649,7 @@ fn append_skill_knowledge_scored(
             skill = %slot.skill_id,
             relevance = slot.relevance,
             tokens_est = slot.token_estimate,
-            "appended knowledge (relevance-scored)",
+            "appended knowledge (relevance-scored, telemetry-modulated)",
         );
     }
 }

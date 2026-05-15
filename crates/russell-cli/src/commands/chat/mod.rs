@@ -183,8 +183,46 @@ pub async fn run(paths: &Paths) -> Result<()> {
                         continue;
                     }
                     if is_refusal(trimmed) {
-                        println!("  Denied. Action not executed.");
+                        let denied_action = match &pending_action {
+                            Some(pa) => format!("{}/{}", pa.action.skill_id(), pa.action.action_id()),
+                            None => "unknown".to_string(),
+                        };
+                        println!("  Denied.");
                         pending_action = None;
+
+                        // Gap 1: Cybernetic feedback closure — denial triggers
+                        // LLM re-orientation so Jack can propose alternatives
+                        // rather than the loop terminating with a broken feedback path.
+                        history.turns.push(Turn {
+                            role: "user".into(),
+                            content: format!(
+                                "The operator denied ACTION: {denied_action}. What else do you recommend?"
+                            ),
+                        });
+                        save_history(&chat_path, &history)?;
+
+                        // Rerun Jack with the denial context to get a new recommendation.
+                        match call_jack(
+                            &mut history,
+                            &chat_path,
+                            &journal,
+                            &session_id,
+                            &current_model,
+                            &reader,
+                            &skills,
+                            profile.as_ref(),
+                            &kask_registry,
+                            &registry,
+                            paths,
+                            &mut pending_action,
+                            &kask_client,
+                            &client_cfg,
+                        ).await {
+                            Ok(()) => {}
+                            Err(_) => {
+                                println!("  → Jack couldn't suggest an alternative right now.");
+                            }
+                        }
                         continue;
                     }
                     // Any other input clears the pending action.

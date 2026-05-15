@@ -458,6 +458,75 @@ pub fn score_knowledge_relevance(
     }
 }
 
+/// Runtime telemetry signals that modulate knowledge relevance.
+///
+/// These represent the **inter-session feedback loop**: past execution
+/// outcomes influence future attention allocation.
+#[derive(Debug, Clone, Default)]
+pub struct SkillTelemetry {
+    /// Freshness score 0.0–1.0 (from probe success rate). 0 = never run.
+    pub freshness: f64,
+    /// Total probe executions (higher = more battle-tested).
+    pub probe_runs: u64,
+    /// Recent probe failure count.
+    pub recent_failures: u64,
+    /// Total intervention executions.
+    pub intervention_runs: u64,
+    /// Recent intervention failures.
+    pub recent_intervention_failures: u64,
+}
+
+/// Score knowledge relevance with inter-session telemetry feedback.
+///
+/// This is the **closed-loop** version of `score_knowledge_relevance`:
+/// it incorporates runtime execution history to boost skills that have
+/// been reliable and penalize those that have been failing.
+///
+/// Scoring formula:
+/// ```text
+/// final_score = symptom_score * reliability_modifier
+/// ```
+///
+/// Where `reliability_modifier`:
+/// - 1.0 if no telemetry (new skill, benefit of the doubt)
+/// - 1.0 + 0.2 * freshness for battle-tested reliable skills (up to 1.2×)
+/// - 1.0 - 0.3 * failure_rate for failing skills (down to 0.7×)
+pub fn score_knowledge_relevance_with_telemetry(
+    skill_symptoms: &[String],
+    active_symptoms: &[String],
+    telemetry: &SkillTelemetry,
+) -> f64 {
+    let base_score = score_knowledge_relevance(skill_symptoms, active_symptoms);
+
+    // No telemetry → no modifier (benefit of the doubt for new skills).
+    if telemetry.probe_runs == 0 && telemetry.intervention_runs == 0 {
+        return base_score;
+    }
+
+    // Compute reliability modifier from execution history.
+    let total_runs = telemetry.probe_runs + telemetry.intervention_runs;
+    let total_failures = telemetry.recent_failures + telemetry.recent_intervention_failures;
+
+    if total_runs == 0 {
+        return base_score;
+    }
+
+    let failure_rate = total_failures as f64 / total_runs as f64;
+
+    let modifier = if failure_rate < 0.1 {
+        // Reliable skill: boost proportional to freshness (how active it's been).
+        1.0 + 0.2 * telemetry.freshness
+    } else if failure_rate > 0.5 {
+        // Unreliable skill: significant penalty.
+        0.7
+    } else {
+        // Middle ground: linear interpolation.
+        1.0 - 0.3 * failure_rate
+    };
+
+    (base_score * modifier).clamp(0.0, 1.0)
+}
+
 // ─── Tests ────────────────────────────────────────────────────────────────
 
 #[cfg(test)]
@@ -583,6 +652,56 @@ mod tests {
         assert_eq!(selected.len(), 2);
         assert_eq!(selected[0].skill_id, "a");
         assert_eq!(selected[1].skill_id, "b");
+    }
+
+    #[test]
+    fn telemetry_boosts_reliable_skill() {
+        // Use 2 symptoms with 1 overlap so base < 1.0
+        let symptoms = vec!["llm_slow".to_string(), "gpu_fallback_to_cpu".to_string()];
+        let active = vec!["llm_slow".to_string()];
+        let base = score_knowledge_relevance(&symptoms, &active);
+        // base = 0.4 + 0.6*(1/2) = 0.7
+
+        let telemetry = SkillTelemetry {
+            freshness: 1.0, // perfect freshness
+            probe_runs: 100,
+            recent_failures: 0,
+            intervention_runs: 10,
+            recent_intervention_failures: 0,
+        };
+        let boosted = score_knowledge_relevance_with_telemetry(&symptoms, &active, &telemetry);
+        // Reliable skill should be boosted above base (1.2× modifier → 0.7 * 1.2 = 0.84)
+        assert!(boosted > base, "expected boosted ({boosted}) > base ({base})");
+    }
+
+    #[test]
+    fn telemetry_penalizes_failing_skill() {
+        let symptoms = vec!["llm_slow".to_string(), "gpu_fallback_to_cpu".to_string()];
+        let active = vec!["llm_slow".to_string()];
+        let base = score_knowledge_relevance(&symptoms, &active);
+
+        let telemetry = SkillTelemetry {
+            freshness: 0.4,
+            probe_runs: 100,
+            recent_failures: 60, // 60% failure rate
+            intervention_runs: 10,
+            recent_intervention_failures: 8,
+        };
+        let penalized = score_knowledge_relevance_with_telemetry(&symptoms, &active, &telemetry);
+        // Failing skill should be penalized below base (0.7× modifier)
+        assert!(penalized < base, "expected penalized ({penalized}) < base ({base})");
+    }
+
+    #[test]
+    fn telemetry_neutral_for_new_skill() {
+        let symptoms = vec!["llm_slow".to_string(), "gpu_fallback_to_cpu".to_string()];
+        let active = vec!["llm_slow".to_string()];
+        let base = score_knowledge_relevance(&symptoms, &active);
+
+        let telemetry = SkillTelemetry::default(); // no runs
+        let scored = score_knowledge_relevance_with_telemetry(&symptoms, &active, &telemetry);
+        // New skill gets no modifier
+        assert!((scored - base).abs() < 0.001, "expected same as base, got {scored} vs {base}");
     }
 
     #[test]

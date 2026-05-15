@@ -24,7 +24,7 @@
 //!
 //! ## Naming
 //!
-//! Previously `russell-doctor`. Renamed per ADR-0027 to reflect that
+//! Previously `russell-doctor`. Renamed per ADR-0026 to reflect that
 //! this crate performs metacognitive functions (reasoning about
 //! reasoning, attention allocation, self-critique) rather than the
 //! narrower "doctor consultation" metaphor.
