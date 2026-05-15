@@ -268,6 +268,7 @@ pub fn check(paths: &Paths) -> Result<()> {
                     last_probe_run_at: None,
                     last_error: None,
                     avg_probe_duration_ms: None,
+                    ewma_success_rate: None,
                     bundled: false,
                 },
             );
@@ -366,6 +367,7 @@ pub fn install(paths: &Paths, name: &str) -> Result<()> {
                     last_probe_run_at: None,
                     last_error: None,
                     avg_probe_duration_ms: None,
+                    ewma_success_rate: None,
                     bundled: false,
                 },
             );
@@ -607,7 +609,8 @@ pub fn put(paths: &Paths, name: Option<&str>) -> Result<()> {
             last_probe_run_at: None,
             last_error: None,
             avg_probe_duration_ms: None,
-            bundled: false,
+            ewma_success_rate: None,
+                    bundled: false,
         };
         registry.upsert(&name, entry);
     })?;
