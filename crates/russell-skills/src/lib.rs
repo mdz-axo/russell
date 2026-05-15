@@ -16,9 +16,9 @@
 //!
 //! The loader refuses any manifest that fails schema validation,
 //! references unknown symptom names, or has unreferenced scripts
-//! in its `scripts/` directory. These are hard errors, not
-//! warnings — the dispatcher must never operate with a partial
-//! skill set.
+//! in its `scripts/` directory. Invalid skills are skipped (with
+//! a warning logged via `eprintln!`) — one broken manifest must
+//! not prevent the rest of the skill set from loading.
 
 #![forbid(unsafe_code)]
 #![deny(rust_2018_idioms)]
@@ -446,12 +446,15 @@ fn expected_exit_default() -> i32 {
 /// Load all skill manifests from a `skills/` directory.
 ///
 /// Returns an empty `Vec` if the directory does not exist.
-/// Poka-yoke: any parse, schema, or consistency error returns
-/// [`LoadError`] — partial loads are not allowed.
+/// Poka-yoke: each manifest is validated individually — invalid
+/// skills are skipped with a warning logged to stderr. One broken
+/// manifest does not prevent the rest from loading.
 ///
 /// # Errors
 ///
-/// Returns [`LoadError`] on any validation failure.
+/// Returns [`LoadError`] only for directory-level I/O failures
+/// (cannot read the skills dir itself). Per-skill validation
+/// errors are logged and skipped.
 pub fn load_all(skills_dir: &Path) -> Result<Vec<Skill>, LoadError> {
     let entries = match std::fs::read_dir(skills_dir) {
         Ok(d) => d,
@@ -461,10 +464,13 @@ pub fn load_all(skills_dir: &Path) -> Result<Vec<Skill>, LoadError> {
 
     let mut skills = Vec::new();
     for entry in entries {
-        let entry = entry.map_err(|e| LoadError::SkillDir {
-            path: skills_dir.to_path_buf(),
-            source: e,
-        })?;
+        let entry = match entry {
+            Ok(e) => e,
+            Err(e) => {
+                eprintln!("warning: skipping unreadable entry in {}: {e}", skills_dir.display());
+                continue;
+            }
+        };
         let path = entry.path();
         if !path.is_dir() {
             continue;
@@ -479,8 +485,12 @@ pub fn load_all(skills_dir: &Path) -> Result<Vec<Skill>, LoadError> {
             continue;
         }
 
-        let skill = load_one(&path, dir_name)?;
-        skills.push(skill);
+        match load_one(&path, dir_name) {
+            Ok(skill) => skills.push(skill),
+            Err(e) => {
+                eprintln!("warning: skipping skill '{}': {e}", dir_name);
+            }
+        }
     }
 
     Ok(skills)
@@ -770,25 +780,26 @@ safety:
     }
 
     #[test]
-    fn rejects_id_mismatch() {
+    fn skips_id_mismatch() {
         let tmp = tempfile::tempdir().unwrap();
         write_skill(tmp.path(), "gpu-doctor", &valid_manifest("wrong-id"));
-        let err = load_all(tmp.path()).unwrap_err();
-        assert!(err.to_string().contains("wrong-id"));
-        assert!(err.to_string().contains("gpu-doctor"));
+        // Lenient: bad skill is skipped, not a hard error.
+        let skills = load_all(tmp.path()).unwrap();
+        assert!(skills.is_empty(), "mismatched id should be skipped");
     }
 
     #[test]
-    fn rejects_unknown_symptom() {
+    fn skips_unknown_symptom() {
         let tmp = tempfile::tempdir().unwrap();
         let yaml = valid_manifest("gpu-doctor").replace("vram_oom", "made_up_symptom");
         write_skill(tmp.path(), "gpu-doctor", &yaml);
-        let err = load_all(tmp.path()).unwrap_err();
-        assert!(err.to_string().contains("made_up_symptom"));
+        // Lenient: bad skill is skipped, not a hard error.
+        let skills = load_all(tmp.path()).unwrap();
+        assert!(skills.is_empty(), "unknown symptom should be skipped");
     }
 
     #[test]
-    fn rejects_bad_rollback_id() {
+    fn skips_bad_rollback_id() {
         let tmp = tempfile::tempdir().unwrap();
         let yaml = r#"
 id: gpu-doctor
@@ -810,12 +821,13 @@ safety:
   max_auto_risk: low
 "#;
         write_skill(tmp.path(), "gpu-doctor", yaml);
-        let err = load_all(tmp.path()).unwrap_err();
-        assert!(err.to_string().contains("no-such-id"));
+        // Lenient: bad skill is skipped, not a hard error.
+        let skills = load_all(tmp.path()).unwrap();
+        assert!(skills.is_empty(), "bad rollback_id should be skipped");
     }
 
     #[test]
-    fn rejects_unreferenced_script() {
+    fn skips_unreferenced_script() {
         let tmp = tempfile::tempdir().unwrap();
         let skill_dir = tmp.path().join("gpu-doctor");
         std::fs::create_dir_all(skill_dir.join("scripts")).unwrap();
@@ -830,8 +842,9 @@ safety:
             "#!/bin/bash\necho oops\n",
         )
         .unwrap();
-        let err = load_all(tmp.path()).unwrap_err();
-        assert!(err.to_string().contains("orphan.sh"));
+        // Lenient: bad skill is skipped, not a hard error.
+        let skills = load_all(tmp.path()).unwrap();
+        assert!(skills.is_empty(), "unreferenced script should be skipped");
     }
 
     #[test]
@@ -906,11 +919,12 @@ safety:
     }
 
     #[test]
-    fn missing_manifest_in_skill_dir_is_error() {
+    fn skips_missing_manifest_in_skill_dir() {
         let tmp = tempfile::tempdir().unwrap();
         std::fs::create_dir_all(tmp.path().join("gpu-doctor")).unwrap();
-        let err = load_all(tmp.path()).unwrap_err();
-        assert!(err.to_string().contains("missing manifest"));
+        // Lenient: directory without manifest.yaml is skipped.
+        let skills = load_all(tmp.path()).unwrap();
+        assert!(skills.is_empty(), "missing manifest should be skipped");
     }
 
     #[test]

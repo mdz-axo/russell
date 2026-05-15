@@ -79,7 +79,7 @@
 - package_metadata_stale
 - security_advisory_relevant
 
-# Skill discovery (skill-discovery skill)
+# Skill discovery / management (skill-discovery, skill-manager skills)
 - skill_not_in_catalog
 - skill_manifest_invalid
 - skill_install_failed
@@ -89,6 +89,7 @@
 - skill_rollback_unresolvable
 - skill_dependency_missing
 - skill_hardware_incompatible
+- skill_coverage_gap
 
 # Scenario testing (scenario-tester skill)
 - agent_latency_spike

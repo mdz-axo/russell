@@ -47,6 +47,8 @@ pub struct RegistryEntry {
     pub status: LifecycleStatus,
     /// Semver version from manifest.
     pub version: String,
+    /// Date the skill was authored (ISO 8601).
+    pub authored: String,
     /// Symptoms this skill addresses (from manifest).
     pub symptoms: Vec<String>,
     /// Where the skill came from.
@@ -114,6 +116,7 @@ impl RegistryEntry {
     pub fn new_default(
         status: LifecycleStatus,
         version: impl Into<String>,
+        authored: impl Into<String>,
         symptoms: Vec<String>,
         source: SkillSource,
         installed: impl Into<String>,
@@ -123,6 +126,7 @@ impl RegistryEntry {
         Self {
             status,
             version: version.into(),
+            authored: authored.into(),
             symptoms,
             source,
             trust_tier,

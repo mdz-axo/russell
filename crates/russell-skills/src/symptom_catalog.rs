@@ -94,7 +94,7 @@ pub static SYMPTOMS: &[&str] = &[
     "api_status_check_needed",
     "package_metadata_stale",
     "security_advisory_relevant",
-    // Skill discovery (skill-discovery skill — find, evaluate, install new skills)
+    // Skill discovery / management (skill-discovery, skill-manager skills)
     "skill_not_in_catalog",
     "skill_manifest_invalid",
     "skill_install_failed",
@@ -104,6 +104,7 @@ pub static SYMPTOMS: &[&str] = &[
     "skill_rollback_unresolvable",
     "skill_dependency_missing",
     "skill_hardware_incompatible",
+    "skill_coverage_gap",
     // Scenario testing (scenario-tester skill — test agentic AI systems)
     "agent_latency_spike",
     "agent_throughput_degraded",
