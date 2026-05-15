@@ -3,7 +3,7 @@
 //! mutation, persistence, score computation, and freshness tracking.
 
 use russell_skills::registry::{
-    LifecycleStatus, RegistryCache, RegistryEntry, SkillSource, TrustTier,
+    LifecycleStatus, RegistryCache, RegistryEntry, SkillSource,
 };
 use std::path::Path;
 
