@@ -1,3 +1,17 @@
+---
+title: "ADR-0026: Metacognitive Layer (russell-meta)"
+audience: [architects, developers]
+last_updated: 2026-05-15
+togaf_phase: "H"
+version: "1.0.0"
+status: "Accepted"
+---
+
+<!-- TOGAF_DOMAIN: Application Architecture -->
+<!-- VERSION: 1.0.0 -->
+<!-- STATUS: Accepted -->
+<!-- LAST_UPDATED: 2026-05-15 -->
+
 # ADR-0026: Metacognitive Layer (`russell-meta`)
 
 - **Status:** Accepted

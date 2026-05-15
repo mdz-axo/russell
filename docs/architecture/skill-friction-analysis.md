@@ -1,3 +1,17 @@
+---
+title: "Skill System — Organic Growth Friction Analysis"
+audience: [architects, developers]
+last_updated: 2026-05-15
+togaf_phase: "G"
+version: "1.0.0"
+status: "Active"
+---
+
+<!-- TOGAF_DOMAIN: Application Architecture -->
+<!-- VERSION: 1.0.0 -->
+<!-- STATUS: Active -->
+<!-- LAST_UPDATED: 2026-05-15 -->
+
 # Skill System — Organic Growth Friction Analysis
 
 > Per-subsystem root cause with code citations, quantified by lines touched to resolve.

@@ -1,3 +1,17 @@
+---
+title: "Russell Skill System — Semantic Analysis, Redesign & Refactoring"
+audience: [architects, developers]
+last_updated: 2026-05-15
+togaf_phase: "C"
+version: "1.0.0"
+status: "Active"
+---
+
+<!-- TOGAF_DOMAIN: Application Architecture -->
+<!-- VERSION: 1.0.0 -->
+<!-- STATUS: Active -->
+<!-- LAST_UPDATED: 2026-05-15 -->
+
 # Russell Skill System — Semantic Analysis, Redesign & Refactoring
 
 > **Date:** 2026-05-15

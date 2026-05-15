@@ -1,3 +1,17 @@
+---
+title: "Skill System — Hexagonal Ports & Adapters"
+audience: [architects, developers, agents]
+last_updated: 2026-05-15
+togaf_phase: "C"
+version: "1.0.0"
+status: "Active"
+---
+
+<!-- TOGAF_DOMAIN: Application Architecture -->
+<!-- VERSION: 1.0.0 -->
+<!-- STATUS: Active -->
+<!-- LAST_UPDATED: 2026-05-15 -->
+
 # Skill System — Hexagonal Ports & Adapters
 
 > Each port defined as a trait in `russell-core` (the port definition layer per cross-crate DAG).

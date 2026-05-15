@@ -7,9 +7,9 @@ version: "1.0.0"
 status: "Active"
 ---
 
-<!-- TOGAF_DOMAIN: Architecture -->
+<!-- TOGAF_DOMAIN: Application Architecture -->
 <!-- VERSION: 1.0.0 -->
-<!-- STATUS: Draft -->
+<!-- STATUS: Active -->
 <!-- LAST_UPDATED: 2026-05-14 -->
 
 # Skill Self-Management Strategy

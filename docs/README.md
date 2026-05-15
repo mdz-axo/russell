@@ -194,7 +194,7 @@ They live under [`adr/deferred/`](adr/deferred/):
 | Active authoritative docs | 92 |
 | Active ADRs | 18 |
 | Deferred ADRs | 7 |
-| Archived docs | 6 |
+| Archived docs | 7 |
 | Templates | 5 |
 
 _Verify with `find docs -type f -name '*.md' -not -path 'docs/archive/*' | wc -l`; current as of `last_updated`._

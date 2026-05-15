@@ -1,3 +1,17 @@
+---
+title: "Cybernetic Review of Russell Skill System Refactoring Plan"
+audience: [architects, developers]
+last_updated: 2026-05-15
+togaf_phase: "G"
+version: "1.0.0"
+status: "Active"
+---
+
+<!-- TOGAF_DOMAIN: Application Architecture -->
+<!-- VERSION: 1.0.0 -->
+<!-- STATUS: Active -->
+<!-- LAST_UPDATED: 2026-05-15 -->
+
 # Cybernetic Review of the Russell Skill System Refactoring Plan
 
 > **Lens:** `pragmatic-cybernetics` v3.0.0 (KNOWLEDGE.md + 6 reference files)

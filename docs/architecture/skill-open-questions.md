@@ -1,3 +1,17 @@
+---
+title: "Skill System — Open Questions & Underspecified Boundaries"
+audience: [architects, developers]
+last_updated: 2026-05-15
+togaf_phase: "H"
+version: "1.0.0"
+status: "Active"
+---
+
+<!-- TOGAF_DOMAIN: Application Architecture -->
+<!-- VERSION: 1.0.0 -->
+<!-- STATUS: Active -->
+<!-- LAST_UPDATED: 2026-05-15 -->
+
 # Skill System — Open Questions & Underspecified Boundaries
 
 > Design decisions that cannot be resolved in the current context.

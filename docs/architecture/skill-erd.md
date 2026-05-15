@@ -1,3 +1,17 @@
+---
+title: "Skill System — Entity-Relationship Diagrams"
+audience: [architects, developers]
+last_updated: 2026-05-15
+togaf_phase: "C"
+version: "1.0.0"
+status: "Active"
+---
+
+<!-- TOGAF_DOMAIN: Application Architecture -->
+<!-- VERSION: 1.0.0 -->
+<!-- STATUS: Active -->
+<!-- LAST_UPDATED: 2026-05-15 -->
+
 # Skill System — Entity-Relationship Diagrams
 
 > Derived from `docs/architecture/skill-domain-model.ttl`.

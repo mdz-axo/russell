@@ -1,3 +1,17 @@
+---
+title: "Skill Sharing — Minimum Viable Architecture"
+audience: [architects, developers]
+last_updated: 2026-05-15
+togaf_phase: "C"
+version: "1.0.0"
+status: "Active"
+---
+
+<!-- TOGAF_DOMAIN: Application Architecture -->
+<!-- VERSION: 1.0.0 -->
+<!-- STATUS: Active -->
+<!-- LAST_UPDATED: 2026-05-15 -->
+
 # Skill Sharing — Minimum Viable Architecture
 
 > Preserves JR-1 (austerity), JR-6 (reuse-don't-depend), and ADR-0025 §8 (remote deferral is liftable with justification).
