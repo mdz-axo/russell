@@ -445,10 +445,15 @@ pub fn compose_templated(
     let temperature = hint.as_ref().and_then(|h| h.temperature);
     let max_tokens = hint.as_ref().and_then(|h| h.max_tokens);
 
+    // The objective is the rendered content minus the Subjective/Assessment/Plan
+    // sections — it's the data Jack was given to reason about. For evidence
+    // bundles and backward compatibility, we populate it from the rendered output.
+    let objective = rendered.clone();
+
     Ok(SoapPrompt {
         system: system_prompt,
         subjective,
-        objective: String::new(), // Embedded in rendered via template
+        objective,
         rendered,
         temperature,
         max_tokens,
@@ -562,6 +567,92 @@ fn build_reflex_block(reader: &JournalReader) -> Result<String> {
     Ok(block.trim_end().to_string())
 }
 
+/// Derive active symptom signals from recent journal events and probe data.
+///
+/// Bridges the vocabulary gap between sentinel probe names
+/// (e.g., "gpu_vram_used_pct") and symptom catalog entries
+/// (e.g., "vram_oom") using keyword extraction.
+///
+/// Sources:
+/// 1. Module paths from elevated-severity events (contains probe names)
+/// 2. Summary text keyword extraction
+/// 3. Direct symptom signals from event action/tier fields
+///
+/// The resulting list is used for fuzzy matching against skill symptoms:
+/// a skill declaring `symptoms: [vram_oom]` will match if "vram" appears
+/// in the active symptoms.
+fn derive_active_symptoms(events: &[russell_core::journal::EventRow]) -> Vec<String> {
+    let mut symptoms = Vec::new();
+
+    for ev in events {
+        // Only consider elevated-severity events.
+        let sev = ev.severity.as_str();
+        if sev != "warn" && sev != "alert" && sev != "crit" {
+            continue;
+        }
+
+        // Source 1: module paths contain probe names.
+        // "sentinel/threshold/gpu_vram_used_pct" → "gpu_vram_used_pct"
+        // "sentinel/rate/loadavg_1m" → "loadavg_1m"
+        // "skill/okapi-watcher" → "okapi-watcher"
+        if let Some(module) = &ev.module {
+            if let Some(probe) = module.strip_prefix("sentinel/threshold/") {
+                symptoms.push(probe.to_string());
+                // Extract keywords from probe name.
+                extract_keywords(probe, &mut symptoms);
+            } else if let Some(probe) = module.strip_prefix("sentinel/rate/") {
+                symptoms.push(probe.to_string());
+                extract_keywords(probe, &mut symptoms);
+            } else if let Some(skill_id) = module.strip_prefix("skill/") {
+                symptoms.push(skill_id.to_string());
+            }
+        }
+
+        // Source 2: summary text — extract known symptom indicator keywords.
+        if let Some(summary) = &ev.summary {
+            let lower = summary.to_lowercase();
+            for keyword in [
+                "oom", "swap", "gpu", "vram", "timeout", "stall",
+                "degraded", "slow", "zombie", "pressure", "exhaustion",
+                "drift", "skew", "bloat", "corruption",
+            ] {
+                if lower.contains(keyword) {
+                    symptoms.push(keyword.to_string());
+                }
+            }
+        }
+
+        // Source 3: tier field — "sentinel" events about self-vitals.
+        if ev.tier.as_deref() == Some("self_vital") {
+            if let Some(module) = &ev.module {
+                // "proprio/llm_p95_latency_ms" → keywords
+                if let Some(vital) = module.strip_prefix("proprio/") {
+                    extract_keywords(vital, &mut symptoms);
+                }
+            }
+        }
+    }
+
+    symptoms.sort();
+    symptoms.dedup();
+    symptoms
+}
+
+/// Extract meaningful keywords from a probe/vital name (split on `_`, skip noise).
+fn extract_keywords(name: &str, out: &mut Vec<String>) {
+    for keyword in name.split('_') {
+        if keyword.len() >= 3
+            && !matches!(
+                keyword,
+                "used" | "pct" | "mib" | "avg" | "max" | "min"
+                    | "total" | "count" | "the" | "last" | "run"
+            )
+        {
+            out.push(keyword.to_string());
+        }
+    }
+}
+
 /// Append KNOWLEDGE.md with relevance scoring and token budgeting.
 ///
 /// Uses the prompt registry's relevance scoring to select which
@@ -577,20 +668,24 @@ fn append_skill_knowledge_scored(
     skills: &[Skill],
     skills_base_dir: &Path,
     reader: &JournalReader,
-    window_start: i64,
+    _window_start: i64,
     skill_registry: Option<&russell_skills::registry::RegistryCache>,
 ) {
-    // Determine active symptoms from recent events.
-    let active_symptoms: Vec<String> = reader
-        .recent(20)
-        .unwrap_or_default()
-        .iter()
-        .filter(|r| r.severity.as_str() == "warn" || r.severity.as_str() == "alert" || r.severity.as_str() == "crit")
-        .filter_map(|r| r.module.as_ref())
-        .map(|m| m.to_string())
-        .collect();
-
-    let _ = window_start; // used by caller context
+    // Derive active symptoms from two sources:
+    //
+    // 1. Probe names from recent threshold breaches — sentinel events
+    //    record `outputs["probe"]` with values like "gpu_vram_used_pct",
+    //    "loadavg_1m", "swap_used_mib".
+    //
+    // 2. Skill IDs from recent skill-related events — skill execution
+    //    events record module as "skill/<id>".
+    //
+    // We synthesize "active symptoms" by extracting these signals and
+    // matching them against the symptom catalog using keyword overlap.
+    // A symptom like "vram_oom" matches a probe like "gpu_vram_used_pct"
+    // because they share the "vram" keyword.
+    let recent_events = reader.recent(20).unwrap_or_default();
+    let active_symptoms = derive_active_symptoms(&recent_events);
 
     // Budget: ~3000 tokens for knowledge injection.
     const KNOWLEDGE_BUDGET_TOKENS: usize = 3000;
@@ -625,14 +720,12 @@ fn append_skill_knowledge_scored(
                     score_knowledge_relevance_with_telemetry(
                         &skill.symptoms,
                         &active_symptoms,
-                        true, // applies_when filter already passed
                         &telemetry,
                     )
                 }
                 None => score_knowledge_relevance(
                     &skill.symptoms,
                     &active_symptoms,
-                    true, // applies_when filter already passed
                 ),
             };
 

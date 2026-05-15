@@ -94,6 +94,11 @@ pub struct RegistryEntry {
     /// EWMA of probe run durations in milliseconds.
     #[serde(default)]
     pub avg_probe_duration_ms: Option<f64>,
+    /// EWMA success rate (0.0–1.0). Updated on each probe/intervention
+    /// execution. More recent outcomes weigh more heavily than historical.
+    /// `None` means no executions have been recorded yet.
+    #[serde(default)]
+    pub ewma_success_rate: Option<f64>,
     /// Whether this is a bundled skill (resistant to pruning).
     #[serde(default)]
     pub bundled: bool,
@@ -134,6 +139,7 @@ impl RegistryEntry {
             last_probe_run_at: None,
             last_error: None,
             avg_probe_duration_ms: None,
+            ewma_success_rate: None,
             bundled,
         }
     }

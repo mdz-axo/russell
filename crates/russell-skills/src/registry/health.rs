@@ -33,11 +33,17 @@ pub fn record_probe_execution(
             entry.last_error = Some(msg.to_string());
         }
     }
-    // EWMA update.
+    // EWMA duration update.
     let current = duration_ms as f64;
     entry.avg_probe_duration_ms = Some(match entry.avg_probe_duration_ms {
         Some(prev) => EWMA_ALPHA * current + (1.0 - EWMA_ALPHA) * prev,
         None => current,
+    });
+    // EWMA success rate update — recent outcomes weigh more.
+    let outcome = if success { 1.0 } else { 0.0 };
+    entry.ewma_success_rate = Some(match entry.ewma_success_rate {
+        Some(prev) => EWMA_ALPHA * outcome + (1.0 - EWMA_ALPHA) * prev,
+        None => outcome,
     });
 }
 
@@ -54,13 +60,31 @@ pub fn record_intervention_execution(
             entry.last_error = Some(msg.to_string());
         }
     }
+    // EWMA success rate update.
+    let outcome = if success { 1.0 } else { 0.0 };
+    entry.ewma_success_rate = Some(match entry.ewma_success_rate {
+        Some(prev) => EWMA_ALPHA * outcome + (1.0 - EWMA_ALPHA) * prev,
+        None => outcome,
+    });
 }
 
 /// Freshness score: how recently and reliably the skill has run.
 ///
-/// Returns 0.0 if the skill has never run, up to 1.0 for no failures.
+/// Uses `ewma_success_rate` when available (recency-weighted).
+/// Falls back to the all-time ratio `1 - failures/runs` for entries
+/// that predate the EWMA field.
+///
+/// Returns 0.0 if the skill has never run, up to 1.0 for perfect reliability.
 #[must_use]
 pub fn freshness_score(entry: &RegistryEntry) -> f64 {
+    if entry.probe_runs == 0 && entry.intervention_runs == 0 {
+        return 0.0;
+    }
+    // Prefer EWMA success rate (recency-weighted, forgets old failures).
+    if let Some(ewma) = entry.ewma_success_rate {
+        return ewma.clamp(0.0, 1.0);
+    }
+    // Fallback: all-time ratio (backward compat for entries without EWMA).
     if entry.probe_runs == 0 {
         return 0.0;
     }

@@ -165,6 +165,9 @@ pub enum SkillKind {
 }
 
 impl Default for SkillKind {
+    /// Default is `Actionable` — process skills (probes + interventions)
+    /// are the primary case. Knowledge-only lenses must be explicitly
+    /// declared or inferred from empty probes/interventions.
     fn default() -> Self {
         Self::Actionable
     }

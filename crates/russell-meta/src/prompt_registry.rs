@@ -433,42 +433,50 @@ pub fn select_knowledge(slots: &mut [KnowledgeSlot], budget_tokens: usize) -> Ve
 }
 
 /// Score a knowledge skill's relevance based on symptom overlap
-/// with the current alert state, enhanced with structural relevance
-/// from the skill's `applies_when` clauses.
+/// with the current alert state.
 ///
-/// `skill_symptoms` — symptoms the knowledge skill covers.
-/// `active_symptoms` — symptoms that are currently alerting/elevated.
-/// `applies_when_match` — whether the skill's `applies_when` matches the host.
+/// `skill_symptoms` — symptoms the knowledge skill covers (catalog entries
+/// like "vram_oom", "llm_slow").
+/// `active_symptoms` — signals derived from recent events (probe names,
+/// keywords like "vram", "gpu", "swap", "timeout").
 ///
-/// Gap 4: Cybernetic feedback — structural relevance provides a floor
-/// score for skills whose `applies_when` matches the machine profile
-/// (e.g., `ubuntu-jack` on an Ubuntu host), even when no symptom is
-/// currently firing. Symptom overlap provides a boost on top.
+/// Matching is **keyword-based**: a skill symptom "vram_oom" matches if
+/// any active symptom contains "vram" or "oom" as a substring, or vice versa.
+/// This bridges the vocabulary gap between the formal symptom catalog and
+/// the runtime signals extracted from journal events.
 ///
-/// Returns 0.0 if no structural or symptom relevance, up to 1.0.
+/// Returns 0.0 if no overlap, up to 1.0 for full coverage.
 pub fn score_knowledge_relevance(
     skill_symptoms: &[String],
     active_symptoms: &[String],
-    applies_when_match: bool,
 ) -> f64 {
-    let structural_floor: f64 = if applies_when_match { 0.3 } else { 0.0 };
-
-    if skill_symptoms.is_empty() && !applies_when_match {
-        return 0.0;
-    }
     if skill_symptoms.is_empty() || active_symptoms.is_empty() {
-        return structural_floor.max(0.1);
+        // Knowledge with no symptoms gets a base relevance (always somewhat useful).
+        return 0.3;
     }
     let overlap = skill_symptoms
         .iter()
-        .filter(|s| active_symptoms.contains(s))
+        .filter(|skill_sym| {
+            // A skill symptom matches if ANY active symptom overlaps by keyword.
+            active_symptoms.iter().any(|active| {
+                // Exact match.
+                if skill_sym.as_str() == active.as_str() {
+                    return true;
+                }
+                // Keyword containment: "vram_oom" contains "vram", or "vram" is in "gpu_vram_used_pct".
+                if skill_sym.contains(active.as_str()) || active.contains(skill_sym.as_str()) {
+                    return true;
+                }
+                // Split skill symptom into keywords and check any match.
+                skill_sym.split('_').any(|kw| kw.len() >= 3 && active.contains(kw))
+            })
+        })
         .count();
-    let symptom_score = if overlap == 0 {
-        0.2
+    if overlap == 0 {
+        0.2 // base relevance for applicable knowledge
     } else {
         0.4 + 0.6 * (overlap as f64 / skill_symptoms.len().max(1) as f64)
-    };
-    (structural_floor + symptom_score).min(1.0).max(0.0)
+    }
 }
 
 /// Runtime telemetry signals that modulate knowledge relevance.
@@ -507,10 +515,9 @@ pub struct SkillTelemetry {
 pub fn score_knowledge_relevance_with_telemetry(
     skill_symptoms: &[String],
     active_symptoms: &[String],
-    applies_when_match: bool,
     telemetry: &SkillTelemetry,
 ) -> f64 {
-    let base_score = score_knowledge_relevance(skill_symptoms, active_symptoms, applies_when_match);
+    let base_score = score_knowledge_relevance(skill_symptoms, active_symptoms);
 
     // No telemetry → no modifier (benefit of the doubt for new skills).
     if telemetry.probe_runs == 0 && telemetry.intervention_runs == 0 {
