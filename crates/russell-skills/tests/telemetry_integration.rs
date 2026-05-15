@@ -3,7 +3,7 @@
 //! mutation, persistence, score computation, and freshness tracking.
 
 use russell_skills::registry::{
-    LifecycleStatus, RegistryCache, RegistryEntry, SkillSource,
+    LifecycleStatus, RegistryCache, RegistryEntry, SkillSource, TrustTier,
 };
 use std::path::Path;
 
@@ -13,6 +13,7 @@ fn test_entry() -> RegistryEntry {
         version: "1.0.0".into(),
         symptoms: vec!["vram_oom".into()],
         source: SkillSource::Bundled,
+        trust_tier: TrustTier::T4,
         installed: "2026-05-01".into(),
         last_evaluated: None,
         valid_until: None,

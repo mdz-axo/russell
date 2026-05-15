@@ -19,7 +19,7 @@ pub mod objective;
 pub mod spinner;
 
 use anyhow::{Context, Result};
-use russell_core::journal::JournalWriter;
+use russell_core::journal::{JournalReader, JournalWriter};
 use russell_core::paths::Paths;
 use russell_meta::action::{self, ResolvedAction};
 use russell_mcp::client::KaskMcpClient;
@@ -277,8 +277,6 @@ pub async fn run(paths: &Paths) -> Result<()> {
                 if let Ok(fresh) = russell_skills::registry::RegistryCache::load(&registry_path) {
                     registry = fresh;
                 }
-            }
-            Err(ReadlineError::Interrupted) => {
             }
             Err(ReadlineError::Interrupted) => {
                 println!("^C");
@@ -553,6 +551,157 @@ async fn handle_slash_command(
             true
         }
     }
+}
+
+/// Call Jack (the LLM) with the current conversation state, handle
+/// any ACTION: proposals in the response, and update history.
+///
+/// This is the shared LLM invocation path used by both the main chat
+/// loop (new user input) and the denial re-orientation loop (Gap 1:
+/// cybernetic feedback closure — when the operator denies an ACTION,
+/// Jack is re-prompted with the denial to propose an alternative).
+#[allow(clippy::too_many_arguments)]
+async fn call_jack(
+    history: &mut ChatHistory,
+    chat_path: &std::path::Path,
+    journal: &JournalWriter,
+    session_id: &str,
+    current_model: &str,
+    reader: &JournalReader,
+    skills: &[russell_skills::Skill],
+    profile: Option<&russell_core::Profile>,
+    kask_registry: &ToolRegistry,
+    registry: &russell_skills::registry::RegistryCache,
+    paths: &Paths,
+    pending_action: &mut Option<PendingAction>,
+    kask_client: &Option<KaskMcpClient>,
+    _client_cfg: &russell_meta::client::ClientConfig,
+) -> Result<()> {
+    // Build the fresh SOAP objective.
+    let objective = objective::build_objective(reader, skills, profile, kask_registry, registry);
+    let system = russell_meta::JACK_CHAT_PERSONA.to_string();
+
+    // Build the messages array for the LLM.
+    let mut messages: Vec<serde_json::Value> = Vec::new();
+    messages.push(serde_json::json!({
+        "role": "system",
+        "content": system,
+    }));
+
+    // Insert the current journal state as a "user" message.
+    if !objective.is_empty() {
+        messages.push(serde_json::json!({
+            "role": "user",
+            "content": format!(
+                "# Current journal snapshot\n\n{objective}\n\n---\n\nContinue the conversation with the operator."
+            ),
+        }));
+    }
+
+    // Add conversation history.
+    for turn in &history.turns {
+        messages.push(serde_json::json!({
+            "role": turn.role,
+            "content": turn.content,
+        }));
+    }
+
+    // Gap 6: Enforce minimum reasoning budget in chat history.
+    // If total prompt tokens approach the model's context window,
+    // the history is summarized to preserve reasoning headroom.
+    let total_prompt_tokens = estimate_message_tokens(&messages);
+    const MIN_REASONING_BUDGET_TOKENS: usize = 2048;
+    const CONTEXT_WINDOW_TOKENS: usize = 32768;
+    let max_history_tokens = CONTEXT_WINDOW_TOKENS
+        .saturating_sub(MIN_REASONING_BUDGET_TOKENS)
+        .saturating_sub(system.len() / 4 + objective.len() / 4 + 200); // system + obj overhead
+
+    if total_prompt_tokens > max_history_tokens {
+        // Attenuate conversation history to preserve reasoning budget.
+        // Remove oldest turns (keeping the system/objective messages first).
+        let history_start = 2; // system + objective messages
+        while estimate_message_tokens(&messages) > max_history_tokens && messages.len() > history_start + 2 {
+            messages.remove(history_start);
+            if messages.len() > history_start + 1 {
+                messages.remove(history_start);
+            }
+        }
+        tracing::debug!(
+            total = total_prompt_tokens,
+            max_allowed = max_history_tokens,
+            "chat history truncated to preserve reasoning budget"
+        );
+    }
+
+    // Persist history before calling LLM.
+    save_history(chat_path, history)?;
+
+    // Call the LLM with an animated thinking spinner.
+    let cfg = russell_meta::client::ClientConfig::from_env();
+    let response = spinner::call_okapi_with_spinner(&cfg, current_model, &messages).await;
+
+    match response {
+        Ok(content) => {
+            // Clear the spinner line and print the response.
+            print!("\r\x1b[K");
+            std::io::stdout().flush().unwrap();
+            println!("Jack → {content}\n");
+            history.turns.push(Turn {
+                role: "assistant".into(),
+                content: content.clone(),
+            });
+            save_history(chat_path, history)?;
+
+            // Journal the chat turn as a help-session event.
+            journal_chat_turn(journal, session_id, current_model, "(chat turn)", &content);
+
+            // Check for ACTION: proposal.
+            let kask_tool_infos = kask::build_kask_tool_infos(kask_registry);
+            match action::resolve_with_kask(&content, skills, &kask_tool_infos) {
+                Some(Ok(action)) => {
+                    let manifest = extract_manifest_block(&content);
+                    handle_action_proposal(
+                        action,
+                        journal,
+                        kask_client,
+                        session_id,
+                        current_model,
+                        paths,
+                        history,
+                        chat_path,
+                        pending_action,
+                        manifest,
+                    ).await?;
+                }
+                Some(Err(e)) => {
+                    println!("  → {e}");
+                }
+                None => { /* normal, no action proposed */ }
+            }
+        }
+        Err(e) => {
+            let msg = format!("(can't reach the LLM right now — {e})");
+            println!("{msg}\n");
+            history.turns.push(Turn {
+                role: "assistant".into(),
+                content: msg.clone(),
+            });
+            save_history(chat_path, history)?;
+        }
+    }
+    Ok(())
+}
+
+/// Estimate the token count of a JSON messages array.
+/// Rough heuristic: 1 token ≈ 4 characters of content.
+fn estimate_message_tokens(messages: &[serde_json::Value]) -> usize {
+    let mut total = 0;
+    for msg in messages {
+        if let Some(content) = msg.get("content").and_then(|c| c.as_str()) {
+            total += content.len() / 4;
+        }
+    }
+    total
 }
 
 /// Extract a `---manifest` … `---` block from an LLM response.

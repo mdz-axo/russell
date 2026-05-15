@@ -433,29 +433,42 @@ pub fn select_knowledge(slots: &mut [KnowledgeSlot], budget_tokens: usize) -> Ve
 }
 
 /// Score a knowledge skill's relevance based on symptom overlap
-/// with the current alert state.
+/// with the current alert state, enhanced with structural relevance
+/// from the skill's `applies_when` clauses.
 ///
 /// `skill_symptoms` — symptoms the knowledge skill covers.
 /// `active_symptoms` — symptoms that are currently alerting/elevated.
+/// `applies_when_match` — whether the skill's `applies_when` matches the host.
 ///
-/// Returns 0.0 if no overlap, up to 1.0 for full coverage.
+/// Gap 4: Cybernetic feedback — structural relevance provides a floor
+/// score for skills whose `applies_when` matches the machine profile
+/// (e.g., `ubuntu-jack` on an Ubuntu host), even when no symptom is
+/// currently firing. Symptom overlap provides a boost on top.
+///
+/// Returns 0.0 if no structural or symptom relevance, up to 1.0.
 pub fn score_knowledge_relevance(
     skill_symptoms: &[String],
     active_symptoms: &[String],
+    applies_when_match: bool,
 ) -> f64 {
+    let structural_floor: f64 = if applies_when_match { 0.3 } else { 0.0 };
+
+    if skill_symptoms.is_empty() && !applies_when_match {
+        return 0.0;
+    }
     if skill_symptoms.is_empty() || active_symptoms.is_empty() {
-        // Knowledge with no symptoms gets a base relevance (always somewhat useful).
-        return 0.3;
+        return structural_floor.max(0.1);
     }
     let overlap = skill_symptoms
         .iter()
         .filter(|s| active_symptoms.contains(s))
         .count();
-    if overlap == 0 {
-        0.2 // base relevance for applicable knowledge
+    let symptom_score = if overlap == 0 {
+        0.2
     } else {
         0.4 + 0.6 * (overlap as f64 / skill_symptoms.len().max(1) as f64)
-    }
+    };
+    (structural_floor + symptom_score).min(1.0).max(0.0)
 }
 
 /// Runtime telemetry signals that modulate knowledge relevance.
@@ -494,9 +507,10 @@ pub struct SkillTelemetry {
 pub fn score_knowledge_relevance_with_telemetry(
     skill_symptoms: &[String],
     active_symptoms: &[String],
+    applies_when_match: bool,
     telemetry: &SkillTelemetry,
 ) -> f64 {
-    let base_score = score_knowledge_relevance(skill_symptoms, active_symptoms);
+    let base_score = score_knowledge_relevance(skill_symptoms, active_symptoms, applies_when_match);
 
     // No telemetry → no modifier (benefit of the doubt for new skills).
     if telemetry.probe_runs == 0 && telemetry.intervention_runs == 0 {
@@ -620,9 +634,27 @@ mod tests {
     fn knowledge_relevance_scoring() {
         let skill_symptoms = vec!["llm_slow".to_string(), "gpu_fallback_to_cpu".to_string()];
         let active = vec!["llm_slow".to_string(), "swap_pressure".to_string()];
-        let score = score_knowledge_relevance(&skill_symptoms, &active);
-        // One overlap out of 2 skill symptoms → 0.4 + 0.6*(1/2) = 0.7
-        assert!((score - 0.7).abs() < 0.01);
+        let score = score_knowledge_relevance(&skill_symptoms, &active, true);
+        // Structural floor (0.3) + symptom score (0.4 + 0.6*(1/2) = 0.7) = 1.0
+        assert!((score - 1.0).abs() < 0.01, "expected ~1.0, got {score}");
+    }
+
+    #[test]
+    fn knowledge_relevance_no_structural_floor() {
+        let skill_symptoms = vec!["llm_slow".to_string()];
+        let active: Vec<String> = vec![];
+        let score = score_knowledge_relevance(&skill_symptoms, &active, false);
+        // No structural floor, no active symptoms → 0.1 (base for empty active)
+        assert!(score < 0.15, "expected low, got {score}");
+    }
+
+    #[test]
+    fn knowledge_relevance_structural_only() {
+        let skill_symptoms: Vec<String> = vec![];
+        let active: Vec<String> = vec![];
+        let score = score_knowledge_relevance(&skill_symptoms, &active, true);
+        // Structural floor (0.3) with empty symptoms → max(0.3, 0.1) = 0.3
+        assert!((score - 0.3).abs() < 0.01, "expected 0.3, got {score}");
     }
 
     #[test]
@@ -656,11 +688,11 @@ mod tests {
 
     #[test]
     fn telemetry_boosts_reliable_skill() {
-        // Use 2 symptoms with 1 overlap so base < 1.0
-        let symptoms = vec!["llm_slow".to_string(), "gpu_fallback_to_cpu".to_string()];
+        // Use no structural floor so base < 1.0, making the boost visible.
         let active = vec!["llm_slow".to_string()];
-        let base = score_knowledge_relevance(&symptoms, &active);
-        // base = 0.4 + 0.6*(1/2) = 0.7
+        let symptoms2 = vec!["llm_slow".to_string(), "gpu_fallback_to_cpu".to_string()];
+        let base2 = score_knowledge_relevance(&symptoms2, &active, false);
+        // Without structural floor: 0.4 + 0.6*(1/2) = 0.7
 
         let telemetry = SkillTelemetry {
             freshness: 1.0, // perfect freshness
@@ -669,26 +701,28 @@ mod tests {
             intervention_runs: 10,
             recent_intervention_failures: 0,
         };
-        let boosted = score_knowledge_relevance_with_telemetry(&symptoms, &active, &telemetry);
-        // Reliable skill should be boosted above base (1.2× modifier → 0.7 * 1.2 = 0.84)
-        assert!(boosted > base, "expected boosted ({boosted}) > base ({base})");
+        let boosted = score_knowledge_relevance_with_telemetry(&symptoms2, &active, false, &telemetry);
+        // Reliable skill gets 1.2× multiplier: 0.7 * 1.2 = 0.84 > 0.7
+        assert!(boosted > base2, "expected boosted ({boosted}) > base ({base2})");
     }
 
     #[test]
     fn telemetry_penalizes_failing_skill() {
+        // Use no structural floor + 2 symptoms with 1 overlap for visible penalty.
         let symptoms = vec!["llm_slow".to_string(), "gpu_fallback_to_cpu".to_string()];
         let active = vec!["llm_slow".to_string()];
-        let base = score_knowledge_relevance(&symptoms, &active);
+        let base = score_knowledge_relevance(&symptoms, &active, false);
+        // base = 0.4 + 0.6*(1/2) = 0.7
 
         let telemetry = SkillTelemetry {
             freshness: 0.4,
             probe_runs: 100,
-            recent_failures: 60, // 60% failure rate
+            recent_failures: 60,
             intervention_runs: 10,
             recent_intervention_failures: 8,
         };
-        let penalized = score_knowledge_relevance_with_telemetry(&symptoms, &active, &telemetry);
-        // Failing skill should be penalized below base (0.7× modifier)
+        let penalized = score_knowledge_relevance_with_telemetry(&symptoms, &active, false, &telemetry);
+        // Failing skill should be penalized below base (down to 0.7×)
         assert!(penalized < base, "expected penalized ({penalized}) < base ({base})");
     }
 
@@ -696,10 +730,10 @@ mod tests {
     fn telemetry_neutral_for_new_skill() {
         let symptoms = vec!["llm_slow".to_string(), "gpu_fallback_to_cpu".to_string()];
         let active = vec!["llm_slow".to_string()];
-        let base = score_knowledge_relevance(&symptoms, &active);
+        let base = score_knowledge_relevance(&symptoms, &active, false);
 
         let telemetry = SkillTelemetry::default(); // no runs
-        let scored = score_knowledge_relevance_with_telemetry(&symptoms, &active, &telemetry);
+        let scored = score_knowledge_relevance_with_telemetry(&symptoms, &active, false, &telemetry);
         // New skill gets no modifier
         assert!((scored - base).abs() < 0.001, "expected same as base, got {scored} vs {base}");
     }

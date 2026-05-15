@@ -6,6 +6,7 @@
 //! how well they run, how often they fail, and how fresh they are.
 
 use super::RegistryEntry;
+use crate::registry::LifecycleStatus;
 
 /// EWMA smoothing factor (alpha = 0.2 ≈ 5-sample effective window).
 const EWMA_ALPHA: f64 = 0.2;
@@ -318,4 +319,112 @@ mod tests {
             "EWMA should be ~120, got {ewma}"
         );
     }
+
+    #[test]
+    fn aggregate_alert_detects_criticality() {
+        use crate::registry::{LifecycleStatus, RegistryEntry, SkillSource};
+        let mut entries: Vec<RegistryEntry> = Vec::new();
+        // 5 skills: 2 healthy, 2 stale, 1 retired
+        for (i, (status, probe_runs, failures)) in [
+            (LifecycleStatus::Active, 100, 0),
+            (LifecycleStatus::Active, 100, 5),
+            (LifecycleStatus::StaleWarning, 10, 8),
+            (LifecycleStatus::Deprecated, 50, 25),
+            (LifecycleStatus::Retired, 0, 0),
+        ].iter().enumerate() {
+            let mut entry = RegistryEntry::new_default(
+                *status,
+                "1.0.0",
+                vec![format!("symptom_{i}")],
+                SkillSource::Bundled,
+                "2026-05-01",
+                true,
+            );
+            entry.probe_runs = *probe_runs;
+            entry.recent_probe_failures = *failures;
+            entries.push(entry);
+        }
+        let score = aggregate_alert_score(&entries);
+        // Retired + deprecated + high failure rate should push score above threshold
+        assert!(score > 0.5, "aggregate alert should detect unhealthy skills, got {score}");
+    }
+
+    #[test]
+    fn aggregate_alert_zero_for_all_healthy() {
+        use crate::registry::{LifecycleStatus, RegistryEntry, SkillSource};
+        let mut entries: Vec<RegistryEntry> = Vec::new();
+        for i in 0..3 {
+            let mut entry = RegistryEntry::new_default(
+                LifecycleStatus::Active,
+                "1.0.0",
+                vec![format!("symptom_{i}")],
+                SkillSource::Bundled,
+                "2026-05-01",
+                true,
+            );
+            entry.probe_runs = 100;
+            entry.recent_probe_failures = 0;
+            entries.push(entry);
+        }
+        let score = aggregate_alert_score(&entries);
+        assert!((score - 0.0).abs() < 0.01, "all healthy should score 0, got {score}");
+    }
+}
+
+/// Gap 2: Algedonic differentiation — compute an aggregate alert score
+/// (0.0–1.0) from all registry entries, representing the overall health
+/// of the skill catalog as a single "pain index."
+///
+/// Formula: weighted average of per-skill degradation signals:
+/// - Retired skills contribute 1.0 (maximum pain)
+/// - Deprecated skills contribute 0.8
+/// - StaleWarning skills contribute 0.5
+/// - Active/Installed skills contribute based on failure rate + staleness
+///
+/// This aggregate prevents alert fatigue (Audit Item 3): instead of
+/// surfacing N individual skill health warnings, the operator sees a
+/// single severity signal. Individual skill details are available on
+/// demand via `russell skill stats`.
+#[must_use]
+pub fn aggregate_alert_score(entries: &[RegistryEntry]) -> f64 {
+    if entries.is_empty() {
+        return 0.0;
+    }
+
+    let max_severity_alerts: usize = 3;
+
+    let mut scores: Vec<(f64, &str)> = Vec::new();
+    for entry in entries {
+        let score = match entry.status {
+            LifecycleStatus::Retired => 1.0,
+            LifecycleStatus::Deprecated => 0.8,
+            LifecycleStatus::StaleWarning => 0.5,
+            _ => {
+                let failure_rate = if entry.probe_runs > 0 {
+                    entry.recent_probe_failures as f64 / entry.probe_runs as f64
+                } else {
+                    0.0
+                };
+                let staleness = match (entry.probe_runs, entry.recent_probe_failures) {
+                    (0, _) => 0.3,
+                    (_, f) if f as f64 / entry.probe_runs.max(1) as f64 > 0.5 => 0.4,
+                    _ => 0.0,
+                };
+                (failure_rate.max(staleness)).min(1.0)
+            }
+        };
+        if score > 0.0 {
+            scores.push((score, &entry.deprecation_reason.as_deref().unwrap_or("")));
+        }
+    }
+
+    scores.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
+    let top = &scores[..scores.len().min(max_severity_alerts)];
+
+    if top.is_empty() {
+        return 0.0;
+    }
+
+    let total: f64 = top.iter().map(|(s, _)| s).sum();
+    (total / top.len() as f64).clamp(0.0, 1.0)
 }

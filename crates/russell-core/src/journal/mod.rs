@@ -475,6 +475,27 @@ impl JournalReader {
         Ok(row.flatten())
     }
 
+    /// Timestamp (unix seconds) of the most-recent remote skill
+    /// registry fetch, or `None` if no fetches have been recorded.
+    ///
+    /// Gap 5: Used by proprioception's `remote_discovery_latency_s` probe.
+    /// Reads from the `events` table where `action = 'remote.skill.fetch'`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`CoreError::Sqlite`] on DB errors.
+    pub fn last_remote_fetch_ts(&self) -> Result<Option<i64>> {
+        let conn = self.open_ro()?;
+        let row: Option<Option<i64>> = conn
+            .query_row(
+                "SELECT MAX(ts) FROM events WHERE action = 'remote.skill.fetch'",
+                [],
+                |r| r.get::<_, Option<i64>>(0),
+            )
+            .ok();
+        Ok(row.flatten())
+    }
+
     /// Compute the p95 of `latency_ms` from `help_sessions` rows
     /// in the last 24 hours.
     ///

@@ -1,0 +1,465 @@
+@prefix skill: <https://russell.harness/skill/> .
+@prefix sk: <https://russell.harness/skill-kind/> .
+@prefix ls: <https://russell.harness/lifecycle/> .
+@prefix safety: <https://russell.harness/safety/> .
+@prefix prompt: <https://russell.harness/prompt/> .
+@prefix reg: <https://russell.harness/registry/> .
+@prefix telemetry: <https://russell.harness/telemetry/> .
+@prefix dispatch: <https://russell.harness/dispatch/> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+# ============================================================================
+# Russell Skill System — Semantic Domain Model
+# Version: 1.0.0
+# Generated: 2026-05-15
+# Scope: crates/russell-skills + crates/russell-meta + crates/russell-core
+#
+# Annotations use rdfs:comment with crate path:
+#   <crate>/src/<file>:<line_range>
+# ============================================================================
+
+# ── Core Domain Entities ────────────────────────────────────────────────────
+
+skill:Skill rdf:type rdfs:Class ;
+  rdfs:comment """
+    A fully loaded skill instance. The central domain aggregate.
+    Locus: crates/russell-skills/src/lib.rs:175-211
+    Properties: id, kind, version, authored, symptoms, applies_when,
+                probes, interventions, safety, evaluation, scripts
+  """ .
+
+skill:SkillKind rdf:type rdfs:Class ;
+  rdfs:comment """
+    Classifier for skill agency level.
+    Locus: crates/russell-skills/src/lib.rs:158-173
+    Variants: Actionable (has probes + interventions), Lens (KNOWLEDGE.md only)
+    SEMANTIC OVERLOAD: Lens-type skills carry KNOWLEDGE.md but have no
+    probes/interventions. The SkillKind enum conflates "capability type"
+    with "agency level" — a Lens skill has different lifecycle transitions,
+    different evaluation criteria, and different prompt integration than
+    an Actionable skill, yet they share a single struct.
+  """ .
+
+skill:Manifest rdf:type rdfs:Class ;
+  rdfs:comment """
+    Raw YAML manifest before validation. Deserialized then validated into Skill.
+    Locus: crates/russell-skills/src/lib.rs:379-406 (RawManifest)
+           crates/russell-skills/src/lib.rs:625 (parse_manifest)
+    Note: There is no typed Manifest struct — RawManifest is the deser target,
+    and Skill is the validated domain object. The implicit concept of
+    "a manifest on disk" is under-specified (no type).
+  """ .
+
+skill:Probe rdf:type rdfs:Class ;
+  rdfs:comment """
+    A read-only diagnostic step (id, cmd, timeout).
+    Locus: crates/russell-skills/src/lib.rs:236-249
+  """ .
+
+skill:Intervention rdf:type rdfs:Class ;
+  rdfs:comment """
+    A mutating action with risk band and rollback strategy.
+    Locus: crates/russell-skills/src/lib.rs:251-276
+  """ .
+
+skill:RiskBand rdf:type rdfs:Class ;
+  rdfs:comment """
+    Risk classification for interventions.
+    Locus: crates/russell-skills/src/lib.rs:316-330
+    Variants: None, Low, Medium, High, Critical
+    Implements PartialOrd for gating via max_auto_risk.
+  """ .
+
+skill:Rollback rdf:type rdfs:Class ;
+  rdfs:comment """
+    Rollback strategy for a mutation.
+    Locus: crates/russell-skills/src/lib.rs:278-313
+    Variants: RollbackId, NoneNeeded, Reboot
+  """ .
+
+skill:Evaluation rdf:type rdfs:Class ;
+  rdfs:comment """
+    Post-intervention evaluation checks.
+    Locus: crates/russell-skills/src/lib.rs:356-361
+    Contains Vec<EvalCheck>.
+    Note: This struct exists in the Skill aggregate but is never consulted
+    by the Dispatcher or chat loop — it is parsed from manifests but
+    unwired to any runtime path. UNDER-SPECIFIED: no consumer.
+  """ .
+
+skill:EvalCheck rdf:type rdfs:Class ;
+  rdfs:comment """
+    A single post-intervention verification step.
+    Locus: crates/russell-skills/src/lib.rs:363-377
+  """ .
+
+skill:AppliesWhen rdf:type rdfs:Class ;
+  rdfs:comment """
+    Profile precondition for skill applicability.
+    Locus: crates/russell-skills/src/lib.rs:216-233
+    Variants: Scalar (os_family, distro, etc.), List (any-of matching)
+  """ .
+
+skill:Symptom rdf:type rdfs:Class ;
+  rdfs:comment """
+    A canonical symptom identifier (116 catalogued).
+    Locus: crates/russell-skills/src/symptom_catalog.rs:SYMPTOMS
+           crates/russell-skills/data/symptoms.yaml
+    Under-specified: Symptom is a String, not a typed struct. No
+    severity, no category metadata, no cross-reference to probes.
+  """ .
+
+skill:KnowledgeArtifact rdf:type rdfs:Class ;
+  rdfs:comment """
+    A KNOWLEDGE.md file injected into the LLM prompt.
+    Locus: implicit — loaded via std::fs::read_to_string in
+           crates/russell-meta/src/prompt.rs:606-607
+    Under-specified: No struct, no version, no staleness tracking.
+    Exists only as a side-effect of the skills_base_dir / skill.id / "KNOWLEDGE.md" convention.
+  """ .
+
+skill:EvidenceBundle rdf:type rdfs:Class ;
+  rdfs:comment """
+    SOAP evidence folder: stdout.txt, stderr.txt, event.json.
+    Locus: crates/russell-skills/src/dispatch.rs:672-688 (write_evidence)
+    Under-specified: No struct — a directory layout convention.
+    EvidenceBundle exists as a concept in AGENTS.md vocabulary but
+    has no corresponding Rust type.
+  """ .
+
+skill:SkillSource rdf:type rdfs:Class ;
+  rdfs:comment """
+    Provenance of a skill.
+    Locus: crates/russell-skills/src/registry/mod.rs:140-159
+    Variants: Bundled, Registry, Workshop, Manual, Remote
+  """ .
+
+# ── Registry Entities ───────────────────────────────────────────────────────
+
+reg:RegistryCache rdf:type rdfs:Class ;
+  rdfs:comment """
+    Local YAML cache: BTreeMap<skill_id, RegistryEntry>.
+    Locus: crates/russell-skills/src/registry/mod.rs:38-41
+    Persisted at ~/.local/share/harness/registry/local-cache.yaml
+    JR-7: rebuildable from manifests + journal.
+    SEMANTIC OVERLOAD: This struct serves as (a) lookup index,
+    (b) telemetry store, (c) lifecycle tracker, and (d) serialization
+    target — four domain jobs, one struct.
+  """ .
+
+reg:RegistryEntry rdf:type rdfs:Class ;
+  rdfs:comment """
+    One skill's cache entry: lifecycle state, telemetry, provenance.
+    Locus: crates/russell-skills/src/registry/mod.rs:45-95
+    Fields: status, version, symptoms, source, installed, last_evaluated,
+            valid_until, coverage_score, superseded_by, deprecation_reason,
+            probe_runs, recent_probe_failures, intervention_runs,
+            recent_intervention_failures, last_probe_run_at, last_error,
+            avg_probe_duration_ms, bundled (18 fields)
+    SEMANTIC OVERLOAD: This single struct conflates lifecycle state,
+    identity metadata, quality scoring, execution telemetry, and
+    provenance — violating single-responsibility.
+  """ .
+
+reg:LifecycleStatus rdf:type rdfs:Class ;
+  rdfs:comment """
+    String-keyed lifecycle state enum.
+    Locus: crates/russell-skills/src/registry/lifecycle.rs:16-31
+    Transition path: discovered → evaluated → installed → active →
+                     stale_warning → deprecated → retired
+    Transition guards: is_loadable() returns true for Installed/Active/StaleWarning.
+    Note: Transitions are not type-enforced — any code can set any status
+    on any entry. No compiler guard against invalid transitions.
+  """ .
+
+reg:SafetyScan rdf:type rdfs:Class ;
+  rdfs:comment """
+    Pre-install content safety scanner (7 rule categories).
+    Locus: crates/russell-skills/src/registry/safety.rs:13-16
+    Used by: workshop commands, skill install command.
+    Note: No trait — SafetyScan is a concrete struct. Not called during
+    normal skill loading (only during install/workshop).
+  """ .
+
+safety:ScanFinding rdf:type rdfs:Class ;
+  rdfs:comment """
+    A single safety finding: severity, rule_id, description, snippet.
+    Locus: crates/russell-skills/src/registry/safety.rs:20-29
+  """ .
+
+safety:ScanSeverity rdf:type rdfs:Class ;
+  rdfs:comment """
+    Safety scan severity: Info, Warn, Block.
+    Locus: crates/russell-skills/src/registry/safety.rs:33-40
+  """ .
+
+# ── Prompt System Entities ──────────────────────────────────────────────────
+
+prompt:PromptRegistry rdf:type rdfs:Class ;
+  rdfs:comment """
+    MiniJinja template registry with inference hints.
+    Locus: crates/russell-meta/src/prompt_registry.rs:173-177
+    Methods: with_defaults(), load_disk_overrides(), render(),
+             render_with_hint(), inference_hint()
+  """ .
+
+prompt:PromptTemplate rdf:type rdfs:Class ;
+  rdfs:comment """
+    A named .md.j2 template with optional [inference] header.
+    Locus: crates/russell-meta/src/prompt_registry.rs:157-160 (TemplateInfo)
+    Default templates: soap, chat_objective, workshop.
+    Disk overrides at ~/.config/harness/prompts/*.md.j2
+  """ .
+
+prompt:InferenceHint rdf:type rdfs:Class ;
+  rdfs:comment """
+    Per-template LLM parameters: temperature, max_tokens, reasoning_effort.
+    Locus: crates/russell-meta/src/prompt_registry.rs:58-69
+    Parsed from [inference] TOML header in .md.j2 templates.
+  """ .
+
+prompt:KnowledgeSlot rdf:type rdfs:Class ;
+  rdfs:comment """
+    A knowledge chunk scored for relevance-based token injection.
+    Locus: crates/russell-meta/src/prompt_registry.rs:408-417
+    Fields: skill_id, content, relevance, token_estimate.
+  """ .
+
+prompt:SkillTelemetry rdf:type rdfs:Class ;
+  rdfs:comment """
+    Runtime signals modulating knowledge relevance.
+    Locus: crates/russell-meta/src/prompt_registry.rs:466-477
+    Fields: freshness, probe_runs, recent_failures,
+            intervention_runs, recent_intervention_failures.
+  """ .
+
+prompt:SoapPrompt rdf:type rdfs:Class ;
+  rdfs:comment """
+    The assembled SOAP prompt sent to the LLM.
+    Locus: crates/russell-meta/src/client.rs:118-131
+    Fields: system, subjective, objective, rendered, temperature, max_tokens.
+  """ .
+
+# ── Dispatch Entities ────────────────────────────────────────────────────────
+
+dispatch:Dispatcher rdf:type rdfs:Class ;
+  rdfs:comment """
+    Subprocess executor enforcing IDRS, risk caps, poka-yoke.
+    Locus: crates/russell-skills/src/dispatch.rs:169-190
+    Methods: run(), run_and_journal(), dispatch(),
+             run_intervention_with_rollback().
+    Note: No trait — concrete struct only.
+  """ .
+
+dispatch:RunOutcome rdf:type rdfs:Class ;
+  rdfs:comment """
+    Result of a single subprocess execution.
+    Locus: crates/russell-skills/src/dispatch.rs:62-77
+  """ .
+
+dispatch:RollbackOutcome rdf:type rdfs:Class ;
+  rdfs:comment """
+    Result of forward + rollback execution pair.
+    Locus: crates/russell-skills/src/dispatch.rs:99-106
+  """ .
+
+dispatch:ResolvedAction rdf:type rdfs:Class ;
+  rdfs:comment """
+    Parsed ACTION: protocol output.
+    Locus: crates/russell-meta/src/action.rs:29-80
+    Variants: Probe, Intervention, KaskTool.
+    Note: No trait — resolved via free functions resolve(),
+    resolve_with_kask().
+  """ .
+
+prompt:ActionError rdf:type rdfs:Class ;
+  rdfs:comment """
+    ACTION: protocol parsing errors.
+    Locus: crates/russell-meta/src/action.rs:138-172
+  """ .
+
+# ── Port & Adapter Entities (hexagonal boundary) ─────────────────────────────
+
+skill:Port rdf:type rdfs:Class ;
+  rdfs:comment """
+    A hexagonal port: a trait defining a domain boundary contract.
+    EXISTING PORTS:
+    - LlmClient (russell-meta/src/client.rs:143)
+    - TimerSource (russell-proprio/src/lib.rs:54)
+    - ProbeDescriptor (russell-sentinel/src/probes/descriptor.rs:20)
+    - TokenProvider (russell-mcp/src/auth.rs:39)
+    IMPLICIT PORTS (no trait, only concrete struct or free fn):
+    - SkillLoader (FilesystemSkillLoader pattern)
+    - SkillRegistry (RegistryCache struct)
+    - SafetyScanner (SafetyScan struct)
+    - SkillDispatcher (Dispatcher struct)
+    - LifecycleManager (lifecycle module functions)
+    - TelemetryRecorder (health module functions)
+    - QualityEvaluator (compute_quality_score fn)
+    - KnowledgeInjector (append_skill_knowledge_scored fn)
+    - PromptComposer (compose_with_kask / compose_templated fns)
+    - ActionResolver (resolve / resolve_with_kask fns)
+    - ConsentGate (chat consent flow)
+    - RemoteDiscovery (RegistrySource struct, no fetch logic)
+    - SkillDistribution (no types exist)
+  """ .
+
+skill:Adapter rdf:type rdfs:Class ;
+  rdfs:comment """
+    A hexagonal adapter: a concrete implementation of a Port trait.
+    EXISTING:
+    - OkapiClient : LlmClient (russell-meta/src/oai_client.rs)
+    - MockClient : LlmClient (russell-meta/src/mock.rs)
+    - SystemdTimerSource : TimerSource (russell-proprio/src/lib.rs:70)
+    - Concrete probe structs : ProbeDescriptor (russell-sentinel/src/probes/*.rs)
+    - StaticTokenProvider : TokenProvider (russell-mcp/src/auth.rs:51)
+    - FileTokenProvider : TokenProvider (russell-mcp/src/auth.rs:88)
+    PROPOSED (from docs/analysis/russell-skill-system-refactoring.md):
+    - FilesystemSkillLoader, YamlRegistryCache, HeuristicScanner,
+      SubprocessDispatcher, JournaledLifecycle, EwmaTelemetry,
+      SixFactorScorer, ScoredKnowledgeInjector, MiniJinjaComposer,
+      RegexActionResolver, ReadlineConsentGate, GitRepoAdapter,
+      LocalFilesystemAdapter, KaskMcpAdapter
+  """ .
+
+# ── Relations ────────────────────────────────────────────────────────────────
+
+# Skill aggregate composition
+skill:Skill skill:hasKind skill:SkillKind .
+skill:Skill skill:hasProbe skill:Probe .
+skill:Skill skill:hasIntervention skill:Intervention .
+skill:Skill skill:hasEvaluation skill:Evaluation .
+skill:Skill skill:addressesSymptom skill:Symptom .
+skill:Skill skill:hasSource skill:SkillSource .
+skill:Skill skill:requiresManifest skill:Manifest .
+
+# Manifest → Skill
+skill:Manifest skill:validatesInto skill:Skill .
+
+# Intervention constraints
+skill:Intervention skill:constrainedBy skill:RiskBand .
+skill:Intervention skill:hasRollback skill:Rollback .
+
+# Evaluation composition
+skill:Evaluation skill:containsCheck skill:EvalCheck .
+
+# Registry topology
+reg:RegistryCache reg:containsEntry reg:RegistryEntry .
+reg:RegistryEntry reg:hasState reg:LifecycleStatus .
+reg:RegistryEntry reg:referencesSkill skill:Skill .
+reg:RegistryEntry reg:hasSource skill:SkillSource .
+reg:RegistryEntry reg:hasTelemetry telemetry:TelemetrySnapshot .
+
+# Lifecycle transitions (identity string-keyed)
+reg:LifecycleStatus reg:nextState reg:LifecycleStatus .  # no type guard
+
+# Safety
+reg:SafetyScan reg:blocksInstall skill:Skill .
+safety:ScanFinding safety:foundIn skill:Manifest .
+
+# Prompt pipeline
+prompt:PromptRegistry prompt:containsTemplate prompt:PromptTemplate .
+prompt:PromptTemplate prompt:declaresHint prompt:InferenceHint .
+prompt:PromptRegistry prompt:produces prompt:SoapPrompt .
+prompt:KnowledgeSlot prompt:derivedFrom skill:KnowledgeArtifact .
+prompt:SkillTelemetry prompt:modulates prompt:KnowledgeSlot .
+
+# Dispatch pipeline
+dispatch:Dispatcher dispatch:executes skill:Probe .
+dispatch:Dispatcher dispatch:executes skill:Intervention .
+dispatch:Dispatcher dispatch:produces dispatch:RunOutcome .
+dispatch:Dispatcher dispatch:produces dispatch:RollbackOutcome .
+dispatch:Dispatcher dispatch:writesEvidence skill:EvidenceBundle .
+
+# SkILL LOADING: Skill → Port/Adapter pipeline
+skill:Skill skill:loadedBy skill:Port .  # SkillLoader port
+reg:RegistryEntry reg:validatedBy skill:Port .  # SkillValidator port
+dispatch:Dispatcher dispatch:governedBy skill:Port .  # SkillDispatcher port
+prompt:SoapPrompt prompt:assembledBy skill:Port .  # PromptAssembler port
+
+# Telemetry (implicit)
+telemetry:TelemetrySnapshot rdf:type rdfs:Class ;
+  rdfs:comment """
+    The set of telemetry fields on RegistryEntry that constitute
+    a skill's runtime performance snapshot. UNDER-SPECIFIED:
+    no dedicated type — fields are flattened onto RegistryEntry.
+    Locus: crates/russell-skills/src/registry/mod.rs:73-91
+    Fields: probe_runs, recent_probe_failures, intervention_runs,
+            recent_intervention_failures, last_probe_run_at,
+            last_error, avg_probe_duration_ms.
+  """ .
+
+# Knowledge artifact bridging
+skill:KnowledgeArtifact skill:injectedInto prompt:SoapPrompt .
+skill:KnowledgeArtifact skill:scoredBy prompt:KnowledgeSlot .
+
+# Symptom catalog
+skill:Symptom skill:cataloguedIn skill:SymptomCatalog .
+skill:SymptomCatalog rdf:type rdfs:Class ;
+  rdfs:comment """
+    The compiled-in symptom registry (116 entries).
+    Locus: crates/russell-skills/src/symptom_catalog.rs:SYMPTOMS
+           crates/russell-skills/data/symptoms.yaml
+  """ .
+
+# Kask ecosystem
+prompt:ResolvedAction prompt:resolvesTo dispatch:ResolvedAction .
+skill:KaskTool rdf:type rdfs:Class ;
+  rdfs:comment """
+    MCP tool exposed by Kask, resolved via ACTION: kask/<tool>.
+    Locus: crates/russell-meta/src/action.rs:216-226 (KaskToolInfo)
+           crates/russell-mcp/src/registry.rs:ToolRegistry
+  """ .
+prompt:ResolvedAction prompt:includesKaskTool skill:KaskTool .
+
+# ── Semantic Overload & Under-specification Annotations ─────────────────────
+
+skill:RegistryCacheOverload rdfs:comment """
+  RegistryCache is semantically overloaded:
+  1. Skill index (lookup_symptom, by_status, coverage_gaps)
+  2. Telemetry store (record_execution, record_intervention, avg_probe_duration_ms)
+  3. Lifecycle tracker (status transitions via upsert + by_status)
+  4. Serialization target (serde Serialize/Deserialize for local-cache.yaml)
+  Resolution: extract SkillIndex, SkillTelemetry, and LifecycleRegistry as separate
+  types, with RegistryCache as a facade or removed entirely.
+""" .
+
+skill:RegistryEntryOverload rdfs:comment """
+  RegistryEntry is semantically overloaded (18 fields):
+  1. Identity (version, symptoms, source, bundled)
+  2. Lifecycle (status, installed, valid_until)
+  3. Quality (coverage_score, last_evaluated)
+  4. Telemetry (probe_runs, recent_probe_failures, avg_probe_duration_ms, etc.)
+  5. Deprecation metadata (superseded_by, deprecation_reason)
+  Resolution: split into SkillIdentity, SkillLifecycle, SkillHealth (Task 5/6).
+""" .
+
+skill:SymptomUnderspec rdfs:comment """
+  Symptom is just a String — no severity, category, or cross-reference to probes.
+  Resolution: typed Symptom { id, category, severity_hint, related_probes }.
+""" .
+
+skill:EvidenceUnderspec rdfs:comment """
+  EvidenceBundle is a directory layout convention, not a type.
+  Resolution: typed EvidenceBundle { path, outcomes, events }.
+""" .
+
+skill:ManifestUnderspec rdfs:comment """
+  There is no typed Manifest — RawManifest is the YAML deser target, and Skill
+  is the validated domain object. The concept of "a manifest file on disk
+  with its raw content and parse state" has no type.
+""" .
+
+skill:EvaluationUnwired rdfs:comment """
+  Skill.evaluation (EvalCheck) is parsed from manifests but never consulted
+  by the Dispatcher or chat loop. It exists in the domain model but has
+  no runtime consumer — a dead field.
+""" .
+
+skill:LensAgencyGap rdfs:comment """
+  SkillKind::Lens skills inject KNOWLEDGE.md but have no probes or interventions.
+  They cannot be dispatched, evaluated by scenario tester, or health-tracked
+  like Actionable skills. Their "agency" differs qualitatively — yet they
+  share the same struct and lifecycle. The SkillKind split is insufficient.
+""" .

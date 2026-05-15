@@ -51,6 +51,11 @@ pub struct RegistryEntry {
     pub symptoms: Vec<String>,
     /// Where the skill came from.
     pub source: SkillSource,
+    /// Gap 3: Execution trust tier — determines whether this skill
+    /// needs consent gates, sandbox testing, or can auto-execute.
+    /// Independent of `source` (a `Workshop` skill starts at T3, not T4).
+    #[serde(default = "default_trust_tier")]
+    pub trust_tier: TrustTier,
     /// ISO 8601 date of installation.
     pub installed: String,
     /// ISO 8601 date of last evaluation.
@@ -109,11 +114,13 @@ impl RegistryEntry {
         installed: impl Into<String>,
         bundled: bool,
     ) -> Self {
+        let trust_tier = initial_trust_tier(&source);
         Self {
             status,
             version: version.into(),
             symptoms,
             source,
+            trust_tier,
             installed: installed.into(),
             last_evaluated: None,
             valid_until: None,
@@ -179,6 +186,62 @@ pub enum RegistryKind {
     HttpIndex,
     /// A local filesystem path.
     LocalDir,
+}
+
+/// Gap 3: Execution trust tier — determines the gates required before
+/// a skill's probes and interventions can execute.
+///
+/// Trust tiers are mapped from the skill governance framework
+/// (`pragmatic-cybernetics/references/skill-governance.md`):
+///
+/// | Tier | Access | Gates Required |
+/// |------|--------|---------------|
+/// | T1 (Metadata) | Name, description only | None — informational only |
+/// | T2 (Instructions) | Read skill instructions | G1: Provenance verified |
+/// | T3 (Supervised) | Execute with consent | G2: Safety scanned + G3: Sandbox tested |
+/// | T4 (Autonomous) | Full auto-execution | G4: Continuous monitoring active |
+///
+/// Initial trust tier is derived from `SkillSource`:
+/// - `Bundled` → T4 (trusted by provenance)
+/// - `Workshop` → T3 (operator-created, not yet verified)
+/// - `Registry` → T2 (requires G2/G3 gates before execution)
+/// - `Remote { url }` → T1 (metadata only, full ascent required)
+/// - `Manual` → T2 (operator copied, no provenance chain)
+///
+/// Trust follows **Slovic asymmetry**: a single anomalous probe result
+/// from a T4 skill demotes it to T3 immediately. Re-escalation requires
+/// sustained evidence through multiple gates.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TrustTier {
+    /// Metadata only — name, description, symptoms. No execution.
+    T1,
+    /// Instructions readable — KNOWLEDGE.md injectable. No execution.
+    T2,
+    /// Supervised execution — requires operator consent for every action.
+    T3,
+    /// Autonomous execution — probes auto-execute, interventions auto-approve.
+    T4,
+}
+
+/// Derive the initial trust tier from a skill's source.
+///
+/// Conservative defaults: even `Bundled` skills start at T4 because
+/// they are shipped with Russell and are provenance-verified.
+/// All external sources start at T1–T3 requiring gate escalation.
+#[must_use]
+pub fn initial_trust_tier(source: &SkillSource) -> TrustTier {
+    match source {
+        SkillSource::Bundled => TrustTier::T4,
+        SkillSource::Workshop => TrustTier::T3,
+        SkillSource::Registry { .. } => TrustTier::T2,
+        SkillSource::Remote { .. } => TrustTier::T1,
+        SkillSource::Manual => TrustTier::T2,
+    }
+}
+
+fn default_trust_tier() -> TrustTier {
+    TrustTier::T3
 }
 
 /// Configuration for remote registry sources.
@@ -414,11 +477,13 @@ mod tests {
 
     fn test_entry(status: LifecycleStatus, version: &str, symptoms: Vec<&str>, source: SkillSource) -> RegistryEntry {
         let bundled = matches!(source, SkillSource::Bundled);
+        let trust_tier = initial_trust_tier(&source);
         RegistryEntry {
             status,
             version: version.into(),
             symptoms: symptoms.into_iter().map(String::from).collect(),
             source,
+            trust_tier,
             installed: "2026-05-01".into(),
             last_evaluated: None,
             valid_until: None,

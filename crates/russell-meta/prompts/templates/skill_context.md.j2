@@ -1,0 +1,48 @@
+[inference]
+temperature = 0.2
+max_tokens = 4096
+
+{# ──────────────────────────────────────────────────────────────
+   Template: skill_context.md.j2
+   Purpose:  Rendered skill context block injected into SOAP/chat
+             templates. Provides structured skill inventory for
+             the LLM's decision support.
+   ────────────────────────────────────────────────────────────── #}
+
+## Available Skills
+
+{% if actionable_skills %}
+### Actionable Skills (probes + interventions)
+
+| Skill ID | Kind | Probes | Interventions |
+|---|---|---|---|
+{% for skill in actionable_skills %}
+| {{ skill.id }} | {{ skill.kind }} | {{ skill.probes | map(attribute="id") | join(", ") }} | {{ skill.interventions | map(attribute="id") | join(", ") }} |
+{% endfor %}
+
+**Probe syntax:** `ACTION: <skill-id>/<probe-id>`
+**Intervention syntax:** `ACTION: <skill-id>/<intervention-id>`
+{% endif %}
+
+{% if knowledge_skills %}
+### Knowledge Skills (domain expertise injected into prompt)
+
+{% for skill in knowledge_skills %}
+- **{{ skill.id }}** — symptoms: {{ skill.symptoms }}
+  {% if skill.health %}
+  - Health: freshness={{ "%.2f" | format(skill.health.freshness) }}, probe_runs={{ skill.health.probe_runs }}
+  {% endif %}
+{% endfor %}
+{% endif %}
+
+{% if kask_tools %}
+### Kask MCP Tools
+
+| Tool | Risk |
+|---|---|
+{% for tool in kask_tools %}
+| {{ tool.name }} | {{ tool.risk }} |
+{% endfor %}
+
+**Kask syntax:** `ACTION: kask/<tool-name>`
+{% endif %}

@@ -1,0 +1,61 @@
+# Skill → Prompt Template Mapping Registry
+# Version: 1.0.0
+# Schema: russell.prompt-template-map.v1
+#
+# Governs which MiniJinja template is rendered for a given
+# SkillKind × LifecycleStatus × context_phase combination.
+#
+# Compiled-in default. Operator overrides at:
+#   ~/.config/harness/prompts/templates.yaml
+#
+# Replaces the ad-hoc logic previously at prompt.rs:563-623.
+
+version: "1.0.0"
+
+defaults:
+  soap: "soap"           # one-shot SOAP health check
+  chat: "chat_objective" # multi-turn chat REPL
+  workshop: "workshop"   # skill creation/management
+
+# Context-phase selectors: which template to use based on
+# what the caller is doing.
+context_phases:
+  jack:         # russell jack (one-shot)
+    template: soap
+  chat:         # russell chat (multi-turn)
+    template: chat_objective
+  workshop:     # russell workshop (now folded into chat, F6)
+    template: chat_objective
+
+# Skill visibility in prompt: which fields to include per skill kind.
+skill_injection:
+  Actionable:
+    display_probes: true
+    display_interventions: true
+    display_risk: true
+    template_block: "actionable_skills"
+
+  Lens:
+    display_probes: false
+    display_interventions: false
+    display_knowledge: true
+    template_block: "knowledge_skills"
+
+# Knowledge budget configuration.
+knowledge_budget:
+  max_tokens: 3000
+  min_tokens_per_skill: 200    # minimum token guarantee per selected skill
+  stale_penalty_factor: 0.7    # stale skills get 0.7× relevance multiplier
+  reliability_boost: 0.2       # reliable skills (failure < 10%) get +0.2×
+
+# Inference hint defaults (overridden by per-template [inference] headers).
+inference_defaults:
+  soap:
+    temperature: 0.2
+    max_tokens: 4096
+  chat_objective:
+    temperature: 0.4
+    max_tokens: 2048
+  workshop:
+    temperature: 0.6
+    max_tokens: 4096

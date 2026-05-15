@@ -97,6 +97,19 @@ pub const PROBE_HELP_ERROR_RATE: &str = "help_error_rate_pct";
 /// Probe name for the Kask MCP reachability self-vital (Phase 4C, ADR-0025 §5).
 pub const PROBE_KASK_MCP_REACHABLE: &str = "kask_mcp_reachable_ms";
 
+/// Gap 5: Probe name for remote skill discovery latency self-vital.
+///
+/// Tracks the time since the last successful discovery fetch from
+/// configured remote registries. When remote discovery is not configured,
+/// this vital returns `None` (no sample written — equivalent to the
+/// kask MCP probe's graceful degradation).
+///
+/// Thresholds are conservative — remote registries are external dependencies
+/// with unpredictable latency:
+/// - Warn: > 3600 s (1 hour — stale index)
+/// - Alert: > 86400 s (24 hours — registry unreachable, content frozen)
+pub const PROBE_REMOTE_DISCOVERY_LATENCY: &str = "remote_discovery_latency_s";
+
 // ---------------------------------------------------------------------------
 // Sentinel age thresholds
 // ---------------------------------------------------------------------------
@@ -157,6 +170,18 @@ pub const ERROR_RATE_ALERT_THRESHOLD_PCT: f64 = 50.0;
 /// Threshold (milliseconds) above which the kask MCP latency vital emits `warn`.
 /// 2× the 2s health probe timeout.
 pub const KASK_LATENCY_WARN_THRESHOLD_MS: u64 = 2_000;
+
+// ---------------------------------------------------------------------------
+// Remote discovery thresholds (Gap 5)
+// ---------------------------------------------------------------------------
+
+/// Threshold (seconds) above which the remote discovery latency vital
+/// emits `warn`. ~1 hour — stale index.
+pub const REMOTE_DISCOVERY_WARN_THRESHOLD_S: i64 = 3_600;
+
+/// Threshold (seconds) above which the remote discovery latency vital
+/// emits `alert`. ~24 hours — registry unreachable.
+pub const REMOTE_DISCOVERY_ALERT_THRESHOLD_S: i64 = 86_400;
 
 // ---------------------------------------------------------------------------
 // AutoimmuneGuard
@@ -264,6 +289,13 @@ pub struct ProprioResult {
     pub kask_mcp_reachable_ms: Option<u64>,
     /// Severity of the kask MCP reachability vital.
     pub kask_mcp_reachable_severity: Severity,
+
+    // -- Remote discovery latency (Gap 5) --
+    /// Time since last successful remote skill registry fetch, in seconds.
+    /// `None` if remote discovery is not configured or has never run.
+    pub remote_discovery_latency_s: Option<i64>,
+    /// Severity of the remote discovery latency vital.
+    pub remote_discovery_latency_severity: Severity,
 }
 
 /// Input from the async Kask MCP health probe, passed into the proprio cycle
@@ -390,6 +422,9 @@ fn run_once_inner(
     // 6. Kask MCP reachability (Phase 4C, ADR-0025 §5).
     let (kask_mcp_ms, kask_mcp_severity) = gather_kask_mcp_reachable(writer, now, kask_health);
 
+    // 7. Remote discovery latency (Gap 5).
+    let (remote_latency_s, remote_latency_severity) = gather_remote_discovery_latency(writer, now);
+
     // Emit events for any vital that breached threshold.
     // Descriptors: (severity, module, probe_name, value_f64, warn_threshold, alert_threshold, json_key)
     let vitals: &[(Severity, &str, &str, f64, f64, f64, &str)] = &[
@@ -440,6 +475,15 @@ fn run_once_inner(
             ERROR_RATE_ALERT_THRESHOLD_PCT,
             "pct",
         ),
+        (
+            remote_latency_severity,
+            "proprio/remote_discovery",
+            PROBE_REMOTE_DISCOVERY_LATENCY,
+            remote_latency_s.unwrap_or(-1) as f64,
+            REMOTE_DISCOVERY_WARN_THRESHOLD_S as f64,
+            REMOTE_DISCOVERY_ALERT_THRESHOLD_S as f64,
+            "latency_s",
+        ),
     ];
 
     let mut event_emitted = false;
@@ -475,6 +519,8 @@ fn run_once_inner(
         help_error_rate_severity: error_rate_severity,
         kask_mcp_reachable_ms: kask_mcp_ms,
         kask_mcp_reachable_severity: kask_mcp_severity,
+        remote_discovery_latency_s: remote_latency_s,
+        remote_discovery_latency_severity: remote_latency_severity,
     })
 }
 
@@ -758,6 +804,57 @@ fn gather_kask_mcp_reachable(
     (kask_ms, sev)
 }
 
+/// Gap 5: Gather the remote discovery latency vital.
+///
+/// Reads the time since the last successful remote registry fetch from
+/// the journal. When remote discovery is not configured or has never run,
+/// returns `None` — no sample is written and severity is `Info`.
+///
+/// This is a foundation probe: it detects when the remote registry
+/// pipeline is stalled (stale index, unreachable Git registries) and
+/// alerts the operator before skill content becomes obsolete.
+///
+/// When `RemoteDiscovery` is fully wired (Gap 3), this probe will also
+/// read latency from the registry cache's `last_fetch_at` timestamp.
+fn gather_remote_discovery_latency(
+    writer: &JournalWriter,
+    now: i64,
+) -> (Option<i64>, Severity) {
+    // Read the last remote discovery fetch event from the journal.
+    // For now, this checks if any `remote.skill.fetch` event exists.
+    // When remote discovery is wired, this will read from the registry
+    // cache's last_fetch_at timestamp.
+    let latency = match writer.reader().last_remote_fetch_ts() {
+        Ok(Some(last_ts)) => Some(now.saturating_sub(last_ts)),
+        // None means no remote discovery has been configured/run.
+        Ok(None) => None,
+        Err(e) => {
+            warn!(error = %e, "proprio: failed to read remote discovery timestamp");
+            None
+        }
+    };
+
+    let sev = match latency {
+        Some(d) => classify_threshold(d, REMOTE_DISCOVERY_WARN_THRESHOLD_S, REMOTE_DISCOVERY_ALERT_THRESHOLD_S),
+        None => Severity::Info,
+    };
+
+    // Write sample even when None — records the probe ran.
+    if let Err(e) = writer.append_sample(
+        now,
+        Scope::Self_,
+        PROBE_REMOTE_DISCOVERY_LATENCY,
+        latency.map(|d| d as f64),
+        None,
+        Some("s"),
+    ) {
+        warn!(error = %e, "proprio: failed to write {PROBE_REMOTE_DISCOVERY_LATENCY} sample");
+    }
+
+    debug!(latency_s = ?latency, severity = ?sev, "proprio: {PROBE_REMOTE_DISCOVERY_LATENCY}");
+    (latency, sev)
+}
+
 /// Emit a self-scope event for a threshold breach.
 fn emit_event(
     writer: &JournalWriter,
@@ -937,14 +1034,17 @@ mod tests {
         )
         .unwrap();
 
-        // All five self-scope probes should be present.
-        for probe in [
+        // Core self-scope probes (5 original + kask + remote = 7 total;
+        // kask probe only written when kask_health is provided).
+        let expected_probes = &[
             PROBE_SENTINEL_AGE,
             PROBE_JOURNAL_STALL,
             PROBE_LLM_P95_LATENCY,
             PROBE_TIMER_DRIFT,
             PROBE_HELP_ERROR_RATE,
-        ] {
+            PROBE_REMOTE_DISCOVERY_LATENCY,
+        ];
+        for probe in expected_probes {
             let count: i64 = conn
                 .query_row(
                     "SELECT COUNT(*) FROM samples WHERE scope='self' AND probe=?1",

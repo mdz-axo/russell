@@ -610,6 +610,9 @@ fn append_skill_knowledge_scored(
             }
 
             // Score with telemetry feedback if registry is available.
+            // Gap 4: Structural relevance — since the applies_when filter above
+            // already ensures only host-relevant skills reach this point,
+            // always pass applies_when_match=true for the structural relevance floor.
             let relevance = match skill_registry.and_then(|reg| reg.skills.get(&skill.id)) {
                 Some(entry) => {
                     let telemetry = SkillTelemetry {
@@ -622,10 +625,15 @@ fn append_skill_knowledge_scored(
                     score_knowledge_relevance_with_telemetry(
                         &skill.symptoms,
                         &active_symptoms,
+                        true, // applies_when filter already passed
                         &telemetry,
                     )
                 }
-                None => score_knowledge_relevance(&skill.symptoms, &active_symptoms),
+                None => score_knowledge_relevance(
+                    &skill.symptoms,
+                    &active_symptoms,
+                    true, // applies_when filter already passed
+                ),
             };
 
             let token_estimate = content.len() / 4;

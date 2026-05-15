@@ -8,7 +8,7 @@ use anyhow::{Context, Result};
 use russell_core::journal::JournalWriter;
 use russell_core::paths::Paths;
 use russell_core::time::now_date_iso8601;
-use russell_skills::registry::{LifecycleStatus, RegistryCache, RegistryEntry};
+use russell_skills::registry::{LifecycleStatus, RegistryCache, RegistryEntry, TrustTier};
 use russell_skills::{Skill, load_all};
 use std::time::Duration;
 
@@ -254,6 +254,7 @@ pub fn check(paths: &Paths) -> Result<()> {
                     version: skill.version.clone(),
                     symptoms: skill.symptoms.clone(),
                     source: russell_skills::registry::SkillSource::Manual,
+                    trust_tier: russell_skills::registry::TrustTier::T2,
                     installed: skill.authored.clone(),
                     last_evaluated: None,
                     valid_until: None,
@@ -351,6 +352,7 @@ pub fn install(paths: &Paths, name: &str) -> Result<()> {
                     version: version.clone(),
                     symptoms: vec![],
                     source: SkillSource::Manual,
+                    trust_tier: TrustTier::T2,
                     installed: chrono_now(),
                     last_evaluated: None,
                     valid_until: None,
@@ -591,6 +593,7 @@ pub fn put(paths: &Paths, name: Option<&str>) -> Result<()> {
             version: version.clone(),
             symptoms: symptoms.clone(),
             source: SkillSource::Manual,
+            trust_tier: TrustTier::T2,
             installed: authored.clone(),
             last_evaluated: None,
             valid_until: None,
