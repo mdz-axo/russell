@@ -73,6 +73,9 @@ pub fn validate_endpoint(url: &str) -> Result<()> {
 ///
 /// Speaks Kask's REST API for MCP tool access. Authenticated via bearer
 /// token. Connects only to loopback addresses.
+///
+/// Rate limiting: limits concurrent requests to prevent overwhelming
+/// the Kask gateway during high-frequency tool usage.
 pub struct KaskMcpClient {
     config: KaskMcpConfig,
     http: reqwest::Client,
@@ -80,13 +83,15 @@ pub struct KaskMcpClient {
     server_name: Option<String>,
     /// Whether the client has completed the health check.
     initialized: bool,
+    /// Rate limiter for concurrent requests (default: 10 concurrent).
+    rate_limit: Option<tokio::sync::Semaphore>,
 }
 
 impl KaskMcpClient {
     /// Construct a new client from configuration.
     ///
     /// Does NOT connect or initialize — call [`connect`](Self::connect)
-    /// to perform the handshake.
+    /// to perform the health check.
     ///
     /// # Errors
     /// Returns [`McpError::NonLoopbackRefused`] if the endpoint is not loopback.
@@ -100,11 +105,16 @@ impl KaskMcpClient {
             .build()
             .map_err(|e| McpError::Config(format!("failed to build HTTP client: {e}")))?;
 
+        // Rate limiter: allow up to 10 concurrent requests to prevent
+        // overwhelming the Kask gateway during high-frequency tool usage.
+        let rate_limit = Some(tokio::sync::Semaphore::new(10));
+
         Ok(Self {
             config,
             http,
             server_name: None,
             initialized: false,
+            rate_limit,
         })
     }
 
@@ -168,6 +178,12 @@ impl KaskMcpClient {
     /// # Errors
     /// Transport, protocol, or authentication errors.
     pub async fn list_tools(&self) -> Result<Vec<McpToolDefinition>> {
+        // Acquire rate limit permit (held for duration of request).
+        if let Some(ref semaphore) = self.rate_limit {
+            let _permit = semaphore.acquire().await
+                .map_err(|e| McpError::Config(format!("rate limiter closed: {e}")))?;
+        }
+
         let tools_url = format!("{}/api/v1/tools", self.config.endpoint.trim_end_matches('/'));
         
         let mut req = self
@@ -238,6 +254,12 @@ impl KaskMcpClient {
         name: impl Into<String>,
         arguments: Option<serde_json::Value>,
     ) -> Result<ToolCallResult> {
+        // Acquire rate limit permit (held for duration of request).
+        if let Some(ref semaphore) = self.rate_limit {
+            let _permit = semaphore.acquire().await
+                .map_err(|e| McpError::Config(format!("rate limiter closed: {e}")))?;
+        }
+
         let tool_name = name.into();
         let call_url = format!(
             "{}/api/v1/tools/{}",

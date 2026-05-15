@@ -250,12 +250,16 @@ violate separation of concerns.
 ### Phase 4A — MCP client foundation
 
 1. Promote `russell-mcp` from stub to client implementation.
-2. Transport: HTTP POST to `http://127.0.0.1:<port>/mcp`
-   with JSON-RPC 2.0.
+2. Transport: HTTP REST API to `http://127.0.0.1:18100/api/v1/*`
+   (Kask's stack-api provides REST endpoints, not JSON-RPC).
 3. Loopback enforcement at connect time (reject non-127.0.0.1/::1).
 4. Bearer token auth from `KASK_MCP_TOKEN`.
 5. `tools/list` caching with configurable TTL (default: 5 min).
 6. `russell mcp-tools` CLI verb: list available Kask tools.
+7. Endpoints:
+   - `GET /health` — connectivity check
+   - `GET /api/v1/tools` — list all tools from all MCP servers
+   - `POST /api/v1/tools/{name}` — invoke a tool
 
 ### Phase 4B — Dispatcher integration
 

@@ -88,8 +88,9 @@ if [ -d "$KASK_REPO" ] && [ -f "$KASK_REPO/Cargo.toml" ]; then
     cat > "$HOME/.config/stack/mcp-registry.json" <<'MCPREG'
 {
   "version": "1.0",
-  "servers": {
+  "native_servers": {
     "russell": {
+      "name": "russell",
       "transport": {
         "type": "stdio",
         "command": "/home/mdz-axolotl/.local/bin/arsenal-mcp-russell",
@@ -97,10 +98,13 @@ if [ -d "$KASK_REPO" ] && [ -f "$KASK_REPO/Cargo.toml" ]; then
       },
       "enabled": true,
       "auto_start": true,
+      "tier": 2,
+      "priority": 1,
       "tags": ["infrastructure", "health", "host"],
       "description": "Russell host-health bridge"
     },
     "okapi-metrics": {
+      "name": "okapi-metrics",
       "transport": {
         "type": "stdio",
         "command": "/home/mdz-axolotl/.local/bin/arsenal-mcp-okapi-metrics",
@@ -108,10 +112,15 @@ if [ -d "$KASK_REPO" ] && [ -f "$KASK_REPO/Cargo.toml" ]; then
       },
       "enabled": true,
       "auto_start": true,
+      "tier": 2,
+      "priority": 2,
       "tags": ["okapi", "inference", "metrics"],
       "description": "Okapi inference metrics"
     }
-  }
+  },
+  "external_servers": {},
+  "default_timeout_ms": 30000,
+  "auto_start_all": true
 }
 MCPREG
     
@@ -119,9 +128,20 @@ MCPREG
     say "Building Kask MCP HTTP gateway (stack-api)…"
     (cd "$KASK_REPO" && cargo build -p stack-api)
     if [ -f "$KASK_REPO/target/debug/stack-api" ]; then
-      say "MCP gateway binary ready at $KASK_REPO/target/debug/stack-api"
-      say "To start the MCP gateway, run:"
-      say "  $REPO/scripts/start-kask-mcp-gateway.sh --background"
+      say "Installing kask-gateway systemd service…"
+      install -m 0644 "$REPO/packaging/systemd/kask-gateway.service" "$HOME/.config/systemd/user/"
+      systemctl --user daemon-reload
+      systemctl --user enable kask-gateway.service
+      systemctl --user start kask-gateway.service
+      
+      # Verify gateway is running
+      sleep 2
+      if curl -sf "http://127.0.0.1:18100/health" >/dev/null 2>&1; then
+        say "✓ Kask gateway started and healthy at http://127.0.0.1:18100"
+      else
+        say "WARNING: Kask gateway may not have started correctly"
+        say "  Check: systemctl --user status kask-gateway.service"
+      fi
     fi
   else
     say "WARNING: arsenal-mcp-russell build failed, MCP tools unavailable"

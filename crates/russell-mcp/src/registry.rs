@@ -236,6 +236,7 @@ mod tests {
             description: Some(desc.to_owned()),
             input_schema: None,
             annotations: None,
+            server: Some("test".to_owned()),
         }
     }
 
@@ -245,6 +246,7 @@ mod tests {
             description: Some("test tool".into()),
             input_schema: None,
             annotations: Some(serde_json::json!({ "risk_band": risk })),
+            server: Some("test".to_owned()),
         }
     }
 

@@ -27,12 +27,10 @@ pub struct KaskHealthResult {
 
 /// Probe the Kask MCP endpoint for reachability.
 ///
-/// Sends a minimal HTTP POST (MCP `ping`) to the configured endpoint.
+/// Sends a GET request to the REST API `/health` endpoint.
 /// Uses a 2-second timeout to avoid blocking the proprioception cycle.
 ///
-/// This is NOT a full MCP handshake — it's a fast health check that
-/// verifies the endpoint is up and responding to HTTP. For a full
-/// initialize + tools/list, use [`KaskMcpClient`](crate::client::KaskMcpClient).
+/// This is a fast health check that verifies the endpoint is up and responding.
 pub async fn probe_reachability() -> KaskHealthResult {
     let config = KaskMcpConfig::from_env();
 
@@ -56,24 +54,23 @@ pub async fn probe_reachability() -> KaskHealthResult {
         }
     };
 
-    // Send a MCP ping (JSON-RPC).
-    let body = serde_json::json!({
-        "jsonrpc": "2.0",
-        "id": 1,
-        "method": "ping"
-    });
+    // Build health endpoint URL (REST API, not JSON-RPC).
+    let health_url = format!(
+        "{}/health",
+        config.endpoint.trim_end_matches('/')
+    );
 
     let start = Instant::now();
 
     let mut req = http
-        .post(&config.endpoint)
-        .header("Content-Type", "application/json");
+        .get(&health_url)
+        .header("Accept", "application/json");
 
     if let Some(ref token) = config.token {
         req = req.bearer_auth(token);
     }
 
-    match req.json(&body).send().await {
+    match req.send().await {
         Ok(resp) => {
             let latency = start.elapsed().as_millis() as u64;
             if resp.status().is_success() {
