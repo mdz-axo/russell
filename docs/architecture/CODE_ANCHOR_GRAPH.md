@@ -28,8 +28,8 @@ status: VERIFIED
 ```
 russell_core::event::EventId rdf:type struct .
 russell_core::event::Event rdf:type struct .
-russell_core::event::Severity rdf:type enum .  # Info, Warn, Alert, Crit
-russell_core::event::Scope rdf:type enum .  # Host, Self
+russell_core::event::Severity rdf:type enum .  # Info, Warn, Alert, Crit; impl Display + FromStr
+russell_core::event::Scope rdf:type enum .  # Host, Self; impl Display + FromStr
 
 russell_core::profile::Profile rdf:type struct .  # russell.profile.v1
 russell_core::profile::HostInfo rdf:type struct .  # os, chassis, cpu, memory, swap
@@ -37,7 +37,13 @@ russell_core::profile::GpuInfo rdf:type struct .  # pci, vendor_id, name, gfx, r
 
 russell_core::journal::JournalWriter rdf:type struct .  # SQLite WAL connection
 russell_core::journal::JournalReader rdf:type struct .  # read-only handle
+russell_core::journal::HelpSessionInput rdf:type struct .  # structured input for append_help_session
 russell_core::journal::HelpSessionStatus rdf:type enum .  # Ok, Error, Fallback, ThresholdSkip
+
+russell_core::time::now_rfc3339 rdf:type fn .  # RFC 3339 UTC timestamp
+russell_core::time::now_unix rdf:type fn .  # Unix seconds
+russell_core::time::now_date_iso8601 rdf:type fn .  # YYYY-MM-DD date string
+russell_core::time::approx_days_between rdf:type fn .  # approximate day count between dates
 
 russell_core::rule::Rule rdf:type struct .  # probe + directional thresholds
 russell_core::rule::RuleSet rdf:type struct .  # loaded rules keyed by probe name
@@ -108,7 +114,8 @@ russell_doctor::mock::MockClient rdf:type struct .  # deterministic test client
 russell_doctor::help::HelpOutcome rdf:type struct .  # session_id, backend, evidence_dir, response
 russell_doctor::help::SkipReason rdf:type enum .  # OfflineFallback, ThresholdSkip
 
-russell_doctor::action::ResolvedAction rdf:type enum .  # Probe, Intervention
+russell_doctor::action::ResolvedAction rdf:type enum .  # Probe, Intervention, KaskTool
+russell_doctor::action::KaskToolInfo rdf:type struct .  # name, risk_band, input_schema
 russell_doctor::action::ActionError rdf:type enum .  # MalformedPrefix, MissingSeparator, etc.
 
 russell_doctor::error::DoctorError rdf:type enum .  # Io, Json, Core, Http, Auth, etc.
@@ -126,8 +133,15 @@ russell_skills::Rollback rdf:type enum .  # RollbackId, NoneNeeded, Reboot
 
 russell_skills::dispatch::Dispatcher rdf:type struct .  # subprocess dispatcher
 russell_skills::dispatch::RunOutcome rdf:type struct .  # cmd, exit_code, stdout, stderr
+russell_skills::dispatch::RollbackOutcome rdf:type struct .  # forward, rollback, rollback_applied
 russell_skills::dispatch::DryRun rdf:type enum .  # Enabled, Disabled
 russell_skills::dispatch::StepType rdf:type enum .  # Probe, Intervention
+
+russell_skills::registry::RegistryCache rdf:type struct .  # BTreeMap<skill_id, RegistryEntry>
+russell_skills::registry::RegistryEntry rdf:type struct .  # status, version, symptoms, telemetry
+russell_skills::registry::LifecycleStatus rdf:type enum .  # Discovered→Evaluated→Installed→Active→…
+russell_skills::registry::ScanSeverity rdf:type enum .  # Info, Warn, Block; impl as_str()
+russell_skills::registry::SafetyScan rdf:type struct .  # 7-rule content safety checker
 ```
 
 ## 5. Russell Proprio — Self-Observation
@@ -139,13 +153,21 @@ russell_proprio::AutoimmuneGuard rdf:type struct .  # recursion guard
 russell_proprio::ProprioResult rdf:type struct .  # 5 self-vitals with severity
 ```
 
-## 6. Cross-Crate Dependencies
+## 6. Russell MCP — Kask Tool Interface
 
 ```
-russell-cli depends_on russell-core, russell-sentinel, russell-doctor, russell-skills, russell-proprio
+russell_mcp::client::KaskMcpClient rdf:type struct .  # JSON-RPC stdio client
+russell_mcp::registry::ToolRegistry rdf:type struct .  # tool cache with TTL
+russell_mcp::config::KaskMcpConfig rdf:type struct .  # endpoint, tool_ttl, auth
+```
+
+## 7. Cross-Crate Dependencies
+
+```
+russell-cli depends_on russell-core, russell-sentinel, russell-doctor, russell-skills, russell-proprio, russell-mcp
 russell-doctor depends_on russell-core
 russell-skills depends_on russell-core
 russell-proprio depends_on russell-core
 russell-sentinel depends_on russell-core
-russell-mcp depends_on nothing (Phase-0 stub)
+russell-mcp depends_on nothing (standalone)
 ```

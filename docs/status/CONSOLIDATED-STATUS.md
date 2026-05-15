@@ -44,10 +44,10 @@ of every meaningful development session.
 
 ### Code
 
-- Rust workspace with 7 crates (6 active, 1 stub —
-  `russell-mcp` is a placeholder per ADR-0003).
-- `russell-core` implements paths, event schema, profile,
-  journal (SQLite + WAL + migrations), telemetry, time.
+- Rust workspace with 7 crates (all active).
+- `russell-core` implements paths, event schema (`Severity`/`Scope`
+  with `Display`+`FromStr`), profile, journal (SQLite + WAL +
+  migrations), telemetry, time (`approx_days_between`).
 - `russell-sentinel` implements 25 probes across 7 categories:
   memory (3), swap (1), load (1), processes (7), GPU (5),
   disks (3), network (2), systemd (3). Plus Okapi probes via
@@ -63,7 +63,9 @@ of every meaningful development session.
   `chat`, `skill` (subcommands: `list`, `run`, `stats`, `check`,
   `install`, `prune`, `restore`, `retire`), `workshop`,
   `okapi-probe`, `proprio`, `mcp-tools`.
-- 166 tests passing.
+  `chat` is split into 7 submodules (consent, commands, execute,
+  kask, objective, spinner, history) for maintainability.
+- 218 tests passing.
 - 21 scenario tests passing (`scenario-tests.sh`).
 - 12 skills loaded (okapi-watcher, web-search, skill-discovery,
   skill-workshop, skill-maintenance, scenario-tester, sysadmin,
