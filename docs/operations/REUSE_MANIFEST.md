@@ -62,9 +62,6 @@ blocker.
 | 2 | `docs/standards/TOGAF_LITE_FOR_OPEN_SOURCE.md` | `kask/docs/TOGAF_LITE_FOR_OPEN_SOURCE.md` | *(see §6)* | Canonical source for Russell. Kask and Okapi carry copies. No Russell-specific changes. | Manual sync on version bump. Russell is canonical for Russell repo. |
 | 3 | `docs/standards/WRITING_EXCELLENCE.md` | `kask/docs/standards/WRITING_EXCELLENCE.md` | *(see §6)* | Canonical source for Russell. Kask and Okapi carry copies. No Russell-specific changes. | Manual sync on version bump. Russell is canonical for Russell repo. |
 | 4 | `docs/standards/DOCUMENTATION_STANDARDS.md` | `kask/docs/standards/DOCUMENTATION_STANDARDS.md` | *(see §6)* | Canonical source for Russell. Kask and Okapi carry copies. No Russell-specific changes. | Manual sync on version bump. Russell is canonical for Russell repo. |
-| 2 | `docs/standards/TOGAF_LITE_FOR_OPEN_SOURCE.md` | `kask/docs/TOGAF_LITE_FOR_OPEN_SOURCE.md` | *(see §6)* | Canonical source for Russell. Kask and Okapi carry copies. No Russell-specific changes. | Manual sync on version bump. Russell is canonical for Russell repo. |
-| 3 | `docs/standards/WRITING_EXCELLENCE.md` | `kask/docs/standards/WRITING_EXCELLENCE.md` | *(see §6)* | Canonical source for Russell. Kask and Okapi carry copies. No Russell-specific changes. | Manual sync on version bump. Russell is canonical for Russell repo. |
-| 4 | `docs/standards/DOCUMENTATION_STANDARDS.md` | `kask/docs/standards/DOCUMENTATION_STANDARDS.md` | *(see §6)* | Canonical source for Russell. Kask and Okapi carry copies. No Russell-specific changes. | Manual sync on version bump. Russell is canonical for Russell repo. |
 
 ## 4. Planned copies (removed — copies completed in Phase 1)
 

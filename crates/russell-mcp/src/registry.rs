@@ -98,6 +98,40 @@ impl ToolRegistry {
         self.tools.iter().any(|t| t.name == name)
     }
 
+    /// Invalidate the cache immediately.
+    ///
+    /// Call this when a `notifications/tools/list_changed` event is received
+    /// from the MCP server, or when explicit cache invalidation is needed.
+    pub fn invalidate(&mut self) {
+        debug!("tool registry cache invalidated");
+        self.last_refresh = None;
+    }
+
+    /// Remove a specific tool from the cache (fine-grained invalidation).
+    ///
+    /// Returns `true` if the tool was found and removed, `false` otherwise.
+    pub fn remove_tool(&mut self, name: &str) -> bool {
+        let initial_len = self.tools.len();
+        self.tools.retain(|t| t.name != name);
+        let removed = self.tools.len() < initial_len;
+        if removed {
+            debug!(tool = name, "tool removed from cache");
+        }
+        removed
+    }
+
+    /// Add or update a tool in the cache (for explicit tool registration).
+    pub fn upsert_tool(&mut self, tool: McpToolDefinition) {
+        if let Some(existing) = self.tools.iter_mut().find(|t| t.name == tool.name) {
+            *existing = tool;
+            debug!(tool = %existing.name, "tool updated in cache");
+        } else {
+            let tool_name = tool.name.clone();
+            self.tools.push(tool);
+            debug!(tool = %tool_name, "tool added to cache");
+        }
+    }
+
     /// Look up a tool definition by name.
     pub fn get_tool(&self, name: &str) -> Option<&McpToolDefinition> {
         self.tools.iter().find(|t| t.name == name)

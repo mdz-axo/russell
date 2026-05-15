@@ -3,6 +3,7 @@
 
 pub mod chat;
 pub mod digest;
+pub mod docs;
 pub mod help;
 pub mod list;
 pub mod mcp_tools;

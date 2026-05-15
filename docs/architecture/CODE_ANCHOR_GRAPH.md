@@ -1,3 +1,17 @@
+---
+title: "Code Anchor Graph — Public Type Registry"
+audience: [architects, developers, agents]
+last_updated: 2026-05-14
+togaf_phase: "C"
+version: "1.0.0"
+status: "Active"
+---
+
+<!-- TOGAF_DOMAIN: Data Architecture -->
+<!-- VERSION: 1.0.0 -->
+<!-- STATUS: Active -->
+<!-- LAST_UPDATED: 2026-05-14 -->
+
 # Russell — Code Anchor Graph
 
 <!-- DIAGRAM_ALIGNMENT

@@ -3,16 +3,16 @@ title: "TOGAF Traceability Matrix"
 audience: [architects, developers, contributors]
 last_updated: 2026-05-14
 togaf_phase: "C"
-version: "1.1.0"
+version: "1.2.0"
 status: "Active"
 ---
 
 # Russell TOGAF Traceability Matrix
 
 <!-- TOGAF_DOMAIN: Cross-cutting — Architecture Governance -->
-<!-- VERSION: 1.0.0 -->
+<!-- VERSION: 1.2.0 -->
 <!-- STATUS: Active -->
-<!-- LAST_UPDATED: 2026-05-12 -->
+<!-- LAST_UPDATED: 2026-05-14 -->
 
 This matrix maps Russell's **small** documentation corpus onto
 TOGAF ADM phases. Russell does not have 40 architecture
@@ -61,11 +61,11 @@ is not a business concern.
 | **Preliminary** — Principles, Standards | [`PRINCIPLES_CATALOG.md`](PRINCIPLES_CATALOG.md), [`../standards/*.md`](../standards/) | JR-1 … JR-7 live here; includes DOCUMENTATION_STANDARDS, CODING_RUST, COMMITS, ADR, SAFETY, WRITING_EXCELLENCE |
 | **Phase A** — Architecture Vision | [`../../cybernetic-health-harness.md`](../../cybernetic-health-harness.md), [`PRINCIPLES_CATALOG.md`](PRINCIPLES_CATALOG.md), [`overview.md`](overview.md), [`THE_JACK.md`](THE_JACK.md) | The full vision, current shape, and persona design |
 | **Phase B** — Business Architecture | *(skipped)* | Single-operator tool; no business concern |
-| **Phase C** — IS (Data + Application) | [`../specifications/PERSISTENCE_CATALOG.md`](../specifications/PERSISTENCE_CATALOG.md), [`overview.md`](overview.md), [`../adr/0024-skill-registry-workshop-lifecycle.md`](../adr/0024-skill-registry-workshop-lifecycle.md) | Data persistence, crate topology, registry schema |
+| **Phase C** — IS (Data + Application) | [`../specifications/PERSISTENCE_CATALOG.md`](../specifications/PERSISTENCE_CATALOG.md), [`overview.md`](overview.md), [`CODE_ANCHOR_GRAPH.md`](CODE_ANCHOR_GRAPH.md), [`../adr/0024-skill-registry-workshop-lifecycle.md`](../adr/0024-skill-registry-workshop-lifecycle.md) | Data persistence, crate topology, registry schema, public type registry |
 | **Phase D** — Technology | [`../adr/0009-tokio-runtime.md`](../adr/deferred/0009-tokio-runtime.md) *(deferred)*, [`../operations/REUSE_MANIFEST.md`](../operations/REUSE_MANIFEST.md), [`../../install.sh`](../../install.sh), [`../operations/INSTALL.md`](../operations/INSTALL.md) | Tech stack, reuse register, deployment |
 | **Phase E/F** — Migration | [`../../cybernetic-health-harness.md` §20](../../cybernetic-health-harness.md), [`../status/CONSOLIDATED-STATUS.md`](../status/CONSOLIDATED-STATUS.md) | Roadmap and where we are |
 | **Phase G** — Governance | [`../status/CONSOLIDATED-STATUS.md`](../status/CONSOLIDATED-STATUS.md), [`../standards/safety.md`](../standards/safety.md), [`../../AGENTS.md`](../../AGENTS.md), [`../../scenario-tests.sh`](../../scenario-tests.sh) | Safety contract, identity, test coverage |
-| **Phase H** — Change Management | [`../adr/`](../adr/) (17 active ADRs: 0001–0002, 0004, 0006, 0008, 0011, 0013, 0015–0024; 7 deferred: 0003, 0005, 0007, 0009–0010, 0012, 0014); [`../status/skill-lifecycle-gaps.md`](../status/skill-lifecycle-gaps.md) | Locked decisions and lifecycle gaps |
+| **Phase H** — Change Management | [`../adr/`](../adr/) (18 active ADRs: 0001–0002, 0004, 0006, 0008, 0011, 0013, 0015–0025; 7 deferred: 0003, 0005, 0007, 0009–0010, 0012, 0014); [`../status/skill-lifecycle-gaps.md`](../status/skill-lifecycle-gaps.md) | Locked decisions and lifecycle gaps |
 | **Requirements Mgmt** | [`../specifications/MVP_SPEC.md`](../specifications/MVP_SPEC.md), [`../specifications/PERSISTENCE_CATALOG.md`](../specifications/PERSISTENCE_CATALOG.md) | The pinned boundary |
 
 ## 3. Principle → Phase Anchoring

@@ -1,9 +1,9 @@
 ---
 title: "Russell Architecture Principles Catalog"
 audience: [architects, developers, contributors, agents]
-last_updated: 2026-04-18
+last_updated: 2026-05-14
 togaf_phase: "Preliminary"
-version: "1.0.0"
+version: "1.1.0"
 status: "Active"
 ---
 
@@ -256,12 +256,12 @@ follows from it.
 | Principle | TOGAF Phase | Artifact |
 |---|---|---|
 | JR-1 | Preliminary / Phase A | This catalog, `MVP_SPEC.md` |
-| JR-2 | Phase C (IS) / Governance | ADR-0008, Safety standard |
-| JR-3 | Phase C (IS) | ADR-0008 |
-| JR-4 | Phase C (IS) | ADR-0016 *(to-be-authored)*, Doctor spec |
-| JR-5 | Phase G (Governance) | ADR-0015, proprio archive |
-| JR-6 | Phase D (Technology) | ADR-0013, `REUSE_MANIFEST.md` |
-| JR-7 | Phase C (Data) | ADR-0004, ADR-0006, `PERSISTENCE_CATALOG.md` |
+| JR-2 | Phase C (IS) / Governance | ADR-0008, ADR-0023 (skills dispatch), Safety standard |
+| JR-3 | Phase C (IS) | ADR-0008, ADR-0023 (poka-yoke dispatcher) |
+| JR-4 | Phase C (IS) | ADR-0016, ADR-0025 (Kask MCP client) |
+| JR-5 | Phase G (Governance) | ADR-0015, ADR-0021 (reflex arcs) |
+| JR-6 | Phase D (Technology) | ADR-0013, ADR-0017, `REUSE_MANIFEST.md` |
+| JR-7 | Phase C (Data) | ADR-0004, ADR-0006, ADR-0024 (skill lifecycle), `PERSISTENCE_CATALOG.md` |
 
 ## 7. Amending the Catalog
 

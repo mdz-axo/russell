@@ -1,3 +1,17 @@
+---
+title: "Machine Profile — The Patient"
+audience: [operators, developers, agents]
+last_updated: 2026-05-14
+togaf_phase: "C"
+version: "2.0.0"
+status: "Active"
+---
+
+<!-- TOGAF_DOMAIN: Data Architecture -->
+<!-- VERSION: 2.0.0 -->
+<!-- STATUS: Active -->
+<!-- LAST_UPDATED: 2026-05-14 -->
+
 # Machine Profile — "The Patient"
 
 Observed 2026-05-11 on `mdz-axolotl-Laptop-16`.

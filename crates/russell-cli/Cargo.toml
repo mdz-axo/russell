@@ -19,6 +19,7 @@ russell-skills.workspace = true
 russell-doctor.workspace = true
 russell-proprio.workspace = true
 russell-mcp.workspace = true
+russell-mcp-server.workspace = true
 anyhow.workspace = true
 clap.workspace = true
 tokio.workspace = true

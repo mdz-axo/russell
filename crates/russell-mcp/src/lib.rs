@@ -8,8 +8,9 @@
 //!
 //! # Architecture
 //!
+//! - [`auth::TokenProvider`] — Token authentication with automatic refresh.
 //! - [`config::KaskMcpConfig`] — env-driven configuration.
-//! - [`client::KaskMcpClient`] — the MCP JSON-RPC client (HTTP POST).
+//! - [`client::KaskMcpClient`] — the REST API client.
 //! - [`registry::ToolRegistry`] — cached `tools/list` with TTL refresh.
 //! - [`error::McpError`] — error taxonomy.
 //!
@@ -22,6 +23,7 @@
 #![deny(rust_2018_idioms)]
 #![warn(missing_docs)]
 
+pub mod auth;
 pub mod client;
 pub mod config;
 pub mod error;

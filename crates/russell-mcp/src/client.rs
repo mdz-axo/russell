@@ -5,14 +5,15 @@
 //! loopback constraint (ADR-0025 §4) at connect time.
 //!
 //! Uses Kask's REST API endpoints:
+//! - `GET /health` — health check
 //! - `GET /api/v1/tools` — list all MCP tools
 //! - `POST /api/v1/tools/{name}` — invoke a tool
-//! - `GET /health` — health check
 
 use serde::Deserialize;
 use serde_json::json;
 use tracing::debug;
 
+use crate::auth::TokenProvider;
 use crate::config::KaskMcpConfig;
 use crate::error::{McpError, Result};
 use crate::types::{McpToolDefinition, ToolCallResult};
@@ -79,6 +80,8 @@ pub fn validate_endpoint(url: &str) -> Result<()> {
 pub struct KaskMcpClient {
     config: KaskMcpConfig,
     http: reqwest::Client,
+    /// Token provider for authentication (supports automatic refresh).
+    token_provider: crate::auth::ChainedTokenProvider,
     /// Server name from the last successful connection.
     server_name: Option<String>,
     /// Whether the client has completed the health check.
@@ -93,6 +96,9 @@ impl KaskMcpClient {
     /// Does NOT connect or initialize — call [`connect`](Self::connect)
     /// to perform the health check.
     ///
+    /// Uses a chained token provider: tries file-based token rotation
+    /// first, falls back to `KASK_MCP_TOKEN` environment variable.
+    ///
     /// # Errors
     /// Returns [`McpError::NonLoopbackRefused`] if the endpoint is not loopback.
     /// Returns [`McpError::Config`] if the HTTP client cannot be built.
@@ -105,6 +111,9 @@ impl KaskMcpClient {
             .build()
             .map_err(|e| McpError::Config(format!("failed to build HTTP client: {e}")))?;
 
+        // Token provider: file-based rotation with env fallback.
+        let token_provider = crate::auth::ChainedTokenProvider::new(None)?;
+
         // Rate limiter: allow up to 10 concurrent requests to prevent
         // overwhelming the Kask gateway during high-frequency tool usage.
         let rate_limit = Some(tokio::sync::Semaphore::new(10));
@@ -112,6 +121,7 @@ impl KaskMcpClient {
         Ok(Self {
             config,
             http,
+            token_provider,
             server_name: None,
             initialized: false,
             rate_limit,
@@ -130,7 +140,8 @@ impl KaskMcpClient {
             .get(&health_url)
             .header("Accept", "application/json");
 
-        if let Some(ref token) = self.config.token {
+        // Attach bearer token if available.
+        if let Ok(token) = self.token_provider.get_token().await {
             req = req.bearer_auth(token);
         }
 
@@ -191,7 +202,8 @@ impl KaskMcpClient {
             .get(&tools_url)
             .header("Accept", "application/json");
 
-        if let Some(ref token) = self.config.token {
+        // Attach bearer token if available.
+        if let Ok(token) = self.token_provider.get_token().await {
             req = req.bearer_auth(token);
         }
 
@@ -273,7 +285,8 @@ impl KaskMcpClient {
             .header("Content-Type", "application/json")
             .header("Accept", "application/json");
 
-        if let Some(ref token) = self.config.token {
+        // Attach bearer token if available.
+        if let Ok(token) = self.token_provider.get_token().await {
             req = req.bearer_auth(token);
         }
 

@@ -1,7 +1,16 @@
-<!--
-audience: developers setting up a Russell dev environment
-last-reviewed: 2026-04-17
--->
+---
+title: "Contributing to Russell"
+audience: [developers, contributors]
+last_updated: 2026-05-14
+togaf_phase: "Preliminary"
+version: "1.0.0"
+status: "Active"
+---
+
+<!-- TOGAF_DOMAIN: Governance -->
+<!-- VERSION: 1.0.0 -->
+<!-- STATUS: Active -->
+<!-- LAST_UPDATED: 2026-05-14 -->
 
 # Contributing to Russell
 

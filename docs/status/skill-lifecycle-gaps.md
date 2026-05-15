@@ -9,6 +9,11 @@ status: "Active"
 
 # Skill Lifecycle Gap Analysis — 2026-05-13
 
+<!-- TOGAF_DOMAIN: Governance -->
+<!-- VERSION: 1.0.0 -->
+<!-- STATUS: Active -->
+<!-- LAST_UPDATED: 2026-05-14 -->
+
 > Derived from running 10 end-to-end scenarios against the newly built
 > workshop REPL, registry cache, and safety scanner. All integrations
 > tested: 21/21 test assertions pass.

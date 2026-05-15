@@ -1,0 +1,21 @@
+[Unit]
+Description=Rotate Russell Kask MCP Token Weekly
+Documentation=file:///home/mdz-axolotl/Clones/russell/docs/operations/KASK_TOKEN_ROTATION.md
+OnCalendar=weekly
+Persistent=true
+RandomizedDelaySec=1h
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/rotate-russell-token.sh
+StandardOutput=journal
+StandardError=journal
+
+# Security hardening
+NoNewPrivs=true
+ProtectHome=true
+ProtectSystem=true
+PrivateTmp=true
+
+[Install]
+WantedBy=default.target

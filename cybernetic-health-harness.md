@@ -1,6 +1,20 @@
+---
+title: "The Cybernetic Health Harness"
+audience: [architects, developers, contributors]
+last_updated: 2026-05-14
+togaf_phase: "A"
+version: "1.0.0"
+status: "Aspirational"
+---
+
+<!-- TOGAF_DOMAIN: Architecture Vision -->
+<!-- VERSION: 1.0.0 -->
+<!-- STATUS: Aspirational -->
+<!-- LAST_UPDATED: 2026-05-14 -->
+
 # The Cybernetic Health Harness
 
-> A self-adaptive maintenance framework for a Framework 16 / AMD RDNA3 / Ubuntu workstation used as a local AI/ML development machine.
+> **Status: Aspirational.** This is the full design target for Russell. It describes the vision, not the current implementation. Code sketches in this document are illustrative, not production-complete. For current state, see [`MVP_SPEC.md`](docs/specifications/MVP_SPEC.md) and [`CONSOLIDATED-STATUS.md`](docs/status/CONSOLIDATED-STATUS.md). Where this document and an active ADR conflict, the ADR wins per the [Authority Hierarchy](AGENTS.md#2-authority-hierarchy).
 >
 > This is a **design document**, not an implementation. Code blocks are illustrative blueprints, not production-complete. Version numbers, flag names, and kernel specifics should be verified against current upstream before any code lands.
 
@@ -252,6 +266,14 @@ graph LR
   OLLAMA --> FM3
   OLLAMA --> A4
 ```
+<!-- DIAGRAM_ALIGNMENT
+id: DIAG-CHH-KNOWLEDGE-001
+type: flowchart
+verified_date: 2026-05-14
+verified_against: Section 5 — Pre-Reflection Conceptual Graph
+reference_sources: MACHINE_PROFILE.md, cybernetic-health-harness.md §5
+status: STALE
+-->
 
 ### Node/edge table (normalized)
 
@@ -328,6 +350,14 @@ graph TB
   DOCTOR --> NOTIFY & DASH
   JOURNAL --> DASH
 ```
+<!-- DIAGRAM_ALIGNMENT
+id: DIAG-CHH-ARCHITECTURE-002
+type: flowchart
+verified_date: 2026-05-14
+verified_against: Section 6 — System Architecture
+reference_sources: MVP_SPEC.md, ADR-0013, CAPABILITY_GRAPH.md
+status: STALE
+-->
 
 **Key architectural choices:**
 
@@ -641,6 +671,14 @@ sequenceDiagram
     end
     D->>D: write bundle, update journal
 ```
+<!-- DIAGRAM_ALIGNMENT
+id: DIAG-CHH-TRIAGE-003
+type: sequenceDiagram
+verified_date: 2026-05-14
+verified_against: Section 12.2 — LLM-assisted triage loop
+reference_sources: ADR-0008, ADR-0016, ADR-0023, PRINCIPLES_CATALOG.md JR-2, JR-3
+status: STALE
+-->
 
 **Safety rails:**
 
@@ -670,6 +708,14 @@ stateDiagram-v2
     Seed --> [*]: bootstrap complete
     Quarantine --> [*]: partial install, user notified
 ```
+<!-- DIAGRAM_ALIGNMENT
+id: DIAG-CHH-BOOTSTRAP-004
+type: stateDiagram-v2
+verified_date: 2026-05-14
+verified_against: Section 17 — Bootstrap and Install
+reference_sources: PERSISTENCE_CATALOG.md, REUSE_MANIFEST.md
+status: STALE
+-->
 
 **Probe** gathers:
 
@@ -1171,6 +1217,14 @@ graph TB
   STEADY -.- JOUR
   POKA -.- REG
 ```
+<!-- DIAGRAM_ALIGNMENT
+id: DIAG-CHH-VSM-005
+type: flowchart
+verified_date: 2026-05-14
+verified_against: Section 22 — VSM Layers (Policy, Intelligence, Control, Coordination, Operations)
+reference_sources: PRINCIPLES_CATALOG.md, THE_JACK.md, CAPABILITY_GRAPH.md
+status: STALE
+-->
 
 Principle edges (dashed) and control edges (solid) are separated so the reader can see the *governing* structure independent of the *executing* structure. This is the VSM lens.
 

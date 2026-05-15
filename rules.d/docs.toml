@@ -1,0 +1,55 @@
+# Russell Documentation Quality Gates
+# Schema: russell.rule.v1
+# Operator overrides in ~/.config/harness/rules.d/docs.toml take precedence.
+
+[rules.frontmatter_completeness]
+probe = "doc_frontmatter_completeness"
+description = "Fraction of active docs with complete frontmatter (6 fields)"
+warn_below = 1.0
+alert_below = 0.95
+crit_below = 0.90
+
+[rules.broken_links]
+probe = "doc_broken_link_count"
+description = "Count of broken internal links across authoritative docs"
+warn_above = 0
+alert_above = 3
+crit_above = 10
+
+[rules.freshness_stale]
+probe = "doc_stale_count"
+description = "Count of documents with last_updated > 180 days old"
+warn_above = 2
+alert_above = 5
+crit_above = 10
+
+[rules.freshness_review]
+probe = "doc_review_count"
+description = "Count of documents with last_updated 91-180 days old"
+warn_above = 10
+alert_above = 25
+
+[rules.diagram_alignment]
+probe = "doc_missing_diagram_alignment"
+description = "Count of mermaid blocks without DIAGRAM_ALIGNMENT in authoritative docs"
+warn_above = 0
+alert_above = 2
+crit_above = 5
+
+[rules.html_comment_block]
+probe = "doc_missing_html_comment"
+description = "Fraction of docs missing HTML comment block (TOGAF_DOMAIN, VERSION, STATUS, LAST_UPDATED)"
+warn_below = 1.0
+alert_below = 0.90
+
+[rules.citation_density]
+probe = "doc_citation_density"
+description = "Fraction of architecture/spec/standards docs with ≥1 citation per section"
+warn_below = 0.8
+alert_below = 0.5
+
+[rules.voice_hedging]
+probe = "doc_hedging_count"
+description = "Count of hedging phrases across authoritative docs"
+warn_above = 5
+alert_above = 15

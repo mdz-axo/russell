@@ -95,6 +95,19 @@ enum Command {
         #[arg(long)]
         ping: bool,
     },
+    /// Start the MCP server (stdio transport). Used by IDE frontends
+    /// (Zed, Claude Desktop, Cline/Roo) to query Russell's telemetry.
+    Mcp,
+    /// Check documentation quality — run linter, link check, freshness
+    /// audit, metric-integrity verification, and diagram-alignment
+    /// validation. Returns non-zero if any authoritative document fails.
+    #[command(name = "docs")]
+    Docs {
+        /// Check all documents and all rules, not just alerts in
+        /// authoritative documents.
+        #[arg(long)]
+        strict: bool,
+    },
 }
 
 #[derive(Subcommand, Debug)]
@@ -162,5 +175,7 @@ async fn main() -> Result<()> {
                 commands::mcp_tools::run().await
             }
         }
+        Command::Mcp => russell_mcp_server::serve_stdio(paths).await,
+        Command::Docs { strict } => commands::docs::run(&paths, strict),
     }
 }

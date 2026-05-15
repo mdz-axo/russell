@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: MIT OR Apache-2.0
 [package]
-name = "russell-mcp"
+name = "russell-mcp-server"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -12,16 +12,12 @@ authors.workspace = true
 path = "src/lib.rs"
 
 [dependencies]
-thiserror.workspace = true
+russell-core.workspace = true
+russell-sentinel.workspace = true
+rmcp = { version = "1.7", features = ["server", "transport-io", "macros"] }
+tokio = { workspace = true, features = ["io-util", "io-std"] }
 serde.workspace = true
 serde_json.workspace = true
-tokio = { workspace = true, features = ["sync"] }
 tracing.workspace = true
-reqwest.workspace = true
-urlencoding = "2.1"
-async-trait = "0.1"
-chrono = { version = "0.4", features = ["serde"] }
-
-[dev-dependencies]
-tempfile.workspace = true
-tokio = { workspace = true, features = ["test-util"] }
+thiserror.workspace = true
+anyhow.workspace = true

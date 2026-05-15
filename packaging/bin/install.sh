@@ -124,7 +124,7 @@ if [ -d "$KASK_REPO" ] && [ -f "$KASK_REPO/Cargo.toml" ]; then
 }
 MCPREG
     
-    # Build stack-api for MCP HTTP gateway
+# Build stack-api for MCP HTTP gateway
     say "Building Kask MCP HTTP gateway (stack-api)…"
     (cd "$KASK_REPO" && cargo build -p stack-api)
     if [ -f "$KASK_REPO/target/debug/stack-api" ]; then
@@ -142,6 +142,37 @@ MCPREG
         say "WARNING: Kask gateway may not have started correctly"
         say "  Check: systemctl --user status kask-gateway.service"
       fi
+    fi
+    
+    # Set up token rotation
+    say "Installing token rotation script and timer…"
+    mkdir -p "$HOME/.local/bin"
+    install -m 0755 "$REPO/scripts/rotate-russell-token.sh" "$HOME/.local/bin/"
+    install -m 0644 "$REPO/packaging/systemd/kask-token-rotate.service" "$HOME/.config/systemd/user/"
+    install -m 0644 "$REPO/packaging/systemd/kask-token-rotate.timer" "$HOME/.config/systemd/user/"
+    
+    # Create token directory
+    mkdir -p "$(dirname "$TOKEN_FILE")"
+    
+    # Initial token setup if principal exists
+    if stack-admin key get --for russell &>/dev/null; then
+      say "Setting up initial Russell MCP token…"
+      stack-admin key get --for russell --format json > "$TOKEN_FILE" 2>/dev/null || true
+      if [ -f "$TOKEN_FILE" ] && [ -s "$TOKEN_FILE" ]; then
+        chmod 600 "$TOKEN_FILE"
+        say "✓ Initial token installed"
+      fi
+    else
+      say "NOTE: Russell service principal not found in Kask"
+      say "  To create it, run in Kask repo:"
+      say "    stack-admin key create --for russell --type service \\"
+      say "      --display 'Russell (Host Curator)' --ttl 168h"
+    fi
+    
+    systemctl --user daemon-reload
+    systemctl --user enable kask-token-rotate.timer
+    say "✓ Token rotation timer enabled (runs weekly)"
+  fi
     fi
   else
     say "WARNING: arsenal-mcp-russell build failed, MCP tools unavailable"

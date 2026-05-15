@@ -1,3 +1,17 @@
+---
+title: "Russell — Your Machine's Terrier"
+audience: [operators, developers, contributors, agents]
+last_updated: 2026-05-14
+togaf_phase: "Preliminary"
+version: "1.0.0"
+status: "Active"
+---
+
+<!-- TOGAF_DOMAIN: Business Architecture -->
+<!-- VERSION: 1.0.0 -->
+<!-- STATUS: Active -->
+<!-- LAST_UPDATED: 2026-05-14 -->
+
 # Russell — Your Machine's Terrier
 
 > *Though she be but little, she is fierce.* — Shakespeare, *A Midsummer Night's Dream* III.ii.

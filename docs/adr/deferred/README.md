@@ -28,7 +28,7 @@ corresponding feature's phase opens.
 
 | ADR | Subject | Lifts in phase |
 |---|---|---|
-| [0003](0003-mcp-transport.md) | MCP stdio transport | Phase 4+ |
+| ~~0003~~ | ~~MCP stdio transport~~ | **Lifted → v0.20.0** |
 | [0005](0005-privileged-operations.md) | PolKit + helper binaries for root-requiring actions | Phase 3 (if apt/fwupd skills) |
 | [0007](0007-yaml-manifest-subprocess-skill-model.md) | YAML skill manifests + subprocess dispatch | Phase 3 |
 | [0009](0009-tokio-runtime.md) | Tokio runtime posture | Already implicit in code; formal lift when MCP/Doctor async grows |

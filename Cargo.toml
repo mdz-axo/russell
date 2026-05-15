@@ -10,6 +10,7 @@ members = [
     "crates/russell-doctor",
     "crates/russell-proprio",
     "crates/russell-mcp",
+    "crates/russell-mcp-server",
     "crates/russell-cli",
 ]
 
@@ -29,6 +30,7 @@ russell-skills   = { path = "crates/russell-skills" }
 russell-doctor   = { path = "crates/russell-doctor" }
 russell-proprio  = { path = "crates/russell-proprio" }
 russell-mcp      = { path = "crates/russell-mcp" }
+russell-mcp-server = { path = "crates/russell-mcp-server" }
 
 # Third-party (see ADRs 0004, 0009, 0010, 0012)
 thiserror = "2"
