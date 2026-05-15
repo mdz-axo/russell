@@ -50,6 +50,16 @@ pub async fn run(paths: &Paths, note: Option<&str>) -> Result<()> {
 
     let skills = russell_skills::load_all(&paths.skills()).unwrap_or_default();
 
+    // Reconcile registry against disk (fix stale/orphan entries).
+    {
+        let registry_path = paths.state.join("registry").join("local-cache.yaml");
+        let mut registry = russell_skills::registry::RegistryCache::load(&registry_path)
+            .unwrap_or_default();
+        if registry.reconcile(&skills) {
+            let _ = registry.save(&registry_path);
+        }
+    }
+
     let outcome = russell_meta::run_help(paths, &writer, note, &kask_tool_names)
         .await
         .context("running Doctor help flow")?;
