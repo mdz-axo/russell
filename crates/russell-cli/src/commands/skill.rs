@@ -8,7 +8,7 @@ use anyhow::{Context, Result};
 use russell_core::journal::JournalWriter;
 use russell_core::paths::Paths;
 use russell_core::time::now_date_iso8601;
-use russell_skills::registry::{LifecycleStatus, RegistryCache, RegistryEntry, TrustTier};
+use russell_skills::registry::{LifecycleStatus, RegistryCache, RegistryEntry};
 use russell_skills::{Skill, load_all};
 use std::time::Duration;
 
@@ -249,35 +249,22 @@ pub fn check(paths: &Paths) -> Result<()> {
         if !registry.skills.contains_key(&skill.id) {
             registry.upsert(
                 &skill.id,
-                RegistryEntry {
-                    status: russell_skills::registry::LifecycleStatus::Active,
-                    version: skill.version.clone(),
-                    symptoms: skill.symptoms.clone(),
-                    source: russell_skills::registry::SkillSource::Manual,
-                    trust_tier: russell_skills::registry::TrustTier::T2,
-                    installed: skill.authored.clone(),
-                    last_evaluated: None,
-                    valid_until: None,
-                    coverage_score: None,
-                    superseded_by: None,
-                    deprecation_reason: None,
-                    probe_runs: 0,
-                    recent_probe_failures: 0,
-                    intervention_runs: 0,
-                    recent_intervention_failures: 0,
-                    last_probe_run_at: None,
-                    last_error: None,
-                    avg_probe_duration_ms: None,
-                    ewma_success_rate: None,
-                    bundled: false,
-                },
+                RegistryEntry::new_default(
+                    russell_skills::registry::LifecycleStatus::Active,
+                    skill.version.clone(),
+                    skill.authored.clone(),
+                    skill.symptoms.clone(),
+                    russell_skills::registry::SkillSource::Manual,
+                    skill.authored.clone(),
+                    false,
+                ),
             );
         }
     }
 
     let today = chrono_now();
     for (id, entry) in &registry.skills {
-        let stale = RegistryCache::is_stale(&entry.installed, &today);
+        let stale = RegistryCache::is_stale(&entry.authored, &today);
         let mark = if stale { "⚠ stale" } else { "✓" };
         let score = entry.coverage_score.map_or("--".into(), |s| format!("{s:.2}"));
         let cluster = classify_skill(&entry.symptoms);
@@ -346,30 +333,18 @@ pub fn install(paths: &Paths, name: &str) -> Result<()> {
         } else {
             from_status = None;
             let version = "0.1.0".to_string();
+            let today = chrono_now();
             registry.upsert(
                 name,
-                RegistryEntry {
-                    status: LifecycleStatus::Installed,
-                    version: version.clone(),
-                    symptoms: vec![],
-                    source: SkillSource::Manual,
-                    trust_tier: TrustTier::T2,
-                    installed: chrono_now(),
-                    last_evaluated: None,
-                    valid_until: None,
-                    coverage_score: None,
-                    superseded_by: None,
-                    deprecation_reason: None,
-                    probe_runs: 0,
-                    recent_probe_failures: 0,
-                    intervention_runs: 0,
-                    recent_intervention_failures: 0,
-                    last_probe_run_at: None,
-                    last_error: None,
-                    avg_probe_duration_ms: None,
-                    ewma_success_rate: None,
-                    bundled: false,
-                },
+                RegistryEntry::new_default(
+                    LifecycleStatus::Installed,
+                    version.clone(),
+                    &today,
+                    vec![],
+                    SkillSource::Manual,
+                    &today,
+                    false,
+                ),
             );
             println!("{name} registered (v{version}).");
         }
@@ -590,28 +565,15 @@ pub fn put(paths: &Paths, name: Option<&str>) -> Result<()> {
     let symptoms = _skill.symptoms.clone();
     let registry_path = paths.state.join("registry").join("local-cache.yaml");
     RegistryCache::with_update(&registry_path, |registry| {
-        let entry = RegistryEntry {
-            status: LifecycleStatus::Active,
-            version: version.clone(),
-            symptoms: symptoms.clone(),
-            source: SkillSource::Manual,
-            trust_tier: TrustTier::T2,
-            installed: authored.clone(),
-            last_evaluated: None,
-            valid_until: None,
-            coverage_score: None,
-            superseded_by: None,
-            deprecation_reason: None,
-            probe_runs: 0,
-            recent_probe_failures: 0,
-            intervention_runs: 0,
-            recent_intervention_failures: 0,
-            last_probe_run_at: None,
-            last_error: None,
-            avg_probe_duration_ms: None,
-            ewma_success_rate: None,
-                    bundled: false,
-        };
+        let entry = RegistryEntry::new_default(
+            LifecycleStatus::Active,
+            version.clone(),
+            authored.clone(),
+            symptoms.clone(),
+            SkillSource::Manual,
+            authored.clone(),
+            false,
+        );
         registry.upsert(&name, entry);
     })?;
 

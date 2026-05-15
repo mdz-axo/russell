@@ -8,28 +8,15 @@ use russell_skills::registry::{
 use std::path::Path;
 
 fn test_entry() -> RegistryEntry {
-    RegistryEntry {
-        status: LifecycleStatus::Active,
-        version: "1.0.0".into(),
-        symptoms: vec!["vram_oom".into()],
-        source: SkillSource::Bundled,
-        trust_tier: TrustTier::T4,
-        installed: "2026-05-01".into(),
-        last_evaluated: None,
-        valid_until: None,
-        coverage_score: None,
-        superseded_by: None,
-        deprecation_reason: None,
-        probe_runs: 0,
-        recent_probe_failures: 0,
-        intervention_runs: 0,
-        recent_intervention_failures: 0,
-        last_probe_run_at: None,
-        last_error: None,
-        avg_probe_duration_ms: None,
-        ewma_success_rate: None,
-        bundled: true,
-    }
+    RegistryEntry::new_default(
+        LifecycleStatus::Active,
+        "1.0.0",
+        "2026-05-01",
+        vec!["vram_oom".into()],
+        SkillSource::Bundled,
+        "2026-05-01",
+        true,
+    )
 }
 
 #[test]

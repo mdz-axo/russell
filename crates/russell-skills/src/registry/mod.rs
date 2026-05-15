@@ -486,30 +486,15 @@ mod tests {
     use super::*;
 
     fn test_entry(status: LifecycleStatus, version: &str, symptoms: Vec<&str>, source: SkillSource) -> RegistryEntry {
-        let bundled = matches!(source, SkillSource::Bundled);
-        let trust_tier = initial_trust_tier(&source);
-        RegistryEntry {
+        RegistryEntry::new_default(
             status,
-            version: version.into(),
-            symptoms: symptoms.into_iter().map(String::from).collect(),
+            version,
+            "2026-05-01",
+            symptoms.into_iter().map(String::from).collect(),
             source,
-            trust_tier,
-            installed: "2026-05-01".into(),
-            last_evaluated: None,
-            valid_until: None,
-            coverage_score: None,
-            superseded_by: None,
-            deprecation_reason: None,
-            probe_runs: 0,
-            recent_probe_failures: 0,
-            intervention_runs: 0,
-            recent_intervention_failures: 0,
-            last_probe_run_at: None,
-            last_error: None,
-            avg_probe_duration_ms: None,
-            ewma_success_rate: None,
-            bundled,
-        }
+            "2026-05-01",
+            matches!(source, SkillSource::Bundled),
+        )
     }
 
     #[test]

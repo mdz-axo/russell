@@ -273,6 +273,7 @@ mod tests {
         RegistryEntry::new_default(
             LifecycleStatus::Active,
             "0.1.0",
+            "2026-05-01",
             vec!["vram_oom".to_string()],
             SkillSource::Bundled,
             "2026-05-01",
@@ -321,6 +322,7 @@ mod tests {
         let entry = RegistryEntry::new_default(
             LifecycleStatus::Discovered,
             "0.1.0",
+            "2026-05-01",
             vec![],
             SkillSource::Workshop,
             "2026-05-01",
@@ -359,6 +361,7 @@ mod tests {
             let mut entry = RegistryEntry::new_default(
                 *status,
                 "1.0.0",
+                "2026-05-01",
                 vec![format!("symptom_{i}")],
                 SkillSource::Bundled,
                 "2026-05-01",
@@ -381,6 +384,7 @@ mod tests {
             let mut entry = RegistryEntry::new_default(
                 LifecycleStatus::Active,
                 "1.0.0",
+                "2026-05-01",
                 vec![format!("symptom_{i}")],
                 SkillSource::Bundled,
                 "2026-05-01",

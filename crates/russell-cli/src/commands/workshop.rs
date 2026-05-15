@@ -275,6 +275,7 @@ fn sync_registry_from_skills(registry: &mut RegistryCache, skills: &[Skill]) {
                 RegistryEntry::new_default(
                     LifecycleStatus::Active,
                     skill.version.clone(),
+                    skill.authored.clone(),
                     skill.symptoms.clone(),
                     source,
                     skill.authored.clone(),
@@ -581,10 +582,13 @@ fn do_install(registry: &mut RegistryCache, skills_dir: &std::path::Path, name: 
             let id = name.to_string();
             let version =
                 extract_yaml_field(&manifest, "version").unwrap_or_else(|| "0.1.0".into());
+            let authored =
+                extract_yaml_field(&manifest, "authored").unwrap_or_else(|| "unknown".into());
             let symptoms = extract_yaml_list(&manifest, "symptoms");
             let mut entry = RegistryEntry::new_default(
                 LifecycleStatus::Installed,
                 version,
+                authored,
                 symptoms,
                 SkillSource::Manual,
                 now_date_iso8601(),
@@ -697,9 +701,12 @@ async fn do_fetch(
             }
 
             let today = now_date_iso8601();
+            let authored =
+                extract_yaml_field(&content, "authored").unwrap_or_else(|| today.clone());
             let mut entry = RegistryEntry::new_default(
                 LifecycleStatus::Discovered,
                 version,
+                authored,
                 symptoms,
                 SkillSource::Remote { url: url.to_string() },
                 today.clone(),
@@ -962,6 +969,7 @@ async fn do_search_remote(registry: &mut RegistryCache, query: &str) {
                 RegistryEntry::new_default(
                     LifecycleStatus::Discovered,
                     "unknown",
+                    "unknown",
                     vec![],
                     SkillSource::Remote { url: url.clone() },
                     now_date_iso8601(),
@@ -1125,9 +1133,10 @@ safety:
         RegistryEntry::new_default(
             LifecycleStatus::Discovered,
             "0.1.0",
+            &today,
             vec![],
             SkillSource::Workshop,
-            today,
+            &today,
             false,
         ),
     );
