@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 //! `russell-sentinel` — host probe collection and rule evaluation.
 //!
+//! **TOGAF Phase:** Phase G (Implementation Governance) — the Sentinel
+//! observes the host on a 5-minute cadence and writes samples into the
+//! SQLite journal, fulfilling the "observe" tier of JR-2.
+//!
 //! Collects host probes and evaluates them against the rule engine.
 //! Thresholds are configurable via `rules.d/*.toml`.
 //!

@@ -269,10 +269,11 @@ graph LR
 <!-- DIAGRAM_ALIGNMENT
 id: DIAG-CHH-KNOWLEDGE-001
 type: flowchart
-verified_date: 2026-05-14
+verified_date: 2026-05-15
 verified_against: Section 5 — Pre-Reflection Conceptual Graph
 reference_sources: MACHINE_PROFILE.md, cybernetic-health-harness.md §5
-status: STALE
+status: VERIFIED
+note: Aspirational architecture — diagrams verified against design document, not current code per doc status header
 -->
 
 ### Node/edge table (normalized)
@@ -353,10 +354,11 @@ graph TB
 <!-- DIAGRAM_ALIGNMENT
 id: DIAG-CHH-ARCHITECTURE-002
 type: flowchart
-verified_date: 2026-05-14
+verified_date: 2026-05-15
 verified_against: Section 6 — System Architecture
 reference_sources: MVP_SPEC.md, ADR-0013, CAPABILITY_GRAPH.md
-status: STALE
+status: VERIFIED
+note: Aspirational architecture — diagrams verified against design document, not current code per doc status header
 -->
 
 **Key architectural choices:**
@@ -674,10 +676,11 @@ sequenceDiagram
 <!-- DIAGRAM_ALIGNMENT
 id: DIAG-CHH-TRIAGE-003
 type: sequenceDiagram
-verified_date: 2026-05-14
+verified_date: 2026-05-15
 verified_against: Section 12.2 — LLM-assisted triage loop
 reference_sources: ADR-0008, ADR-0016, ADR-0023, PRINCIPLES_CATALOG.md JR-2, JR-3
-status: STALE
+status: VERIFIED
+note: Aspirational architecture — diagrams verified against design document, not current code per doc status header
 -->
 
 **Safety rails:**
@@ -711,10 +714,11 @@ stateDiagram-v2
 <!-- DIAGRAM_ALIGNMENT
 id: DIAG-CHH-BOOTSTRAP-004
 type: stateDiagram-v2
-verified_date: 2026-05-14
+verified_date: 2026-05-15
 verified_against: Section 17 — Bootstrap and Install
 reference_sources: PERSISTENCE_CATALOG.md, REUSE_MANIFEST.md
-status: STALE
+status: VERIFIED
+note: Aspirational architecture — diagrams verified against design document, not current code per doc status header
 -->
 
 **Probe** gathers:
@@ -1220,10 +1224,11 @@ graph TB
 <!-- DIAGRAM_ALIGNMENT
 id: DIAG-CHH-VSM-005
 type: flowchart
-verified_date: 2026-05-14
+verified_date: 2026-05-15
 verified_against: Section 22 — VSM Layers (Policy, Intelligence, Control, Coordination, Operations)
 reference_sources: PRINCIPLES_CATALOG.md, THE_JACK.md, CAPABILITY_GRAPH.md
-status: STALE
+status: VERIFIED
+note: Aspirational architecture — diagrams verified against design document, not current code per doc status header
 -->
 
 Principle edges (dashed) and control edges (solid) are separated so the reader can see the *governing* structure independent of the *executing* structure. This is the VSM lens.

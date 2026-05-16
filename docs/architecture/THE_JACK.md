@@ -1,7 +1,7 @@
 ---
 title: "The Jack — Russell's persona"
 audience: [operators, developers, contributors, agents, architects]
-last_updated: 2026-04-18
+last_updated: 2026-05-15
 togaf_phase: "A"
 version: "1.0.0"
 status: "Active"
@@ -12,7 +12,7 @@ status: "Active"
 <!-- TOGAF_DOMAIN: Architecture Vision -->
 <!-- VERSION: 1.0.0 -->
 <!-- STATUS: Active -->
-<!-- LAST_UPDATED: 2026-04-18 -->
+<!-- LAST_UPDATED: 2026-05-15 -->
 
 > *Though she be but little, she is fierce.*
 > — Shakespeare, *A Midsummer Night's Dream* III.ii.

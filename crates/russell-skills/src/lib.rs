@@ -1,11 +1,9 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 //! `russell-skills` — skill manifest loader (Phase 3).
 //!
-//! Loads and validates YAML skill manifests. The skill model was
-//! originally deferred (ADR-0007) and is now active per
-//! [ADR-0023](../../docs/adr/0023-lift-adr-0007-phase3-skills.md).
-//! The full lifecycle (discovery → retirement) is governed by
-//! [ADR-0024](../../docs/adr/0024-skill-registry-workshop-lifecycle.md).
+//! **TOGAF Phase:** Phase C (Application Architecture) — implements the
+//! skill playbook execution port. Loads and validates YAML skill manifests.
+//! The poka-yoke dispatcher enforces JR-3 (LLM selects from known IDs only).
 //!
 //! Each skill lives under `skills/<id>/` with a `manifest.yaml`
 //! file that declares probes (read-only) and interventions

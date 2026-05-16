@@ -10,9 +10,9 @@ status: "Active"
 # Persistence Catalog
 
 <!-- TOGAF_DOMAIN: Data Architecture -->
-<!-- VERSION: 1.0.0 -->
+<!-- VERSION: 1.1.0 -->
 <!-- STATUS: Active -->
-<!-- LAST_UPDATED: 2026-05-06 -->
+<!-- LAST_UPDATED: 2026-05-14 -->
 
 Under JR-7 (persistence is auditable), every byte Russell writes
 is registered here. If you add a new persistent artifact, you

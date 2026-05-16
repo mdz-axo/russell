@@ -9,7 +9,7 @@ status: "Active"
 
 <!-- TOGAF_DOMAIN: Data Architecture / Application Architecture -->
 <!-- VERSION: 1.0.0 -->
-<!-- STATUS: Accepted -->
+<!-- STATUS: Active -->
 <!-- LAST_UPDATED: 2026-05-13 -->
 
 # ADR-0024: Skill Registry, Workshop, and Lifecycle — Discovery-to-Retirement Pipeline

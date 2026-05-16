@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 //! `russell-core` — foundation crate.
 //!
+//! **TOGAF Phase:** Phase C (Data Architecture) — domain types define the
+//! canonical data shape for the single SQLite journal (JR-7).
+//!
 //! Provides the cross-cutting types every other Russell crate depends on:
 //!
 //! - [`paths`] — XDG-aware state / config / data paths. The one place that

@@ -9,7 +9,7 @@ status: "Active"
 
 <!-- TOGAF_DOMAIN: Change Management -->
 <!-- VERSION: 1.1.0 -->
-<!-- STATUS: Implemented -->
+<!-- STATUS: Active -->
 <!-- LAST_UPDATED: 2026-05-11 -->
 
 # ADR-0023: Lift ADR-0007 Deferral — Phase 3 Skills and Dispatch

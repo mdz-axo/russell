@@ -8,7 +8,7 @@ status: "Active"
 ---
 
 <!-- TOGAF_DOMAIN: Governance -->
-<!-- VERSION: 1.0.0 -->
+<!-- VERSION: 1.1.0 -->
 <!-- STATUS: Active -->
 <!-- LAST_UPDATED: 2026-05-14 -->
 

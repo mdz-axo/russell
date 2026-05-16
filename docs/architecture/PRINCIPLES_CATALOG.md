@@ -10,9 +10,9 @@ status: "Active"
 # Russell Architecture Principles Catalog
 
 <!-- TOGAF_DOMAIN: Cross-cutting — Architecture Principles -->
-<!-- VERSION: 1.0.0 -->
+<!-- VERSION: 1.1.0 -->
 <!-- STATUS: Active -->
-<!-- LAST_UPDATED: 2026-04-18 -->
+<!-- LAST_UPDATED: 2026-05-14 -->
 
 **Version:** 1.0.0
 **Status:** Active

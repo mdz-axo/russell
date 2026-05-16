@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 //! `russell-mcp` — MCP client for the trusted Kask relationship.
 //!
+//! **TOGAF Phase:** Phase C (Application Architecture) — exposes Russell's
+//! telemetry as MCP tools (`russell_jack`, `russell_sentinel`, `russell_proprio`)
+//! for agentic consumption via Kask's MCP infrastructure.
+//!
 //! Per [ADR-0025](../../docs/adr/0025-kask-mcp-client-trusted-relationship.md),
 //! Russell gains an MCP client that connects **exclusively** to the local
 //! Kask installation's MCP endpoint. No general remote MCP servers. No

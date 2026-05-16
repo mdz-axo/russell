@@ -1,30 +1,12 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
-//! `russell-meta` — the metacognitive layer.
+//! `russell-meta` — metacognitive layer (the Nurse).
 //!
-//! This crate is Russell's System 4 (Intelligence) in VSM terms:
-//! the subsystem that reasons *about* the system, decides *when* to
-//! consult the LLM, selects *which* knowledge to inject, interprets
-//! *what* the LLM proposes, and closes the feedback loop between
-//! observation and action.
+//! **TOGAF Phase:** Phase C (Application Architecture) — implements the
+//! LLM consultation capability (JR-4). Composes SOAP prompts, resolves
+//! ACTION: syntax, injects skill knowledge, and routes to the configured
+//! LLM backend (Okapi by default; OpenRouter opt-in).
 //!
-//! ## Responsibilities
-//!
-//! - **Prompt composition** — template-driven SOAP assembly with
-//!   relevance-scored knowledge injection and token budgeting.
-//! - **LLM client abstraction** — Okapi routing, inference hint
-//!   application, model resolution.
-//! - **Action resolution** — parsing ACTION syntax from LLM output,
-//!   dispatching to skills and Kask tools.
-//! - **Help orchestration** — the `russell jack` pipeline (compose →
-//!   dispatch → journal → escalate).
-//! - **Self-assessment** — quality scoring, outcome tracking, and
-//!   the ability to criticize and adapt its own behavior on the fly.
-//! - **Fallback reasoning** — rule-based logic when the LLM is
-//!   unavailable.
-//!
-//! ## Naming
-//!
-//! Previously `russell-doctor`. Renamed per ADR-0026 to reflect that
+//! Previously `russell-doctor`. Renamed per ADR-0026.
 //! this crate performs metacognitive functions (reasoning about
 //! reasoning, attention allocation, self-critique) rather than the
 //! narrower "doctor consultation" metaphor.

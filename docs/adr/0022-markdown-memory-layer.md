@@ -9,7 +9,7 @@ status: "Active"
 
 <!-- TOGAF_DOMAIN: Data Architecture -->
 <!-- VERSION: 1.0.0 -->
-<!-- STATUS: Accepted -->
+<!-- STATUS: Active -->
 <!-- LAST_UPDATED: 2026-05-09 -->
 
 # ADR-0022: Markdown Memory Layer — Derived Exports for Human Legibility

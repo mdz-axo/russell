@@ -9,7 +9,7 @@ status: "Active"
 
 <!-- TOGAF_DOMAIN: Technology Architecture -->
 <!-- VERSION: 1.0.0 -->
-<!-- STATUS: Accepted -->
+<!-- STATUS: Active -->
 <!-- LAST_UPDATED: 2026-05-06 -->
 
 # ADR-0019: Separate probe cadences and adopt OKH instrumentation at tool/connector boundaries

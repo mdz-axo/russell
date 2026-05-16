@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 //! `russell` — command-line entry point.
 //!
+//! **TOGAF Phase:** Phase D (Technology Architecture) — the operator's
+//! primary interface. Ships the six read-only verbs plus the Nurse's
+//! `help` cry-for-help channel and interactive `chat` REPL.
+//!
 //! Phase 1 (`cybernetic-health-harness.md` §20,
-//! `docs/specifications/MVP_SPEC.md` §2) ships the six read-only
-//! verbs plus the Nurse's `help` cry-for-help channel.
 
 #![deny(unsafe_code)]
 #![deny(rust_2018_idioms)]
