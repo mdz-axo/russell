@@ -151,6 +151,14 @@ echo "==> Installing binary…"
 cp "$BINARY_SRC" "${BIN_DIR}/${BINARY_NAME}"
 chmod +x "${BIN_DIR}/${BINARY_NAME}"
 
+# Remove any stale cargo-installed copy to prevent PATH shadowing.
+# The canonical install location is ~/.local/bin (this script).
+CARGO_BIN="${HOME}/.cargo/bin/${BINARY_NAME}"
+if [ -f "$CARGO_BIN" ] && [ "$CARGO_BIN" != "${BIN_DIR}/${BINARY_NAME}" ]; then
+    echo "  → Removing stale ${CARGO_BIN} (canonical is ${BIN_DIR}/${BINARY_NAME})"
+    rm -f "$CARGO_BIN"
+fi
+
 echo "==> Installing systemd units…"
 cp "${REPO_ROOT}/packaging/systemd/russell-sentinel.service" "$SYSTEMD_USER_DIR"
 cp "${REPO_ROOT}/packaging/systemd/russell-sentinel.timer" "$SYSTEMD_USER_DIR"
