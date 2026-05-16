@@ -36,7 +36,8 @@ Phase 1c began 2026-04-17 as a 30-day unattended soak per
   fully characterized.
 
 Findings F-1 through F-9 are recorded in
-[`../status/SOAK_FINDINGS.md`](../status/SOAK_FINDINGS.md).
+[`../archive/status--SOAK_FINDINGS.md`](../archive/status--SOAK_FINDINGS.md)
+(archived 2026-05-15; Phase 1c closed).
 
 The empirical data is sufficient to characterize Russell's
 steady-state behaviour. Continuing to 30 days would not produce
@@ -125,7 +126,7 @@ auditable records.
 
 ## References
 
-- [`../status/SOAK_FINDINGS.md`](../status/SOAK_FINDINGS.md) — full findings register.
+- [`../archive/status--SOAK_FINDINGS.md`](../archive/status--SOAK_FINDINGS.md) — full findings register (archived 2026-05-15).
 - [`../specifications/MVP_SPEC.md`](../specifications/MVP_SPEC.md) §6 — success criteria (amended).
 - [`../status/CONSOLIDATED-STATUS.md`](../status/CONSOLIDATED-STATUS.md) — phase tracker.
 - [ADR-0015](0015-proprioception-self-health.md) — proprioception design (F-7 context).

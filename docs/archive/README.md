@@ -1,7 +1,7 @@
 ---
 title: "Documentation Archive"
 audience: [contributors, architects]
-last_updated: 2026-05-12
+last_updated: 2026-05-15
 togaf_phase: "Repository"
 version: "1.0.0"
 status: "Active"
@@ -12,6 +12,7 @@ status: "Active"
 <!-- TOGAF_DOMAIN: Repository -->
 <!-- VERSION: 1.0.0 -->
 <!-- STATUS: Active -->
+<!-- LAST_UPDATED: 2026-05-15 -->
 
 Superseded or explicitly deferred-and-out-of-scope documents
 live here with provenance. Never delete archived docs silently
@@ -20,7 +21,8 @@ live here with provenance. Never delete archived docs silently
 ## Provenance Log
 
 | Archived on | File | Reason | Superseded by |
-|---|---|---|---|---|
+|---|---|---|---|
+| 2026-05-15 | [`status--SOAK_FINDINGS.md`](status--SOAK_FINDINGS.md) | Phase 1c soak closed per ADR-0018. All findings recorded; no action items remain. | `adr/0018-close-phase-1c.md` |
 | 2026-05-15 | [`standards--documentation.md`](standards--documentation.md) | Merged into DOCUMENTATION_STANDARDS.md §§11-15; voice/register, Markov conventions, cross-linking rules, tables, terminology | `standards/DOCUMENTATION_STANDARDS.md` |
 | 2026-05-15 | [`specifications--TOGAF_LITE_FOR_OPEN_SOURCE.md`](specifications--TOGAF_LITE_FOR_OPEN_SOURCE.md) | Duplicate redirect stub; canonical copy in `standards/TOGAF_LITE_FOR_OPEN_SOURCE.md` | `standards/TOGAF_LITE_FOR_OPEN_SOURCE.md` |
 | 2026-05-12 | [`audit-crate.md`](audit-crate.md) | Kask artifact (references `/audit-crate` commands, Kask platform architecture); not a Russell document | N/A — belongs in Kask repo |

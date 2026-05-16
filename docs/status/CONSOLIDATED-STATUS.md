@@ -254,6 +254,9 @@ build→install→test→sentinel flow.
   `RUSSELL_DOCTOR_BACKEND=openrouter`.
 - ADR-0016 settled the retry policy: single round-trip, no retry.
 - `russell-doctor` split into its own crate during Phase 1.
+  (Renamed to `russell-meta` per ADR-0026, 2026-05-15. Historical
+  references to `russell-doctor` in changelog entries below refer to
+  the same crate now named `russell-meta`.)
 
 ## 5. Risk register (current)
 

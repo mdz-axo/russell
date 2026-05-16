@@ -106,8 +106,6 @@ may exist but must not contradict these.
 
 - [`status/CONSOLIDATED-STATUS.md`](status/CONSOLIDATED-STATUS.md)
   — current state.
-- [`status/SOAK_FINDINGS.md`](status/SOAK_FINDINGS.md)
-  — observational backlog during Phase 1c.
 
 ### 2.7 ADRs (active)
 
