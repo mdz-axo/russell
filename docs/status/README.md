@@ -1,7 +1,7 @@
 ---
 title: "Status"
 audience: [operators, developers, contributors]
-last_updated: 2026-04-18
+last_updated: 2026-05-15
 togaf_phase: "G"
 version: "1.0.0"
 status: "Active"
@@ -12,7 +12,7 @@ status: "Active"
 <!-- TOGAF_DOMAIN: Governance -->
 <!-- VERSION: 1.0.0 -->
 <!-- STATUS: Active -->
-<!-- LAST_UPDATED: 2026-04-18 -->
+<!-- LAST_UPDATED: 2026-05-15 -->
 
 | Document | Purpose |
 |---|---|
