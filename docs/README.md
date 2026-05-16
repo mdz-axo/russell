@@ -17,7 +17,7 @@ status: "Active"
 <!-- TOGAF_DOMAIN: Cross-cutting — Documentation Governance -->
 <!-- VERSION: 1.0.0 -->
 <!-- STATUS: Active -->
-<!-- LAST_UPDATED: 2026-05-09 -->
+<!-- LAST_UPDATED: 2026-05-15 -->
 
 This is the **single navigation entrypoint** for Russell's active
 documentation corpus. Russell is small; the corpus should be too.
@@ -193,7 +193,7 @@ They live under [`adr/deferred/`](adr/deferred/):
 | Active authoritative docs | 92 |
 | Active ADRs | 19 |
 | Deferred ADRs | 7 |
-| Archived docs | 7 |
+| Archived docs | 8 |
 | Templates | 5 |
 
 _Verify with `find docs -type f -name '*.md' -not -path 'docs/archive/*' | wc -l`; current as of `last_updated`._
