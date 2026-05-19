@@ -33,7 +33,14 @@ use russell_core::paths::Paths;
 
 use crate::client::{Backend, ClientConfig, LlmClient, SoapPrompt};
 use crate::error::{DoctorError, Result};
+use crate::rate_limit::{RateLimitConfig, RateLimiter};
 use crate::{fallback, mock, oai_client, prompt};
+
+/// Process-wide LLM rate limiter. Shared across `russell jack`
+/// and `russell chat` calls within the same process lifetime.
+/// Default: 3 requests/minute, burst of 3.
+static LLM_RATE_LIMITER: std::sync::LazyLock<RateLimiter> =
+    std::sync::LazyLock::new(|| RateLimiter::new(RateLimitConfig::default()));
 
 /// Why the LLM was not called.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -180,17 +187,28 @@ async fn dispatch_backend(
                 .unwrap_or(crate::health::DEFAULT_BASE_URL);
             crate::health::ensure_ready(base).await;
 
-            let client = oai_client::OkapiClient::new(&okapi_cfg).await?;
-            match client.chat(soap).await {
-                Ok(resp) => ("okapi", Some(resp), None, None),
-                Err(e) => {
-                    warn!(error = %e, "okapi call failed — falling back");
-                    (
-                        "okapi",
-                        None,
-                        Some(error_kind_of(&e)),
-                        Some(SkipReason::OfflineFallback),
-                    )
+            // Rate-limit gate (T14): prevent resource exhaustion.
+            if let Err(e) = LLM_RATE_LIMITER.try_acquire() {
+                warn!(error = %e, "LLM rate-limited — falling back to offline");
+                (
+                    "okapi",
+                    None,
+                    Some(error_kind_of(&e)),
+                    Some(SkipReason::OfflineFallback),
+                )
+            } else {
+                let client = oai_client::OkapiClient::new(&okapi_cfg).await?;
+                match client.chat(soap).await {
+                    Ok(resp) => ("okapi", Some(resp), None, None),
+                    Err(e) => {
+                        warn!(error = %e, "okapi call failed — falling back");
+                        (
+                            "okapi",
+                            None,
+                            Some(error_kind_of(&e)),
+                            Some(SkipReason::OfflineFallback),
+                        )
+                    }
                 }
             }
         }

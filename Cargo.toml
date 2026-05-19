@@ -55,6 +55,8 @@ strsim = "0.11"
 rand = "0.8"
 minijinja = "2"
 zeroize = { version = "1", features = ["derive"] }
+sha2 = "0.10"
+hex = "0.4"
 
 [profile.dev]
 opt-level = 0

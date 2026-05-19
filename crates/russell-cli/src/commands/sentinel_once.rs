@@ -10,7 +10,7 @@
 //! the age is always ~0 s and the self-vital can never trigger.
 
 use anyhow::{Context, Result};
-use russell_core::ReflexSet;
+use russell_core::{BudgetVerdict, ReflexBudget, ReflexSet};
 use russell_core::RuleSet;
 use russell_core::event::{Event, Scope, Severity};
 use russell_core::journal::{JournalReader, JournalWriter};
@@ -128,7 +128,12 @@ pub fn run(paths: &Paths) -> Result<()> {
     //
     //    Cooldown: skip arcs that fired for the same probe within the
     //    arc's cooldown window (prevents oscillation).
+    //
+    //    Budget (T10): Global cap prevents cascading intervention storms.
+    //    Circuit breaker halts all reflexes after 3 consecutive failures.
     let now = russell_core::time::now_unix();
+    let mut budget = ReflexBudget::new();
+
     for ev in threshold_events.iter().chain(scenario_events.iter()) {
         let Some(probe) = ev.outputs.get("probe").and_then(|v| v.as_str()) else {
             continue;
@@ -136,6 +141,37 @@ pub fn run(paths: &Paths) -> Result<()> {
         let Some(arc) = reflexes.find(probe, ev.severity) else {
             continue;
         };
+
+        // Budget gate: check global reflex budget before per-arc cooldown.
+        match budget.check(now) {
+            BudgetVerdict::Allowed => {}
+            BudgetVerdict::BudgetExhausted => {
+                tracing::warn!(
+                    probe,
+                    "reflex budget exhausted — skipping all remaining arcs"
+                );
+                let mut budget_ev = Event::new("reflex_budget_exhausted", Severity::Warn);
+                budget_ev.tier = Some("sentinel".into());
+                budget_ev.module = Some("reflex/budget".into());
+                budget_ev.summary = Some(format!(
+                    "reflex budget exhausted ({} firings this hour) — escalating to operator",
+                    budget.firings_this_hour()
+                ));
+                journal.append(&budget_ev)?;
+                break;
+            }
+            BudgetVerdict::BreakerOpen => {
+                tracing::warn!("reflex circuit breaker OPEN — all reflexes halted");
+                let mut breaker_ev = Event::new("reflex_breaker_open", Severity::Alert);
+                breaker_ev.tier = Some("sentinel".into());
+                breaker_ev.module = Some("reflex/breaker".into());
+                breaker_ev.summary = Some(
+                    "circuit breaker tripped — consecutive failures exceeded threshold".into(),
+                );
+                journal.append(&breaker_ev)?;
+                break;
+            }
+        }
 
         // Check cooldown: has this arc fired recently for this probe?
         let cooldown_since = now - arc.cooldown_secs;
@@ -151,6 +187,9 @@ pub fn run(paths: &Paths) -> Result<()> {
             );
             continue;
         }
+
+        // Record firing in budget.
+        budget.record_firing(now);
 
         let mut ref_ev = Event::new("reflex_proposed", ev.severity);
         ref_ev.tier = Some("sentinel".into());

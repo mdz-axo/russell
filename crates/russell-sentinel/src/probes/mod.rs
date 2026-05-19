@@ -23,7 +23,7 @@ pub mod registry;
 pub mod systemd;
 pub mod tools;
 
-pub use descriptor::ProbeDescriptor;
+pub use descriptor::{ProbeCollector, ProbeDescriptor, ProbeMetadata};
 pub use registry::ProbeRegistry;
 
 /// One sample emitted by a probe.

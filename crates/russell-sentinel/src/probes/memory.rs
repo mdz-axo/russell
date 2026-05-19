@@ -37,20 +37,24 @@ pub fn load_avg_1m() -> Option<f64> {
     tools::parse_loadavg_1m(&raw)
 }
 
-// -- ProbeDescriptor impls --
+// -- ProbeDescriptor impls (T13: split into Metadata + Collector) --
+// MemAvailableMib uses the NEW split form (ProbeMetadata + ProbeCollector).
+// Others retain the old unified form (directly impl ProbeDescriptor)
+// until migrated.
 
-use super::descriptor::ProbeDescriptor;
+use super::descriptor::{ProbeCollector, ProbeDescriptor, ProbeMetadata};
 
-/// Probe descriptor for `mem_available_mib`.
 /// Probe descriptor for `mem_available_mib`.
 pub struct MemAvailableMib;
-impl ProbeDescriptor for MemAvailableMib {
+impl ProbeMetadata for MemAvailableMib {
     fn name(&self) -> &'static str {
         "mem_available_mib"
     }
     fn unit(&self) -> Option<&'static str> {
         Some("MiB")
     }
+}
+impl ProbeCollector for MemAvailableMib {
     fn collect(&self) -> Option<f64> {
         mem_available_mib()
     }

@@ -18,6 +18,7 @@
 //! opened.
 
 pub mod migrations;
+pub mod port;
 
 use std::path::{Path, PathBuf};
 use std::str::FromStr;

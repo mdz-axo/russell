@@ -163,7 +163,7 @@ impl ResolvedAction {
 pub enum ActionError {
     /// The ACTION: prefix was malformed.
     MalformedPrefix {
-        /// The raw line that could not be parsed.
+        /// The raw line that was not found.
         raw: String,
     },
     /// Missing `/` separator between skill and action ID.
@@ -193,6 +193,14 @@ pub enum ActionError {
         probes: Vec<String>,
         /// Available intervention IDs in this skill.
         interventions: Vec<String>,
+    },
+    /// Nested ACTION: detected in LLM output (prompt injection attempt).
+    /// Task 3.4: Security hardening against LLM action injection.
+    NestedActionDetected {
+        /// The raw response containing nested ACTION: patterns.
+        raw_response: String,
+        /// Count of ACTION: occurrences found.
+        count: usize,
     },
 }
 
@@ -229,6 +237,12 @@ impl std::fmt::Display for ActionError {
                 write!(
                     f,
                     "'{action_id}' is not a known action in skill '{skill_id}'. Available probes: {probes:?}, interventions: {interventions:?}"
+                )
+            }
+            Self::NestedActionDetected { raw_response, count } => {
+                write!(
+                    f,
+                    "Security violation: detected {count} ACTION: patterns in LLM output (prompt injection attempt). Only one ACTION: per response is allowed. Raw response: `{raw_response}`"
                 )
             }
         }
@@ -287,11 +301,28 @@ pub fn resolve(
 /// `kask_tools` (the poka-yoke for MCP tools per ADR-0025 §7).
 ///
 /// Returns `None` if no `ACTION:` line is present in the response.
+///
+/// # Task 3.4: Nested ACTION: Detection
+///
+/// This function now detects prompt injection attempts where the LLM
+/// output contains multiple `ACTION:` patterns. If more than one
+/// `ACTION:` line is found, returns `ActionError::NestedActionDetected`.
+/// This is a security measure per the Schneier/Miller security lens
+/// from the adversarial review.
 pub fn resolve_with_kask(
     response: &str,
     skills: &[Skill],
     kask_tools: &[KaskToolInfo],
 ) -> Option<std::result::Result<ResolvedAction, ActionError>> {
+    // Task 3.4: Detect nested ACTION: patterns (prompt injection attempt).
+    let action_count = response.lines().filter(|line| line.trim().starts_with("ACTION:")).count();
+    if action_count > 1 {
+        return Some(Err(ActionError::NestedActionDetected {
+            raw_response: response.to_string(),
+            count: action_count,
+        }));
+    }
+
     let action_line = response
         .lines()
         .rev()
@@ -879,6 +910,59 @@ mod tests {
             }
             _ => panic!("expected KaskTool"),
         }
+    }
+
+    // ── Task 3.4: Nested ACTION: Detection tests ──────────────────
+
+    #[test]
+    fn nested_action_detected() {
+        let skills = [make_skill()];
+        let response = "Let me check.\nACTION: test-skill/probe-1\n\nActually, also do this:\nACTION: test-skill/iv-1";
+        let err = resolve(response, &skills)
+            .unwrap()
+            .unwrap_err();
+        match err {
+            ActionError::NestedActionDetected { count, .. } => {
+                assert_eq!(count, 2);
+            }
+            _ => panic!("expected NestedActionDetected"),
+        }
+    }
+
+    #[test]
+    fn single_action_is_ok() {
+        let skills = [make_skill()];
+        let response = "Let me check.\nACTION: test-skill/probe-1";
+        let result = resolve(response, &skills).unwrap().unwrap();
+        assert!(result.is_probe());
+    }
+
+    #[test]
+    fn nested_action_in_kask_context() {
+        let skills = [make_skill()];
+        let kask_tools = make_kask_tools();
+        let response = "Checking Kask.\nACTION: kask/russell_host_snapshot\n\nAlso query:\nACTION: kask/paradigm_shift_query";
+        let err = resolve_with_kask(response, &skills, &kask_tools)
+            .unwrap()
+            .unwrap_err();
+        match err {
+            ActionError::NestedActionDetected { count, .. } => {
+                assert_eq!(count, 2);
+            }
+            _ => panic!("expected NestedActionDetected"),
+        }
+    }
+
+    #[test]
+    fn nested_action_error_message() {
+        let skills = [make_skill()];
+        let response = "First action\nACTION: test-skill/probe-1\nSecond action\nACTION: test-skill/iv-1\nThird action\nACTION: kask/tool";
+        let err = resolve(response, &skills)
+            .unwrap()
+            .unwrap_err();
+        let msg = err.to_string();
+        assert!(msg.contains("3 ACTION: patterns"));
+        assert!(msg.contains("prompt injection attempt"));
     }
 
     #[test]

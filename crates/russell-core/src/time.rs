@@ -1,7 +1,19 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 //! Thin wrapper around `time::OffsetDateTime` to standardise
 //! how Russell stamps journal rows and filenames.
+//!
+//! ## Clock trait (T2 — capability injection)
+//!
+//! The [`Clock`] trait abstracts time acquisition. Production code
+//! uses [`SystemClock`]; tests use [`FixedClock`] for deterministic
+//! assertions. This eliminates ambient time authority — callers
+//! must explicitly pass a clock capability.
+//!
+//! The free functions [`now_rfc3339`], [`now_unix`], etc. remain
+//! for backward compatibility but are implemented in terms of
+//! `SystemClock`. New code should prefer the trait.
 
+use std::sync::atomic::{AtomicI64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 use time::OffsetDateTime;
 
@@ -82,6 +94,102 @@ fn parse_date_parts(d: &str) -> (i64, i64, i32) {
     (y, m, d)
 }
 
+// ─── Clock trait (T2) ────────────────────────────────────────
+
+/// Abstraction over time acquisition.
+///
+/// Eliminates ambient authority: callers must receive a `&dyn Clock`
+/// capability to obtain timestamps. This enables deterministic
+/// testing and makes temporal dependencies explicit.
+///
+/// ## OCAP alignment (Miller)
+///
+/// The clock is a capability — possession of `&dyn Clock` IS the
+/// authority to observe time. No global mutable state, no ambient
+/// syscalls hidden inside domain logic.
+pub trait Clock: Send + Sync {
+    /// Current Unix timestamp (seconds since epoch).
+    fn now_unix(&self) -> i64;
+
+    /// Current time as RFC 3339 string (e.g. `2026-05-19T21:15:00Z`).
+    fn now_rfc3339(&self) -> String;
+
+    /// Current date as ISO 8601 string (e.g. `2026-05-19`).
+    fn now_date_iso8601(&self) -> String;
+}
+
+/// Production clock — delegates to the system clock.
+///
+/// This is the default implementation used by all production code.
+/// Zero-sized type; cloning and passing around is free.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct SystemClock;
+
+impl Clock for SystemClock {
+    fn now_unix(&self) -> i64 {
+        now_unix()
+    }
+
+    fn now_rfc3339(&self) -> String {
+        now_rfc3339()
+    }
+
+    fn now_date_iso8601(&self) -> String {
+        now_date_iso8601()
+    }
+}
+
+/// Deterministic clock for testing.
+///
+/// Returns a fixed timestamp that can be advanced manually.
+/// Useful for asserting temporal invariants without flaky
+/// real-time dependencies.
+#[derive(Debug)]
+pub struct FixedClock {
+    unix: AtomicI64,
+}
+
+impl FixedClock {
+    /// Create a fixed clock at the given Unix timestamp.
+    #[must_use]
+    pub fn new(unix: i64) -> Self {
+        Self {
+            unix: AtomicI64::new(unix),
+        }
+    }
+
+    /// Advance the clock by `secs` seconds.
+    pub fn advance(&self, secs: i64) {
+        self.unix.fetch_add(secs, Ordering::Relaxed);
+    }
+
+    /// Set the clock to a specific Unix timestamp.
+    pub fn set(&self, unix: i64) {
+        self.unix.store(unix, Ordering::Relaxed);
+    }
+}
+
+impl Clock for FixedClock {
+    fn now_unix(&self) -> i64 {
+        self.unix.load(Ordering::Relaxed)
+    }
+
+    fn now_rfc3339(&self) -> String {
+        let ts = self.now_unix();
+        OffsetDateTime::from_unix_timestamp(ts)
+            .unwrap_or(OffsetDateTime::UNIX_EPOCH)
+            .format(&time::format_description::well_known::Rfc3339)
+            .unwrap_or_else(|_| "1970-01-01T00:00:00Z".into())
+    }
+
+    fn now_date_iso8601(&self) -> String {
+        let ts = self.now_unix();
+        let dt = OffsetDateTime::from_unix_timestamp(ts)
+            .unwrap_or(OffsetDateTime::UNIX_EPOCH);
+        format!("{:04}-{:02}-{:02}", dt.year(), dt.month() as u8, dt.day())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -122,5 +230,38 @@ mod tests {
     fn approx_days_between_one_year() {
         let d = approx_days_between("2025-01-01", "2026-01-01");
         assert_eq!(d, 365);
+    }
+
+    // --- Clock trait tests (T2) ---
+
+    #[test]
+    fn system_clock_returns_real_time() {
+        let clock = SystemClock;
+        assert!(clock.now_unix() > 1_700_000_000);
+        assert!(clock.now_rfc3339().ends_with('Z'));
+        assert_eq!(clock.now_date_iso8601().len(), 10);
+    }
+
+    #[test]
+    fn fixed_clock_returns_deterministic_time() {
+        // 2026-01-15T00:00:00Z
+        let clock = FixedClock::new(1_768_435_200);
+        assert_eq!(clock.now_unix(), 1_768_435_200);
+        assert_eq!(clock.now_rfc3339(), "2026-01-15T00:00:00Z");
+        assert_eq!(clock.now_date_iso8601(), "2026-01-15");
+    }
+
+    #[test]
+    fn fixed_clock_advance() {
+        let clock = FixedClock::new(1_000_000);
+        clock.advance(3600);
+        assert_eq!(clock.now_unix(), 1_003_600);
+    }
+
+    #[test]
+    fn fixed_clock_set() {
+        let clock = FixedClock::new(0);
+        clock.set(2_000_000_000);
+        assert_eq!(clock.now_unix(), 2_000_000_000);
     }
 }

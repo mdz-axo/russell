@@ -1,22 +1,32 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
-//! Probe descriptor trait — the port definition for a single
-//! host-scope probe.
+//! Probe descriptor traits — the port definitions for host-scope probes.
 //!
-//! Each probe is a zero-sized type implementing [`ProbeDescriptor`].
-//! The trait provides declarative metadata (name, unit) and a
-//! collection function returning `Option<f64>`.
+//! ## Architecture (T13 — identity/collector separation)
 //!
-//! This replaces the manual `collect()` boilerplate with a
-//! type-driven registry ([`super::ProbeRegistry`]) that iterates
-//! all registered probes and produces [`super::Sample`] values.
+//! Two tiers:
+//! - [`ProbeDescriptor`] — the unified trait (name + unit + collect).
+//!   All existing probes implement this directly. The registry stores
+//!   `Box<dyn ProbeDescriptor>`.
+//! - [`ProbeMetadata`] + [`ProbeCollector`] — the split form for new
+//!   code. `ProbeCollector: ProbeMetadata` so it's a refinement.
+//!   Types implementing `ProbeCollector` also satisfy `ProbeDescriptor`
+//!   via a blanket impl.
+//!
+//! ### Why both?
+//!
+//! The unified trait keeps existing code unchanged (JR-1: no gratuitous
+//! churn). The split form enables:
+//! - Pure introspection (`&dyn ProbeMetadata`) without I/O deps
+//! - Mock probes in tests (implement `ProbeCollector` with stub)
+//! - Skill-registered probes with metadata from manifest
 
 use super::Sample;
 
-/// A single host probe — name, unit, and collection logic.
+/// The unified probe trait — name, unit, and collection in one.
 ///
-/// Implementors are zero-sized types (no state). The `collect`
-/// method reads from `/proc`, `/sys`, or subprocesses and returns
-/// either a numeric value or `None` (probe unavailable).
+/// The registry stores `Box<dyn ProbeDescriptor>`. Existing probes
+/// implement this directly. New probes may prefer the split form
+/// ([`ProbeMetadata`] + [`ProbeCollector`]).
 pub trait ProbeDescriptor: Send + Sync {
     /// Immutable probe name, e.g. `"mem_available_mib"`.
     fn name(&self) -> &'static str;
@@ -26,12 +36,50 @@ pub trait ProbeDescriptor: Send + Sync {
     fn unit(&self) -> Option<&'static str>;
 
     /// Collect the probe value. Returns `None` if the probe is
-    /// unavailable on this host (missing sysfs, permission denied,
-    /// no GPU, etc.).
+    /// unavailable on this host.
     fn collect(&self) -> Option<f64>;
 }
 
-/// Convenience: convert a [`ProbeDescriptor`] into a [`Sample`].
+/// Pure probe identity — no I/O, no side effects.
+///
+/// The "read" half of a probe. Enables introspection, serialization,
+/// and display without importing collection logic.
+pub trait ProbeMetadata: Send + Sync {
+    /// Immutable probe name.
+    fn name(&self) -> &'static str;
+    /// Unit string.
+    fn unit(&self) -> Option<&'static str>;
+    /// Category for grouping. Default: "host".
+    fn category(&self) -> &'static str {
+        "host"
+    }
+}
+
+/// A probe that can collect a value.
+///
+/// The "execute" half — extends [`ProbeMetadata`] with I/O.
+/// Implementing this automatically provides [`ProbeDescriptor`]
+/// via blanket impl.
+pub trait ProbeCollector: ProbeMetadata {
+    /// Collect the probe value. Returns `None` if unavailable.
+    fn collect(&self) -> Option<f64>;
+}
+
+/// Blanket: anything implementing the split traits satisfies the
+/// unified descriptor.
+impl<T: ProbeCollector + 'static> ProbeDescriptor for T {
+    fn name(&self) -> &'static str {
+        ProbeMetadata::name(self)
+    }
+    fn unit(&self) -> Option<&'static str> {
+        ProbeMetadata::unit(self)
+    }
+    fn collect(&self) -> Option<f64> {
+        ProbeCollector::collect(self)
+    }
+}
+
+/// Convenience: convert a [`dyn ProbeDescriptor`] into a [`Sample`].
 impl dyn ProbeDescriptor {
     /// Produce a `Sample` if the probe succeeds, or `None` if the
     /// probe is unavailable.
