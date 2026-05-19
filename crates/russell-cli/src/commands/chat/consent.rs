@@ -3,8 +3,26 @@
 //!
 //! Manages pending actions (probes/interventions) and operator
 //! consent via natural language affirmation or refusal.
+//!
+//! ## Security model (T5 hardening)
+//!
+//! - Pending actions expire after [`CONSENT_EXPIRY_SECS`] seconds
+//!   of inactivity to prevent stale approvals.
+//! - Consent phrases are checked against an exact allowlist (no
+//!   substring matching) to prevent LLM output from triggering
+//!   unintended approvals.
+//! - The `/approve` slash command is the canonical consent form;
+//!   natural-language phrases are accepted as a UX convenience
+//!   but only from exact-match input lines.
+
+use std::time::Instant;
 
 use russell_meta::action::ResolvedAction;
+
+/// Pending actions expire after this many seconds without operator
+/// input. Prevents a stale intervention from executing long after
+/// context has shifted.
+pub const CONSENT_EXPIRY_SECS: u64 = 300; // 5 minutes
 
 /// A pending action (probe or intervention) awaiting operator consent.
 /// Derived from [`ResolvedAction`] with UI-specific fields.
@@ -15,10 +33,41 @@ pub struct PendingAction {
     /// interventions like `create-manifest` where the LLM produces
     /// content that must be piped to the CLI command).
     pub stdin_content: Option<String>,
+    /// When this action was proposed. Used for expiry checking.
+    pub proposed_at: Instant,
+}
+
+impl PendingAction {
+    /// Create a new pending action with the current timestamp.
+    pub fn new(action: ResolvedAction, stdin_content: Option<String>) -> Self {
+        Self {
+            action,
+            stdin_content,
+            proposed_at: Instant::now(),
+        }
+    }
+
+    /// Whether this pending action has expired.
+    pub fn is_expired(&self) -> bool {
+        self.proposed_at.elapsed().as_secs() >= CONSENT_EXPIRY_SECS
+    }
+
+    /// Human-readable description for confirmation display.
+    pub fn describe(&self) -> String {
+        format!(
+            "{}/{}",
+            self.action.skill_id(),
+            self.action.action_id()
+        )
+    }
 }
 
 /// Returns true if the input looks like natural-language consent
 /// ("ok", "yes", "do it", "go ahead", "sure", "yep", etc.).
+///
+/// These are whole-line exact matches only — never substring or
+/// partial matching, to prevent LLM-generated text from triggering
+/// consent inadvertently.
 pub fn is_affirmative(input: &str) -> bool {
     let lower = input.to_lowercase();
     let lower = lower.trim();
@@ -61,4 +110,38 @@ pub fn is_refusal(input: &str) -> bool {
             | "wait"
             | "hold on"
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn affirmative_matches_exact_only() {
+        assert!(is_affirmative("yes"));
+        assert!(is_affirmative("  ok  "));
+        assert!(is_affirmative("DO IT"));
+        // These must NOT match — they're phrases that could appear
+        // in LLM output embedded in longer text.
+        assert!(!is_affirmative("If you'd like to do it, type /approve"));
+        assert!(!is_affirmative("yes but also no"));
+        assert!(!is_affirmative("okay sure whatever you say"));
+    }
+
+    #[test]
+    fn refusal_matches() {
+        assert!(is_refusal("/deny"));
+        assert!(is_refusal("no"));
+        assert!(is_refusal("cancel"));
+        assert!(!is_refusal("no way jose")); // not exact match
+    }
+
+    #[test]
+    fn consent_expiry_constant_is_reasonable() {
+        // 5 minutes — long enough for the operator to read and decide,
+        // short enough to prevent stale approvals.
+        assert_eq!(CONSENT_EXPIRY_SECS, 300);
+        assert!(CONSENT_EXPIRY_SECS >= 60);
+        assert!(CONSENT_EXPIRY_SECS <= 600);
+    }
 }

@@ -806,6 +806,7 @@ impl JournalReader {
                 ewma_mean,
                 ewma_var,
                 count,
+                updated_ts: Some(crate::time::now_unix()),
             });
         }
         Ok(results)
@@ -815,13 +816,19 @@ impl JournalReader {
     /// `baselines` table. Returns an empty `Vec` if no baselines
     /// have been computed yet.
     ///
+    /// # Task 4.1: Baseline freshness guard
+    ///
+    /// Now includes `updated_ts` for freshness checks. Callers should
+    /// use [`BaselineRow::is_stale()`] to verify baselines are current
+    /// before citing them in assessments.
+    ///
     /// # Errors
     ///
     /// Returns [`CoreError::Sqlite`] on DB errors.
     pub fn read_baselines(&self) -> Result<Vec<BaselineRow>> {
         let conn = self.open_ro()?;
         let mut stmt = conn.prepare(
-            "SELECT probe, p50, p95, p99, ewma_mean, ewma_var
+            "SELECT probe, p50, p95, p99, ewma_mean, ewma_var, updated_ts
                FROM baselines
               WHERE scope = 'host'
                 AND p95 IS NOT NULL",
@@ -836,6 +843,7 @@ impl JournalReader {
                     ewma_mean: r.get(4)?,
                     ewma_var: r.get(5)?,
                     count: 0,
+                    updated_ts: r.get(6)?,
                 })
             })?
             .collect::<std::result::Result<Vec<_>, _>>()?;
@@ -1019,6 +1027,38 @@ pub struct BaselineRow {
     pub ewma_var: Option<f64>,
     /// Number of samples in the window.
     pub count: i64,
+    /// Unix timestamp when this baseline was last computed.
+    /// Used for freshness checks (Task 4.1).
+    pub updated_ts: Option<i64>,
+}
+
+impl BaselineRow {
+    /// Check if this baseline is stale (older than `max_age_hours`).
+    ///
+    /// Returns `true` if `updated_ts` is `None` or if the baseline
+    /// was computed more than `max_age_hours` ago.
+    ///
+    /// # Task 4.1: Baseline freshness guard
+    ///
+    /// This implements D1 from the adversarial review: baselines
+    /// now have a freshness guard. When stale, Jack's SOAP shows
+    /// "baselines stale (last updated X days ago)" instead of
+    /// citing potentially obsolete statistics.
+    #[must_use]
+    pub fn is_stale(&self, max_age_hours: u32) -> bool {
+        let Some(updated) = self.updated_ts else {
+            return true;
+        };
+        let now = crate::time::now_unix();
+        let age_hours = (now - updated) as f64 / 3600.0;
+        age_hours > max_age_hours as f64
+    }
+
+    /// Check if this baseline is fresh (not stale).
+    #[must_use]
+    pub fn is_fresh(&self, max_age_hours: u32) -> bool {
+        !self.is_stale(max_age_hours)
+    }
 }
 
 /// Compute a percentile value from a sorted slice.

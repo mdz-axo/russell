@@ -105,6 +105,25 @@ struct RulesFile {
     rule: Vec<Rule>,
 }
 
+/// A structured warning from configuration file loading.
+///
+/// Surfaced in `russell status` and fed to proprioception as a
+/// self-vital. The operator gets actionable feedback instead of
+/// silently-skipped files.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ConfigWarning {
+    /// Path of the file that failed.
+    pub path: String,
+    /// Human-readable reason for the failure.
+    pub reason: String,
+}
+
+impl std::fmt::Display for ConfigWarning {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}: {}", self.path, self.reason)
+    }
+}
+
 /// A loaded collection of rules, keyed by probe name.
 ///
 /// Built-in defaults are always present; operator overrides from
@@ -204,6 +223,82 @@ impl RuleSet {
             }
             debug!(path = %path.display(), count, "loaded rules from file");
         }
+    }
+
+    /// Load rules from a directory, returning structured warnings
+    /// for any files that failed to parse.
+    ///
+    /// This is the diagnostic version of [`load_from_dir`] — it
+    /// returns a [`Vec<ConfigWarning>`] that the CLI can surface
+    /// in `russell status` or feed to proprioception.
+    pub fn load_from_dir_with_warnings(
+        &mut self,
+        dir: &std::path::Path,
+    ) -> Vec<ConfigWarning> {
+        let mut warnings = Vec::new();
+        let entries = match std::fs::read_dir(dir) {
+            Ok(d) => d,
+            Err(e) => {
+                if e.kind() != std::io::ErrorKind::NotFound {
+                    warnings.push(ConfigWarning {
+                        path: dir.display().to_string(),
+                        reason: format!("cannot read directory: {e}"),
+                    });
+                }
+                return warnings;
+            }
+        };
+
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.extension().is_none_or(|e| e != "toml") {
+                continue;
+            }
+
+            let content = match std::fs::read_to_string(&path) {
+                Ok(c) => c,
+                Err(e) => {
+                    warnings.push(ConfigWarning {
+                        path: path.display().to_string(),
+                        reason: format!("unreadable: {e}"),
+                    });
+                    continue;
+                }
+            };
+
+            let file: RulesFile = match toml::from_str(&content) {
+                Ok(f) => f,
+                Err(e) => {
+                    warnings.push(ConfigWarning {
+                        path: path.display().to_string(),
+                        reason: format!("parse error: {e}"),
+                    });
+                    continue;
+                }
+            };
+
+            if let Some(ref schema) = file.schema
+                && schema != RULE_SCHEMA
+            {
+                warnings.push(ConfigWarning {
+                    path: path.display().to_string(),
+                    reason: format!(
+                        "unknown schema: expected {}, found {}",
+                        RULE_SCHEMA, schema
+                    ),
+                });
+                continue;
+            }
+
+            for rule in file.rule {
+                if let Some(pos) = self.rules.iter().position(|r| r.probe == rule.probe) {
+                    self.rules[pos] = rule;
+                } else {
+                    self.rules.push(rule);
+                }
+            }
+        }
+        warnings
     }
 
     /// Evaluate a probe value against its rule. Returns the highest

@@ -503,6 +503,8 @@ fn error_kind_of(e: &DoctorError) -> String {
         DoctorError::BadResponse(_) => "bad_response".into(),
         DoctorError::Fmt(_) => "fmt".into(),
         DoctorError::Prompt(_) => "prompt".into(),
+        DoctorError::Skill(_) => "skill".into(),
+        DoctorError::RiskGate(_) => "risk_gate".into(),
         DoctorError::Other(_) => "other".into(),
     }
 }

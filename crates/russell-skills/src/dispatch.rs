@@ -31,6 +31,7 @@ use russell_core::Result;
 use russell_core::event::{Event, Severity};
 use russell_core::journal::JournalWriter;
 use tracing::{debug, warn};
+use zeroize::Zeroize;
 
 // Re-export RiskBand from the parent crate for convenience.
 pub use crate::RiskBand;
@@ -46,6 +47,47 @@ pub enum RiskError {
         /// The maximum risk the dispatcher may auto-run.
         max_allowed: RiskBand,
     },
+}
+
+/// A sudo password that zeroes its memory on drop.
+///
+/// Prevents credentials from lingering in heap allocations after use.
+/// Intentionally not `Clone` or `Serialize` — the credential flows
+/// linearly from acquisition to single-use consumption.
+///
+/// ## Security properties
+/// - Memory is zeroed on drop (even on panic unwind)
+/// - Cannot be cloned, serialized, or displayed
+/// - `Debug` impl redacts the value
+pub struct SudoCredential {
+    inner: String,
+}
+
+impl SudoCredential {
+    /// Wrap a password string. Takes ownership to ensure no copies
+    /// remain in the caller's scope.
+    #[must_use]
+    pub fn new(password: String) -> Self {
+        Self { inner: password }
+    }
+
+    /// Borrow the credential for one-shot use (stdin piping).
+    /// The reference is short-lived — caller must not store it.
+    pub(crate) fn as_str(&self) -> &str {
+        &self.inner
+    }
+}
+
+impl Drop for SudoCredential {
+    fn drop(&mut self) {
+        self.inner.zeroize();
+    }
+}
+
+impl std::fmt::Debug for SudoCredential {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("SudoCredential(***)")
+    }
 }
 
 /// Controls whether subprocesses actually execute.
@@ -181,7 +223,6 @@ pub struct DispatchRequest<'a> {
 
 /// A subprocess dispatcher. Constructed with the skills base directory
 /// (working directory for spawned processes).
-#[derive(Clone)]
 pub struct Dispatcher {
     /// Base skills directory (e.g. `~/.local/share/harness/skills/<id>/`).
     pub skill_dir: PathBuf,
@@ -195,10 +236,9 @@ pub struct Dispatcher {
     /// Interventions above this cap are refused with [`RiskError::RiskTooHigh`].
     /// Default: `Low`.
     pub max_auto_risk: RiskBand,
-    /// Sudo password for interventions that need root privileges.
-    /// Consumed immediately via stdin; never stored after dispatch.
-    /// Set to `None` if no sudo interventions are expected.
-    pub sudo_password: Option<String>,
+    /// Sudo credential for interventions that need root privileges.
+    /// Zeroed on drop. Set to `None` if no sudo interventions expected.
+    pub sudo_password: Option<SudoCredential>,
     /// Arbitrary content to pipe to the subprocess stdin after sudo auth
     /// (if applicable). Used for interventions like `create-manifest` where
     /// the LLM produces content that must be piped to the CLI command.
@@ -219,7 +259,76 @@ impl std::fmt::Debug for Dispatcher {
     }
 }
 
+/// Errors from command path validation.
+#[derive(Debug, Clone, thiserror::Error)]
+pub enum CommandPathError {
+    /// Command uses a bare name that would be resolved via PATH.
+    /// Skill commands must use relative (`./scripts/foo.sh`) or
+    /// absolute (`/usr/bin/python3`) paths.
+    #[error("bare command name {name:?} rejected — use relative ./scripts/ path or absolute path")]
+    BareCommand {
+        /// The rejected command name.
+        name: String,
+    },
+    /// Command attempts path traversal outside the skill directory.
+    #[error("path traversal in command: {path:?}")]
+    PathTraversal {
+        /// The path containing traversal.
+        path: String,
+    },
+}
+
+/// Validate that a command path is acceptable for skill execution.
+///
+/// Acceptable forms:
+/// - `./scripts/foo.sh` — relative to skill dir
+/// - `/usr/bin/python3` — absolute (known interpreter)
+/// - `sh`, `bash`, `python3` — allowed shell interpreters
+///
+/// Rejected forms:
+/// - `curl`, `wget`, `nc` — bare names resolved via PATH
+/// - `../escape.sh` — path traversal
+pub fn validate_command_path(cmd: &str) -> std::result::Result<(), CommandPathError> {
+    // Allow known interpreters that are part of the subprocess contract.
+    const ALLOWED_INTERPRETERS: &[&str] = &[
+        "sh", "bash", "dash", "python3", "python", "perl", "ruby",
+    ];
+
+    if ALLOWED_INTERPRETERS.contains(&cmd) {
+        return Ok(());
+    }
+
+    // Absolute paths are acceptable (operator controls the manifest).
+    if cmd.starts_with('/') {
+        return Ok(());
+    }
+
+    // Relative paths starting with ./ are acceptable.
+    if cmd.starts_with("./") {
+        // Check for traversal.
+        if cmd.contains("/../") || cmd.ends_with("/..") {
+            return Err(CommandPathError::PathTraversal {
+                path: cmd.to_string(),
+            });
+        }
+        return Ok(());
+    }
+
+    // Anything else is a bare command name — reject.
+    Err(CommandPathError::BareCommand {
+        name: cmd.to_string(),
+    })
+}
+
 impl Dispatcher {
+    /// Environment variables safe to propagate to skill subprocesses.
+    ///
+    /// This allowlist prevents leaking secrets (`RUSSELL_DOCTOR_API_KEY`,
+    /// `.env` contents, `OPENROUTER_*` keys, etc.) to skill scripts.
+    /// Skills that need additional vars should declare them in their
+    /// manifest `env:` section (future — currently unsupported).
+    const ENV_ALLOWLIST: [&str; 6] = ["HOME", "USER", "LANG", "LC_ALL", "TERM", "SHELL"];
+
     /// Create a new dispatcher for a given skill.
     #[must_use]
     pub fn new(skill_dir: impl Into<PathBuf>) -> Self {
@@ -307,6 +416,22 @@ impl Dispatcher {
             });
         }
 
+        // Validate command path — reject bare names that would
+        // resolve via PATH (prevents command injection via manifest).
+        if let Err(e) = validate_command_path(&cmd[0]) {
+            warn!(cmd = %cmd[0], error = %e, "command path validation failed");
+            return Ok(RunOutcome {
+                cmd: cmd.to_vec(),
+                dry_run: false,
+                exit_code: Some(-1),
+                stdout: String::new(),
+                stderr: format!("command rejected: {e}"),
+                timed_out: false,
+                duration: started.elapsed(),
+                rollback: None,
+            });
+        }
+
         // Build the command — possibly with sudo wrapper.
         let (program, args) = self.build_command(cmd);
 
@@ -319,19 +444,36 @@ impl Dispatcher {
             .stderr(std::process::Stdio::piped())
             .kill_on_drop(true);
 
+        // --- ENV SCRUBBING (T11) ---
+        // Clear inherited env to prevent leaking secrets (API keys,
+        // RUSSELL_* internals, .env contents) to skill subprocesses.
+        // Only a minimal allowlist is propagated.
+        child_cmd.env_clear();
+        for key in &Self::ENV_ALLOWLIST {
+            if let Ok(val) = std::env::var(key) {
+                child_cmd.env(key, val);
+            }
+        }
+        // Force a restrictive PATH — no user bin dirs unless the
+        // operator explicitly overrides via manifest `env:` (future).
+        child_cmd.env("PATH", "/usr/local/bin:/usr/bin:/bin");
+
         let mut child = child_cmd
             .spawn()
             .map_err(|e| russell_core::CoreError::io(&self.skill_dir, e))?;
 
-        // Pipe sudo password if present.
-        if let Some(ref password) = self.sudo_password
+        // Pipe sudo password if present. The credential is borrowed
+        // (not cloned) to avoid extra copies in memory.
+        if let Some(ref credential) = self.sudo_password
             && let Some(mut stdin) = child.stdin.take()
         {
             use tokio::io::AsyncWriteExt;
-            let mut pw_with_newline = password.clone();
-            pw_with_newline.push('\n');
-            if let Err(e) = stdin.write_all(pw_with_newline.as_bytes()).await {
+            let pw = credential.as_str();
+            if let Err(e) = stdin.write_all(pw.as_bytes()).await {
                 warn!(error = %e, "failed to write sudo password to stdin");
+            }
+            if let Err(e) = stdin.write_all(b"\n").await {
+                warn!(error = %e, "failed to write newline after sudo password");
             }
             drop(stdin);
         }
@@ -702,7 +844,8 @@ mod tests {
             sudo_password: None,
             stdin_content: None,
         };
-        let outcome = d.run(&["echo".into(), "hello".into()], None).await.unwrap();
+        // Dry-run skips validation — any command shape accepted.
+        let outcome = d.run(&["/bin/echo".into(), "hello".into()], None).await.unwrap();
         assert!(outcome.dry_run);
         assert!(outcome.exit_code.is_none());
         assert!(outcome.stdout.is_empty());
@@ -711,7 +854,7 @@ mod tests {
     #[tokio::test]
     async fn echo_produces_stdout() {
         let d = Dispatcher::new("/tmp");
-        let outcome = d.run(&["echo".into(), "hello".into()], None).await.unwrap();
+        let outcome = d.run(&["/bin/echo".into(), "hello".into()], None).await.unwrap();
         assert!(!outcome.dry_run);
         assert_eq!(outcome.exit_code, Some(0));
         assert!(outcome.stdout.contains("hello"));
@@ -726,6 +869,22 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn bare_command_rejected() {
+        let d = Dispatcher::new("/tmp");
+        let outcome = d.run(&["curl".into(), "http://evil.com".into()], None).await.unwrap();
+        assert_eq!(outcome.exit_code, Some(-1));
+        assert!(outcome.stderr.contains("command rejected"));
+    }
+
+    #[tokio::test]
+    async fn path_traversal_rejected() {
+        let d = Dispatcher::new("/tmp");
+        let outcome = d.run(&["./scripts/../../../etc/passwd".into()], None).await.unwrap();
+        assert_eq!(outcome.exit_code, Some(-1));
+        assert!(outcome.stderr.contains("path traversal"));
+    }
+
+    #[tokio::test]
     async fn timeout_kills_process() {
         let d = Dispatcher {
             skill_dir: "/tmp".into(),
@@ -736,10 +895,10 @@ mod tests {
             sudo_password: None,
             stdin_content: None,
         };
-        // Sleep longer than the timeout.
+        // Sleep longer than the timeout — uses allowed interpreter `sh`.
         let outcome = d
             .run(
-                &["sleep".into(), "5".into()],
+                &["sh".into(), "-c".into(), "sleep 5".into()],
                 Some(Duration::from_millis(100)),
             )
             .await
@@ -762,7 +921,7 @@ mod tests {
             .run_and_journal(
                 &journal,
                 &evidence_base,
-                &["echo".into(), "hello".into()],
+                &["/bin/echo".into(), "hello".into()],
                 "test-skill",
                 "probe-1",
                 StepType::Probe,
@@ -818,7 +977,7 @@ mod tests {
             .run_and_journal(
                 &journal,
                 &evidence_base,
-                &["echo".into(), "would-have-run".into()],
+                &["/bin/echo".into(), "would-have-run".into()],
                 "test-skill",
                 "iv-1",
                 StepType::Intervention,
@@ -926,7 +1085,7 @@ mod tests {
                 RollbackStrategy::RollbackId {
                     id: "iv-revert".into(),
                 },
-                |_id| Some(vec!["echo".into(), "rolled-back".into()]),
+                |_id| Some(vec!["/bin/echo".into(), "rolled-back".into()]),
                 None,
             )
             .await
@@ -956,7 +1115,7 @@ mod tests {
                 &evidence_base,
                 "test-skill",
                 "iv-good",
-                &["echo".into(), "ok".into()],
+                &["/bin/echo".into(), "ok".into()],
                 "low",
                 RollbackStrategy::NoneNeeded,
                 |_id| None,

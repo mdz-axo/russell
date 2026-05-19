@@ -72,6 +72,16 @@ pub enum DoctorError {
     #[error("prompt template error: {0}")]
     Prompt(String),
 
+    /// A skill loading or dispatch error propagated through the
+    /// metacognitive layer (e.g. when Jack tries to resolve an
+    /// ACTION that references a broken manifest).
+    #[error("skill error: {0}")]
+    Skill(#[from] russell_skills::LoadError),
+
+    /// A risk-band gate refused the dispatch.
+    #[error("dispatch refused: {0}")]
+    RiskGate(#[from] russell_skills::dispatch::RiskError),
+
     /// Catch-all for rare conditions.
     #[error("{0}")]
     Other(String),

@@ -39,11 +39,13 @@ pub struct Sample {
     pub unit: Option<&'static str>,
 }
 
-/// Collect one sample per probe. Returns only probes that
-/// produced a value on this invocation.
+/// Collect one sample per probe using the default registry.
 ///
 /// Uses the lazy-initialised singleton [`REGISTRY`]; the registry
 /// is built once and reused across all Sentinel cycles.
+///
+/// For dependency injection (testing, subset probes), prefer
+/// [`collect_with`] which accepts an explicit `&ProbeRegistry`.
 ///
 /// OKH: `okh.pipeline.sentinel_collect`
 #[tracing::instrument(
@@ -56,8 +58,23 @@ pub fn collect() -> Vec<Sample> {
     REGISTRY.collect_all()
 }
 
+/// Collect samples using an explicitly-provided registry.
+///
+/// This is the **capability-injected** version of [`collect`].
+/// Callers pass the registry they constructed, enabling:
+/// - Subset probes for fast tests
+/// - Custom probes registered from skills
+/// - Platform-conditional probes
+///
+/// Production code can use either this or [`collect()`]; the
+/// singleton exists only as a convenience for the hot path.
+pub fn collect_with(registry: &ProbeRegistry) -> Vec<Sample> {
+    registry.collect_all()
+}
+
 /// Lazy-initialised singleton — the registry is built once and
-/// reused across Sentinel cycles.
+/// reused across Sentinel cycles. Use [`collect_with`] to bypass
+/// the singleton for testing or custom probe configurations.
 static REGISTRY: std::sync::LazyLock<ProbeRegistry> =
     std::sync::LazyLock::new(ProbeRegistry::with_defaults);
 

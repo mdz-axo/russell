@@ -26,8 +26,25 @@ use russell_core::journal::{JournalReader, JournalWriter};
 
 /// Run the probe set once and append samples to the journal.
 /// No rule evaluation — samples only.
+///
+/// Uses the default probe registry (singleton). For dependency
+/// injection, use [`run_once_with_registry`].
 pub fn run_once(writer: &JournalWriter) -> Result<usize> {
     let samples = probes::collect();
+    journal_samples(writer, &samples)?;
+    Ok(samples.len())
+}
+
+/// Run the probe set once using an explicitly-provided registry.
+///
+/// This is the **capability-injected** version of [`run_once`],
+/// enabling tests and custom configurations to supply their own
+/// probe set without relying on the global singleton.
+pub fn run_once_with_registry(
+    writer: &JournalWriter,
+    registry: &probes::ProbeRegistry,
+) -> Result<usize> {
+    let samples = probes::collect_with(registry);
     journal_samples(writer, &samples)?;
     Ok(samples.len())
 }
@@ -50,6 +67,26 @@ pub fn run_once_with_rules(
     reader: Option<&JournalReader>,
 ) -> Result<(usize, Vec<Event>)> {
     let samples = probes::collect();
+    journal_samples(writer, &samples)?;
+    let events = if let Some(r) = reader {
+        evaluate_samples_with_rates(rules, &samples, r)
+    } else {
+        evaluate_samples_basic(rules, &samples)
+    };
+    Ok((samples.len(), events))
+}
+
+/// Run the probe set with rule evaluation using an injected registry.
+///
+/// Combines [`run_once_with_registry`] and rule evaluation for
+/// callers who need both dependency injection and threshold checking.
+pub fn run_once_with_rules_and_registry(
+    writer: &JournalWriter,
+    rules: &RuleSet,
+    reader: Option<&JournalReader>,
+    registry: &probes::ProbeRegistry,
+) -> Result<(usize, Vec<Event>)> {
+    let samples = probes::collect_with(registry);
     journal_samples(writer, &samples)?;
     let events = if let Some(r) = reader {
         evaluate_samples_with_rates(rules, &samples, r)

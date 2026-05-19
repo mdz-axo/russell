@@ -141,7 +141,7 @@ pub async fn execute_pending_action(
         }
         match verify.wait().await {
             Ok(s) if s.success() => {
-                dispatcher.sudo_password = Some(password);
+                dispatcher.sudo_password = Some(russell_skills::dispatch::SudoCredential::new(password));
             }
             _ => {
                 println!("  → Wrong sudo password. Aborting action.");

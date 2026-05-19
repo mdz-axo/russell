@@ -157,7 +157,16 @@ pub async fn run(paths: &Paths) -> Result<()> {
 
                 // Consent handling — must come before special commands.
                 if let Some(ref pa) = pending_action {
+                    // T5: Expiry guard — stale pending actions are
+                    // discarded to prevent delayed approvals.
+                    if pa.is_expired() {
+                        println!("  → Pending action expired ({}s). Please re-propose.", consent::CONSENT_EXPIRY_SECS);
+                        pending_action = None;
+                        continue;
+                    }
                     if trimmed == "/approve" || is_affirmative(trimmed) {
+                        // T5: Echo confirmation of what will execute.
+                        println!("  → Executing: {}", pa.describe());
                         let is_skill_mgr_mutation = pa.action.skill_id() == "skill-manager"
                             && matches!(
                                 pa.action.action_id(),
@@ -355,7 +364,7 @@ async fn execute_action(
     if action.is_kask_tool() {
         kask::execute_kask_tool(journal, kask_client, action, session_id, model, paths).await
     } else {
-        let pa = PendingAction { action: action.clone(), stdin_content: None };
+        let pa = PendingAction::new(action.clone(), None);
         execute::execute_pending_action(journal, paths, &pa, session_id, model).await
     }
 }
@@ -397,7 +406,7 @@ async fn handle_action_proposal(
                 action.action_id(), risk.as_str()
             );
             println!("  → Say 'ok' to approve, or 'no' to refuse.");
-            *pending_action = Some(PendingAction { action, stdin_content: None });
+            *pending_action = Some(PendingAction::new(action, None));
         }
     } else if action.is_probe() {
         // Probes are read-only — auto-execute immediately.
@@ -405,7 +414,7 @@ async fn handle_action_proposal(
             "  → Running probe: {}/{}…",
             action.skill_id(), action.action_id()
         );
-        let pa = PendingAction { action, stdin_content: None };
+        let pa = PendingAction::new(action, None);
         let probe_result = execute::execute_pending_action(
             journal, paths, &pa, session_id, current_model,
         ).await;
@@ -430,7 +439,7 @@ async fn handle_action_proposal(
             _ => unreachable!(),
         }
         println!("  → Say 'ok' to approve, or 'no' to refuse.");
-        *pending_action = Some(PendingAction { action, stdin_content });
+        *pending_action = Some(PendingAction::new(action, stdin_content));
     }
     Ok(())
 }

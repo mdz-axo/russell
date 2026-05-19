@@ -1,0 +1,311 @@
+---
+title: "Adversarial Multi-Perspective Review — Action Plan"
+audience: [architects, developers, contributors, agents]
+last_updated: 2026-05-19
+togaf_phase: "C"
+version: "1.0.0"
+status: "Active"
+---
+
+# Adversarial Multi-Perspective Review — Action Plan
+
+<!-- TOGAF_DOMAIN: Cross-cutting — Architecture Remediation -->
+<!-- VERSION: 1.0.0 -->
+<!-- STATUS: Active -->
+<!-- LAST_UPDATED: 2026-05-19 -->
+
+**Generated:** 2026-05-19
+**Review Scope:** Full codebase semantic mapping
+**Principles:** JR-1 through JR-7 preserved
+
+---
+
+## 1. Semantic Mapping — Entity Relationship Diagram
+
+```mermaid
+erDiagram
+    SENTINEL ||--o{ SAMPLE : "writes every 5min"
+    SENTINEL ||--o{ EVENT : "emits on breach"
+    PROPRIO ||--o{ SAMPLE : "writes self-vitals"
+    META ||--o{ HELP_SESSION : "consults LLM"
+    SKILL ||--o{ PROBE : "defines"
+    SKILL ||--o{ INTERVENTION : "defines"
+    DISPATCH ||--o{ EVENT : "journals execution"
+    RULE ||--o{ SAMPLE : "evaluates against"
+    BASELINE ||--o{ SAMPLE : "computed from"
+    REFLEX ||--o{ EVENT : "triggers on"
+    
+    SENTINEL {
+        string probe_set "25 probes"
+        string cadence "5min"
+        string rule_engine "TOML"
+    }
+    PROPRIO {
+        string vitals "5 self-vitals"
+        string guard "AutoimmuneGuard"
+    }
+    META {
+        string persona "Jack"
+        string backends "Okapi, OpenRouter"
+        string syntax "ACTION:"
+    }
+    SKILL {
+        string id "kebab-case"
+        SkillKind kind "actionable|lens"
+        RiskBand max_auto_risk
+    }
+    SAMPLE {
+        int ts "unix seconds"
+        string probe "name"
+        float value "numeric"
+        string scope "host|self"
+    }
+    EVENT {
+        string action "harness.event.v1"
+        Severity severity "ok|warn|alert|crit"
+        string evidence_ref "path"
+    }
+    RULE {
+        string probe "name"
+        float warn_threshold
+        float alert_threshold
+        float rate_warn "rate-of-change"
+    }
+    BASELINE {
+        string probe "name"
+        float ewma_mean "7d half-life"
+        float p95 "30d rolling"
+    }
+    REFLEX {
+        string probe "trigger"
+        string intervention "action"
+        int cooldown_secs
+    }
+```
+
+<!-- DIAGRAM_ALIGNMENT
+id: DIAG-REVIEW-ER-001
+type: erDiagram
+verified_date: 2026-05-19
+verified_against: crates/russell-*/, docs/specifications/PERSISTENCE_CATALOG.md
+reference_sources: CAPABILITY_GRAPH.md, AGENTS.md §5
+status: VERIFIED
+-->
+
+---
+
+## 2. Weakness Identification — Multi-Perspective Analysis
+
+### 2.1 Architectural Weaknesses (Hexagonal Ports/Adapters Lens)
+
+| ID | Weakness | Root Cause | Driver | Priority |
+|---|---|---|---|---|
+| A1 | **Tight coupling between CLI and crates** — `russell-cli` imports all 7 crates directly | Workspace layout lacks facade/anti-corruption layer | JR-1 austerity prioritized simplicity over modularity | Medium |
+| A2 | **No explicit port interfaces** — traits exist but are not enforced as hexagonal ports | Ad-hoc interface design, not systematic | Speed of MVP delivery | High |
+| A3 | **`russell-mcp-server` duplicated** — two MCP crates with unclear separation | ADR-0003 deferred, then ADR-0025 lifted partially | Incremental feature addition without refactor | Medium |
+| A4 | **Kask integration is HTTP-only** — no typed client, relies on manual endpoint knowledge | ADR-0025 specifies boundary but not client abstraction | Trust relationship assumed, not encoded | Low |
+
+### 2.2 Code Quality Weaknesses (Gordon Hoare / CSP Lens)
+
+| ID | Weakness | Root Cause | Driver | Priority |
+|---|---|---|---|---|
+| C1 | **No formal process algebra** — concurrent paths (Sentinel, Proprio, Chat) not modeled as CSP processes | Rust `tokio` used without CSP abstraction | Pragmatism over formalism | Low |
+| C2 | **Channel boundaries implicit** — no typed channels between crates | Direct function calls, not message passing | Performance assumption | Low |
+| C3 | **Race conditions possible** — `AutoimmuneGuard` uses mutex but wiring deferred | Foundation built, integration deferred | Phase 2A partial implementation | High |
+| C4 | **No deadlock detection** — journal writer is single-threaded but readers unbounded | SQLite WAL mode assumed safe | ADR-0004 decision | Medium |
+
+### 2.3 Security Weaknesses (Schneier / Miller Lens)
+
+| ID | Weakness | Root Cause | Driver | Priority |
+|---|---|---|---|---|
+| S1 | **No capability attenuation** — skills have full access to env, no sandboxing | Subprocess dispatcher trusts manifest authors | JR-6 reuse over dependency | High |
+| S2 | **Prompt injection surface** — `KNOWLEDGE.md` injected into system prompt without sanitization | Safety scanner runs on install, not runtime | Performance assumption | High |
+| S3 | **No cryptographic evidence sealing** — evidence bundles are plain JSON | IDRS requires structured log, not signatures | MVP scope | Medium |
+| S4 | **Bearer token in plaintext** — Kask MCP client stores token in `mcp-registry.json` | Trusted relationship assumed | ADR-0025 scope | Medium |
+| S5 | **No recursion guard on ACTION:** — nested ACTION: in LLM output not detected | Action parser is single-pass | JR-3 LLM-never-emits-shell assumption | High |
+
+### 2.4 Data Integrity Weaknesses (JR-7 / Persistence Lens)
+
+| ID | Weakness | Root Cause | Driver | Priority |
+|---|---|---|---|---|
+| D1 | **Baselines lack freshness guard** — `read_baselines()` does not check `updated_ts` | Computed daily in sentinel-once, not validated | Assumption of cadence reliability | High |
+| D2 | **No journal compaction** — unbounded growth until Phase 2 | MVP_SPEC §6 deferred compaction | JR-1 austerity | Medium |
+| D3 | **Evidence bundles not deduplicated** — identical samples stored per session | Per-session isolation prioritized | SOAP bundle design | Low |
+| D4 | **No schema evolution strategy** — migrations forward-only, no downgrades | ADR-0004 decision | Simplicity | Low |
+
+### 2.5 Operational Weaknesses (VSM / Cybernetic Lens)
+
+| ID | Weakness | Root Cause | Driver | Priority |
+|---|---|---|---|---|
+| O1 | **No Andon cord implementation** — `russell confirm` exists but not wired to reflex arcs | Reflex arcs detection-only (Phase 2A) | ADR-0021 scope | Medium |
+| O2 | **Self-triage not wired** — `AutoimmuneGuard` built but not called in `run_once()` | Proprioception Phase 2A partial | Incremental implementation | High |
+| O3 | **No chaos probe** — no deliberate failure injection | MVP_SPEC §6 deferred | JR-1 austerity | Low |
+| O4 | **Skill lifecycle incomplete** — `retire` removes from disk, no archive | ADR-0024 lifecycle, not retention | Storage assumption | Medium |
+
+---
+
+## 3. Remediation Plan — Task Sequence
+
+### Phase 1: Architectural Refactoring (Hexagonal Ports/Adapters)
+
+#### Task 1.1: Define explicit port traits
+- [ ] Create `russell-ports` crate with sealed traits for each capability boundary
+- [ ] Traits: `ProbePort`, `JournalPort`, `LlmPort`, `DispatchPort`, `ReflexPort`
+- [ ] Each trait defines input/output types as associated types
+- [ ] Implement adapters in existing crates, depend on `russell-ports`
+- [ ] Update `CAPABILITY_GRAPH.md` with trait-to-code mapping
+
+#### Task 1.2: Introduce anti-corruption layer for CLI
+- [ ] Create `russell-facade` crate that re-exports unified API
+- [ ] CLI imports only `russell-facade`, not individual crates
+- [ ] Facade handles composition, error translation, path resolution
+- [ ] Reduce CLI `main.rs` from 229 lines to <100 lines
+
+#### Task 1.3: Consolidate MCP crates
+- [ ] Merge `russell-mcp` (client) and `russell-mcp-server` (server) into single `russell-mcp` crate
+- [ ] Feature `client` for Kask integration, `server` for IDE frontends
+- [ ] Author ADR-0027 documenting consolidation
+- [ ] Update `MCP_SURFACE.md` with unified API
+
+#### Task 1.4: Typed Kask client
+- [ ] Create `kask-client` struct in `russell-mcp` with typed methods
+- [ ] Methods: `list_tools()`, `call_tool(name, args)`, `get_metrics()`
+- [ ] Deserialize `mcp-registry.json` into typed config
+- [ ] Add bearer token from env, not file
+
+### Phase 2: Code Quality Improvements (CSP / Hoare Patterns)
+
+#### Task 2.1: Model concurrent processes as CSP
+- [ ] Add `russell-csp` module with process types
+- [ ] Use `tokio::sync::mpsc` typed channels between processes
+- [ ] Define message enums: `SentinelMsg`, `ProprioMsg`, `ChatMsg`
+- [ ] Document process algebra in `docs/architecture/CSP_MODEL.md`
+
+#### Task 2.2: Wire AutoimmuneGuard
+- [ ] Call `AutoimmuneGuard::try_acquire()` at start of `run_once()` functions
+- [ ] Return early with `Event::autoimmune_blocked` if guard held
+- [ ] Add test: concurrent self-triage attempts block correctly
+- [ ] Update ADR-0021 with wiring evidence
+
+#### Task 2.3: Add deadlock detection
+- [ ] Use `tokio::task::spawn` with timeout for journal readers
+- [ ] Add `journal_reader_stall_s` vital (already defined, not computed)
+- [ ] Alert if any reader exceeds 5s without response
+- [ ] Test: simulate slow reader, verify alert fires
+
+### Phase 3: Security Hardening (Schneier / Miller)
+
+#### Task 3.1: Capability attenuation for skills
+- [ ] Add `allowed_env_keys: Vec<String>` to manifest schema
+- [ ] Dispatcher filters env to only allowed keys before subprocess spawn
+- [ ] Default: empty (no env passed)
+- [ ] Add `needs_network: bool` flag, enforce via dispatcher
+- [ ] Update safety scanner to flag unrestricted env access
+
+#### Task 3.2: Prompt sanitization pipeline
+- [ ] Add `sanitize_knowledge()` function in `russell-meta::prompt`
+- [ ] Strip markdown code blocks, limit length to 4KB, remove URLs
+- [ ] Run on `KNOWLEDGE.md` before injection into system prompt
+- [ ] Add test: prompt injection attempts are neutralized
+
+#### Task 3.3: Evidence bundle sealing
+- [ ] Add SHA-256 hash of each evidence file to `event.json`
+- [ ] Write `manifest.json` with file hashes and timestamp
+- [ ] Verify on read: hash mismatch = `Event::evidence_tampered`
+- [ ] Document in `PERSISTENCE_CATALOG.md` §2.3
+
+#### Task 3.4: Nested ACTION: detection
+- [ ] Extend `ActionParser` to recursively scan LLM output for nested `ACTION:` patterns
+- [ ] Reject with `DoctorError::NestedAction` if found
+- [ ] Log as `llm.action_injection_attempt` event
+- [ ] Add test: LLM output with nested actions is rejected
+
+### Phase 4: Data Integrity (JR-7 / Persistence)
+
+#### Task 4.1: Baseline freshness guard
+- [ ] Add `is_stale(&self, max_age_hours: u32) -> bool` to `BaselineRow`
+- [ ] `read_baselines()` returns `Option<BaselineRow>` — `None` if stale
+- [ ] Jack's SOAP shows "baselines stale" if `None`
+- [ ] Add rule: baseline age > 48h = warning event
+
+#### Task 4.2: Journal compaction skill
+- [ ] Create `journal-compactor` skill with probe and intervention
+- [ ] Intervention: `VACUUM` SQLite, delete samples > 365 days old
+- [ ] Risk: medium (data loss), requires confirmation
+- [ ] Test: compact 1GB journal, verify integrity post-compaction
+
+#### Task 4.3: Evidence deduplication
+- [ ] Add `sample_hash` column to `samples` table
+- [ ] Before writing evidence bundle, check for duplicate samples
+- [ ] Store reference to existing sample file, not copy
+- [ ] Update evidence bundle format to support references
+
+#### Task 4.4: Schema migration testing
+- [ ] Add `migration_test` CI job
+- [ ] Add downgrade script for each migration
+- [ ] Document downgrade procedure in `PERSISTENCE_CATALOG.md` §3
+
+### Phase 5: Operational Completeness (VSM / Cybernetic)
+
+#### Task 5.1: Wire Andon cord to reflex arcs
+- [ ] Extend `russell confirm` to accept reflex arc proposals
+- [ ] Add `confirmations` table row for reflex arcs
+- [ ] Reflex arc fires only after confirmation if risk > cap
+- [ ] Update ADR-0021 with Andon wiring
+
+#### Task 5.2: Complete self-triage wiring
+- [ ] Call `proprio::run_once()` before `sentinel::run_once()` in main loop
+- [ ] If proprio reports degraded state, skip host probes
+- [ ] Add `proprio_degraded` kill-switch state to `russell status`
+- [ ] Test: simulate journal stall, verify Sentinel skips
+
+#### Task 5.3: Chaos probe skill
+- [ ] Create `chaos-probe` skill with interventions
+- [ ] Each intervention has automatic rollback
+- [ ] Risk: high, requires confirmation, runs only on demand
+- [ ] Document in `MVP_SPEC.md` §6 as "now implemented"
+
+#### Task 5.4: Skill archive on retire
+- [ ] Extend `russell skill retire` to move skill to archive
+- [ ] Keep manifest + scripts, delete evidence bundles per retention
+- [ ] Add `russell skill restore-from-archive` command
+- [ ] Update `REUSE_MANIFEST.md` with archive provenance
+
+---
+
+## 4. Future Task — Open Questions
+
+| Question | Domain | Resolution Path | Priority |
+|---|---|---|---|
+| **What is the backpressure strategy** when journal writer cannot keep up with Sentinel cadence? | Concurrency | ADR-0028: define max queue depth, drop policy, alert threshold | Medium |
+| **How does Russell handle multi-machine operators** who want to aggregate telemetry? | Architecture | ADR-0029: define federation protocol, auth, data sync | Low |
+| **What is the skill dependency graph** — can skills depend on other skills? | Skills | ADR-0030: define dependency resolution, load order, circular dependency detection | Medium |
+| **How are LLM token budgets enforced** per chat session, per day, per operator? | Cost Control | ADR-0031: define token accounting, budget alerts, hard caps | Medium |
+| **What is the upgrade path** when Russell's on-disk format changes between major versions? | Migration | ADR-0032: define version detection, migration wizard, rollback plan | High |
+| **How does Russell integrate with external alerting** (PagerDuty, email, SMS)? | Operations | ADR-0033: define notification providers, rate limiting, escalation | Low |
+| **What is the skill marketplace model** — can operators share skills, rate them? | Ecosystem | ADR-0034: define skill registry protocol, licensing, attribution | Low |
+| **How does Russell handle time-zone changes** for operators who travel? | Localization | ADR-0035: define time-zone detection, timer adjustment, digest alignment | Low |
+
+---
+
+## 5. Implementation Progress
+
+| Phase | Tasks Complete | Tasks Total | Status |
+|---|---|---|---|
+| Phase 1: Architectural Refactoring | 0 | 4 | Not Started |
+| Phase 2: Code Quality | 0 | 3 | Not Started |
+| Phase 3: Security Hardening | 0 | 4 | Not Started |
+| Phase 4: Data Integrity | 0 | 4 | Not Started |
+| Phase 5: Operational Completeness | 0 | 4 | Not Started |
+| **Total** | **0** | **19** | **Not Started** |
+
+---
+
+## 6. References
+
+- [`AGENTS.md`](../../AGENTS.md) — binding vocabulary and authority hierarchy
+- [`PRINCIPLES_CATALOG.md`](../architecture/PRINCIPLES_CATALOG.md) — JR-1 through JR-7
+- [`CAPABILITY_GRAPH.md`](../architecture/CAPABILITY_GRAPH.md) — cross-repository capability map
+- [`PERSISTENCE_CATALOG.md`](../specifications/PERSISTENCE_CATALOG.md) — persistence audit
+- [`MVP_SPEC.md`](../specifications/MVP_SPEC.md) — MVP boundary
+- [`safety.md`](../standards/safety.md) — IDRS contract

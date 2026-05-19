@@ -23,6 +23,8 @@
 //! max_retries = 3
 //! ```
 
+use std::collections::VecDeque;
+
 use serde::Deserialize;
 
 use crate::event::Severity;
@@ -179,6 +181,148 @@ impl ReflexSet {
     }
 }
 
+// ─── Global reflex budget & circuit breaker (T10) ───────────────
+
+/// Default maximum interventions per hour across all arcs.
+const DEFAULT_BUDGET_PER_HOUR: u32 = 5;
+/// Default consecutive failures before the breaker opens.
+const DEFAULT_BREAKER_THRESHOLD: u32 = 3;
+
+/// Global execution budget preventing cascading intervention storms.
+///
+/// Tracks the rolling count of interventions within the budget window
+/// and opens a circuit breaker after consecutive failures.
+///
+/// ## Design rationale
+///
+/// Per-arc cooldowns prevent a single arc from oscillating, but cannot
+/// prevent N arcs from firing simultaneously. The budget caps total
+/// intervention throughput. The circuit breaker detects cascading
+/// failures (3 consecutive interventions fail → halt all reflex
+/// activity and escalate to operator).
+#[derive(Debug, Clone)]
+pub struct ReflexBudget {
+    /// Maximum interventions allowed in the budget window.
+    max_per_hour: u32,
+    /// Rolling record of intervention timestamps (epoch seconds).
+    recent_firings: VecDeque<i64>,
+    /// Consecutive failure counter — resets on success.
+    consecutive_failures: u32,
+    /// Threshold for opening the circuit breaker.
+    breaker_threshold: u32,
+    /// Whether the circuit breaker is currently open (tripped).
+    breaker_open: bool,
+}
+
+/// Result of a budget check before reflex execution.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BudgetVerdict {
+    /// Intervention may proceed.
+    Allowed,
+    /// Budget exhausted — too many interventions this hour.
+    BudgetExhausted,
+    /// Circuit breaker tripped — consecutive failures exceeded threshold.
+    BreakerOpen,
+}
+
+impl ReflexBudget {
+    /// Create a budget with default thresholds.
+    #[must_use]
+    pub fn new() -> Self {
+        Self {
+            max_per_hour: DEFAULT_BUDGET_PER_HOUR,
+            recent_firings: VecDeque::new(),
+            consecutive_failures: 0,
+            breaker_threshold: DEFAULT_BREAKER_THRESHOLD,
+            breaker_open: false,
+        }
+    }
+
+    /// Create with custom thresholds.
+    #[must_use]
+    pub fn with_limits(max_per_hour: u32, breaker_threshold: u32) -> Self {
+        Self {
+            max_per_hour,
+            recent_firings: VecDeque::new(),
+            consecutive_failures: 0,
+            breaker_threshold,
+            breaker_open: false,
+        }
+    }
+
+    /// Check whether a new intervention is allowed right now.
+    ///
+    /// Call this before dispatching a reflex intervention. If the
+    /// verdict is not [`BudgetVerdict::Allowed`], the caller should
+    /// skip execution and escalate to the operator.
+    #[must_use]
+    pub fn check(&mut self, now_unix: i64) -> BudgetVerdict {
+        if self.breaker_open {
+            return BudgetVerdict::BreakerOpen;
+        }
+
+        // Evict firings older than 1 hour.
+        let window_start = now_unix - 3600;
+        while self.recent_firings.front().is_some_and(|&ts| ts < window_start) {
+            self.recent_firings.pop_front();
+        }
+
+        if self.recent_firings.len() as u32 >= self.max_per_hour {
+            return BudgetVerdict::BudgetExhausted;
+        }
+
+        BudgetVerdict::Allowed
+    }
+
+    /// Record that an intervention was dispatched.
+    pub fn record_firing(&mut self, now_unix: i64) {
+        self.recent_firings.push_back(now_unix);
+    }
+
+    /// Record an intervention outcome. Resets the failure counter
+    /// on success; increments and possibly trips the breaker on failure.
+    pub fn record_outcome(&mut self, success: bool) {
+        if success {
+            self.consecutive_failures = 0;
+        } else {
+            self.consecutive_failures += 1;
+            if self.consecutive_failures >= self.breaker_threshold {
+                self.breaker_open = true;
+                tracing::warn!(
+                    failures = self.consecutive_failures,
+                    threshold = self.breaker_threshold,
+                    "reflex circuit breaker OPEN — all reflex interventions halted"
+                );
+            }
+        }
+    }
+
+    /// Manually reset the circuit breaker (operator action).
+    pub fn reset_breaker(&mut self) {
+        self.breaker_open = false;
+        self.consecutive_failures = 0;
+        tracing::info!("reflex circuit breaker reset by operator");
+    }
+
+    /// Whether the circuit breaker is currently open.
+    #[must_use]
+    pub fn is_breaker_open(&self) -> bool {
+        self.breaker_open
+    }
+
+    /// Number of interventions fired in the current hour window.
+    #[must_use]
+    pub fn firings_this_hour(&self) -> u32 {
+        self.recent_firings.len() as u32
+    }
+}
+
+impl Default for ReflexBudget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// Built-in default reflex arcs shipped with Russell.
 const DEFAULT_ARCS_TOML: &str = include_str!("defaults.toml");
 
@@ -221,5 +365,67 @@ mod tests {
     fn crit_triggers_alert_arc() {
         let rs = ReflexSet::with_defaults();
         assert!(rs.find("disk_root_used_pct", Severity::Crit).is_some());
+    }
+
+    // --- Budget tests (T10) ---
+
+    #[test]
+    fn budget_allows_within_limit() {
+        let mut b = ReflexBudget::with_limits(3, 3);
+        let now = 1_000_000;
+        assert_eq!(b.check(now), BudgetVerdict::Allowed);
+        b.record_firing(now);
+        assert_eq!(b.check(now), BudgetVerdict::Allowed);
+        b.record_firing(now + 1);
+        assert_eq!(b.check(now + 2), BudgetVerdict::Allowed);
+        b.record_firing(now + 2);
+        // 3 firings — budget exhausted.
+        assert_eq!(b.check(now + 3), BudgetVerdict::BudgetExhausted);
+    }
+
+    #[test]
+    fn budget_window_evicts_old_firings() {
+        let mut b = ReflexBudget::with_limits(2, 3);
+        let hour_ago = 1_000_000;
+        b.record_firing(hour_ago);
+        b.record_firing(hour_ago + 1);
+        // Both within window — exhausted.
+        assert_eq!(b.check(hour_ago + 100), BudgetVerdict::BudgetExhausted);
+        // 1 hour + 1 second later — old firings evicted.
+        assert_eq!(b.check(hour_ago + 3601), BudgetVerdict::Allowed);
+    }
+
+    #[test]
+    fn breaker_trips_on_consecutive_failures() {
+        let mut b = ReflexBudget::with_limits(10, 3);
+        b.record_outcome(false);
+        assert!(!b.is_breaker_open());
+        b.record_outcome(false);
+        assert!(!b.is_breaker_open());
+        b.record_outcome(false); // 3rd consecutive failure
+        assert!(b.is_breaker_open());
+        assert_eq!(b.check(1_000_000), BudgetVerdict::BreakerOpen);
+    }
+
+    #[test]
+    fn success_resets_failure_counter() {
+        let mut b = ReflexBudget::with_limits(10, 3);
+        b.record_outcome(false);
+        b.record_outcome(false);
+        b.record_outcome(true); // resets counter
+        b.record_outcome(false);
+        b.record_outcome(false);
+        assert!(!b.is_breaker_open()); // only 2 consecutive, not 3
+    }
+
+    #[test]
+    fn breaker_reset_allows_new_firings() {
+        let mut b = ReflexBudget::with_limits(10, 2);
+        b.record_outcome(false);
+        b.record_outcome(false);
+        assert!(b.is_breaker_open());
+        b.reset_breaker();
+        assert!(!b.is_breaker_open());
+        assert_eq!(b.check(1_000_000), BudgetVerdict::Allowed);
     }
 }

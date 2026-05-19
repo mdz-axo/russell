@@ -127,15 +127,32 @@ pub fn compose_with_kask(
         writeln!(objective, "- (no samples recorded)")?;
     } else {
         // Read 30-day baselines for deviation detection.
-        let baselines: std::collections::BTreeMap<String, (Option<f64>, Option<f64>)> = reader
+        // Task 4.1: Track baseline staleness and warn if outdated.
+        let baselines: std::collections::BTreeMap<String, russell_core::journal::BaselineRow> = reader
             .read_baselines()
             .unwrap_or_default()
             .into_iter()
-            .map(|b| (b.probe, (b.p95, b.ewma_mean)))
+            .map(|b| (b.probe.clone(), b))
             .collect();
         let has_baselines = !baselines.is_empty();
+        
+        // Check for stale baselines (older than 48 hours).
+        let stale_baselines: Vec<&str> = baselines
+            .values()
+            .filter(|b| b.is_stale(48))
+            .map(|b| b.probe.as_str())
+            .collect();
+        let any_stale = !stale_baselines.is_empty();
 
         if has_baselines {
+            if any_stale {
+                writeln!(
+                    objective,
+                    "\n⚠️ **Baseline staleness warning:** {} probes have baselines older than 48h: {}\n",
+                    stale_baselines.len(),
+                    stale_baselines.join(", ")
+                )?;
+            }
             writeln!(
                 objective,
                 "| probe | count | min | avg | max | last | p95 (30d) | ewma (7d) | unit |"
@@ -151,9 +168,9 @@ pub fn compose_with_kask(
         for s in &summaries {
             let unit = s.unit.as_deref().unwrap_or("");
             if has_baselines {
-                let (p95, ewma) = baselines
-                    .get(&s.probe)
-                    .map(|(p, e)| (*p, *e))
+                let baseline = baselines.get(&s.probe);
+                let (p95, ewma) = baseline
+                    .map(|b| (b.p95, b.ewma_mean))
                     .unwrap_or((None, None));
                 let p95_str = p95
                     .map(fmt_f64_baseline)
@@ -161,10 +178,16 @@ pub fn compose_with_kask(
                 let ewma_str = ewma
                     .map(fmt_f64_baseline)
                     .unwrap_or_else(|| "—".to_string());
+                let stale_marker = if baseline.map(|b| b.is_stale(48)).unwrap_or(false) {
+                    " ⚠️"
+                } else {
+                    ""
+                };
                 writeln!(
                     objective,
-                    "| {} | {} | {} | {} | {} | {} | {} | {} | {} |",
+                    "| {}{} | {} | {} | {} | {} | {} | {} | {} | {} |",
                     s.probe,
+                    stale_marker,
                     s.count,
                     fmt_opt_f64(s.min),
                     fmt_opt_f64(s.avg),

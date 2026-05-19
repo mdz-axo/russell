@@ -42,5 +42,5 @@ pub mod time;
 pub use error::{CoreError, Result};
 pub use event::{Event, EventId, Severity};
 pub use profile::Profile;
-pub use reflex::ReflexSet;
-pub use rule::RuleSet;
+pub use reflex::{BudgetVerdict, ReflexBudget, ReflexSet};
+pub use rule::{ConfigWarning, RuleSet};
