@@ -161,4 +161,3 @@ impl Clock for FixedClock {
         format!("{:04}-{:02}-{:02}", dt.year(), dt.month() as u8, dt.day())
     }
 }
-

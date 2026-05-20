@@ -173,4 +173,3 @@ impl JournalWritePort for InMemoryJournal {
         Ok(())
     }
 }
-

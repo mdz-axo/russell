@@ -15,8 +15,8 @@ use crate::client::HKaskMcpClient;
 use crate::config::HKaskMcpConfig;
 use crate::error::Result;
 use crate::types::McpToolDefinition;
-use russell_skills::RiskBand;
 use russell_meta::action::HKaskToolInfo;
+use russell_skills::RiskBand;
 
 /// Cached tool registry backed by a hKask MCP connection.
 ///
@@ -243,15 +243,12 @@ impl ToolRegistry {
             ))),
         }
     }
-    }
+}
 
 /// Collect hKask MCP tool infos for the SOAP prompt and action resolver.
 /// Returns an empty list on any failure (graceful degradation).
 /// Falls back to the disk cache if hKask is unreachable.
-pub async fn collect_tool_infos(
-    config: &HKaskMcpConfig,
-    cache_path: &Path,
-) -> Vec<HKaskToolInfo> {
+pub async fn collect_tool_infos(config: &HKaskMcpConfig, cache_path: &Path) -> Vec<HKaskToolInfo> {
     if config.validate().is_err() {
         return vec![];
     }
@@ -296,7 +293,6 @@ fn load_cached_tool_infos(cache_path: &Path) -> Vec<HKaskToolInfo> {
     }
     vec![]
 }
-
 
 /// Convert a [`ToolRegistry`] to a [`HKaskToolInfo`] list.
 fn registry_to_hkask_infos(registry: &ToolRegistry) -> Vec<HKaskToolInfo> {

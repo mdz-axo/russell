@@ -16,13 +16,13 @@ use crate::error::Result;
 pub trait McpConfig {
     /// Get the endpoint URL.
     fn endpoint(&self) -> &str;
-    
+
     /// Get the bearer token (if configured).
     fn token(&self) -> Option<&str>;
-    
+
     /// Validate the configuration (e.g., loopback check).
     fn validate(&self) -> Result<()>;
-    
+
     /// Whether a token is configured (can authenticate).
     fn has_token(&self) -> bool;
 }
@@ -31,15 +31,15 @@ impl McpConfig for HKaskMcpConfig {
     fn endpoint(&self) -> &str {
         &self.endpoint
     }
-    
+
     fn token(&self) -> Option<&str> {
         self.token.as_deref()
     }
-    
+
     fn validate(&self) -> Result<()> {
         self.validate()
     }
-    
+
     fn has_token(&self) -> bool {
         self.has_token()
     }

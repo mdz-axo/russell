@@ -1,8 +1,12 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // Tests for russell-core crate - migrated to separate crate per AGENTS.md §12
 
+#![allow(unused_imports, dead_code)]
+
 mod hash_chain {
-    use russell_core::hash_chain::{compute_event_hash, genesis_hash, verify_chain, verify_link, ChainVerdict, HASH_HEX_LEN};
+    use russell_core::hash_chain::{
+        ChainVerdict, HASH_HEX_LEN, compute_event_hash, genesis_hash, verify_chain, verify_link,
+    };
 
     #[test]
     fn genesis_hash_is_deterministic() {
@@ -141,8 +145,10 @@ mod event {
 }
 
 mod time {
-    use russell_core::time::{approx_days_between, now_date_iso8601, now_rfc3339, now_unix, SystemClock, FixedClock};
     use russell_core::Clock;
+    use russell_core::time::{
+        FixedClock, SystemClock, approx_days_between, now_date_iso8601, now_rfc3339, now_unix,
+    };
 
     #[test]
     fn rfc3339_is_plausible() {
@@ -216,8 +222,8 @@ mod time {
 }
 
 mod paths {
-    use russell_core::paths::{Paths, ensure_dir};
     use russell_core::error::CoreError;
+    use russell_core::paths::{Paths, ensure_dir};
 
     #[test]
     fn rooted_paths_produce_expected_layout() {
@@ -248,8 +254,8 @@ mod paths {
 }
 
 mod profile {
-    use russell_core::profile::{Profile, PROFILE_SCHEMA};
     use russell_core::error::CoreError;
+    use russell_core::profile::{PROFILE_SCHEMA, Profile};
 
     #[test]
     fn stub_round_trips() {
@@ -311,7 +317,6 @@ mod profile {
 
 mod schedule {
     use russell_core::schedule::ScheduleSet;
-    use time::Weekday;
 
     #[test]
     fn empty_set_no_active() {
@@ -320,8 +325,8 @@ mod schedule {
 }
 
 mod journal {
-    use russell_core::journal::JournalWriter;
     use russell_core::event::{Event, Severity};
+    use russell_core::journal::JournalWriter;
 
     fn tmp_path() -> (tempfile::TempDir, std::path::PathBuf) {
         let tmp = tempfile::tempdir().unwrap();
@@ -357,7 +362,12 @@ mod journal {
     fn severity_counts() {
         let (_g, p) = tmp_path();
         let w = JournalWriter::open(&p).unwrap();
-        for sev in [Severity::Info, Severity::Info, Severity::Warn, Severity::Crit] {
+        for sev in [
+            Severity::Info,
+            Severity::Info,
+            Severity::Warn,
+            Severity::Crit,
+        ] {
             w.append(&Event::new("x", sev)).unwrap();
         }
         let _c = w.reader().severity_counts(0, i64::MAX).unwrap();
@@ -365,8 +375,8 @@ mod journal {
 }
 
 mod reflex {
-    use russell_core::reflex::{ReflexSet, ReflexBudget, BudgetVerdict};
     use russell_core::event::Severity;
+    use russell_core::reflex::{BudgetVerdict, ReflexBudget, ReflexSet};
 
     #[test]
     fn empty_set_returns_none() {
@@ -411,8 +421,8 @@ mod reflex {
 }
 
 mod rule {
-    use russell_core::rule::RuleSet;
     use russell_core::event::Severity;
+    use russell_core::rule::RuleSet;
 
     #[test]
     fn defaults_mem_warn_below() {

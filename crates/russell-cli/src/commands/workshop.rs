@@ -7,13 +7,15 @@
 //!
 //! See ADR-0024.
 
+use crate::commands::utils::{
+    call_llm, extract_manifest_block, extract_yaml_field, extract_yaml_list,
+};
 use anyhow::{Context, Result};
 use russell_core::paths::Paths;
 use russell_core::time::{approx_days_between, now_date_iso8601};
 use russell_meta::client::LlmClient;
 use russell_meta::client::SoapPrompt;
 use russell_meta::oai_client::OkapiClient;
-use crate::commands::utils::{extract_yaml_field, extract_yaml_list, extract_manifest_block, call_llm};
 use russell_skills::Skill;
 use russell_skills::registry::{
     LifecycleStatus, RegistryCache, RegistryEntry, SafetyScan, SkillSource,
@@ -774,10 +776,15 @@ async fn adapt_via_llm(
          add timeout values, or refine symptom coverage. Output ONLY the complete YAML manifest \
          in a ```yaml code block. Do not explain the changes."
     );
-    let adapted = match call_llm(client_cfg, fallback_model, "You are a YAML editor for Russell skill manifests. Output ONLY the YAML in a code block.", &prompt, Some(0.6)).await {
-        Ok(resp) => resp,
-        Err(_) => String::new(),
-    };
+    let adapted = call_llm(
+        client_cfg,
+        fallback_model,
+        "You are a YAML editor for Russell skill manifests. Output ONLY the YAML in a code block.",
+        &prompt,
+        Some(0.6),
+    )
+    .await
+    .unwrap_or_default();
     if adapted.is_empty() {
         return (String::new(), false);
     }
@@ -942,12 +949,12 @@ fn do_restore(registry: &mut RegistryCache, name: &str) {
 
 /// Delete a skill: remove directory, mark as retired in cache.
 fn do_delete(registry: &mut RegistryCache, skills_dir: &std::path::Path, name: &str) {
-    if let Some(entry) = registry.skills.get(name) {
-        if entry.bundled {
-            println!("{name} is a bundled skill and cannot be deleted.");
-            println!("  Use 'prune {name}' to deprecate it instead.");
-            return;
-        }
+    if let Some(entry) = registry.skills.get(name)
+        && entry.bundled
+    {
+        println!("{name} is a bundled skill and cannot be deleted.");
+        println!("  Use 'prune {name}' to deprecate it instead.");
+        return;
     }
 
     let skill_dir = skills_dir.join(name);

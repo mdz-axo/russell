@@ -123,11 +123,12 @@ fn apply_one(conn: &Connection, m: &Migration) -> Result<()> {
 mod tests {
     use rusqlite::{Connection, params};
 
-    use crate::journal::migrations::{run, MIGRATIONS};
+    use crate::journal::migrations::{MIGRATIONS, run};
 
     fn fresh() -> Connection {
         let c = Connection::open_in_memory().unwrap();
-        c.execute_batch("PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL;").unwrap();
+        c.execute_batch("PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL;")
+            .unwrap();
         c
     }
 
@@ -148,16 +149,10 @@ mod tests {
     fn runs_once_then_noop() {
         let c = fresh();
         run(&c).unwrap();
-        assert_eq!(
-            current_version(&c),
-            MIGRATIONS.last().unwrap().version
-        );
+        assert_eq!(current_version(&c), MIGRATIONS.last().unwrap().version);
         // Second run must not re-apply.
         run(&c).unwrap();
-        assert_eq!(
-            current_version(&c),
-            MIGRATIONS.last().unwrap().version
-        );
+        assert_eq!(current_version(&c), MIGRATIONS.last().unwrap().version);
     }
 
     #[test]

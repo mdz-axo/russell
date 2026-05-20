@@ -270,7 +270,6 @@ impl std::fmt::Display for ActionError {
     }
 }
 
-
 /// A post-intervention evaluation check, resolved from the skill manifest.
 #[derive(Debug, Clone)]
 pub struct EvalCheckInfo {

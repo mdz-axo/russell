@@ -71,7 +71,7 @@ const CONSENT_EXPIRY_SECS: u64 = 300;
 
 /// A pending action (probe or intervention) awaiting operator consent.
 #[derive(Debug, Clone)]
-struct PendingAction {
+pub struct PendingAction {
     action: ResolvedAction,
     stdin_content: Option<String>,
     proposed_at: Instant,
@@ -101,10 +101,24 @@ fn is_affirmative(input: &str) -> bool {
     let lower = lower.trim();
     matches!(
         lower,
-        "ok" | "okay" | "yes" | "yep" | "yeah" | "yea" | "sure"
-            | "do it" | "go ahead" | "go for it" | "approved"
-            | "run it" | "execute" | "please" | "y" | "yes please"
-            | "ok do it" | "lets go" | "let's go"
+        "ok" | "okay"
+            | "yes"
+            | "yep"
+            | "yeah"
+            | "yea"
+            | "sure"
+            | "do it"
+            | "go ahead"
+            | "go for it"
+            | "approved"
+            | "run it"
+            | "execute"
+            | "please"
+            | "y"
+            | "yes please"
+            | "ok do it"
+            | "lets go"
+            | "let's go"
     )
 }
 
@@ -409,10 +423,10 @@ pub async fn run(paths: &Paths) -> Result<()> {
         russell_skills::registry::RegistryCache::load(&registry_path).unwrap_or_default();
 
     // Reconcile registry against disk (fix stale/orphan entries).
-    if registry.reconcile(&skills) {
-        if let Err(e) = registry.save(&registry_path) {
-            tracing::warn!(error = %e, "registry reconcile save failed");
-        }
+    if registry.reconcile(&skills)
+        && let Err(e) = registry.save(&registry_path)
+    {
+        tracing::warn!(error = %e, "registry reconcile save failed");
     }
 
     // Load model config from the shared ClientConfig.
@@ -617,8 +631,8 @@ pub async fn run(paths: &Paths) -> Result<()> {
                 }
 
                 // Special commands.
-                if trimmed.starts_with('/') {
-                    if handle_slash_command(
+                if trimmed.starts_with('/')
+                    && handle_slash_command(
                         trimmed,
                         &mut skills,
                         &mut editor,
@@ -631,9 +645,8 @@ pub async fn run(paths: &Paths) -> Result<()> {
                         paths,
                     )
                     .await
-                    {
-                        continue;
-                    }
+                {
+                    continue;
                 }
 
                 // Add user message to history.
@@ -851,9 +864,7 @@ async fn handle_slash_command(
             if other == "/model list" {
                 // Lazy-fetch Okapi models on first use.
                 if !*okapi_models_fetched {
-                    *okapi_models = okapi_list_models(base_url)
-                        .await
-                        .unwrap_or_default();
+                    *okapi_models = okapi_list_models(base_url).await.unwrap_or_default();
                     *okapi_models_fetched = true;
                 }
                 println!("  Available models ({}):", okapi_models.len());
@@ -877,9 +888,7 @@ async fn handle_slash_command(
                 }
                 // Lazy-fetch Okapi models for switching.
                 if !*okapi_models_fetched {
-                    *okapi_models = okapi_list_models(base_url)
-                        .await
-                        .unwrap_or_default();
+                    *okapi_models = okapi_list_models(base_url).await.unwrap_or_default();
                     *okapi_models_fetched = true;
                 }
                 // If Okapi is unreachable, trust the operator's input directly.
@@ -998,7 +1007,9 @@ async fn call_jack(
     // `russell jack` receives in one-shot mode.
     let mut system = russell_meta::JACK_CHAT_PERSONA.to_string();
     {
-        use russell_meta::prompt_registry::{KnowledgeSlot, score_knowledge_relevance, select_knowledge};
+        use russell_meta::prompt_registry::{
+            KnowledgeSlot, score_knowledge_relevance, select_knowledge,
+        };
 
         // Derive active symptoms from recent events (same as compose_templated).
         let recent_events = reader.recent(20).unwrap_or_default();
@@ -1049,7 +1060,7 @@ async fn call_jack(
                 });
             }
         }
-        let selected = select_knowledge(&mut slots, KNOWLEDGE_BUDGET_TOKENS);
+        let selected = select_knowledge(&slots, KNOWLEDGE_BUDGET_TOKENS);
         for slot in selected {
             system.push_str("\n\n---\n\n# Knowledge: ");
             system.push_str(&slot.skill_id);
@@ -1264,11 +1275,11 @@ fn extract_inline_args(response: &str) -> Vec<String> {
     };
 
     let mut args = Vec::new();
-    let mut chars = line.chars().peekable();
+    let chars = line.chars().peekable();
     let mut current = String::new();
     let mut in_quote = false;
 
-    while let Some(ch) = chars.next() {
+    for ch in chars {
         if ch == '"' || ch == '\'' {
             in_quote = !in_quote;
         } else if ch == ' ' && !in_quote {

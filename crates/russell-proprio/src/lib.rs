@@ -584,14 +584,7 @@ fn gather_journal_stall(writer: &JournalWriter, now: i64) -> Result<(Option<i64>
         warn: STALL_WARN_THRESHOLD_S as f64,
         alert: STALL_ALERT_THRESHOLD_S as f64,
     };
-    gather_i64_vital(
-        writer,
-        now,
-        PROBE_JOURNAL_STALL,
-        stall_s,
-        thresholds,
-        "s",
-    )
+    gather_i64_vital(writer, now, PROBE_JOURNAL_STALL, stall_s, thresholds, "s")
 }
 
 /// Gather the LLM p95 latency vital.
@@ -606,14 +599,7 @@ fn gather_llm_p95_latency(
         warn: LLM_P95_WARN_THRESHOLD_MS,
         alert: LLM_P95_ALERT_THRESHOLD_MS,
     };
-    gather_f64_vital(
-        writer,
-        now,
-        PROBE_LLM_P95_LATENCY,
-        p95,
-        thresholds,
-        "ms",
-    )
+    gather_f64_vital(writer, now, PROBE_LLM_P95_LATENCY, p95, thresholds, "ms")
 }
 
 /// Gather the timer drift vital.
@@ -763,14 +749,7 @@ fn gather_help_error_rate(
         warn: ERROR_RATE_WARN_THRESHOLD_PCT,
         alert: ERROR_RATE_ALERT_THRESHOLD_PCT,
     };
-    gather_f64_vital(
-        writer,
-        now,
-        PROBE_HELP_ERROR_RATE,
-        rate,
-        thresholds,
-        "%",
-    )
+    gather_f64_vital(writer, now, PROBE_HELP_ERROR_RATE, rate, thresholds, "%")
 }
 
 /// Gather the Kask MCP reachability vital (Phase 4C, ADR-0025 §5).

@@ -128,7 +128,6 @@ pub async fn run(paths: &Paths, id: &str, dry_run: bool) -> Result<()> {
     Ok(())
 }
 
-
 fn parse_skill_ref(id: &str) -> Result<(&str, &str)> {
     let mut parts = id.splitn(2, '/');
     let skill = parts.next().context("missing skill id in reference")?;
@@ -450,12 +449,12 @@ pub fn retire(paths: &Paths, name: &str) -> Result<()> {
     let old = RegistryCache::load(&registry_path)
         .ok()
         .and_then(|r| r.skills.get(name).cloned());
-    if let Some(ref entry) = old {
-        if entry.bundled {
-            anyhow::bail!(
-                "{name} is a bundled skill and cannot be retired. Use 'russell skill prune {name}' to deprecate it instead."
-            );
-        }
+    if let Some(ref entry) = old
+        && entry.bundled
+    {
+        anyhow::bail!(
+            "{name} is a bundled skill and cannot be retired. Use 'russell skill prune {name}' to deprecate it instead."
+        );
     }
 
     if !skill_dir.exists() {

@@ -31,6 +31,7 @@ use serde::Deserialize;
 
 /// Okapi capabilities from `/api/engine/status`.
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct OkapiMetricsResponse {
     tokens_generated_total: i64,
     prompt_tokens_evaluated_total: i64,
@@ -89,7 +90,6 @@ fn fetch_metrics(base_url: &str) -> Result<OkapiMetricsResponse> {
 }
 
 /// Fetch Okapi engine capabilities from `/api/engine/status`.
-
 fn extract_samples(m: &OkapiMetricsResponse) -> Vec<OkapiSample> {
     let mut samples = Vec::new();
 

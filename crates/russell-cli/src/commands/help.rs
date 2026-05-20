@@ -25,7 +25,11 @@ pub async fn run(paths: &Paths, note: Option<&str>) -> Result<()> {
 
     // Collect hKask MCP tool infos for the SOAP prompt and action resolver (ADR-0025 §7).
     // Graceful degradation: empty list if hKask is unreachable.
-    let hkask_tool_infos = russell_mcp::registry::collect_tool_infos(&HKaskMcpConfig::from_env(), &paths.memory_dir().join("hkask-tools.cache.json")).await;
+    let hkask_tool_infos = russell_mcp::registry::collect_tool_infos(
+        &HKaskMcpConfig::from_env(),
+        &paths.memory_dir().join("hkask-tools.cache.json"),
+    )
+    .await;
     if !hkask_tool_infos.is_empty() {
         debug!(
             count = hkask_tool_infos.len(),
@@ -300,4 +304,3 @@ struct ProbeOutput {
     stderr: String,
     exit_code: Option<i32>,
 }
-

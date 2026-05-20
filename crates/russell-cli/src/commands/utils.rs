@@ -58,7 +58,7 @@ pub fn extract_manifest_block(response: &str) -> Option<String> {
         }
         return Some(content);
     }
-    
+
     // Try ```yaml format
     let start = response.find("```yaml");
     let body_start = match start {
@@ -92,7 +92,10 @@ pub async fn call_llm(
         chat_cfg.api_key = Some("okapi".into());
     }
 
-    let base = chat_cfg.base_url.as_deref().unwrap_or(russell_meta::health::DEFAULT_BASE_URL);
+    let base = chat_cfg
+        .base_url
+        .as_deref()
+        .unwrap_or(russell_meta::health::DEFAULT_BASE_URL);
     if !russell_meta::health::ensure_ready(base).await {
         return Err(anyhow::anyhow!("Okapi not reachable"));
     }
