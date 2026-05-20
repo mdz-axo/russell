@@ -124,7 +124,7 @@ Capability: Agent Tool Exposition
 
 ---
 
-## 2. Kask Capability Graph
+## 2. hKask Capability Graph
 
 ### 2.1 Core Platform (stack/)
 
@@ -164,7 +164,7 @@ Capability: MCP Tool Servers
 ### 2.3 Observability (Cross-cutting)
 
 ```
-Capability: OKH — Open Kask Health
+Capability: OKH — Open hKask Health
   Namespace: okh.*
   Prefixes:
     - okh.connector.* — external I/O
@@ -216,7 +216,7 @@ Capability: Extended API
   Endpoint: POST /api/rerank — document ranking (embedding-based or cross-encoder)
   Endpoint: GET /metrics — Prometheus metrics (KV-cache hit ratio)
   Endpoint: GET /api/metrics — JSON metrics (context utilization)
-  Endpoint: POST /api/kask/* — Kask lifecycle endpoints (routes_kask.go)
+  Endpoint: POST /api/kask/* — hKask lifecycle endpoints (routes_kask.go)
 ```
 
 ### 3.3 Import Pipeline
@@ -247,13 +247,13 @@ Capability: Model Persistence
 Russell Nurse ──(OpenAI API)──▶ Okapi Server (127.0.0.1:11435)
   Contract: /api/chat/completions with LoRA adapter context
 
-Kask Arsenal ──(MCP)──▶ Russell Journal (SQLite)
+hKask Arsenal ──(MCP)──▶ Russell Journal (SQLite)
   Contract: Read-only access to samples, events tables
 
-Kask Stack ──(Okapi API)──▶ Okapi Server
+hKask Stack ──(Okapi API)──▶ Okapi Server
   Contract: Model loading, LoRA hot-swap, MoE offload, reranking
 
-Russell MCP ──(MCP protocol)──▶ Kask Stack
+Russell MCP ──(MCP protocol)──▶ hKask Stack
   Contract: Tool discovery, capability negotiation
 
 Russell Nurse ──(SOAP bundle)──▶ Okapi LLM

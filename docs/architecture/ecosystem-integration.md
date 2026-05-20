@@ -1,5 +1,5 @@
 ---
-title: "Ecosystem Integration — Kask & Okapi Reference Model"
+title: "Ecosystem Integration — hKask & Okapi Reference Model"
 audience: [architects, developers]
 last_updated: 2026-05-15
 togaf_phase: "C"
@@ -12,21 +12,21 @@ status: "Active"
 <!-- STATUS: Active -->
 <!-- LAST_UPDATED: 2026-05-15 -->
 
-# Ecosystem Integration — Kask & Okapi Reference Model
+# Ecosystem Integration — hKask & Okapi Reference Model
 
-> Defines the interfaces that make Russell's skill registry a Kask ecosystem
+> Defines the interfaces that make Russell's skill registry a hKask ecosystem
 > reference model: MCP tool exposure, Okapi LLM skill routing, cross-project
 > skill portability, and OKH span bridging.
 > Version: 1.0.0 | 2026-05-15
 
 ---
 
-## 1. Kask MCP Tool Exposure
+## 1. hKask MCP Tool Exposure
 
 ### New MCP Server: `arsenal-mcp-russell-skills`
 
 Extends the existing `arsenal-mcp-russell` (7 tools reading Russell's journal)
-with a new skill-inventory MCP server exposing skill metadata to Kask's
+with a new skill-inventory MCP server exposing skill metadata to hKask's
 Curator (Duncan) and the `stack-control-plane`.
 
 #### MCP Tool Definitions
@@ -120,8 +120,8 @@ arsenal-mcp-russell-skills (MCP server, localhost loopback)
 
 ### Duncan (Curator) Integration
 
-Duncan — Kask's infrastructure Curator — uses `skill_inventory` and `skill_health`
-to surface Russell skill state in the Kask dashboard:
+Duncan — hKask's infrastructure Curator — uses `skill_inventory` and `skill_health`
+to surface Russell skill state in the hKask dashboard:
 
 ```
 Duncan's dashboard
@@ -132,7 +132,7 @@ Duncan's dashboard
 
 ### `stack-control-plane` Integration
 
-Kask's control plane queries `skill_lifecycle_history` to detect version drift:
+hKask's control plane queries `skill_lifecycle_history` to detect version drift:
 
 ```
 stack-control-plane
@@ -196,7 +196,7 @@ never sees raw skill data.
 
 ### Manifest Schema as Ecosystem Contract
 
-The manifest.yaml schema is the Kask ecosystem's skill contract:
+The manifest.yaml schema is the hKask ecosystem's skill contract:
 
 ```yaml
 id: <kebab-case-id>       # required — unique identifier
@@ -226,7 +226,7 @@ evaluation:                # optional — post-intervention checks
 skill written for Russell. This includes:
 
 - **Russell** (`FilesystemSkillLoader`): native loader
-- **Kask** (future `SkillLoader` adapter): same schema, different dispatch
+- **hKask** (future `SkillLoader` adapter): same schema, different dispatch
 - **Okapi** (prompt injection only): reads `symptoms` and `kind`, ignores probes/interventions
 - **Third-party** (web-based skill browser): renders manifest metadata
 
@@ -235,7 +235,7 @@ skill written for Russell. This includes:
 | Tool | Loads manifest | Executes probes? | Executes interventions? | Injects knowledge? |
 |---|---|---|---|---|
 | Russell | Yes | Yes (IDRS-gated) | Yes (IDRS + consent) | Yes (scored + budgeted) |
-| Kask (proposed) | Yes | Yes (Kask governance) | Yes (Kask governance) | Yes |
+| hKask (proposed) | Yes | Yes (hKask governance) | Yes (hKask governance) | Yes |
 | Okapi | Yes | No | No | Yes (via skill_hint) |
 | Web browser | Yes | No | No | No |
 
@@ -245,7 +245,7 @@ skill written for Russell. This includes:
 
 ### Span Namespace
 
-Russell's OKH spans are emitted via the same `tracing` layer Kask uses:
+Russell's OKH spans are emitted via the same `tracing` layer hKask uses:
 
 ```
 okh.<layer>.<module>.<signal>
@@ -270,14 +270,14 @@ okh.skill.dispatch.rollback  ← rollback execution
 okh.skill.lifecycle.transition ← state transition
 ```
 
-### Kask Observability Integration
+### hKask Observability Integration
 
-Kask's observability surface (Loki + Grafana) picks up Russell skill health natively
+hKask's observability surface (Loki + Grafana) picks up Russell skill health natively
 because both systems use the same `tracing` subscriber:
 
 ```
 Russell (tracing spans) → OpenTelemetry collector → Loki → Grafana
-Kask    (tracing spans) → OpenTelemetry collector → Loki → Grafana
+hKask    (tracing spans) → OpenTelemetry collector → Loki → Grafana
                                          ↑
                                    shared OTEL collector
                                    (same Span ID format)
@@ -312,7 +312,7 @@ okh_skill_eval_reliability{reliability < 0.7}
 │                        KASK ECOSYSTEM                                │
 │                                                                      │
 │  ┌──────────────┐    ┌──────────────┐    ┌──────────────────────┐   │
-│  │   Russell     │    │   Kask       │    │   Okapi              │  │
+│  │   Russell     │    │   hKask       │    │   Okapi              │  │
 │  │   (skill host)│    │   (control   │    │   (LLM router)       │  │
 │  │               │    │    plane)    │    │                      │  │
 │  │  - Skill reg. │◄──►│  - MCP tools │    │  - skill_hint ctx    │  │

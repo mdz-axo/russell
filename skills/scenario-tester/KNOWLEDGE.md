@@ -3,7 +3,7 @@
 > **A note from Jack about testing agents:** Testing an AI agent isn't like
 > testing a library. There's no deterministic return value — there's only
 > emergent behavior under load. Okapi loads a model, responds to a prompt,
-> maybe hallucinates, maybe times out. Kask dispatches tools, orchestrates
+> maybe hallucinates, maybe times out. hKask dispatches tools, orchestrates
 > subagents, maybe gets stuck in a loop. Russell watches, records, and cries
 > for help. I need to know: is the agent fast enough? Does it degrade under
 > concurrent load? Does it fail gracefully? So I design scenarios — user
@@ -12,7 +12,7 @@
 > both.
 >
 > **Source:** This knowledge file. Paired with probe scripts in `scripts/`.
-> **Test targets:** Okapi (LLM inference), Kask (agent orchestration, via MCP),
+> **Test targets:** Okapi (LLM inference), hKask (agent orchestration, via MCP),
 > Russell (health harness self-test).
 
 ---
@@ -52,7 +52,7 @@ cleanup: <how to restore state after test>
 - `okapi-context-window` — Escalate prompt length 1K→4K→16K→64K chars, measure latency growth
 - `okapi-error-recovery` — Send malformed requests, measure error rate and recovery time
 
-**Kask scenarios (via MCP tools):**
+**hKask scenarios (via MCP tools):**
 - `kask-tool-completion` — Dispatch a known tool, measure round-trip time
 - `kask-multi-agent-orchestration` — Chain 3 subagent calls, measure end-to-end latency
 - `kask-tool-timeout` — Request a slow tool, observe timeout behavior

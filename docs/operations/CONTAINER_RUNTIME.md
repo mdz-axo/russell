@@ -64,7 +64,7 @@ socket.
 | Field | Value |
 |-------|-------|
 | Image | `docker.io/qdrant/qdrant:latest` |
-| Purpose | Vector database for the Kask knowledge system |
+| Purpose | Vector database for the hKask knowledge system |
 | Ports | 6333 (HTTP API), 6334 (gRPC) |
 | Volume | `~/Clones/kask/.data/qdrant` → `/qdrant/storage` |
 | Env | `RUN_MODE=production` |

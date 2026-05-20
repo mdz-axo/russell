@@ -16,7 +16,7 @@ status: "Active"
 
 ## Status: ✅ Complete
 
-All recommended enhancements for Russell's Kask MCP integration have been implemented and tested.
+All recommended enhancements for Russell's hKask MCP integration have been implemented and tested.
 
 ---
 
@@ -27,7 +27,7 @@ All recommended enhancements for Russell's Kask MCP integration have been implem
 - `packaging/bin/install.sh` (updated)
 
 **Features:**
-- systemd user service for automatic Kask gateway management
+- systemd user service for automatic hKask gateway management
 - Auto-restart on failure
 - Security hardening (NoNewPrivs, ProtectHome, ProtectSystem)
 - Integrated into Russell install flow
@@ -63,7 +63,7 @@ systemctl --user status kask-gateway.service
 
 **Features:**
 - 10 concurrent request limit via tokio semaphore
-- Prevents overwhelming Kask gateway during high-frequency usage
+- Prevents overwhelming hKask gateway during high-frequency usage
 - Permit held for duration of each request
 
 **Test:** ✅ All 20 tests passing
@@ -92,7 +92,7 @@ systemctl --user status kask-gateway.service
 - `KaskMcpClient::new()` uses `ChainedTokenProvider` by default
 - All HTTP requests use fresh token automatically
 
-**Kask-Side Setup Required:**
+**hKask-Side Setup Required:**
 ```bash
 # Create Russell service principal
 stack-admin key create --for russell --type service \
@@ -135,8 +135,8 @@ registry.remove_tool("deprecated_tool");
 registry.upsert_tool(new_tool_definition);
 ```
 
-**Kask-Side Implementation Guide:**
-See `docs/operations/MCP_TOOL_CACHE_INVALIDATION.md` for complete guide on implementing `notifications/tools/list_changed` in Kask MCP servers.
+**hKask-Side Implementation Guide:**
+See `docs/operations/MCP_TOOL_CACHE_INVALIDATION.md` for complete guide on implementing `notifications/tools/list_changed` in hKask MCP servers.
 
 ---
 
@@ -221,7 +221,7 @@ test result: ok. 20 passed
 
 The `packaging/bin/install.sh` script now:
 
-1. ✅ Builds `arsenal-mcp-russell` from Kask repo
+1. ✅ Builds `arsenal-mcp-russell` from hKask repo
 2. ✅ Installs to `~/.local/bin/`
 3. ✅ Updates MCP registry with correct format
 4. ✅ Builds and starts `stack-api` gateway via systemd
@@ -231,7 +231,7 @@ The `packaging/bin/install.sh` script now:
 
 ---
 
-## Remaining Kask-Side Work
+## Remaining hKask-Side Work
 
 | Item | Status | Notes |
 |------|--------|-------|
@@ -279,4 +279,4 @@ cargo test -p russell-mcp -p russell-cli
 **Next Steps:**
 1. Run `./packaging/bin/install.sh --release` on fresh install
 2. Jack can check token status via `ACTION: kask/russell_token_status`
-3. Optional: Implement `notifications/tools/list_changed` in Kask MCP servers
+3. Optional: Implement `notifications/tools/list_changed` in hKask MCP servers

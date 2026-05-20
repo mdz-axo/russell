@@ -254,13 +254,13 @@ aggressive intervention.
 | New CLI subcommand | `russell-cli::commands` | `CONTRIBUTING.md` §9; mirror in MCP if user-facing |
 | New self-health vital | `russell-proprio::probes` | [`../archive/proprioception.md`](../archive/proprioception.md); ADR if new failure class |
 
-## 8. Kask integration surface
+## 8. hKask integration surface
 
-### Kask → Russell (read path)
+### hKask → Russell (read path)
 
 Russell's journal (`~/.local/state/harness/journal.db`) is read by
-`arsenal-mcp-russell` — an MCP tool server that lives in the Kask
-repo (`~/Clones/kask`). It exposes 7 tools:
+`arsenal-mcp-russell` — an MCP tool server that lives in the hKask
+repo (`~/Clones/hKask`). It exposes 7 tools:
 
 | MCP tool | Purpose |
 |---|---|
@@ -270,16 +270,16 @@ repo (`~/Clones/kask`). It exposes 7 tools:
 | `russell_help_sessions` | LLM consultation history |
 | `russell_curator_assess` | Duncan's structured health assessment |
 | `russell_cadence_health` | Observation cadence gap analysis |
-| `russell_token_status` | Kask MCP token status |
+| `russell_token_status` | hKask MCP token status |
 
-**Duncan** is an infrastructure Curator in Kask's
+**Duncan** is an infrastructure Curator in hKask's
 `stack-control-plane` that calls `russell_curator_assess` to
 produce health reports with findings and recommendations.
 
-### Russell → Kask (MCP client path)
+### Russell → hKask (MCP client path)
 
 Per ADR-0025, Russell's `russell-mcp` crate is a fully operational
-MCP client that calls into Kask's `stack-api` gateway
+MCP client that calls into hKask's `stack-api` gateway
 (`http://127.0.0.1:8080`). Russell has access to 193 tools across
 16 MCP servers registered in `~/.config/stack/mcp-registry.json`:
 
@@ -303,10 +303,10 @@ MCP client that calls into Kask's `stack-api` gateway
 | `russell` | 7 | Host health/journal/proprioception |
 
 **Integration boundary:** no cross-crate dependency. Russell does
-not import Kask; Kask does not import Russell. Communication in
-both directions is via HTTP REST to `stack-api` (Russell → Kask)
+not import hKask; hKask does not import Russell. Communication in
+both directions is via HTTP REST to `stack-api` (Russell → hKask)
 and via the SQLite journal read by `arsenal-mcp-russell`
-(Kask → Russell).
+(hKask → Russell).
 
 See [`../proposals/russell-kask-integration.md`](../proposals/russell-kask-integration.md)
 for the full design.
