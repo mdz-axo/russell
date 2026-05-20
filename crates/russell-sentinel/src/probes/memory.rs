@@ -6,7 +6,6 @@
 
 use super::connectors;
 use super::tools;
-use crate::impl_probe;
 
 /// Probe: available memory in MiB.
 ///
@@ -37,6 +36,12 @@ pub fn load_avg_1m() -> Option<f64> {
     let raw = connectors::read_file_to_string("/proc/loadavg")?;
     tools::parse_loadavg_1m(&raw)
 }
+
+pub struct MemAvailableMib;
+pub struct SwapUsedMib;
+pub struct LoadAvg1m;
+pub struct MemPressureSome;
+pub struct MemPressureFull;
 
 impl_probe!(MemAvailableMib, "mem_available_mib", "MiB", mem_available_mib);
 impl_probe!(SwapUsedMib, "swap_used_mib", "MiB", swap_used_mib);

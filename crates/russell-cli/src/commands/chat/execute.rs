@@ -75,8 +75,8 @@ pub async fn execute_pending_action(
             rollback_cmd.clone(),
             *rollback_is_reboot,
         ),
-        ResolvedAction::KaskTool { .. } => {
-            println!("  → Internal error: KaskTool routed to local dispatcher.");
+        ResolvedAction::HKaskTool { .. } => {
+            println!("  → Internal error: HKaskTool routed to local dispatcher.");
             return None;
         }
     };

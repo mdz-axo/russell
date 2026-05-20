@@ -291,14 +291,14 @@ pub fn resolve(
     response: &str,
     skills: &[Skill],
 ) -> Option<std::result::Result<ResolvedAction, ActionError>> {
-    resolve_with_kask(response, skills, &[])
+    resolve_with_hkask(response, skills, &[])
 }
 
 /// Parse the last `ACTION:` line from a response and resolve it
 /// against both the loaded skill set AND the hKask MCP tool registry.
 ///
 /// When `skill_id == "hkask"`, the action_id is validated against
-/// `kask_tools` (the poka-yoke for MCP tools per ADR-0025 §7).
+/// `hkask_tools` (the poka-yoke for MCP tools per ADR-0025 §7).
 ///
 /// Returns `None` if no `ACTION:` line is present in the response.
 ///
@@ -309,10 +309,10 @@ pub fn resolve(
 /// `ACTION:` line is found, returns `ActionError::NestedActionDetected`.
 /// This is a security measure per the Schneier/Miller security lens
 /// from the adversarial review.
-pub fn resolve_with_kask(
+pub fn resolve_with_hkask(
     response: &str,
     skills: &[Skill],
-    kask_tools: &[HKaskToolInfo],
+    hkask_tools: &[HKaskToolInfo],
 ) -> Option<std::result::Result<ResolvedAction, ActionError>> {
     // Task 3.4: Detect nested ACTION: patterns (prompt injection attempt).
     let action_count = response.lines().filter(|line| line.trim().starts_with("ACTION:")).count();
@@ -354,10 +354,10 @@ pub fn resolve_with_kask(
 
     // hKask MCP tool path (ADR-0025 §7).
     // Only route to hKask if tools are available (registry is populated).
-    if skill_id == "hkask" && !kask_tools.is_empty() {
+    if skill_id == "hkask" && !hkask_tools.is_empty() {
         // Strip inline arguments from the action_id (e.g. "tool --arg val" → "tool").
         let bare_tool_name = action_id.split(' ').next().unwrap_or(action_id);
-        return resolve_kask_tool(bare_tool_name, kask_tools, skills, response);
+        return resolve_hkask_tool(bare_tool_name, hkask_tools, skills, response);
     }
 
     let skill = match skills.iter().find(|s| s.id == skill_id) {
@@ -365,7 +365,7 @@ pub fn resolve_with_kask(
         None => {
             // Include "hkask" in the loaded list if we have hKask tools.
             let mut loaded: Vec<String> = skills.iter().map(|s| s.id.clone()).collect();
-            if !kask_tools.is_empty() {
+            if !hkask_tools.is_empty() {
                 loaded.push("hkask".to_string());
             }
             return Some(Err(ActionError::UnknownSkill {
@@ -698,8 +698,8 @@ mod tests {
     #[test]
     fn hkask_tool_with_risk_band() {
         let skills = [make_skill()];
-        let kask_tools = make_kask_tools();
-        let result = resolve_with_kask("ACTION: hkask/russell_host_snapshot", &skills, &kask_tools)
+        let hkask_tools = make_hkask_tools();
+        let result = resolve_with_hkask("ACTION: hkask/russell_host_snapshot", &skills, &hkask_tools)
             .unwrap()
             .unwrap();
         match result {
@@ -773,7 +773,7 @@ mod tests {
 
     // ── Kask MCP tool resolution tests (ADR-0025) ──────────────────
 
-    fn make_kask_tools() -> Vec<HKaskToolInfo> {
+    fn make_hkask_tools() -> Vec<HKaskToolInfo> {
         vec![
             HKaskToolInfo {
                 name: "paradigm_shift_query".into(),
@@ -798,8 +798,8 @@ mod tests {
     #[test]
     fn resolves_hkask_tool() {
         let skills = [make_skill()];
-        let kask_tools = make_kask_tools();
-        let result = resolve_with_kask("ACTION: hkask/paradigm_shift_query", &skills, &kask_tools)
+        let hkask_tools = make_hkask_tools();
+        let result = resolve_with_hkask("ACTION: hkask/paradigm_shift_query", &skills, &hkask_tools)
             .unwrap()
             .unwrap();
         assert!(result.is_hkask_tool());
@@ -810,8 +810,8 @@ mod tests {
     #[test]
     fn unknown_hkask_tool_is_error() {
         let skills = [make_skill()];
-        let kask_tools = make_kask_tools();
-        let err = resolve_with_kask("ACTION: hkask/nonexistent", &skills, &kask_tools)
+        let hkask_tools = make_hkask_tools();
+        let err = resolve_with_hkask("ACTION: hkask/nonexistent", &skills, &hkask_tools)
             .unwrap()
             .unwrap_err();
         assert!(err.to_string().contains("nonexistent"));
@@ -821,17 +821,17 @@ mod tests {
     fn hkask_prefix_without_tools_is_unknown_skill() {
         let skills = [make_skill()];
         // No hKask tools available — "hkask" is not a loaded skill.
-        let err = resolve_with_kask("ACTION: hkask/anything", &skills, &[])
+        let err = resolve_with_hkask("ACTION: hkask/anything", &skills, &[])
             .unwrap()
             .unwrap_err();
         assert!(err.to_string().contains("hkask"));
     }
 
     #[test]
-    fn local_skill_still_resolves_with_kask_tools_present() {
+    fn local_skill_still_resolves_with_hkask_tools_present() {
         let skills = [make_skill()];
-        let kask_tools = make_kask_tools();
-        let result = resolve_with_kask("ACTION: test-skill/probe-1", &skills, &kask_tools)
+        let hkask_tools = make_hkask_tools();
+        let result = resolve_with_hkask("ACTION: test-skill/probe-1", &skills, &hkask_tools)
             .unwrap()
             .unwrap();
         assert!(result.is_probe());
@@ -841,8 +841,8 @@ mod tests {
     #[test]
     fn hkask_tool_parses_required_fields_from_schema() {
         let skills = [make_skill()];
-        let kask_tools = make_kask_tools();
-        let result = resolve_with_kask("ACTION: hkask/paradigm_shift_query", &skills, &kask_tools)
+        let hkask_tools = make_hkask_tools();
+        let result = resolve_with_hkask("ACTION: hkask/paradigm_shift_query", &skills, &hkask_tools)
             .unwrap()
             .unwrap();
         match result {
@@ -858,9 +858,9 @@ mod tests {
     #[test]
     fn hkask_tool_parses_arguments_line() {
         let skills = [make_skill()];
-        let kask_tools = make_kask_tools();
+        let hkask_tools = make_hkask_tools();
         let response = "Let me query the Cascade about that.\n\nArguments: {\"prompt\": \"What is wrong?\", \"depth\": \"thorough\"}\n\nACTION: hkask/paradigm_shift_query";
-        let result = resolve_with_kask(response, &skills, &kask_tools)
+        let result = resolve_with_hkask(response, &skills, &hkask_tools)
             .unwrap()
             .unwrap();
         match result {
@@ -876,11 +876,11 @@ mod tests {
     #[test]
     fn hkask_tool_parses_key_value_args() {
         let skills = [make_skill()];
-        let kask_tools = make_kask_tools();
-        let result = resolve_with_kask(
+        let hkask_tools = make_hkask_tools();
+        let result = resolve_with_hkask(
             "ACTION: hkask/paradigm_shift_query --prompt \"check GPU\" --depth thorough",
             &skills,
-            &kask_tools,
+            &hkask_tools,
         )
         .unwrap()
         .unwrap();
@@ -898,7 +898,7 @@ mod tests {
     fn hkask_tool_no_required_fields() {
         let skills = [make_skill()];
         let hkask_tools = make_hkask_tools();
-        let result = resolve_with_kask("ACTION: hkask/russell_host_snapshot", &skills, &hkask_tools)
+        let result = resolve_with_hkask("ACTION: hkask/russell_host_snapshot", &skills, &hkask_tools)
             .unwrap()
             .unwrap();
         match result {
@@ -944,7 +944,7 @@ mod tests {
         let skills = [make_skill()];
         let hkask_tools = make_hkask_tools();
         let response = "Checking hKask.\nACTION: hkask/russell_host_snapshot\n\nAlso query:\nACTION: hkask/paradigm_shift_query";
-        let err = resolve_with_kask(response, &skills, &hkask_tools)
+        let err = resolve_with_hkask(response, &skills, &hkask_tools)
             .unwrap()
             .unwrap_err();
         match err {

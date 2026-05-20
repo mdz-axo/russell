@@ -16,6 +16,42 @@
 #![deny(rust_2018_idioms)]
 #![warn(missing_docs)]
 
+/// Macro to generate ProbeDescriptor impls, reducing boilerplate.
+///
+/// Usage: `impl_probe!(StructName, "probe_name", "unit", function_name);`
+///
+/// For unitless probes: `impl_probe!(StructName, "probe_name", none, function_name);`
+#[macro_export]
+macro_rules! impl_probe {
+    ($struct_name:ident, $name:literal, "unit", $func:ident) => {
+        impl $crate::probes::descriptor::ProbeMetadata for $struct_name {
+            fn name(&self) -> &'static str { $name }
+            fn unit(&self) -> Option<&'static str> { Some("unit") }
+        }
+        impl $crate::probes::descriptor::ProbeCollector for $struct_name {
+            fn collect(&self) -> Option<f64> { $func() }
+        }
+    };
+    ($struct_name:ident, $name:literal, $unit:literal, $func:ident) => {
+        impl $crate::probes::descriptor::ProbeMetadata for $struct_name {
+            fn name(&self) -> &'static str { $name }
+            fn unit(&self) -> Option<&'static str> { Some($unit) }
+        }
+        impl $crate::probes::descriptor::ProbeCollector for $struct_name {
+            fn collect(&self) -> Option<f64> { $func() }
+        }
+    };
+    ($struct_name:ident, $name:literal, none, $func:ident) => {
+        impl $crate::probes::descriptor::ProbeMetadata for $struct_name {
+            fn name(&self) -> &'static str { $name }
+            fn unit(&self) -> Option<&'static str> { None }
+        }
+        impl $crate::probes::descriptor::ProbeCollector for $struct_name {
+            fn collect(&self) -> Option<f64> { $func() }
+        }
+    };
+}
+
 pub mod probes;
 
 use probes::Sample;

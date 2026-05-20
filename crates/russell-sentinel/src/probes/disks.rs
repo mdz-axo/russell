@@ -7,7 +7,6 @@
 
 use super::connectors;
 use super::tools;
-use crate::impl_probe;
 
 /// Probe: I/O pressure "some" average over the last 10 seconds.
 ///
@@ -39,6 +38,10 @@ pub fn disk_root_used_pct() -> Option<f64> {
     }
     Some((used as f64 / total as f64) * 100.0)
 }
+
+pub struct DiskIoPressureSome;
+pub struct DiskIoPressureFull;
+pub struct DiskRootUsedPct;
 
 impl_probe!(DiskIoPressureSome, "disk_io_pressure_some_pct", "%", disk_io_pressure_some_pct);
 impl_probe!(DiskIoPressureFull, "disk_io_pressure_full_pct", "%", disk_io_pressure_full_pct);

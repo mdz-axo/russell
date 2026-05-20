@@ -1,0 +1,98 @@
+---
+name: {{ id }}
+version: {{ version | default("0.1.0") }}
+author: {{ author | default("Russell (Jack the Nurse)") }}
+license: {{ license | default("MIT OR Apache-2.0") }}
+description: {{ description }}
+symptoms:
+{% for symptom in symptoms %}
+  - {{ symptom }}
+{% endfor %}
+tags:
+{% for tag in tags %}
+  - {{ tag }}
+{% endfor %}
+  - russell-replicant
+permissions:
+{% if permissions.shell %}
+  - shell
+{% endif %}
+{% if permissions.network %}
+  - network
+{% endif %}
+{% if permissions.filesystem %}
+  - filesystem
+{% endif %}
+config:
+{% for key, value in config.items() %}
+  {{ key }}:
+    type: {{ value.type | default("string") }}
+    required: {{ value.required | default(false) }}
+{% if value.default %}
+    default: "{{ value.default }}"
+{% endif %}
+{% if value.description %}
+    description: "{{ value.description }}"
+{% endif %}
+{% endfor %}
+entryPoint:
+  type: {{ entry_point.type | default("shell") }}
+  path: {{ entry_point.path | default("./scripts/probe.sh") }}
+{% if triggers.schedule %}
+triggers:
+  schedule: "{{ triggers.schedule }}"
+{% endif %}
+visibility: {{ visibility | default("public") }}
+replicant: russell
+artifact_type: skill
+---
+
+# {{ id }} Skill
+
+{{ description }}
+
+## Probes
+
+| ID | Command | Timeout | Capture |
+|---|---|---|---|
+{% for probe in probes %}
+| `{{ probe.id }}` | `{{ probe.cmd | join(" ") }}` | {{ probe.timeout | default("30s") }} | {{ probe.capture | default("stdout") }} |
+{% endfor %}
+
+## Interventions
+
+| ID | Command | Risk | Rollback |
+|---|---|---|---|
+{% for intervention in interventions %}
+| `{{ intervention.id }}` | `{{ intervention.cmd | join(" ") }}` | {{ intervention.risk }} | {{ intervention.rollback }} |
+{% endfor %}
+
+## When Applied
+
+{% for condition in applies_when %}
+- {{ condition }}
+{% endfor %}
+
+## Safety
+
+- Max auto-risk: `{{ safety.max_auto_risk | default("low") }}`
+- Interventions above `{{ safety.max_auto_risk | default("low") }}` require operator consent
+
+{% if references %}
+## References
+
+{% for ref in references %}
+- [{{ ref }}]({{ ref }})
+{% endfor %}
+{% endif %}
+
+## hKask Replicant Metadata
+
+This skill is part of the **Russell** replicant profile in the hKask Universal Agentic Registry.
+
+- **Replicant ID**: `russell`
+- **Visibility**: `{{ visibility | default("public") }}` (semantic memory artifact)
+- **Episodic Memory**: Not included (private to Russell instance)
+- **Registry Topic**: HCS-2 skill discovery registry
+
+> Russell is a cybernetic health harness for Linux AI/ML workstations. He observes, remembers, and reports — never mutates without IDRS contract.

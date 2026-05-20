@@ -8,7 +8,7 @@ use anyhow::{Context, Result};
 use russell_core::journal::JournalWriter;
 use russell_core::paths::Paths;
 use russell_core::time::now_date_iso8601;
-use russell_skills::registry::{LifecycleStatus, RegistryCache, RegistryEntry};
+use russell_skills::registry::{LifecycleStatus, RegistryCache, RegistryEntry, SkillSource};
 use russell_skills::{Skill, load_all};
 use std::time::Duration;
 
@@ -549,15 +549,20 @@ pub fn restore_from_archive(paths: &Paths, name: &str) -> Result<()> {
         .context("restoring skill from archive")?;
     println!("Restored {} from archive.", name);
 
-    // Restore registry entry with updated status.
+// Restore registry entry with updated status.
     let mut restored = false;
     RegistryCache::with_update(&registry_path, |registry| {
         // Create a minimal entry — the full entry will be rebuilt on next load.
-        let mut entry = RegistryEntry::default();
-        entry.id = name.to_string();
-        entry.status = LifecycleStatus::Active;
-        entry.bundled = false;
-        registry.entries.insert(name.to_string(), entry);
+        let entry = RegistryEntry::new_default(
+            LifecycleStatus::Active,
+            "0.0.0",
+            "2026-01-01T00:00:00Z",
+            vec![],
+            SkillSource::Workshop,
+            "2026-01-01T00:00:00Z",
+            false,
+        );
+        registry.skills.insert(name.to_string(), entry);
         restored = true;
     })?;
 
@@ -594,24 +599,6 @@ fn list_archived_skills(paths: &Paths) -> Result<String> {
     }
 }
 
-    let today = now_date_iso8601();
-    let manifest = format!(
-        "id: {name}\n\
-         version: 0.1.0\n\
-         authored: {today}\n\
-         symptoms: []\n\
-         probes: []\n\
-         interventions: []\n"
-    );
-    let manifest_path = skill_dir.join("manifest.yaml");
-    std::fs::write(&manifest_path, &manifest)
-        .with_context(|| format!("writing manifest {}", manifest_path.display()))?;
-
-    println!("Created {}/", skill_dir.display());
-    println!("  Use 'russell workshop adapt {name}' to edit the manifest.");
-    println!("  Use 'russell skill install {name}' to activate it.");
-    Ok(())
-}
 
 /// Write a full skill manifest from stdin.
 /// Reads YAML from stdin, safety-scans it, validates it against the

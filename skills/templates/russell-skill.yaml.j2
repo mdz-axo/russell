@@ -1,0 +1,73 @@
+# SPDX-License-Identifier: MIT OR Apache-2.0
+# {{ id }} — {{ description }}
+#
+# Russell skill manifest (hKask-compatible)
+# Replicant: russell
+# Visibility: {{ visibility | default("public") }}
+
+id: {{ id }}
+version: {{ version | default("0.1.0") }}
+authored: {{ authored | default("2026-05-19") }}
+min_harness_version: {{ min_harness_version | default("0.1.0") }}
+
+symptoms:
+{% for symptom in symptoms %}
+  - {{ symptom }}
+{% endfor %}
+
+applies_when:
+{% for condition in applies_when %}
+  - {{ condition }}
+{% endfor %}
+
+probes:
+{% for probe in probes %}
+  - id: {{ probe.id }}
+    cmd: {{ probe.cmd | to_json }}
+    capture: {{ probe.capture | default("stdout") }}
+    timeout: {{ probe.timeout | default("30s") }}
+{% endfor %}
+
+interventions:
+{% for intervention in interventions %}
+  - id: {{ intervention.id }}
+    cmd: {{ intervention.cmd | to_json }}
+    risk: {{ intervention.risk }}
+    idempotent: {{ intervention.idempotent | default(true) }}
+    rollback: {{ intervention.rollback }}
+    timeout: {{ intervention.timeout | default("120s") }}
+    needs_sudo: {{ intervention.needs_sudo | default(false) }}
+{% endfor %}
+
+safety:
+  max_auto_risk: {{ safety.max_auto_risk | default("low") }}
+{% if safety.require_human_for %}
+  require_human_for:
+{% for human_intervention in safety.require_human_for %}
+    - {{ human_intervention }}
+{% endfor %}
+{% endif %}
+{% if safety.allowed_env_keys %}
+  allowed_env_keys:
+{% for env_key in safety.allowed_env_keys %}
+    - {{ env_key }}
+{% endfor %}
+{% endif %}
+  needs_network: {{ safety.needs_network | default(false) }}
+
+{% if references %}
+references:
+{% for ref in references %}
+  - {{ ref }}
+{% endfor %}
+{% endif %}
+
+---
+# hKask Replicant Metadata
+# This section is for hKask registry compatibility
+
+replicant:
+  id: russell
+  visibility: {{ visibility | default("public") }}
+  artifact_type: {{ artifact_type | default("semantic_memory") }}
+  episodic_memory: false

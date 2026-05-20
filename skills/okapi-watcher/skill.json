@@ -1,0 +1,48 @@
+{
+  "$schema": "https://raw.githubusercontent.com/hashgraph-online/registry-broker-skills/main/schemas/skill.schema.json",
+  "name": "okapi-watcher",
+  "version": "0.3.0",
+  "description": "Monitor local Okapi instance health and model inventory for Russell cybernetic health harness.",
+  "author": "Russell (Jack the Nurse)",
+  "license": "MIT OR Apache-2.0",
+  "homepage": "https://github.com/mdz-axolotl/russell",
+  "tags": ["llm", "okapi", "health-monitor", "gpu", "russell-replicant"],
+  "languages": ["bash", "shell"],
+  "repo": "https://github.com/mdz-axolotl/russell",
+  "permissions": {
+    "shell": {
+      "enabled": true,
+      "commands": ["systemctl", "bash"]
+    },
+    "network": {
+      "enabled": true,
+      "endpoints": ["http://localhost:*"]
+    }
+  },
+  "config": {
+    "okapi_url": {
+      "type": "string",
+      "required": false,
+      "default": "http://localhost:11434",
+      "description": "Okapi API endpoint"
+    }
+  },
+  "entryPoint": {
+    "type": "shell",
+    "path": "./scripts/probe-health.sh"
+  },
+  "triggers": {
+    "schedule": "*/5 * * * *"
+  },
+  "replicant": {
+    "id": "russell",
+    "visibility": "public",
+    "artifact_type": "semantic_memory",
+    "episodic_memory": false
+  },
+  "stats": {
+    "probes": 3,
+    "interventions": 1,
+    "symptoms": 3
+  }
+}

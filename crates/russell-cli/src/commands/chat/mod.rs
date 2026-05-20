@@ -173,7 +173,7 @@ pub async fn run(paths: &Paths) -> Result<()> {
                                 "install" | "build" | "create-manifest" | "delete"
                             );
                         let action_result = execute_action(
-                            &journal, &kask_client, &pa.action, &session_id,
+                            &journal, &hkask_client, &pa.action, &session_id,
                             &current_model, paths,
                         ).await;
                         if let Some(result_text) = action_result {
@@ -207,7 +207,7 @@ pub async fn run(paths: &Paths) -> Result<()> {
                                 "install" | "build" | "create-manifest" | "delete"
                             );
                         let action_result = execute_action(
-                            &journal, &kask_client, &pa.action, &session_id,
+                            &journal, &hkask_client, &pa.action, &session_id,
                             &current_model, paths,
                         ).await;
                         if let Some(result_text) = action_result {
@@ -261,11 +261,11 @@ pub async fn run(paths: &Paths) -> Result<()> {
                             &reader,
                             &skills,
                             profile.as_ref(),
-                            &kask_registry,
+&hkask_registry,
                             &registry,
                             paths,
                             &mut pending_action,
-                            &kask_client,
+&hkask_client,
                             &client_cfg,
                         ).await {
                             Ok(()) => {}
@@ -314,11 +314,11 @@ pub async fn run(paths: &Paths) -> Result<()> {
                     &reader,
                     &skills,
                     profile.as_ref(),
-                    &kask_registry,
+                    &hkask_registry,
                     &registry,
                     paths,
                     &mut pending_action,
-                    &kask_client,
+&hkask_client,
                     &client_cfg,
                 )
                 .await?;
@@ -355,14 +355,14 @@ pub async fn run(paths: &Paths) -> Result<()> {
 /// Unified action executor — dispatches to kask or local skill execution.
 async fn execute_action(
     journal: &JournalWriter,
-    kask_client: &Option<KaskMcpClient>,
+    hkask_client: &Option<HKaskMcpClient>,
     action: &ResolvedAction,
     session_id: &str,
     model: &str,
     paths: &Paths,
 ) -> Option<String> {
-    if action.is_kask_tool() {
-        kask::execute_kask_tool(journal, kask_client, action, session_id, model, paths).await
+    if action.is_hkask_tool() {
+        hkask::execute_hkask_tool(journal, hkask_client, action, session_id, model, paths).await
     } else {
         let pa = PendingAction::new(action.clone(), None);
         execute::execute_pending_action(journal, paths, &pa, session_id, model).await
@@ -374,7 +374,7 @@ async fn execute_action(
 async fn handle_action_proposal(
     action: ResolvedAction,
     journal: &JournalWriter,
-    kask_client: &Option<KaskMcpClient>,
+    hkask_client: &Option<HKaskMcpClient>,
     session_id: &str,
     current_model: &str,
     paths: &Paths,
@@ -383,14 +383,14 @@ async fn handle_action_proposal(
     pending_action: &mut Option<PendingAction>,
     stdin_content: Option<String>,
 ) -> Result<()> {
-    if action.is_kask_tool() {
-        // Kask MCP tool — determine consent based on risk.
+    if action.is_hkask_tool() {
+        // hKask MCP tool — determine consent based on risk.
         let risk = action.risk_band();
         if risk == RiskBand::None {
             // Auto-execute (probe-equivalent).
-            println!("  → Calling kask tool: {}…", action.action_id());
-            let result = kask::execute_kask_tool(
-                journal, kask_client, &action, session_id, current_model, paths,
+            println!("  → Calling hKask tool: {}…", action.action_id());
+            let result = hkask::execute_hkask_tool(
+                journal, hkask_client, &action, session_id, current_model, paths,
             ).await;
             if let Some(result_text) = result {
                 history.turns.push(Turn {
@@ -620,15 +620,15 @@ async fn call_jack(
     reader: &JournalReader,
     skills: &[russell_skills::Skill],
     profile: Option<&russell_core::Profile>,
-    kask_registry: &ToolRegistry,
+    hkask_registry: &ToolRegistry,
     registry: &russell_skills::registry::RegistryCache,
     paths: &Paths,
     pending_action: &mut Option<PendingAction>,
-    kask_client: &Option<KaskMcpClient>,
+    hkask_client: &Option<HKaskMcpClient>,
     _client_cfg: &russell_meta::client::ClientConfig,
 ) -> Result<()> {
     // Build the fresh SOAP objective.
-    let objective = objective::build_objective(reader, skills, profile, kask_registry, registry);
+    let objective = objective::build_objective(reader, skills, profile, hkask_registry, registry);
 
     // Build system prompt: persona + relevance-scored KNOWLEDGE.md injection.
     // All applicable skill knowledge is injected (within token budget),
@@ -770,13 +770,13 @@ async fn call_jack(
             journal_chat_turn(journal, session_id, current_model, "(chat turn)", &content);
 
             // Check for ACTION: proposal.
-            let kask_tool_infos = kask::build_kask_tool_infos(kask_registry);
-            match action::resolve_with_kask(&content, skills, &kask_tool_infos) {
+            let hkask_tool_infos = hkask::build_hkask_tool_infos(hkask_registry);
+            match action::resolve_with_hkask(&content, skills, &hkask_tool_infos) {
                 Some(Ok(mut action)) => {
                     // Append inline CLI arguments from the LLM response to
                     // the subprocess cmd (e.g. `Arguments --name swap-watcher`
                     // → appends `--name swap-watcher` to the manifest's cmd).
-                    if !action.is_kask_tool() {
+                    if !action.is_hkask_tool() {
                         let inline_args = extract_inline_args(&content);
                         if !inline_args.is_empty() {
                             action.append_cmd_args(&inline_args);
@@ -786,7 +786,7 @@ async fn call_jack(
                     handle_action_proposal(
                         action,
                         journal,
-                        kask_client,
+                        hkask_client,
                         session_id,
                         current_model,
                         paths,

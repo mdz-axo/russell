@@ -30,13 +30,13 @@ pub const ENV_KASK_MCP_TOOL_TTL_SECS: &str = "KASK_MCP_TOOL_TTL_SECS";
 /// Environment variable: HTTP timeout in seconds.
 pub const ENV_KASK_MCP_TIMEOUT_SECS: &str = "KASK_MCP_TIMEOUT_SECS";
 
-/// Configuration for the Kask MCP client.
+/// Configuration for the hKask MCP client.
 ///
 /// Constructed from environment variables. The only required value
-/// for a functional connection is `KASK_MCP_TOKEN` — without it,
+/// for a functional connection is `HKASK_MCP_TOKEN` — without it,
 /// the client can still be constructed but will fail authentication.
 #[derive(Debug, Clone)]
-pub struct KaskMcpConfig {
+pub struct HKaskMcpConfig {
     /// MCP endpoint URL (must be loopback).
     pub endpoint: String,
     /// Bearer token for authentication.
@@ -47,7 +47,7 @@ pub struct KaskMcpConfig {
     pub timeout: Duration,
 }
 
-impl KaskMcpConfig {
+impl HKaskMcpConfig {
     /// Load configuration from environment variables.
     ///
     /// Does NOT fail on missing token — the client can be constructed
@@ -100,7 +100,7 @@ mod tests {
 
     #[test]
     fn default_config_is_loopback() {
-        let cfg = KaskMcpConfig {
+        let cfg = HKaskMcpConfig {
             endpoint: DEFAULT_ENDPOINT.to_owned(),
             token: Some("test-token".into()),
             tool_ttl: Duration::from_secs(DEFAULT_TOOL_TTL_SECS),
@@ -111,7 +111,7 @@ mod tests {
 
     #[test]
     fn remote_endpoint_rejected() {
-        let cfg = KaskMcpConfig {
+        let cfg = HKaskMcpConfig {
             endpoint: "http://192.168.1.100:9500/mcp".to_owned(),
             token: Some("test-token".into()),
             tool_ttl: Duration::from_secs(300),

@@ -6,7 +6,6 @@
 //! (deterministic, not LLM-generated — JR-3 compliant).
 
 use super::connectors;
-use crate::impl_probe;
 
 /// Probe: is the system in a degraded state?
 ///
@@ -50,6 +49,10 @@ pub fn systemd_system_failed_count() -> Option<f64> {
     let count = output.trim().lines().count();
     Some(count as f64)
 }
+
+pub struct SystemdDegraded;
+pub struct SystemdUserFailedCount;
+pub struct SystemdSystemFailedCount;
 
 impl_probe!(SystemdDegraded, "systemd_degraded", "bool", systemd_degraded);
 impl_probe!(SystemdUserFailedCount, "systemd_user_failed_count", "count", systemd_user_failed_count);

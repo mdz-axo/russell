@@ -1,22 +1,23 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
-//! Kask MCP health probe for proprioception.
+//! hKask MCP health probe for proprioception.
 //!
 //! Provides a quick async reachability check suitable for inclusion
 //! in Russell's self-vital cycle. Uses a short timeout (2s) to avoid
 //! blocking the proprioception cadence.
 
+use serde::Deserialize;
 use std::time::{Duration, Instant};
 
 use tracing::debug;
 
-use crate::config::KaskMcpConfig;
+use crate::config::HKaskMcpConfig;
 
 /// Timeout for the reachability probe (short — must not block proprio).
 const HEALTH_TIMEOUT: Duration = Duration::from_secs(2);
 
-/// Result of a Kask MCP health probe.
+/// Result of a hKask MCP health probe.
 #[derive(Debug, Clone)]
-pub struct KaskHealthResult {
+pub struct HKaskHealthResult {
     /// Whether the endpoint responded.
     pub reachable: bool,
     /// Round-trip latency in milliseconds (None if unreachable).
@@ -25,18 +26,18 @@ pub struct KaskHealthResult {
     pub error: Option<String>,
 }
 
-/// Probe the Kask MCP endpoint for reachability.
+/// Probe the hKask MCP endpoint for reachability.
 ///
 /// Sends a GET request to the REST API `/health` endpoint.
 /// Uses a 2-second timeout to avoid blocking the proprioception cycle.
 ///
 /// This is a fast health check that verifies the endpoint is up and responding.
-pub async fn probe_reachability() -> KaskHealthResult {
-    let config = KaskMcpConfig::from_env();
+pub async fn probe_reachability() -> HKaskHealthResult {
+    let config = HKaskMcpConfig::from_env();
 
     // Validate endpoint first.
     if let Err(e) = config.validate() {
-        return KaskHealthResult {
+        return HKaskHealthResult {
             reachable: false,
             latency_ms: None,
             error: Some(format!("config: {e}")),
@@ -46,7 +47,7 @@ pub async fn probe_reachability() -> KaskHealthResult {
     let http = match reqwest::Client::builder().timeout(HEALTH_TIMEOUT).build() {
         Ok(c) => c,
         Err(e) => {
-            return KaskHealthResult {
+            return HKaskHealthResult {
                 reachable: false,
                 latency_ms: None,
                 error: Some(format!("http client: {e}")),
@@ -74,15 +75,15 @@ pub async fn probe_reachability() -> KaskHealthResult {
         Ok(resp) => {
             let latency = start.elapsed().as_millis() as u64;
             if resp.status().is_success() {
-                debug!(latency_ms = latency, "kask MCP reachable");
-                KaskHealthResult {
+                debug!(latency_ms = latency, "hKask MCP reachable");
+                HKaskHealthResult {
                     reachable: true,
                     latency_ms: Some(latency),
                     error: None,
                 }
             } else {
                 let status = resp.status().as_u16();
-                KaskHealthResult {
+                HKaskHealthResult {
                     reachable: false,
                     latency_ms: Some(latency),
                     error: Some(format!("HTTP {status}")),
@@ -97,8 +98,8 @@ pub async fn probe_reachability() -> KaskHealthResult {
             } else {
                 e.to_string()
             };
-            debug!(error = %msg, "kask MCP unreachable");
-            KaskHealthResult {
+            debug!(error = %msg, "hKask MCP unreachable");
+            HKaskHealthResult {
                 reachable: false,
                 latency_ms: None,
                 error: Some(msg),

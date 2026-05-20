@@ -11,7 +11,6 @@
 use super::connectors;
 use super::tools;
 use super::tools::ProcessStat;
-use crate::impl_probe;
 
 /// Collect `ProcessStat` for every visible PID.
 ///

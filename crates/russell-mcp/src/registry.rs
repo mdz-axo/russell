@@ -1,21 +1,21 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 //! Tool registry — cached `tools/list` with TTL refresh.
 //!
-//! The registry holds the last-known tool set from Kask's MCP
+//! The registry holds the last-known tool set from hKask's MCP
 //! endpoint. It provides the poka-yoke validation surface: any
 //! tool ID proposed by the LLM or the operator must exist in this
-//! registry (for `kask/` prefixed actions) to be dispatched.
+//! registry (for `hkask/` prefixed actions) to be dispatched.
 
 use std::path::Path;
 use std::time::{Duration, Instant};
 
 use tracing::{debug, info, warn};
 
-use crate::client::KaskMcpClient;
+use crate::client::HKaskMcpClient;
 use crate::error::Result;
 use crate::types::McpToolDefinition;
 
-/// Cached tool registry backed by a Kask MCP connection.
+/// Cached tool registry backed by a hKask MCP connection.
 ///
 /// Thread-safe via interior mutability is NOT provided here — the
 /// caller (CLI, chat loop) owns the registry and refreshes it on
@@ -39,14 +39,14 @@ impl ToolRegistry {
         }
     }
 
-    /// Refresh the tool list from the Kask MCP server.
+    /// Refresh the tool list from the hKask MCP server.
     ///
     /// On success, replaces the cached tools and resets the TTL.
     /// On failure, the previous cache is retained (graceful degradation).
-    pub async fn refresh(&mut self, client: &KaskMcpClient) -> Result<()> {
+    pub async fn refresh(&mut self, client: &HKaskMcpClient) -> Result<()> {
         match client.list_tools().await {
             Ok(tools) => {
-                info!(count = tools.len(), "kask tool registry refreshed");
+                info!(count = tools.len(), "hKask tool registry refreshed");
                 self.tools = tools;
                 self.last_refresh = Some(Instant::now());
                 Ok(())
@@ -55,7 +55,7 @@ impl ToolRegistry {
                 warn!(
                     error = %e,
                     cached_count = self.tools.len(),
-                    "kask tool registry refresh failed; retaining stale cache"
+                    "hKask tool registry refresh failed; retaining stale cache"
                 );
                 Err(e)
             }
@@ -66,7 +66,7 @@ impl ToolRegistry {
     /// a refresh was performed, Ok(false) if cache is still fresh.
     ///
     /// On refresh failure, returns the error but retains stale cache.
-    pub async fn refresh_if_stale(&mut self, client: &KaskMcpClient) -> Result<bool> {
+    pub async fn refresh_if_stale(&mut self, client: &HKaskMcpClient) -> Result<bool> {
         if self.is_stale() {
             self.refresh(client).await?;
             Ok(true)
@@ -183,8 +183,8 @@ impl ToolRegistry {
     /// Save the cached tool definitions to a JSON file on disk.
     ///
     /// This allows Russell to show stale-but-useful tool info even on
-    /// first boot before Kask is reachable. The file is saved after
-    /// every successful refresh from Kask (ADR-0025 §5, graceful degradation).
+    /// first boot before hKask is reachable. The file is saved after
+    /// every successful refresh from hKask (ADR-0025 §5, graceful degradation).
     ///
     /// # Errors
     ///
@@ -218,7 +218,7 @@ impl ToolRegistry {
         debug!(
             path = %path.display(),
             tool_count = self.tools.len(),
-            "kask tool cache saved to disk"
+            "hKask tool cache saved to disk"
         );
         Ok(())
     }
@@ -245,7 +245,7 @@ impl ToolRegistry {
                 debug!(
                     path = %path.display(),
                     tool_count = tools.len(),
-                    "kask tool cache loaded from disk"
+                    "hKask tool cache loaded from disk"
                 );
                 self.tools = tools;
                 // Don't set last_refresh — this is stale data.

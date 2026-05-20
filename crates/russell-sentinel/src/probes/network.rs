@@ -5,7 +5,6 @@
 //! `/proc/net/sockstat6`. Lightweight, no subprocess needed.
 
 use super::connectors;
-use super::descriptor::impl_probe;
 use super::tools;
 
 /// Probe: total TCP sockets in use (IPv4).

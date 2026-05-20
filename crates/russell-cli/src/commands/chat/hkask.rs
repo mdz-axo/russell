@@ -7,16 +7,16 @@
 use russell_core::event::{Event, Severity};
 use russell_core::journal::JournalWriter;
 use russell_core::paths::Paths;
-use russell_meta::action::{KaskToolInfo, ResolvedAction};
-use russell_mcp::client::KaskMcpClient;
+use russell_meta::action::{HKaskToolInfo, ResolvedAction};
+use russell_mcp::client::HKaskMcpClient;
 use russell_mcp::registry::ToolRegistry;
 use russell_skills::RiskBand;
 use tracing::{debug, warn};
 
 use super::execute::journal_chat_turn;
 
-/// Build a list of [`KaskToolInfo`] from the registry for the action resolver.
-pub fn build_kask_tool_infos(registry: &ToolRegistry) -> Vec<KaskToolInfo> {
+/// Build a list of [`HKaskToolInfo`] from the registry for the action resolver.
+pub fn build_hkask_tool_infos(registry: &ToolRegistry) -> Vec<HKaskToolInfo> {
     registry
         .tools()
         .iter()
@@ -32,7 +32,7 @@ pub fn build_kask_tool_infos(registry: &ToolRegistry) -> Vec<KaskToolInfo> {
                     _ => RiskBand::Medium,
                 })
                 .unwrap_or(RiskBand::Medium);
-            KaskToolInfo {
+            HKaskToolInfo {
                 name: t.name.clone(),
                 risk_band,
                 input_schema: t.input_schema.clone(),
@@ -50,9 +50,9 @@ pub fn build_kask_tool_infos(registry: &ToolRegistry) -> Vec<KaskToolInfo> {
 ///
 /// If the tool has required fields declared in its `inputSchema` and
 /// the LLM did not provide arguments, warns the operator and cancels.
-pub async fn execute_kask_tool(
+pub async fn execute_hkask_tool(
     journal: &JournalWriter,
-    kask_client: &Option<KaskMcpClient>,
+    hkask_client: &Option<HKaskMcpClient>,
     action: &ResolvedAction,
     session_id: &str,
     model: &str,
@@ -65,13 +65,13 @@ pub async fn execute_kask_tool(
 
     // Extract arguments from the resolved action.
     let (arguments, required_fields) = match action {
-        ResolvedAction::KaskTool {
+        ResolvedAction::HKaskTool {
             arguments,
             required_fields,
             ..
         } => (arguments, required_fields),
         _ => {
-            println!("  → Internal error: non-Kask action routed to execute_kask_tool.");
+            println!("  → Internal error: non-hKask action routed to execute_hkask_tool.");
             return None;
         }
     };
@@ -84,7 +84,7 @@ pub async fn execute_kask_tool(
         return None;
     }
 
-    let client = match kask_client {
+    let client = match hkask_client {
         Some(c) => c,
         None => {
             println!("  → Kask MCP client not connected. Cannot execute tool.");

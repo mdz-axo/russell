@@ -1,0 +1,36 @@
+russell-replicant
+description=Cybernetic health harness for Linux AI/ML workstations. Russell observes, remembers, and reports — Jack the Nurse persona watches over the machine.
+
+canonical.home=https://github.com/mdz-axolotl/russell
+canonical.docs=https://github.com/mdz-axolotl/russell/tree/main/docs
+canonical.specs=https://github.com/mdz-axolotl/russell/tree/main/docs/specifications
+canonical.adr=https://github.com/mdz-axolotl/russell/tree/main/docs/adr
+
+replicant.id=russell
+replicant.type=health-harness
+replicant.platform=linux
+replicant.persona=jack-nurse
+
+visibility.model=public-except-episodic
+visibility.semantic=public
+visibility.templates=public
+visibility.manifests=public
+visibility.references=public
+visibility.episodic=private
+
+artifact.skills=https://raw.githubusercontent.com/mdz-axolotl/russell/main/skills/
+artifact.manifest=https://raw.githubusercontent.com/mdz-axolotl/russell/main/AGENTS.md
+artifact.schema=https://raw.githubusercontent.com/mdz-axolotl/russell/main/docs/specifications/skill-manifest.schema.yaml
+artifact.citation=https://raw.githubusercontent.com/mdz-axolotl/russell/main/CITATION.cff
+
+repository=https://github.com/mdz-axolotl/russell
+license=MIT OR Apache-2.0
+author=mdz-axolotl
+
+skills.index=12
+skills.public=12
+skills.private=0
+
+probes.total=25
+interventions.total=8
+symptoms.catalog=30

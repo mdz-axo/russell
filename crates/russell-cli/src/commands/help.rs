@@ -78,7 +78,7 @@ pub async fn run(paths: &Paths, note: Option<&str>) -> Result<()> {
                     );
                     let probe_output = execute_probe_capture(paths, &writer, &action).await;
                     // Feed probe results back to Jack for analysis.
-                    match analyze_probe_result(paths, &writer, &outcome.response, &probe_output, &kask_tool_names).await {
+                    match analyze_probe_result(paths, &writer, &outcome.response, &probe_output, &hkask_tool_names).await {
                         Ok(analysis) => analysis,
                         Err(e) => {
                             debug!(error = %e, "probe analysis failed, using original response");
@@ -170,7 +170,7 @@ async fn execute_probe_capture(
     dispatcher.max_auto_risk = match action {
         ResolvedAction::Probe { max_auto_risk, .. } => *max_auto_risk,
         ResolvedAction::Intervention { max_auto_risk, .. } => *max_auto_risk,
-        ResolvedAction::KaskTool { .. } => russell_skills::RiskBand::None,
+        ResolvedAction::HKaskTool { .. } => russell_skills::RiskBand::None,
     };
 
     let result = dispatcher
@@ -217,7 +217,7 @@ async fn analyze_probe_result(
     _writer: &JournalWriter,
     _original_response: &str,
     probe_output: &ProbeOutput,
-    _kask_tool_names: &[(String, Option<String>)],
+    _hkask_tool_names: &[(String, Option<String>)],
 ) -> Result<String> {
     use russell_meta::client::{ClientConfig, LlmClient, SoapPrompt};
     use russell_meta::oai_client;

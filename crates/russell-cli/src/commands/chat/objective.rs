@@ -22,7 +22,7 @@ pub fn build_objective(
     reader: &JournalReader,
     skills: &[Skill],
     profile: Option<&russell_core::Profile>,
-    kask_registry: &ToolRegistry,
+    hkask_registry: &ToolRegistry,
     registry: &RegistryCache,
 ) -> String {
     let now = russell_core::time::now_unix();
@@ -200,11 +200,11 @@ pub fn build_objective(
         }
     }
 
-    // ── Kask MCP tools (ADR-0025) ───────────────────────────────────
-    if !kask_registry.is_empty() {
-        let _ = writeln!(obj, "\n### Kask MCP tools");
-        for tool in kask_registry.tools() {
-            let risk = kask_registry
+    // ── hKask MCP tools (ADR-0025) ───────────────────────────────────
+    if !hkask_registry.is_empty() {
+        let _ = writeln!(obj, "\n### hKask MCP tools");
+        for tool in hkask_registry.tools() {
+            let risk = hkask_registry
                 .tool_risk_band(&tool.name)
                 .unwrap_or_else(|| "medium".into());
             let desc = tool
@@ -219,7 +219,7 @@ pub fn build_objective(
             };
             let _ = writeln!(
                 obj,
-                "- `kask`/`{}` (tool, risk: {}) — {}",
+                "- `hkask`/`{}` (tool, risk: {}) — {}",
                 tool.name, risk, desc_short
             );
         }

@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
-//! Kask REST API client.
+//! hKask REST API client.
 //!
-//! Connects to Kask's stack-api on localhost. Enforces the
+//! Connects to hKask's stack-api on localhost. Enforces the
 //! loopback constraint (ADR-0025 §4) at connect time.
 //!
-//! Uses Kask's REST API endpoints:
+//! Uses hKask's REST API endpoints:
 //! - `GET /health` — health check
 //! - `GET /api/v1/tools` — list all MCP tools
 //! - `POST /api/v1/tools/{name}` — invoke a tool
@@ -14,7 +14,7 @@ use serde_json::json;
 use tracing::debug;
 
 use crate::auth::TokenProvider;
-use crate::config::KaskMcpConfig;
+use crate::config::HKaskMcpConfig;
 use crate::error::{McpError, Result};
 use crate::types::{McpToolDefinition, ToolCallResult};
 
@@ -70,15 +70,15 @@ pub fn validate_endpoint(url: &str) -> Result<()> {
     }
 }
 
-/// Kask API client for the trusted relationship.
+/// hKask API client for the trusted relationship.
 ///
-/// Speaks Kask's REST API for MCP tool access. Authenticated via bearer
+/// Speaks hKask's REST API for MCP tool access. Authenticated via bearer
 /// token. Connects only to loopback addresses.
 ///
 /// Rate limiting: limits concurrent requests to prevent overwhelming
-/// the Kask gateway during high-frequency tool usage.
-pub struct KaskMcpClient {
-    config: KaskMcpConfig,
+/// the hKask gateway during high-frequency tool usage.
+pub struct HKaskMcpClient {
+    config: HKaskMcpConfig,
     http: reqwest::Client,
     /// Token provider for authentication (supports automatic refresh).
     token_provider: crate::auth::ChainedTokenProvider,
@@ -90,19 +90,15 @@ pub struct KaskMcpClient {
     rate_limit: Option<tokio::sync::Semaphore>,
 }
 
-impl KaskMcpClient {
+impl HKaskMcpClient {
     /// Construct a new client from configuration.
     ///
     /// Does NOT connect or initialize — call [`connect`](Self::connect)
     /// to perform the health check.
     ///
     /// Uses a chained token provider: tries file-based token rotation
-    /// first, falls back to `KASK_MCP_TOKEN` environment variable.
-    ///
-    /// # Errors
-    /// Returns [`McpError::NonLoopbackRefused`] if the endpoint is not loopback.
-    /// Returns [`McpError::Config`] if the HTTP client cannot be built.
-    pub fn new(config: KaskMcpConfig) -> Result<Self> {
+    /// first, falls back to `HKASK_MCP_TOKEN` environment variable.
+    pub fn new(config: HKaskMcpConfig) -> Result<Self> {
         config.validate()?;
 
         let http = reqwest::Client::builder()
@@ -115,7 +111,7 @@ impl KaskMcpClient {
         let token_provider = crate::auth::ChainedTokenProvider::new(None)?;
 
         // Rate limiter: allow up to 10 concurrent requests to prevent
-        // overwhelming the Kask gateway during high-frequency tool usage.
+        // overwhelming the hKask gateway during high-frequency tool usage.
         let rate_limit = Some(tokio::sync::Semaphore::new(10));
 
         Ok(Self {
@@ -128,7 +124,7 @@ impl KaskMcpClient {
         })
     }
 
-    /// Perform a health check to verify Kask API is reachable.
+    /// Perform a health check to verify hKask API is reachable.
     ///
     /// # Errors
     /// Transport or authentication errors.
@@ -177,14 +173,14 @@ impl KaskMcpClient {
             format!("health response parse: {e}"),
         ))?;
 
-        self.server_name = Some(format!("kask-api-{}", health.version.unwrap_or_else(|| "unknown".into())));
+        self.server_name = Some(format!("hkask-api-{}", health.version.unwrap_or_else(|| "unknown".into())));
         self.initialized = true;
 
-        debug!(server = ?self.server_name, "Kask API connection established");
+        debug!(server = ?self.server_name, "hKask API connection established");
         Ok(())
     }
 
-    /// Discover available tools from Kask.
+    /// Discover available tools from hKask.
     ///
     /// # Errors
     /// Transport, protocol, or authentication errors.
@@ -444,24 +440,24 @@ mod tests {
 
     #[test]
     fn client_construction_validates_endpoint() {
-        let cfg = KaskMcpConfig {
+        let cfg = HKaskMcpConfig {
             endpoint: "http://192.168.1.1:18100".into(),
             token: None,
             tool_ttl: std::time::Duration::from_secs(300),
             timeout: std::time::Duration::from_secs(30),
         };
-        assert!(KaskMcpClient::new(cfg).is_err());
+        assert!(HKaskMcpClient::new(cfg).is_err());
     }
 
     #[test]
     fn client_construction_succeeds_for_loopback() {
-        let cfg = KaskMcpConfig {
+        let cfg = HKaskMcpConfig {
             endpoint: "http://127.0.0.1:18100".into(),
             token: Some("test-token".into()),
             tool_ttl: std::time::Duration::from_secs(300),
             timeout: std::time::Duration::from_secs(30),
         };
-        let client = KaskMcpClient::new(cfg).unwrap();
+        let client = HKaskMcpClient::new(cfg).unwrap();
         assert!(!client.is_initialized());
         assert_eq!(client.endpoint(), "http://127.0.0.1:18100");
     }

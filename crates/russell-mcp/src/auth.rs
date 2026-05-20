@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
-//! Token provider for Kask MCP authentication.
+//! Token provider for hKask MCP authentication.
 //!
 //! Provides automatic token refresh from a file-based token store.
-//! Kask's `stack-keystore` or a rotation script updates the token file;
+//! hKask's `stack-keystore` or a rotation script updates the token file;
 //! Russell polls for changes before expiry.
 
 use std::path::{Path, PathBuf};
@@ -84,7 +84,7 @@ impl TokenProvider for StaticTokenProvider {
 /// use, checks if the cached token is near expiry and refreshes if needed.
 ///
 /// The token file is expected to be updated by an external process
-/// (e.g., Kask's `stack-keystore` or a rotation script).
+/// (e.g., hKask's `stack-keystore` or a rotation script).
 pub struct FileTokenProvider {
     token_path: PathBuf,
     cached: RwLock<Option<CachedToken>>,
@@ -107,14 +107,14 @@ impl FileTokenProvider {
         }
     }
     
-    /// Default token path: `~/.local/state/kask/mcp-token.json`
+    /// Default token path: `~/.local/state/hkask/mcp-token.json`
     pub fn default_path() -> Result<PathBuf> {
         let home = std::env::var("HOME")
             .or_else(|_| std::env::var("USERPROFILE"))
             .map_err(|_| McpError::Config("Cannot determine home directory".into()))?;
         
         Ok(PathBuf::from(home)
-            .join(".local/state/kask/mcp-token.json"))
+            .join(".local/state/hkask/mcp-token.json"))
     }
     
     /// Create with default path.
