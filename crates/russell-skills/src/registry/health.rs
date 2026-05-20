@@ -263,4 +263,3 @@ fn staleness_threshold(today: &str) -> String {
     let td = (rem % 30).clamp(1, 28);
     format!("{ty:04}-{tm:02}-{td:02}")
 }
-

@@ -350,4 +350,3 @@ pub fn evaluate_scenario_samples(
     }
     events
 }
-

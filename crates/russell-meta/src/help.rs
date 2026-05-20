@@ -526,4 +526,3 @@ fn error_kind_of(e: &DoctorError) -> String {
         DoctorError::Other(_) => "other".into(),
     }
 }
-

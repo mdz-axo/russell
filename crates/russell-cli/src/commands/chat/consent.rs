@@ -107,4 +107,3 @@ pub fn is_refusal(input: &str) -> bool {
             | "hold on"
     )
 }
-

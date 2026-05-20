@@ -663,4 +663,3 @@ fn parse_arg_value(s: &str) -> serde_json::Value {
     }
     serde_json::Value::String(s.to_string())
 }
-

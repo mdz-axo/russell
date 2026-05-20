@@ -208,4 +208,3 @@ fn day_start_unix(now_unix: i64) -> i64 {
     let days_since_epoch = now_unix / 86_400;
     days_since_epoch * 86_400
 }
-

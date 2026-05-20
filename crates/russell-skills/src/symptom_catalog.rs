@@ -143,4 +143,3 @@ fn parse_symptoms_yaml(yaml: &str) -> Vec<String> {
         .map(|l| l[2..].trim().to_string())
         .collect()
 }
-

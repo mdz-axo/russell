@@ -336,4 +336,3 @@ fn find_snippet(content: &str, keyword: &str) -> Option<String> {
     let end = (pos + keyword.len() + 40).min(content.len());
     Some(content[start..end].trim().to_string())
 }
-

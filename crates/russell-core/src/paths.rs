@@ -226,4 +226,3 @@ fn xdg_or(home: &std::path::Path, var: &str, fallback: &str) -> PathBuf {
         _ => home.join(fallback),
     }
 }
-

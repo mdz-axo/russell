@@ -40,4 +40,3 @@ impl_probe!(
     "count",
     net_tcp6_connections
 );
-

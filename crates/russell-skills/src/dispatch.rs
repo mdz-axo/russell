@@ -985,4 +985,3 @@ fn write_evidence(dir: &Path, outcome: &RunOutcome, event: &Event) -> Result<()>
 
     Ok(())
 }
-

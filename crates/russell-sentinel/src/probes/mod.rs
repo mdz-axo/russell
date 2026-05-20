@@ -77,4 +77,3 @@ pub fn collect_with(registry: &ProbeRegistry) -> Vec<Sample> {
 /// the singleton for testing or custom probe configurations.
 static REGISTRY: std::sync::LazyLock<ProbeRegistry> =
     std::sync::LazyLock::new(ProbeRegistry::with_defaults);
-

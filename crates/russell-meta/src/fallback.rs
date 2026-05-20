@@ -81,4 +81,3 @@ fn verdict(c: &SeverityCounts) -> Verdict {
         Verdict::Clean
     }
 }
-

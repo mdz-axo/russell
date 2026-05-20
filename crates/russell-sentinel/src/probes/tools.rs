@@ -203,4 +203,3 @@ pub fn parse_df_output(content: &str) -> Option<(u64, u64)> {
     let used: u64 = parts.next()?.parse().ok()?;
     Some((total, used))
 }
-

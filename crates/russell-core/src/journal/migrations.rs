@@ -119,14 +119,6 @@ fn apply_one(conn: &Connection, m: &Migration) -> Result<()> {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn fresh() -> Connection {
-        Connection::open_in_memory().unwrap()
-    }
-
     fn current_version(conn: &Connection) -> Result<u32> {
         let v: u32 = conn
             .query_row(

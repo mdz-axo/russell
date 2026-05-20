@@ -809,7 +809,7 @@ pub fn parse_manifest(yaml: &str, dir_name: &str) -> std::result::Result<Skill, 
     });
 
     // Determine kind: explicit from manifest, or inferred from content.
-    let kind = raw.kind.unwrap_or_else(|| {
+    let kind = raw.kind.unwrap_or({
         if raw.probes.is_empty() && raw.interventions.is_empty() {
             SkillKind::Lens
         } else {
@@ -836,4 +836,3 @@ pub fn parse_manifest(yaml: &str, dir_name: &str) -> std::result::Result<Skill, 
         evaluation: raw.evaluation,
     })
 }
-

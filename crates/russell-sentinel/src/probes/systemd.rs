@@ -72,4 +72,3 @@ impl_probe!(
     "count",
     systemd_system_failed_count
 );
-

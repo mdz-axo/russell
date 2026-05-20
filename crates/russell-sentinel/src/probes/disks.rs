@@ -61,4 +61,3 @@ impl_probe!(
     "%",
     disk_root_used_pct
 );
-

@@ -112,4 +112,3 @@ async fn start_service() {
         }
     }
 }
-

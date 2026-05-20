@@ -1081,4 +1081,3 @@ fn fmt_f64_baseline(v: f64) -> String {
         format!("{v:.1}")
     }
 }
-

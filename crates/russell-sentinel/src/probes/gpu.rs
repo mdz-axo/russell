@@ -155,4 +155,3 @@ impl ProbeCollector for GpuUtilPct {
         gpu_util_pct()
     }
 }
-

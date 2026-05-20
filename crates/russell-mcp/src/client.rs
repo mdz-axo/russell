@@ -34,23 +34,23 @@ use crate::types::{McpToolDefinition, ToolCallResult};
 pub trait McpClient: Send + Sync {
     /// Connect to the MCP endpoint and perform health check.
     async fn connect(&mut self) -> Result<()>;
-    
+
     /// List available MCP tools.
     async fn list_tools(&self) -> Result<Vec<McpToolDefinition>>;
-    
+
     /// Call an MCP tool by name with optional arguments.
     async fn call_tool(
         &self,
         name: &str,
         arguments: Option<serde_json::Value>,
     ) -> Result<ToolCallResult>;
-    
+
     /// Server name from last successful connection.
     fn server_name(&self) -> Option<&str>;
-    
+
     /// Whether the client is initialized (completed health check).
     fn is_initialized(&self) -> bool;
-    
+
     /// The configured endpoint URL.
     fn endpoint(&self) -> &str;
 }
@@ -60,11 +60,11 @@ impl McpClient for HKaskMcpClient {
     async fn connect(&mut self) -> Result<()> {
         self.connect().await
     }
-    
+
     async fn list_tools(&self) -> Result<Vec<McpToolDefinition>> {
         self.list_tools().await
     }
-    
+
     async fn call_tool(
         &self,
         name: &str,
@@ -72,15 +72,15 @@ impl McpClient for HKaskMcpClient {
     ) -> Result<ToolCallResult> {
         self.call_tool(name, arguments).await
     }
-    
+
     fn server_name(&self) -> Option<&str> {
         self.server_name()
     }
-    
+
     fn is_initialized(&self) -> bool {
         self.is_initialized()
     }
-    
+
     fn endpoint(&self) -> &str {
         self.endpoint()
     }
@@ -477,4 +477,3 @@ fn map_reqwest_error(e: &reqwest::Error) -> McpError {
 }
 
 // ── Tests ──────────────────────────────────────────────────────────
-

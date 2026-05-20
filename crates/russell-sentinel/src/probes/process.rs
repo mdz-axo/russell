@@ -221,4 +221,3 @@ impl ProbeCollector for ProcTopMemPct {
         proc_top_mem_pct()
     }
 }
-

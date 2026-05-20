@@ -260,4 +260,3 @@ impl TokenProvider for ChainedTokenProvider {
         false
     }
 }
-

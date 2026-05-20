@@ -557,4 +557,3 @@ pub enum RegistryError {
 
 // Safety scanner types and functions are now in safety.rs.
 // They are re-exported at the top of this module for backward compatibility.
-

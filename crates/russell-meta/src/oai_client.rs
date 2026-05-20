@@ -459,4 +459,3 @@ fn parse_completion(body: &str) -> Result<ParsedCompletion> {
         completion_tokens,
     })
 }
-
