@@ -154,12 +154,6 @@ impl Profile {
     }
 
     /// Load from disk. Refuses unknown schema versions.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`CoreError::Io`] on FS errors, [`CoreError::Json`]
-    /// on malformed JSON, [`CoreError::UnknownSchema`] on version
-    /// mismatch.
     pub fn load(path: &Path) -> Result<Self> {
         let bytes = std::fs::read(path).map_err(|e| CoreError::io(path, e))?;
         let parsed: Profile = serde_json::from_slice(&bytes)?;

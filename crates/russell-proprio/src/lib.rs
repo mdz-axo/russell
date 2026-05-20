@@ -45,12 +45,6 @@ use tracing::{debug, warn};
 // ---------------------------------------------------------------------------
 
 /// Abstracts the query for the sentinel timer's last trigger time.
-///
-/// The production implementation shells out to `systemctl`; tests use a
-/// fixed value so they don't depend on the host's systemd state.
-///
-/// Returns `Ok(Some(microseconds_since_epoch))` on success,
-/// `Ok(None)` if the timer property isn't found, or `Err(...)` on failure.
 pub trait TimerSource {
     /// Read `LastTriggerUSec` from the sentinel timer.
     ///
@@ -61,11 +55,6 @@ pub trait TimerSource {
 }
 
 /// The production [`TimerSource`] — queries systemd via `systemctl`.
-///
-/// This is a driven adapter for the [`TimerSource`] port. The
-/// port is a pure trait; this adapter shells out to `systemctl
-/// --user show russell-sentinel.timer --property=LastTriggerUSec`
-/// for the production implementation.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct SystemdTimerSource;
 
@@ -98,16 +87,6 @@ pub const PROBE_HELP_ERROR_RATE: &str = "help_error_rate_pct";
 pub const PROBE_KASK_MCP_REACHABLE: &str = "kask_mcp_reachable_ms";
 
 /// Gap 5: Probe name for remote skill discovery latency self-vital.
-///
-/// Tracks the time since the last successful discovery fetch from
-/// configured remote registries. When remote discovery is not configured,
-/// this vital returns `None` (no sample written — equivalent to the
-/// kask MCP probe's graceful degradation).
-///
-/// Thresholds are conservative — remote registries are external dependencies
-/// with unpredictable latency:
-/// - Warn: > 3600 s (1 hour — stale index)
-/// - Alert: > 86400 s (24 hours — registry unreachable, content frozen)
 pub const PROBE_REMOTE_DISCOVERY_LATENCY: &str = "remote_discovery_latency_s";
 
 // ---------------------------------------------------------------------------
@@ -188,14 +167,6 @@ pub const REMOTE_DISCOVERY_ALERT_THRESHOLD_S: i64 = 86_400;
 // ---------------------------------------------------------------------------
 
 /// Process-wide guard preventing re-entrant metacognitive-layer runs.
-///
-/// When held, any attempt to re-enter the metacognitive layer should be refused.
-/// Wired into [`run_once`], [`run_once_with`], and [`run_once_with_kask`]
-/// (Phase 2A, ADR-0015).
-///
-/// Uses [`std::sync::Mutex`] because the current proprioception cycle is
-/// synchronous. Can be upgraded to `tokio::sync::Mutex` if needed for async
-/// metacognitive-layer calls.
 #[derive(Debug)]
 pub struct AutoimmuneGuard(Mutex<()>);
 
@@ -207,13 +178,6 @@ impl AutoimmuneGuard {
     }
 
     /// Enter the guard, blocking until it is acquired.
-    ///
-    /// Returns a standard [`MutexGuard`] that releases the lock on drop.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the mutex is poisoned (i.e., a previous holder panicked
-    /// while holding the guard).
     pub fn enter(&self) -> MutexGuard<'_, ()> {
         self.0.lock().expect("AutoimmuneGuard mutex poisoned")
     }
@@ -319,34 +283,12 @@ pub struct KaskHealthInput {
 // ---------------------------------------------------------------------------
 
 /// Run the proprioception cycle once.
-///
-/// Convenience wrapper around [`run_once_inner`] with the real
-/// [`SystemdTimerSource`] and no Kask health probe.
-///
-/// Acquires the [`AUTOIMMUNE`] guard for the duration of the cycle
-/// to prevent re-entrant metacognitive-layer runs.
-///
-/// # Errors
-///
-/// Returns [`russell_core::CoreError`] on journal I/O failures.
 pub fn run_once(writer: &JournalWriter, reader: &JournalReader) -> Result<ProprioResult> {
     let _guard = AUTOIMMUNE.enter();
     run_once_inner(writer, reader, &SystemdTimerSource, None)
 }
 
 /// Run the proprioception cycle once with a caller-provided [`TimerSource`].
-///
-/// Reads the journal, computes all five self-vitals, writes self-scope
-/// samples, and emits events for any breached thresholds.
-///
-/// Acquires the [`AUTOIMMUNE`] guard for the duration of the cycle.
-///
-/// Tests should use [`FixedTimerSource`] to avoid depending on the host's
-/// systemd state.
-///
-/// # Errors
-///
-/// Returns [`russell_core::CoreError`] on journal I/O failures.
 pub fn run_once_with(
     writer: &JournalWriter,
     reader: &JournalReader,
@@ -357,19 +299,6 @@ pub fn run_once_with(
 }
 
 /// Run the proprioception cycle once with Kask MCP health data.
-///
-/// In addition to the five standard self-vitals, journals the
-/// `kask_mcp_reachable_ms` probe (Phase 4C, ADR-0025 §5).
-///
-/// The caller (CLI) performs the async HTTP health check, then
-/// passes the result here so the synchronous proprio cycle can
-/// journal it without depending on async runtime.
-///
-/// Acquires the [`AUTOIMMUNE`] guard for the duration of the cycle.
-///
-/// # Errors
-///
-/// Returns [`russell_core::CoreError`] on journal I/O failures.
 pub fn run_once_with_kask(
     writer: &JournalWriter,
     reader: &JournalReader,
@@ -758,14 +687,6 @@ fn gather_help_error_rate(
 }
 
 /// Gather the Kask MCP reachability vital (Phase 4C, ADR-0025 §5).
-///
-/// When `kask_health` is `Some`, writes the latency as a self-scope sample.
-/// When `None`, no Kask config is present — no sample is written
-/// (we don't know whether the operator intends to use Kask).
-///
-/// Thresholds:
-/// - Info: reachable and latency < 2000ms
-/// - Warn: unreachable or latency >= 2000ms
 fn gather_kask_mcp_reachable(
     writer: &JournalWriter,
     now: i64,
@@ -816,17 +737,6 @@ fn gather_kask_mcp_reachable(
 }
 
 /// Gap 5: Gather the remote discovery latency vital.
-///
-/// Reads the time since the last successful remote registry fetch from
-/// the journal. When remote discovery is not configured or has never run,
-/// returns `None` — no sample is written and severity is `Info`.
-///
-/// This is a foundation probe: it detects when the remote registry
-/// pipeline is stalled (stale index, unreachable Git registries) and
-/// alerts the operator before skill content becomes obsolete.
-///
-/// When `RemoteDiscovery` is fully wired (Gap 3), this probe will also
-/// read latency from the registry cache's `last_fetch_at` timestamp.
 fn gather_remote_discovery_latency(writer: &JournalWriter, now: i64) -> (Option<i64>, Severity) {
     // Read the last remote discovery fetch event from the journal.
     // For now, this checks if any `remote.skill.fetch` event exists.

@@ -19,17 +19,6 @@ use crate::error::{McpError, Result};
 use crate::types::{McpToolDefinition, ToolCallResult};
 
 /// MCP Client trait — hexagonal port for MCP tool access.
-///
-/// This trait defines the interface for MCP clients, allowing Russell
-/// to work with any MCP implementation (hKask, future backends) without
-/// coupling to specific implementations.
-///
-/// # Safety Constraints
-///
-/// Implementations MUST:
-/// - Validate that endpoints are loopback addresses (ADR-0025 §4)
-/// - Authenticate via bearer token
-/// - Enforce capability scope (Schneier/Miller principle)
 #[async_trait::async_trait]
 pub trait McpClient: Send + Sync {
     /// Connect to the MCP endpoint and perform health check.
@@ -139,12 +128,6 @@ pub fn validate_endpoint(url: &str) -> Result<()> {
 }
 
 /// hKask API client for the trusted relationship.
-///
-/// Speaks hKask's REST API for MCP tool access. Authenticated via bearer
-/// token. Connects only to loopback addresses.
-///
-/// Rate limiting: limits concurrent requests to prevent overwhelming
-/// the hKask gateway during high-frequency tool usage.
 pub struct HKaskMcpClient {
     config: HKaskMcpConfig,
     http: reqwest::Client,
@@ -160,12 +143,6 @@ pub struct HKaskMcpClient {
 
 impl HKaskMcpClient {
     /// Construct a new client from configuration.
-    ///
-    /// Does NOT connect or initialize — call [`connect`](Self::connect)
-    /// to perform the health check.
-    ///
-    /// Uses a chained token provider: tries file-based token rotation
-    /// first, falls back to `HKASK_MCP_TOKEN` environment variable.
     pub fn new(config: HKaskMcpConfig) -> Result<Self> {
         config.validate()?;
 

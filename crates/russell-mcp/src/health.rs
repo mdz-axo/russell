@@ -26,11 +26,6 @@ pub struct HKaskHealthResult {
 }
 
 /// Probe the hKask MCP endpoint for reachability.
-///
-/// Sends a GET request to the REST API `/health` endpoint.
-/// Uses a 2-second timeout to avoid blocking the proprioception cycle.
-///
-/// This is a fast health check that verifies the endpoint is up and responding.
 pub async fn probe_reachability() -> HKaskHealthResult {
     let config = HKaskMcpConfig::from_env();
 

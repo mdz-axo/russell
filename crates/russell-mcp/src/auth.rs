@@ -79,12 +79,6 @@ impl TokenProvider for StaticTokenProvider {
 }
 
 /// File-based token provider with automatic refresh.
-///
-/// Reads token from a JSON file and caches it in memory. Before each
-/// use, checks if the cached token is near expiry and refreshes if needed.
-///
-/// The token file is expected to be updated by an external process
-/// (e.g., hKask's `stack-keystore` or a rotation script).
 pub struct FileTokenProvider {
     token_path: PathBuf,
     cached: RwLock<Option<CachedToken>>,

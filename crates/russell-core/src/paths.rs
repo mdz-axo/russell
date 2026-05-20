@@ -51,11 +51,6 @@ pub struct Paths {
 
 impl Paths {
     /// Resolve paths from the process environment.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`CoreError::BasePath`] if neither the relevant XDG
-    /// variable nor `$HOME` is set.
     pub fn from_env() -> Result<Self> {
         let home = std::env::var_os("HOME")
             .map(PathBuf::from)
@@ -202,11 +197,6 @@ impl Paths {
 }
 
 /// Create a directory and any missing parents. Idempotent.
-///
-/// # Errors
-///
-/// Returns [`CoreError::Io`] on permission / FS errors. Returns
-/// [`CoreError::Invariant`] if the path exists but is not a directory.
 pub fn ensure_dir(path: &std::path::Path) -> Result<()> {
     if path.exists() {
         if path.is_dir() {

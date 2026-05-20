@@ -106,17 +106,6 @@ pub fn run_once_with_registry(
 }
 
 /// Run the probe set with rule evaluation.
-///
-/// Evaluates each numeric sample against the [`RuleSet`] and emits
-/// threshold-breach events for any severity above `Info`.
-///
-/// When `reader` is `Some`, also evaluates rate-of-change thresholds
-/// by comparing against the previous sample in the journal.
-///
-/// Returns (sample count, threshold breach events). The caller is
-/// responsible for journaling the events — this function only
-/// writes samples, not events, preserving the ability to annotate
-/// events with cycle metadata before persistence.
 pub fn run_once_with_rules(
     writer: &JournalWriter,
     rules: &RuleSet,
@@ -208,11 +197,6 @@ fn journal_samples_via_port(
 }
 
 /// Evaluate all numeric samples against the rule set (absolute thresholds only).
-///
-/// This is a pure function — no I/O, no journal writes. Returns only
-/// the breach events; the caller is responsible for journaling them.
-///
-/// Samples without a numeric value (text probes) are silently skipped.
 pub fn evaluate_samples_basic(rules: &RuleSet, samples: &[Sample]) -> Vec<Event> {
     let mut events = Vec::new();
     for s in samples {
@@ -227,11 +211,6 @@ pub fn evaluate_samples_basic(rules: &RuleSet, samples: &[Sample]) -> Vec<Event>
 }
 
 /// Evaluate all numeric samples against the rule set AND rate-of-change
-/// thresholds. Rate is computed from the previous sample in the journal.
-///
-/// Returns breach events for both absolute and rate thresholds.
-/// Rate events use `action = "rate_breach"` to distinguish from
-/// absolute threshold breaches.
 pub fn evaluate_samples_with_rates(
     rules: &RuleSet,
     samples: &[Sample],
@@ -299,16 +278,6 @@ fn build_breach_event(
 }
 
 /// Evaluate externally-written scenario metrics against the rule set.
-///
-/// Reads all samples from the journal written in the last `window_seconds`,
-/// evaluates each numeric sample against the [`RuleSet`], and returns
-/// threshold-breach events. This catches samples written by the
-/// scenario-tester skill (e.g. `okapi_latency_p95_ms`) that the sentinel
-/// doesn't collect through its own probe registry.
-///
-/// Duplicate breaches (same probe name + value) are de-duplicated by
-/// merging with the existing breach events from the sentinel's own
-/// probe collection.
 pub fn evaluate_scenario_samples(
     reader: &JournalReader,
     rules: &RuleSet,

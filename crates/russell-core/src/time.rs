@@ -72,11 +72,6 @@ fn civil_from_days(z: i64) -> (i64, i64, i64) {
 }
 
 /// Approximate number of days between two ISO 8601 date strings
-/// (e.g. `"2026-05-01"` and `"2026-06-15"`).
-///
-/// Uses a simplified 30-day-per-month approximation — sufficient
-/// for staleness checks and display purposes, not for precise
-/// calendrical arithmetic.
 pub fn approx_days_between(a: &str, b: &str) -> i64 {
     let pa = parse_date_parts(a);
     let pb = parse_date_parts(b);
@@ -97,16 +92,6 @@ fn parse_date_parts(d: &str) -> (i64, i64, i32) {
 // ─── Clock trait (T2) ────────────────────────────────────────
 
 /// Abstraction over time acquisition.
-///
-/// Eliminates ambient authority: callers must receive a `&dyn Clock`
-/// capability to obtain timestamps. This enables deterministic
-/// testing and makes temporal dependencies explicit.
-///
-/// ## OCAP alignment (Miller)
-///
-/// The clock is a capability — possession of `&dyn Clock` IS the
-/// authority to observe time. No global mutable state, no ambient
-/// syscalls hidden inside domain logic.
 pub trait Clock: Send + Sync {
     /// Current Unix timestamp (seconds since epoch).
     fn now_unix(&self) -> i64;

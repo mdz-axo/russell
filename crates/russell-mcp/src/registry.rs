@@ -181,15 +181,6 @@ impl ToolRegistry {
     }
 
     /// Save the cached tool definitions to a JSON file on disk.
-    ///
-    /// This allows Russell to show stale-but-useful tool info even on
-    /// first boot before hKask is reachable. The file is saved after
-    /// every successful refresh from hKask (ADR-0025 §5, graceful degradation).
-    ///
-    /// # Errors
-    ///
-    /// Returns an I/O error if the directory cannot be created or the
-    /// file cannot be written.
     pub fn save_to_disk(&self, path: &Path) -> Result<()> {
         if self.tools.is_empty() {
             return Ok(());
@@ -224,15 +215,6 @@ impl ToolRegistry {
     }
 
     /// Load cached tool definitions from a JSON file on disk.
-    ///
-    /// Populates the registry with stale-but-useful tool info. The
-    /// `last_refresh` timestamp is NOT set — callers should also
-    /// attempt a live refresh.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the file exists but cannot be parsed.
-    /// Missing file is not an error (returns `Ok(())` with no change).
     pub fn load_from_disk(&mut self, path: &Path) -> Result<()> {
         match std::fs::read_to_string(path) {
             Ok(json) => {

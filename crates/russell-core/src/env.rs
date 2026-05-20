@@ -75,22 +75,6 @@ fn strip_optional_quotes(s: &str) -> &str {
 }
 
 /// Load the first env file found in Russell's discovery order.
-///
-/// Order (first-wins):
-///
-/// 1. Explicit `override_path` if provided (caller-controlled).
-/// 2. `$XDG_CONFIG_HOME/harness/russell.env` — the documented
-///    operator config
-///    ([`PERSISTENCE_CATALOG.md` §2.5](../../../docs/specifications/PERSISTENCE_CATALOG.md)).
-/// 3. `<repo_root>/.env` where `repo_root` is the first directory
-///    walking up from the current working directory that contains
-///    a file named `Cargo.toml` with a `[workspace]` section —
-///    useful in-dev.
-/// 4. `./.env` — ad-hoc fallback.
-///
-/// Any value already set in the process environment wins over any
-/// file. Missing files are silently skipped. Returns the path that
-/// was loaded, if any.
 pub fn load_discovered(
     config_harness_dir: &std::path::Path,
     override_path: Option<&std::path::Path>,
