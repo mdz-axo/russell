@@ -6,6 +6,7 @@
 //! (deterministic, not LLM-generated — JR-3 compliant).
 
 use super::connectors;
+use crate::impl_probe;
 
 /// Probe: is the system in a degraded state?
 ///

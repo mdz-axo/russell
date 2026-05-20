@@ -25,16 +25,16 @@ pub async fn run(paths: &Paths, note: Option<&str>) -> Result<()> {
         );
     }
 
-    // Collect Kask MCP tool infos for the SOAP prompt and action resolver (ADR-0025 §7).
-    // Graceful degradation: empty list if Kask is unreachable.
-    let kask_tool_infos = collect_kask_tool_infos(paths).await;
-    if !kask_tool_infos.is_empty() {
+    // Collect hKask MCP tool infos for the SOAP prompt and action resolver (ADR-0025 §7).
+    // Graceful degradation: empty list if hKask is unreachable.
+    let hkask_tool_infos = collect_hkask_tool_infos(paths).await;
+    if !hkask_tool_infos.is_empty() {
         debug!(
-            count = kask_tool_infos.len(),
-            "kask tools available for jack"
+            count = hkask_tool_infos.len(),
+            "hkask tools available for jack"
         );
     }
-    let kask_tool_names: Vec<(String, Option<String>)> = kask_tool_infos
+    let hkask_tool_names: Vec<(String, Option<String>)> = hkask_tool_infos
         .iter()
         .map(|t| {
             let risk = match t.risk_band {
@@ -60,13 +60,13 @@ pub async fn run(paths: &Paths, note: Option<&str>) -> Result<()> {
         }
     }
 
-    let outcome = russell_meta::run_help(paths, &writer, note, &kask_tool_names)
+    let outcome = russell_meta::run_help(paths, &writer, note, &hkask_tool_names)
         .await
         .context("running Doctor help flow")?;
 
     // If Jack proposed a probe, run it FIRST and feed results back for analysis.
     let final_response = if let Some(action_result) =
-        action::resolve_with_kask(&outcome.response, &skills, &kask_tool_infos)
+        action::resolve_with_hkask(&outcome.response, &skills, &hkask_tool_infos)
     {
         match action_result {
             Ok(action) => match &action {
@@ -103,9 +103,9 @@ pub async fn run(paths: &Paths, note: Option<&str>) -> Result<()> {
                     println!();
                     outcome.response.clone()
                 }
-                ResolvedAction::KaskTool { .. } => {
-                    println!("  → Jack proposes kask tool: {}.", action.action_id(),);
-                    println!("  → Switch to `russell chat` to execute Kask tools interactively.");
+                ResolvedAction::HKaskTool { .. } => {
+                    println!("  → Jack proposes hKask tool: {}.", action.action_id(),);
+                    println!("  → Switch to `russell chat` to execute hKask tools interactively.");
                     println!();
                     outcome.response.clone()
                 }
@@ -286,38 +286,38 @@ struct ProbeOutput {
     exit_code: Option<i32>,
 }
 
-/// Collect Kask MCP tool infos (name, risk, input_schema) for the SOAP prompt
+/// Collect hKask MCP tool infos (name, risk, input_schema) for the SOAP prompt
 /// and action resolver (ADR-0025 §7).
 /// Returns an empty list on any failure (graceful degradation per ADR-0025 §5).
-/// Falls back to the disk cache if Kask is unreachable.
-async fn collect_kask_tool_infos(paths: &Paths) -> Vec<KaskToolInfo> {
-    let kask_config = KaskMcpConfig::from_env();
-    if kask_config.validate().is_err() {
+/// Falls back to the disk cache if hKask is unreachable.
+async fn collect_hkask_tool_infos(paths: &Paths) -> Vec<HKaskToolInfo> {
+    let hkask_config = HKaskMcpConfig::from_env();
+    if hkask_config.validate().is_err() {
         return vec![];
     }
 
-    let mut client = match KaskMcpClient::new(kask_config.clone()) {
+    let mut client = match HKaskMcpClient::new(hkask_config.clone()) {
         Ok(c) => c,
         Err(e) => {
-            debug!(error = %e, "kask MCP client construction failed");
+            debug!(error = %e, "hKask MCP client construction failed");
             return load_cached_tool_infos(paths);
         }
     };
 
     if client.connect().await.is_err() {
-        debug!("kask MCP connect failed — tools unavailable this session");
+        debug!("hKask MCP connect failed — tools unavailable this session");
         return load_cached_tool_infos(paths);
     }
 
-    let cache_path = paths.memory_dir().join("kask-tools.cache.json");
-    let mut registry = ToolRegistry::new(kask_config.tool_ttl);
+    let cache_path = paths.memory_dir().join("hkask-tools.cache.json");
+    let mut registry = ToolRegistry::new(hkask_config.tool_ttl);
     let _ = registry.load_from_disk(&cache_path);
 
     if let Err(e) = registry.refresh(&client).await {
-        debug!(error = %e, "kask tool registry refresh failed");
+        debug!(error = %e, "hKask tool registry refresh failed");
         // Return cached if refresh failed but we have cached data.
         if !registry.is_empty() {
-            return registry_to_kask_infos(&registry);
+            return registry_to_hkask_infos(&registry);
         }
         return vec![];
     }
@@ -325,26 +325,26 @@ async fn collect_kask_tool_infos(paths: &Paths) -> Vec<KaskToolInfo> {
     // Persist fresh tools to disk.
     let _ = registry.save_to_disk(&cache_path);
 
-    registry_to_kask_infos(&registry)
+    registry_to_hkask_infos(&registry)
 }
 
 /// Load cached tool infos from the disk cache as a fallback.
-fn load_cached_tool_infos(paths: &Paths) -> Vec<KaskToolInfo> {
-    let cache_path = paths.memory_dir().join("kask-tools.cache.json");
-    let mut registry = ToolRegistry::new(KaskMcpConfig::from_env().tool_ttl);
+fn load_cached_tool_infos(paths: &Paths) -> Vec<HKaskToolInfo> {
+    let cache_path = paths.memory_dir().join("hkask-tools.cache.json");
+    let mut registry = ToolRegistry::new(HKaskMcpConfig::from_env().tool_ttl);
     if registry.load_from_disk(&cache_path).is_ok() && !registry.is_empty() {
         debug!(
             count = registry.tool_count(),
-            "loaded kask tools from disk cache"
+            "loaded hKask tools from disk cache"
         );
-        return registry_to_kask_infos(&registry);
+        return registry_to_hkask_infos(&registry);
     }
     vec![]
 }
 
-/// Convert a [`ToolRegistry`] to a [`KaskToolInfo`] list, preserving
+/// Convert a [`ToolRegistry`] to a [`HKaskToolInfo`] list, preserving
 /// `input_schema` from the cached [`McpToolDefinition`].
-fn registry_to_kask_infos(registry: &ToolRegistry) -> Vec<KaskToolInfo> {
+fn registry_to_hkask_infos(registry: &ToolRegistry) -> Vec<HKaskToolInfo> {
     registry
         .tools()
         .iter()
@@ -360,7 +360,7 @@ fn registry_to_kask_infos(registry: &ToolRegistry) -> Vec<KaskToolInfo> {
                     _ => RiskBand::Medium,
                 })
                 .unwrap_or(RiskBand::Medium);
-            KaskToolInfo {
+            HKaskToolInfo {
                 name: t.name.clone(),
                 risk_band,
                 input_schema: t.input_schema.clone(),

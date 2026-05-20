@@ -6,7 +6,7 @@
 //! - [`consent`] — pending action state and affirmation/refusal parsing
 //! - [`execute`] — local skill execution (probes & interventions)
 //! - [`history`] — chat history persistence
-//! - [`kask`] — Kask MCP tool execution (ADR-0025)
+//! - [`hkask`] — hKask MCP tool execution (ADR-0025)
 //! - [`objective`] — SOAP objective builder
 //! - [`spinner`] — LLM call with animated spinner
 
@@ -14,7 +14,7 @@ pub mod commands;
 pub mod consent;
 pub mod execute;
 pub mod history;
-pub mod kask;
+pub mod hkask;
 pub mod objective;
 pub mod spinner;
 
@@ -22,8 +22,8 @@ use anyhow::{Context, Result};
 use russell_core::journal::{JournalReader, JournalWriter};
 use russell_core::paths::Paths;
 use russell_meta::action::{self, ResolvedAction};
-use russell_mcp::client::KaskMcpClient;
-use russell_mcp::config::KaskMcpConfig;
+use russell_mcp::client::HKaskMcpClient;
+use russell_mcp::config::HKaskMcpConfig;
 use russell_mcp::registry::ToolRegistry;
 use russell_skills::RiskBand;
 use rustyline::DefaultEditor;
@@ -52,38 +52,38 @@ pub async fn run(paths: &Paths) -> Result<()> {
     let mut skills = russell_skills::load_all(&paths.skills()).unwrap_or_default();
     let profile = russell_core::Profile::load(&paths.profile()).ok();
 
-    // Initialize Kask MCP client (ADR-0025). Non-blocking — graceful
-    // degradation if Kask is unreachable.
-    let kask_config = KaskMcpConfig::from_env();
-    let mut kask_client: Option<KaskMcpClient> = None;
-    let mut kask_registry = ToolRegistry::new(kask_config.tool_ttl);
-    let kask_cache_path = paths.memory_dir().join("kask-tools.cache.json");
+    // Initialize hKask MCP client (ADR-0025). Non-blocking — graceful
+    // degradation if hKask is unreachable.
+    let hkask_config = HKaskMcpConfig::from_env();
+    let mut hkask_client: Option<HKaskMcpClient> = None;
+    let mut hkask_registry = ToolRegistry::new(hkask_config.tool_ttl);
+    let hkask_cache_path = paths.memory_dir().join("hkask-tools.cache.json");
 
     // Load stale-but-useful tool info from disk (ADR-0025 §5, first-boot resilience).
-    let _ = kask_registry.load_from_disk(&kask_cache_path);
+    let _ = hkask_registry.load_from_disk(&hkask_cache_path);
 
-    if kask_config.validate().is_ok() {
-        match KaskMcpClient::new(kask_config.clone()) {
+    if hkask_config.validate().is_ok() {
+        match HKaskMcpClient::new(hkask_config.clone()) {
             Ok(mut client) => {
                 if let Ok(_init) = client.connect().await {
                     debug!(
                         server = ?client.server_name(),
-                        "kask MCP connected"
+                        "hKask MCP connected"
                     );
                     // Populate tool registry.
-                    if let Err(e) = kask_registry.refresh(&client).await {
-                        debug!(error = %e, "kask tool registry initial refresh failed");
+                    if let Err(e) = hkask_registry.refresh(&client).await {
+                        debug!(error = %e, "hKask tool registry initial refresh failed");
                     } else {
                         // Persist fresh tools to disk for next boot.
-                        let _ = kask_registry.save_to_disk(&kask_cache_path);
+                        let _ = hkask_registry.save_to_disk(&hkask_cache_path);
                     }
-                    kask_client = Some(client);
+                    hkask_client = Some(client);
                 } else {
-                    debug!("kask MCP connect failed — tools unavailable this session");
+                    debug!("hKask MCP connect failed — tools unavailable this session");
                 }
             }
             Err(e) => {
-                debug!(error = %e, "kask MCP client construction failed");
+                debug!(error = %e, "hKask MCP client construction failed");
             }
         }
     }

@@ -7,6 +7,7 @@
 
 use super::connectors;
 use super::tools;
+use crate::impl_probe;
 
 /// Probe: I/O pressure "some" average over the last 10 seconds.
 ///

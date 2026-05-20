@@ -291,7 +291,7 @@ pub fn resolve(
     response: &str,
     skills: &[Skill],
 ) -> Option<std::result::Result<ResolvedAction, ActionError>> {
-    resolve_with_hkask(response, skills, &[])
+    resolve_with_kask(response, skills, &[])
 }
 
 /// Parse the last `ACTION:` line from a response and resolve it
@@ -898,7 +898,7 @@ mod tests {
     fn hkask_tool_no_required_fields() {
         let skills = [make_skill()];
         let hkask_tools = make_hkask_tools();
-        let result = resolve_with_hkask("ACTION: hkask/russell_host_snapshot", &skills, &hkask_tools)
+        let result = resolve_with_kask("ACTION: hkask/russell_host_snapshot", &skills, &hkask_tools)
             .unwrap()
             .unwrap();
         match result {
@@ -944,7 +944,7 @@ mod tests {
         let skills = [make_skill()];
         let hkask_tools = make_hkask_tools();
         let response = "Checking hKask.\nACTION: hkask/russell_host_snapshot\n\nAlso query:\nACTION: hkask/paradigm_shift_query";
-        let err = resolve_with_hkask(response, &skills, &hkask_tools)
+        let err = resolve_with_kask(response, &skills, &hkask_tools)
             .unwrap()
             .unwrap_err();
         match err {

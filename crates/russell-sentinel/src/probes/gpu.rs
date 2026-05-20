@@ -10,6 +10,7 @@
 
 use super::connectors;
 use super::tools;
+use crate::impl_probe;
 
 /// Sysfs path prefix for the dGPU device node.
 /// On Framework 16: `card1` = RX 7700S, `card2` = iGPU (Radeon 880M).

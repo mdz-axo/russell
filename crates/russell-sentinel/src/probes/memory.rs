@@ -6,6 +6,7 @@
 
 use super::connectors;
 use super::tools;
+use crate::impl_probe;
 
 /// Probe: available memory in MiB.
 ///
