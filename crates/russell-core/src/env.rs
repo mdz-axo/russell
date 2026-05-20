@@ -109,10 +109,6 @@ pub fn load_discovered(
 }
 
 /// Find the first existing env file in Russell's discovery order
-/// (read-only — does not load any values).
-///
-/// Search order matches [`load_discovered`]: config dir first,
-/// then repo root, then cwd. Returns `None` if no env file exists.
 pub fn find_env_file(config_harness_dir: &Path) -> Option<std::path::PathBuf> {
     let mut candidates: Vec<std::path::PathBuf> = Vec::new();
     candidates.push(config_harness_dir.join("russell.env"));

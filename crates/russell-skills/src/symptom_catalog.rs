@@ -24,10 +24,6 @@ use std::path::Path;
 const SYMPTOMS_YAML: &str = include_str!("../data/symptoms.yaml");
 
 /// The set of symptom class names that skills may reference.
-/// A `symptoms:` entry in a manifest that is not in this set
-/// causes a [`super::LoadError::UnknownSymptom`] at load time.
-///
-/// This constant is populated from the compiled-in `data/symptoms.yaml`.
 pub static SYMPTOMS: &[&str] = &[
     // Hardware / GPU
     "amdgpu_ring_hang",

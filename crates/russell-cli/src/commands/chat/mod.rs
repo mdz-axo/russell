@@ -483,6 +483,7 @@ async fn handle_action_proposal(
 
 /// Handle slash commands. Returns `true` if the command was handled
 /// (caller should `continue` the REPL loop), `false` if not recognized.
+/// (caller should `continue` the REPL loop), `false` if not recognized.
 #[allow(clippy::too_many_arguments)]
 async fn handle_slash_command(
     trimmed: &str,
@@ -650,6 +651,16 @@ async fn handle_slash_command(
 /// loop (new user input) and the denial re-orientation loop (Gap 1:
 /// cybernetic feedback closure — when the operator denies an ACTION,
 /// Jack is re-prompted with the denial to propose an alternative).
+/// This is the shared LLM invocation path used by both the main chat
+/// loop (new user input) and the denial re-orientation loop (Gap 1:
+/// cybernetic feedback closure — when the operator denies an ACTION,
+/// Jack is re-prompted with the denial to propose an alternative).
+/// loop (new user input) and the denial re-orientation loop (Gap 1:
+/// cybernetic feedback closure — when the operator denies an ACTION,
+/// Jack is re-prompted with the denial to propose an alternative).
+/// cybernetic feedback closure — when the operator denies an ACTION,
+/// Jack is re-prompted with the denial to propose an alternative).
+/// Jack is re-prompted with the denial to propose an alternative).
 #[allow(clippy::too_many_arguments)]
 async fn call_jack(
     history: &mut ChatHistory,
@@ -676,7 +687,7 @@ async fn call_jack(
     // `russell jack` receives in one-shot mode.
     let mut system = russell_meta::JACK_CHAT_PERSONA.to_string();
     {
-        use russell_meta::prompt_registry::{
+        {
             KnowledgeSlot, score_knowledge_relevance, select_knowledge,
         };
         // Derive active symptoms from recent events (same as compose_templated).
@@ -862,6 +873,7 @@ async fn call_jack(
 
 /// Estimate the token count of a JSON messages array.
 /// Rough heuristic: 1 token ≈ 4 characters of content.
+/// Rough heuristic: 1 token ≈ 4 characters of content.
 fn estimate_message_tokens(messages: &[serde_json::Value]) -> usize {
     let mut total = 0;
     for msg in messages {
@@ -883,6 +895,16 @@ fn estimate_message_tokens(messages: &[serde_json::Value]) -> usize {
 /// id: my-skill
 /// ...
 /// ---
+/// ```
+/// id: my-skill
+/// ...
+/// ---
+/// ```
+/// ...
+/// ---
+/// ```
+/// ---
+/// ```
 /// ```
 fn extract_manifest_block(response: &str) -> Option<String> {
     let start_marker = "---manifest\n";
@@ -914,6 +936,16 @@ fn extract_manifest_block(response: &str) -> Option<String> {
 /// `Arguments --name swap-watcher --flag value` into a Vec of individual
 /// argument tokens. Handles quoted values.
 ///
+/// Searches the entire response for the first `Arguments` line.
+/// `Arguments --name swap-watcher --flag value` into a Vec of individual
+/// argument tokens. Handles quoted values.
+///
+/// Searches the entire response for the first `Arguments` line.
+/// argument tokens. Handles quoted values.
+///
+/// Searches the entire response for the first `Arguments` line.
+///
+/// Searches the entire response for the first `Arguments` line.
 /// Searches the entire response for the first `Arguments` line.
 fn extract_inline_args(response: &str) -> Vec<String> {
     let args_line = response

@@ -58,12 +58,14 @@ pub struct SudoCredential {
 impl SudoCredential {
     /// Wrap a password string. Takes ownership to ensure no copies
     /// remain in the caller's scope.
+    /// remain in the caller's scope.
     #[must_use]
     pub fn new(password: String) -> Self {
         Self { inner: password }
     }
 
     /// Borrow the credential for one-shot use (stdin piping).
+    /// The reference is short-lived — caller must not store it.
     /// The reference is short-lived — caller must not store it.
     pub(crate) fn as_str(&self) -> &str {
         &self.inner
@@ -95,6 +97,12 @@ pub enum DryRun {
 ///
 /// For rollback-protected interventions, the `rollback` field
 /// contains the rollback run outcome (if rollback was triggered).
+///
+/// For rollback-protected interventions, the `rollback` field
+/// contains the rollback run outcome (if rollback was triggered).
+/// For rollback-protected interventions, the `rollback` field
+/// contains the rollback run outcome (if rollback was triggered).
+/// contains the rollback run outcome (if rollback was triggered).
 #[derive(Debug, Clone, PartialEq)]
 pub struct RunOutcome {
     /// The command that was executed (or would have been).
@@ -114,6 +122,9 @@ pub struct RunOutcome {
     /// Rollback outcome, if this was an intervention that failed
     /// and rollback was triggered. `None` for probes and successful
     /// interventions.
+    /// and rollback was triggered. `None` for probes and successful
+    /// interventions.
+    /// interventions.
     pub rollback: Option<Box<RunOutcome>>,
 }
 
@@ -132,6 +143,7 @@ impl RunOutcome {
 
     /// Whether the overall operation is safe — either forward succeeded,
     /// or forward failed but rollback succeeded.
+    /// or forward failed but rollback succeeded.
     #[must_use]
     pub fn is_safe(&self) -> bool {
         if self.succeeded() {
@@ -144,10 +156,6 @@ impl RunOutcome {
 }
 
 /// Rollback strategy as resolved by the manifest loader.
-///
-/// This is a simplified, Clone-able version of the manifest's
-/// [`Rollback`](crate::Rollback) enum. The dispatcher doesn't
-/// own skill manifests, so the caller resolves the strategy.
 #[derive(Debug, Clone)]
 pub enum RollbackStrategy {
     /// Roll back via a named intervention.
@@ -163,6 +171,9 @@ pub enum RollbackStrategy {
 
 /// Backward-compatibility alias for code that previously used the
 /// separate `RollbackOutcome` type. New code should use [`RunOutcome`]
+/// directly — it now carries rollback information inline.
+/// separate `RollbackOutcome` type. New code should use [`RunOutcome`]
+/// directly — it now carries rollback information inline.
 /// directly — it now carries rollback information inline.
 #[deprecated(
     since = "0.2.0",
@@ -210,10 +221,6 @@ pub struct DispatchRequest<'a> {
 }
 
 /// A subprocess dispatcher. Constructed with the skills base directory
-/// (working directory for spawned processes).
-///
-/// Task 3.1: Capability attenuation — skills can declare allowed environment
-/// variables via `allowed_env_keys` in their manifest.
 pub struct Dispatcher {
     /// Base skills directory (e.g. `~/.local/share/harness/skills/<id>/`).
     pub skill_dir: PathBuf,
@@ -226,16 +233,26 @@ pub struct Dispatcher {
     /// Maximum risk band that may be auto-executed.
     /// Interventions above this cap are refused with [`RiskError::RiskTooHigh`].
     /// Default: `Low`.
+    /// Interventions above this cap are refused with [`RiskError::RiskTooHigh`].
+    /// Default: `Low`.
+    /// Default: `Low`.
     pub max_auto_risk: RiskBand,
     /// Sudo credential for interventions that need root privileges.
+    /// Zeroed on drop. Set to `None` if no sudo interventions expected.
     /// Zeroed on drop. Set to `None` if no sudo interventions expected.
     pub sudo_password: Option<SudoCredential>,
     /// Arbitrary content to pipe to the subprocess stdin after sudo auth
     /// (if applicable). Used for interventions like `create-manifest` where
     /// the LLM produces content that must be piped to the CLI command.
+    /// (if applicable). Used for interventions like `create-manifest` where
+    /// the LLM produces content that must be piped to the CLI command.
+    /// the LLM produces content that must be piped to the CLI command.
     pub stdin_content: Option<String>,
     /// Environment variables this skill is allowed to access.
     /// Combined with ENV_ALLOWLIST at dispatch time.
+    /// Task 3.1: Capability attenuation.
+    /// Combined with ENV_ALLOWLIST at dispatch time.
+    /// Task 3.1: Capability attenuation.
     /// Task 3.1: Capability attenuation.
     pub allowed_env_keys: Vec<String>,
 }
@@ -265,6 +282,9 @@ impl std::fmt::Debug for Dispatcher {
 pub enum CommandPathError {
     /// Command uses a bare name that would be resolved via PATH.
     /// Skill commands must use relative (`./scripts/foo.sh`) or
+    /// absolute (`/usr/bin/python3`) paths.
+    /// Skill commands must use relative (`./scripts/foo.sh`) or
+    /// absolute (`/usr/bin/python3`) paths.
     /// absolute (`/usr/bin/python3`) paths.
     #[error("bare command name {name:?} rejected — use relative ./scripts/ path or absolute path")]
     BareCommand {
@@ -617,10 +637,6 @@ impl Dispatcher {
     }
 
     /// Port-based variant of [`run_and_journal`] — accepts any
-    /// `JournalWritePort` implementation (T1 hexagonal pattern).
-    ///
-    /// This enables testing skill dispatch with `InMemoryJournal`
-    /// instead of requiring a real SQLite database.
     #[allow(clippy::too_many_arguments)]
     pub async fn run_and_journal_port(
         &self,
@@ -814,6 +830,12 @@ impl Dispatcher {
 ///
 /// The dispatcher doesn't own manifests, so the caller resolves the
 /// strategy before calling `run_intervention_with_rollback`.
+///
+/// The dispatcher doesn't own manifests, so the caller resolves the
+/// strategy before calling `run_intervention_with_rollback`.
+/// The dispatcher doesn't own manifests, so the caller resolves the
+/// strategy before calling `run_intervention_with_rollback`.
+/// strategy before calling `run_intervention_with_rollback`.
 #[must_use]
 pub fn resolve_rollback_strategy(rollback: &crate::Rollback) -> RollbackStrategy {
     match rollback {
@@ -828,6 +850,12 @@ pub fn resolve_rollback_strategy(rollback: &crate::Rollback) -> RollbackStrategy
 /// Write stdout, stderr, and event JSON to the evidence directory.
 ///
 /// Task 3.3: Evidence bundle sealing — computes SHA-256 hashes of all
+/// evidence files and writes a manifest.json for tamper detection.
+///
+/// Task 3.3: Evidence bundle sealing — computes SHA-256 hashes of all
+/// evidence files and writes a manifest.json for tamper detection.
+/// Task 3.3: Evidence bundle sealing — computes SHA-256 hashes of all
+/// evidence files and writes a manifest.json for tamper detection.
 /// evidence files and writes a manifest.json for tamper detection.
 fn write_evidence(dir: &Path, outcome: &RunOutcome, event: &Event) -> Result<()> {
     use sha2::{Digest, Sha256};

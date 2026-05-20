@@ -163,6 +163,16 @@ pub struct TemplateInfo {
 ///
 /// Templates are loaded from compiled-in `.md.j2` files at startup,
 /// with optional disk overrides from `~/.config/harness/prompts/`.
+/// inference hint extraction.
+///
+/// Templates are loaded from compiled-in `.md.j2` files at startup,
+/// with optional disk overrides from `~/.config/harness/prompts/`.
+///
+/// Templates are loaded from compiled-in `.md.j2` files at startup,
+/// with optional disk overrides from `~/.config/harness/prompts/`.
+/// Templates are loaded from compiled-in `.md.j2` files at startup,
+/// with optional disk overrides from `~/.config/harness/prompts/`.
+/// with optional disk overrides from `~/.config/harness/prompts/`.
 pub struct PromptRegistry {
     env: Environment<'static>,
     templates: HashMap<String, TemplateInfo>,
@@ -203,6 +213,12 @@ impl PromptRegistry {
     /// Load disk overrides from a directory, replacing matching templates.
     ///
     /// Only `.md.j2` files whose stem matches an existing template name
+    /// are loaded. Returns the number of templates overridden.
+    ///
+    /// Only `.md.j2` files whose stem matches an existing template name
+    /// are loaded. Returns the number of templates overridden.
+    /// Only `.md.j2` files whose stem matches an existing template name
+    /// are loaded. Returns the number of templates overridden.
     /// are loaded. Returns the number of templates overridden.
     pub fn load_disk_overrides(&mut self, dir: &Path) -> Result<usize> {
         if !dir.is_dir() {
@@ -280,6 +296,12 @@ impl PromptRegistry {
     /// Render a template by name with the given context variables.
     ///
     /// Returns the rendered text. Use [`render_with_hint`] to also
+    /// retrieve the inference hint.
+    ///
+    /// Returns the rendered text. Use [`render_with_hint`] to also
+    /// retrieve the inference hint.
+    /// Returns the rendered text. Use [`render_with_hint`] to also
+    /// retrieve the inference hint.
     /// retrieve the inference hint.
     pub fn render(
         &self,
@@ -484,6 +506,12 @@ pub fn score_knowledge_relevance(skill_symptoms: &[String], active_symptoms: &[S
 /// Runtime telemetry signals that modulate knowledge relevance.
 ///
 /// These represent the **inter-session feedback loop**: past execution
+/// outcomes influence future attention allocation.
+///
+/// These represent the **inter-session feedback loop**: past execution
+/// outcomes influence future attention allocation.
+/// These represent the **inter-session feedback loop**: past execution
+/// outcomes influence future attention allocation.
 /// outcomes influence future attention allocation.
 #[derive(Debug, Clone, Default)]
 pub struct SkillTelemetry {

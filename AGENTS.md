@@ -242,7 +242,7 @@ When a JR principle and a P/C constraint conflict, JR wins
 
 ## 12. Code Budget & Testing Policy
 
-**Line Budget:** ≤22,000 lines Rust production code.
+**Line Budget:** ≤20,000 lines Rust production code.
 
 Russell is governed by JR-1 (*"Though she be but little, she is
 fierce"*). The budget creates natural pressure to delete before
@@ -250,7 +250,7 @@ adding and to consolidate before spreading.
 
 ### What Counts Toward Budget
 
-All code in `russell-*` crates counts toward the 22,000 line limit:
+All code in `russell-*` crates counts toward the 20,000 line limit:
 - Production code in `src/` directories
 - Inline unit tests (`#[cfg(test)]` modules within source files)
 - Integration tests in `tests/` directories within functional crates
@@ -281,7 +281,7 @@ cargo run -- verify-journal        # ensure integrity (separate concern)
   extract test helpers/fixtures into `russell-testing`
 - Tests must have no dependencies on them from production code
 
-### Agent Guidance (approaching 22,000 lines)
+### Agent Guidance (approaching 20,000 lines)
 
 1. First priority: delete, consolidate, simplify production code
 2. Second priority: move inline unit tests to `russell-testing`
@@ -292,7 +292,7 @@ cargo run -- verify-journal        # ensure integrity (separate concern)
 ### Budget vs. JR-1
 
 The budget is a *consequence* of JR-1, not a replacement. If the
-system is well-designed, 22,000 lines is generous for a single-host
+system is well-designed, 20,000 lines is generous for a single-host
 health harness. If you are bumping the ceiling, the design has
 drifted — consolidate rather than expand.
 

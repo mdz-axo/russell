@@ -71,10 +71,6 @@ impl RateLimiter {
     }
 
     /// Attempt to acquire a token. Returns `Ok(())` if a token is
-    /// available, or `Err(DoctorError::RateLimited)` if exhausted.
-    ///
-    /// This is a non-blocking check — it does NOT sleep/wait for
-    /// tokens to refill. The caller decides the retry strategy.
     pub fn try_acquire(&self) -> Result<()> {
         let mut state = self.state.lock().unwrap_or_else(|e| e.into_inner());
 

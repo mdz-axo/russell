@@ -33,10 +33,6 @@ use sha2::{Digest, Sha256};
 pub const HASH_HEX_LEN: usize = 64;
 
 /// Compute the genesis hash (chain seed).
-///
-/// Uses `/etc/machine-id` if available; falls back to a fixed
-/// string. The genesis hash is the `prev_hash` of the first
-/// event in the journal.
 #[must_use]
 pub fn genesis_hash() -> String {
     let seed = std::fs::read_to_string("/etc/machine-id")

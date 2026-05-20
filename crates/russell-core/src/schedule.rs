@@ -45,10 +45,6 @@ pub struct ScheduleSet {
 }
 
 /// Returns the current UTC hour, minute, and weekday.
-///
-/// Note: this is UTC, not local time. Schedule windows are evaluated
-/// against UTC. If local-time scheduling is needed, a timezone-aware
-/// implementation (requiring a new dependency) must replace this.
 fn now_utc() -> (u8, u8, time::Weekday) {
     let now = std::time::SystemTime::now();
     let since_epoch = now.duration_since(std::time::UNIX_EPOCH).unwrap();

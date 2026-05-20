@@ -25,6 +25,9 @@ use russell_skills::{RiskBand, Rollback, Skill};
 /// A resolved ACTION — either a probe (read-only), an intervention
 /// (mutating, requires consent per JR-2), or a hKask MCP tool call
 /// (ADR-0025).
+/// (mutating, requires consent per JR-2), or a hKask MCP tool call
+/// (ADR-0025).
+/// (ADR-0025).
 #[derive(Debug, Clone)]
 pub enum ResolvedAction {
     /// Read-only probe. Auto-executable (risk: none).
@@ -65,13 +68,16 @@ pub enum ResolvedAction {
     },
     /// hKask MCP tool call (ADR-0025). Executed via the MCP client,
     /// not the local skill dispatcher.
+    /// not the local skill dispatcher.
     HKaskTool {
         /// The MCP tool name (from `tools/list`).
         tool_name: String,
         /// Risk band from tool annotations. Defaults to `Medium` when
         /// unset — safe default requiring operator consent.
+        /// unset — safe default requiring operator consent.
         risk_band: RiskBand,
         /// Arguments for the tool call, parsed from the LLM response.
+        /// `None` if the LLM did not provide any.
         /// `None` if the LLM did not provide any.
         arguments: Option<serde_json::Value>,
         /// Expected arguments (required fields from inputSchema).
@@ -133,10 +139,6 @@ impl ResolvedAction {
     }
 
     /// Whether this action requires operator consent.
-    ///
-    /// Probes never require consent (risk: none).
-    /// Interventions require consent when their risk exceeds the skill's `max_auto_risk`.
-    /// hKask tools require consent when their risk > None.
     #[must_use]
     pub fn consent_required(&self) -> bool {
         match self {
@@ -151,6 +153,7 @@ impl ResolvedAction {
     }
 
     /// Append extra CLI arguments to the command argv.
+    /// Only Applies to probes and interventions; no-op for hKask tools.
     /// Only Applies to probes and interventions; no-op for hKask tools.
     pub fn append_cmd_args(&mut self, args: &[String]) {
         match self {
@@ -199,6 +202,7 @@ pub enum ActionError {
         interventions: Vec<String>,
     },
     /// Nested ACTION: detected in LLM output (prompt injection attempt).
+    /// Task 3.4: Security hardening against LLM action injection.
     /// Task 3.4: Security hardening against LLM action injection.
     NestedActionDetected {
         /// The raw response containing nested ACTION: patterns.
@@ -258,6 +262,7 @@ impl std::fmt::Display for ActionError {
 
 /// Metadata for a hKask tool available in the registry, passed by
 /// the caller (keeps `russell-meta` free of `russell-mcp` dependency).
+/// the caller (keeps `russell-meta` free of `russell-mcp` dependency).
 #[derive(Debug, Clone)]
 pub struct HKaskToolInfo {
     /// Tool name (the callable ID).
@@ -265,8 +270,12 @@ pub struct HKaskToolInfo {
     /// Risk band from annotations. Defaults to `RiskBand::Medium`
     /// when unset — safe default per IDRS. Probes should explicitly
     /// declare `RiskBand::None`.
+    /// when unset — safe default per IDRS. Probes should explicitly
+    /// declare `RiskBand::None`.
+    /// declare `RiskBand::None`.
     pub risk_band: RiskBand,
     /// JSON Schema for the tool's input parameters (from `tools/list`).
+    /// Used to extract required field names for operator prompting.
     /// Used to extract required field names for operator prompting.
     pub input_schema: Option<serde_json::Value>,
 }
@@ -468,6 +477,9 @@ fn resolve_hkask_tool(
 /// Extract required field names from a tool's JSON Schema `input_schema`.
 ///
 /// Returns an empty vec if the schema is `None` or has no `required` array.
+///
+/// Returns an empty vec if the schema is `None` or has no `required` array.
+/// Returns an empty vec if the schema is `None` or has no `required` array.
 fn extract_required_fields(schema: &Option<serde_json::Value>) -> Vec<String> {
     schema
         .as_ref()
@@ -529,6 +541,7 @@ fn extract_arguments_from_response(response: &str, _tool_name: &str) -> Option<s
 }
 
 /// Parse `--key value` or `key=value` pairs into a JSON object.
+/// Handles quoted values with internal spaces.
 /// Handles quoted values with internal spaces.
 fn parse_key_value_args(args_str: &str) -> Option<serde_json::Value> {
     let mut map = serde_json::Map::new();

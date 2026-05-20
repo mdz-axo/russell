@@ -12,8 +12,21 @@ use std::time::{Duration, Instant};
 use tracing::{debug, info, warn};
 
 use crate::client::HKaskMcpClient;
+use crate::config::HKaskMcpConfig;
 use crate::error::Result;
 use crate::types::McpToolDefinition;
+use russell_skills::RiskBand;
+
+/// Tool info for Jack's nurse persona — name, risk band, input schema.
+#[derive(Debug, Clone)]
+pub struct HKaskToolInfo {
+    /// Tool name.
+    pub name: String,
+    /// Risk band.
+    pub risk_band: RiskBand,
+    /// JSON schema for tool inputs.
+    pub input_schema: Option<serde_json::Value>,
+}
 
 /// Cached tool registry backed by a hKask MCP connection.
 ///

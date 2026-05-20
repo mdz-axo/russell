@@ -142,6 +142,7 @@ pub enum LoadError {
 
     /// A script file in `scripts/` is not referenced by any probe or
     /// intervention `cmd:` entry.
+    /// intervention `cmd:` entry.
     #[error("skill '{skill_id}' has unreferenced script: {script}")]
     UnreferencedScript {
         /// Skill ID.
@@ -159,12 +160,16 @@ pub enum SkillKind {
     Actionable,
     /// Knowledge-only — KNOWLEDGE.md injected into system prompt.
     /// No probes, no interventions.
+    /// No probes, no interventions.
     Lens,
 }
 
 impl Default for SkillKind {
     /// Default is `Actionable` — process skills (probes + interventions)
     /// are the primary case. Knowledge-only lenses must be explicitly
+    /// declared or inferred from empty probes/interventions.
+    /// are the primary case. Knowledge-only lenses must be explicitly
+    /// declared or inferred from empty probes/interventions.
     /// declared or inferred from empty probes/interventions.
     fn default() -> Self {
         Self::Actionable
@@ -287,6 +292,12 @@ impl Step {
     ///
     /// Probes never require consent. Interventions require consent
     /// when their risk exceeds `max_auto_risk`.
+    ///
+    /// Probes never require consent. Interventions require consent
+    /// when their risk exceeds `max_auto_risk`.
+    /// Probes never require consent. Interventions require consent
+    /// when their risk exceeds `max_auto_risk`.
+    /// when their risk exceeds `max_auto_risk`.
     #[must_use]
     pub fn consent_required(&self, max_auto_risk: RiskBand) -> bool {
         self.risk > RiskBand::None && self.risk > max_auto_risk
@@ -349,6 +360,9 @@ pub struct Intervention {
     pub timeout: String,
     /// Whether this intervention requires root privileges.
     /// The operator will be prompted for their sudo password
+    /// when consenting to execution.
+    /// The operator will be prompted for their sudo password
+    /// when consenting to execution.
     /// when consenting to execution.
     #[serde(default)]
     pub needs_sudo: bool,
@@ -424,10 +438,6 @@ impl RiskBand {
 }
 
 /// Safety constraints for a skill.
-///
-/// Task 3.1: Capability attenuation — skills declare what environment
-/// variables and network access they need. The dispatcher enforces
-/// these constraints at runtime.
 #[derive(Debug, Clone, Deserialize)]
 pub struct Safety {
     /// Maximum risk band the Nurse may auto-run.
@@ -439,9 +449,13 @@ pub struct Safety {
     /// Environment variables this skill is allowed to access.
     /// If empty, no environment variables are passed to subprocesses.
     /// Task 3.1: Capability attenuation for skills.
+    /// If empty, no environment variables are passed to subprocesses.
+    /// Task 3.1: Capability attenuation for skills.
+    /// Task 3.1: Capability attenuation for skills.
     #[serde(default)]
     pub allowed_env_keys: Vec<String>,
     /// Whether this skill requires network access.
+    /// Task 3.1: Skills declaring `true` may be blocked in air-gapped environments.
     /// Task 3.1: Skills declaring `true` may be blocked in air-gapped environments.
     #[serde(default)]
     pub needs_network: bool,
@@ -475,6 +489,7 @@ pub struct EvalCheck {
 pub struct RawManifest {
     pub id: String,
     /// Optional `kind` field. Defaults to `actionable`; if set to `lens`,
+    /// the skill is treated as knowledge-only.
     /// the skill is treated as knowledge-only.
     #[serde(default)]
     pub kind: Option<SkillKind>,
@@ -622,6 +637,7 @@ fn load_one(skill_dir: &Path, dir_name: &str) -> Result<Skill, LoadError> {
 
 /// Check that every executable file in `scripts/` is referenced by
 /// at least one probe or intervention `cmd`.
+/// at least one probe or intervention `cmd`.
 fn check_unreferenced_scripts(
     skill_dir: &Path,
     skill: &Skill,
@@ -713,6 +729,12 @@ fn collect_script_names(cmd: &[String], out: &mut std::collections::BTreeSet<Str
 /// Extract the `id` field from a manifest YAML string without full validation.
 ///
 /// Quick parse to get the skill ID for directory naming. Returns `None`
+/// if the YAML is malformed or the `id` field is missing.
+///
+/// Quick parse to get the skill ID for directory naming. Returns `None`
+/// if the YAML is malformed or the `id` field is missing.
+/// Quick parse to get the skill ID for directory naming. Returns `None`
+/// if the YAML is malformed or the `id` field is missing.
 /// if the YAML is malformed or the `id` field is missing.
 pub fn extract_manifest_id(yaml: &str) -> Option<String> {
     let raw: RawManifest = serde_yaml::from_str(yaml).ok()?;

@@ -56,6 +56,9 @@ pub struct RegistryEntry {
     /// Gap 3: Execution trust tier — determines whether this skill
     /// needs consent gates, sandbox testing, or can auto-execute.
     /// Independent of `source` (a `Workshop` skill starts at T3, not T4).
+    /// needs consent gates, sandbox testing, or can auto-execute.
+    /// Independent of `source` (a `Workshop` skill starts at T3, not T4).
+    /// Independent of `source` (a `Workshop` skill starts at T3, not T4).
     #[serde(default = "default_trust_tier")]
     pub trust_tier: TrustTier,
     /// ISO 8601 date of installation.
@@ -99,6 +102,9 @@ pub struct RegistryEntry {
     /// EWMA success rate (0.0–1.0). Updated on each probe/intervention
     /// execution. More recent outcomes weigh more heavily than historical.
     /// `None` means no executions have been recorded yet.
+    /// execution. More recent outcomes weigh more heavily than historical.
+    /// `None` means no executions have been recorded yet.
+    /// `None` means no executions have been recorded yet.
     #[serde(default)]
     pub ewma_success_rate: Option<f64>,
     /// Whether this is a bundled skill (resistant to pruning).
@@ -111,6 +117,16 @@ impl RegistryEntry {
     /// for all telemetry / lifecycle metadata.
     ///
     /// This eliminates the repeated 18-field struct literals scattered
+    /// across workshop commands and skill sync code.
+    /// for all telemetry / lifecycle metadata.
+    ///
+    /// This eliminates the repeated 18-field struct literals scattered
+    /// across workshop commands and skill sync code.
+    ///
+    /// This eliminates the repeated 18-field struct literals scattered
+    /// across workshop commands and skill sync code.
+    /// This eliminates the repeated 18-field struct literals scattered
+    /// across workshop commands and skill sync code.
     /// across workshop commands and skill sync code.
     #[must_use]
     pub fn new_default(
@@ -221,6 +237,16 @@ pub enum RegistryKind {
 /// Trust follows **Slovic asymmetry**: a single anomalous probe result
 /// from a T4 skill demotes it to T3 immediately. Re-escalation requires
 /// sustained evidence through multiple gates.
+///
+/// Trust follows **Slovic asymmetry**: a single anomalous probe result
+/// from a T4 skill demotes it to T3 immediately. Re-escalation requires
+/// sustained evidence through multiple gates.
+/// Trust follows **Slovic asymmetry**: a single anomalous probe result
+/// from a T4 skill demotes it to T3 immediately. Re-escalation requires
+/// sustained evidence through multiple gates.
+/// from a T4 skill demotes it to T3 immediately. Re-escalation requires
+/// sustained evidence through multiple gates.
+/// sustained evidence through multiple gates.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum TrustTier {
@@ -238,6 +264,16 @@ pub enum TrustTier {
 ///
 /// Conservative defaults: even `Bundled` skills start at T4 because
 /// they are shipped with Russell and are provenance-verified.
+/// All external sources start at T1–T3 requiring gate escalation.
+///
+/// Conservative defaults: even `Bundled` skills start at T4 because
+/// they are shipped with Russell and are provenance-verified.
+/// All external sources start at T1–T3 requiring gate escalation.
+/// Conservative defaults: even `Bundled` skills start at T4 because
+/// they are shipped with Russell and are provenance-verified.
+/// All external sources start at T1–T3 requiring gate escalation.
+/// they are shipped with Russell and are provenance-verified.
+/// All external sources start at T1–T3 requiring gate escalation.
 /// All external sources start at T1–T3 requiring gate escalation.
 #[must_use]
 pub fn initial_trust_tier(source: &SkillSource) -> TrustTier {
@@ -272,6 +308,12 @@ impl RegistryCache {
     ///
     /// # Errors
     /// Returns an error if the file exists but can't be parsed.
+    ///
+    /// # Errors
+    /// Returns an error if the file exists but can't be parsed.
+    /// # Errors
+    /// Returns an error if the file exists but can't be parsed.
+    /// Returns an error if the file exists but can't be parsed.
     pub fn load(path: &Path) -> Result<Self, RegistryError> {
         if !path.exists() {
             return Ok(Self::new());
@@ -289,6 +331,12 @@ impl RegistryCache {
     /// Save to a YAML file.
     ///
     /// # Errors
+    /// Returns an error if the file can't be written.
+    ///
+    /// # Errors
+    /// Returns an error if the file can't be written.
+    /// # Errors
+    /// Returns an error if the file can't be written.
     /// Returns an error if the file can't be written.
     pub fn save(&self, path: &Path) -> Result<(), RegistryError> {
         if let Some(parent) = path.parent() {
@@ -349,6 +397,9 @@ impl RegistryCache {
     /// Record a probe execution in the registry cache.
     ///
     /// Delegates to [`health::record_probe_execution`].
+    ///
+    /// Delegates to [`health::record_probe_execution`].
+    /// Delegates to [`health::record_probe_execution`].
     pub fn record_execution(
         &mut self,
         skill_id: &str,
@@ -364,6 +415,9 @@ impl RegistryCache {
 
     /// Record an intervention execution.
     ///
+    /// Delegates to [`health::record_intervention_execution`].
+    ///
+    /// Delegates to [`health::record_intervention_execution`].
     /// Delegates to [`health::record_intervention_execution`].
     pub fn record_intervention(
         &mut self,
@@ -388,6 +442,16 @@ impl RegistryCache {
     ///
     /// # Errors
     /// Returns a [`RegistryError`] if the cache cannot be loaded or saved.
+    /// acceptable since the registry is rebuildable per JR-7.
+    ///
+    /// # Errors
+    /// Returns a [`RegistryError`] if the cache cannot be loaded or saved.
+    ///
+    /// # Errors
+    /// Returns a [`RegistryError`] if the cache cannot be loaded or saved.
+    /// # Errors
+    /// Returns a [`RegistryError`] if the cache cannot be loaded or saved.
+    /// Returns a [`RegistryError`] if the cache cannot be loaded or saved.
     pub fn with_update(path: &Path, f: impl FnOnce(&mut Self)) -> Result<(), RegistryError> {
         let mut cache = Self::load(path)?;
         f(&mut cache);
@@ -396,6 +460,9 @@ impl RegistryCache {
 
     /// Write a lifecycle transition event to the journal.
     ///
+    /// Delegates to [`lifecycle::journal_transition`].
+    ///
+    /// Delegates to [`lifecycle::journal_transition`].
     /// Delegates to [`lifecycle::journal_transition`].
     pub fn journal_transition(
         journal: &JournalWriter,
@@ -410,6 +477,9 @@ impl RegistryCache {
     /// Compute a quality score 0.0–1.0 for a skill entry.
     ///
     /// Delegates to [`health::compute_quality_score`].
+    ///
+    /// Delegates to [`health::compute_quality_score`].
+    /// Delegates to [`health::compute_quality_score`].
     #[must_use]
     pub fn compute_score(
         entry: &RegistryEntry,
@@ -422,6 +492,9 @@ impl RegistryCache {
     /// Freshness score: how recently and reliably the skill has run.
     ///
     /// Delegates to [`health::freshness_score`].
+    ///
+    /// Delegates to [`health::freshness_score`].
+    /// Delegates to [`health::freshness_score`].
     #[must_use]
     pub fn freshness_score(entry: &RegistryEntry) -> f64 {
         health::freshness_score(entry)
@@ -429,6 +502,9 @@ impl RegistryCache {
 
     /// Check if a skill's authored date makes it stale (> 180 days).
     ///
+    /// Delegates to [`health::is_stale`].
+    ///
+    /// Delegates to [`health::is_stale`].
     /// Delegates to [`health::is_stale`].
     #[must_use]
     pub fn is_stale(authored_date: &str, today: &str) -> bool {
@@ -444,6 +520,16 @@ impl RegistryCache {
     ///    has diverged from the cached entry.
     /// 4. Promotes `Installed` → `Active` for skills that loaded successfully.
     ///
+    /// Returns `true` if any changes were made (caller should save).
+    ///    has diverged from the cached entry.
+    /// 4. Promotes `Installed` → `Active` for skills that loaded successfully.
+    ///
+    /// Returns `true` if any changes were made (caller should save).
+    /// 4. Promotes `Installed` → `Active` for skills that loaded successfully.
+    ///
+    /// Returns `true` if any changes were made (caller should save).
+    ///
+    /// Returns `true` if any changes were made (caller should save).
     /// Returns `true` if any changes were made (caller should save).
     pub fn reconcile(&mut self, disk_skills: &[crate::Skill]) -> bool {
         let today = now_date_iso8601();

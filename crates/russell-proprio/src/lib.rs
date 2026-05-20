@@ -51,6 +51,16 @@ pub trait TimerSource {
     /// # Errors
     ///
     /// Returns a human-readable error string on subprocess or parse failure.
+    ///
+    /// # Errors
+    ///
+    /// Returns a human-readable error string on subprocess or parse failure.
+    /// # Errors
+    ///
+    /// Returns a human-readable error string on subprocess or parse failure.
+    ///
+    /// Returns a human-readable error string on subprocess or parse failure.
+    /// Returns a human-readable error string on subprocess or parse failure.
     fn read_last_trigger_us(&self) -> std::result::Result<Option<u64>, String>;
 }
 
@@ -95,9 +105,11 @@ pub const PROBE_REMOTE_DISCOVERY_LATENCY: &str = "remote_discovery_latency_s";
 
 /// Threshold (seconds) above which the sentinel-age vital emits `warn`.
 /// 1.5× the 300 s cadence.
+/// 1.5× the 300 s cadence.
 pub const SENTINEL_WARN_THRESHOLD_S: i64 = 450;
 
 /// Threshold (seconds) above which the sentinel-age vital emits `alert`.
+/// 6× the 300 s cadence (30 minutes).
 /// 6× the 300 s cadence (30 minutes).
 pub const SENTINEL_ALERT_THRESHOLD_S: i64 = 1_800;
 
@@ -127,6 +139,7 @@ pub const LLM_P95_ALERT_THRESHOLD_MS: f64 = 20_000.0;
 
 /// Threshold (seconds) above which the timer-drift vital emits `warn`.
 /// 1.5× the 60 s timer cadence.
+/// 1.5× the 60 s timer cadence.
 pub const DRIFT_WARN_THRESHOLD_S: i64 = 90;
 
 /// Threshold (seconds) above which the timer-drift vital emits `alert`.
@@ -148,6 +161,7 @@ pub const ERROR_RATE_ALERT_THRESHOLD_PCT: f64 = 50.0;
 
 /// Threshold (milliseconds) above which the kask MCP latency vital emits `warn`.
 /// 2× the 2s health probe timeout.
+/// 2× the 2s health probe timeout.
 pub const KASK_LATENCY_WARN_THRESHOLD_MS: u64 = 2_000;
 
 // ---------------------------------------------------------------------------
@@ -156,9 +170,11 @@ pub const KASK_LATENCY_WARN_THRESHOLD_MS: u64 = 2_000;
 
 /// Threshold (seconds) above which the remote discovery latency vital
 /// emits `warn`. ~1 hour — stale index.
+/// emits `warn`. ~1 hour — stale index.
 pub const REMOTE_DISCOVERY_WARN_THRESHOLD_S: i64 = 3_600;
 
 /// Threshold (seconds) above which the remote discovery latency vital
+/// emits `alert`. ~24 hours — registry unreachable.
 /// emits `alert`. ~24 hours — registry unreachable.
 pub const REMOTE_DISCOVERY_ALERT_THRESHOLD_S: i64 = 86_400;
 
@@ -186,6 +202,12 @@ impl AutoimmuneGuard {
     ///
     /// Returns `Some(guard)` if acquired, `None` if the guard is already
     /// held by another caller.
+    ///
+    /// Returns `Some(guard)` if acquired, `None` if the guard is already
+    /// held by another caller.
+    /// Returns `Some(guard)` if acquired, `None` if the guard is already
+    /// held by another caller.
+    /// held by another caller.
     #[must_use]
     pub fn try_enter(&self) -> Option<MutexGuard<'_, ()>> {
         self.0.try_lock().ok()
@@ -201,6 +223,9 @@ impl Default for AutoimmuneGuard {
 /// The process-wide autoimmune guard — prevents re-entrant metacognitive-layer
 /// runs (a Nurse run whose subject is Russell himself). Held for the
 /// duration of any proprioception cycle.
+/// runs (a Nurse run whose subject is Russell himself). Held for the
+/// duration of any proprioception cycle.
+/// duration of any proprioception cycle.
 static AUTOIMMUNE: std::sync::LazyLock<AutoimmuneGuard> =
     std::sync::LazyLock::new(AutoimmuneGuard::new);
 
@@ -213,6 +238,7 @@ static AUTOIMMUNE: std::sync::LazyLock<AutoimmuneGuard> =
 pub struct ProprioResult {
     // -- Sentinel age (MVP, JR-5) --
     /// The computed sentinel age in seconds, or `None` if no host samples
+    /// exist yet (first-ever cycle).
     /// exist yet (first-ever cycle).
     pub age_s: Option<i64>,
     /// The severity band the sentinel fell into.
@@ -229,12 +255,14 @@ pub struct ProprioResult {
     // -- LLM p95 latency (Phase 2A) --
     /// p95 of LLM latency in last 24h, in milliseconds. `None` if fewer
     /// than 4 data points exist.
+    /// than 4 data points exist.
     pub llm_p95_latency_ms: Option<f64>,
     /// Severity of the LLM latency vital.
     pub llm_p95_severity: Severity,
 
     // -- Timer drift (Phase 2A) --
     /// Seconds since the systemd timer last triggered. `None` if systemctl
+    /// is unavailable or the timer isn't found.
     /// is unavailable or the timer isn't found.
     pub timer_drift_s: Option<i64>,
     /// Severity of the timer drift vital.
@@ -243,6 +271,7 @@ pub struct ProprioResult {
     // -- Help error rate (Phase 2A) --
     /// Percentage of help sessions in error/fallback/threshold_skip state,
     /// over the last 24h. `None` if no sessions exist.
+    /// over the last 24h. `None` if no sessions exist.
     pub help_error_rate_pct: Option<f64>,
     /// Severity of the help error rate vital.
     pub help_error_rate_severity: Severity,
@@ -250,12 +279,14 @@ pub struct ProprioResult {
     // -- Kask MCP reachability (Phase 4C, ADR-0025 §5) --
     /// Kask MCP latency in milliseconds, or `None` if the probe was not
     /// run (no kask config) or the endpoint was unreachable.
+    /// run (no kask config) or the endpoint was unreachable.
     pub kask_mcp_reachable_ms: Option<u64>,
     /// Severity of the kask MCP reachability vital.
     pub kask_mcp_reachable_severity: Severity,
 
     // -- Remote discovery latency (Gap 5) --
     /// Time since last successful remote skill registry fetch, in seconds.
+    /// `None` if remote discovery is not configured or has never run.
     /// `None` if remote discovery is not configured or has never run.
     pub remote_discovery_latency_s: Option<i64>,
     /// Severity of the remote discovery latency vital.
@@ -265,10 +296,14 @@ pub struct ProprioResult {
     /// Whether the journal hash chain is intact. `true` if verification
     /// passed (or no chained events exist yet). `false` if a break was
     /// detected. `None` if verification could not run.
+    /// passed (or no chained events exist yet). `false` if a break was
+    /// detected. `None` if verification could not run.
+    /// detected. `None` if verification could not run.
     pub journal_chain_intact: Option<bool>,
 }
 
 /// Input from the async Kask MCP health probe, passed into the proprio cycle
+/// by the CLI layer (which performs the async HTTP check).
 /// by the CLI layer (which performs the async HTTP check).
 #[derive(Debug, Clone, Copy)]
 pub struct KaskHealthInput {
@@ -312,6 +347,16 @@ pub fn run_once_with_kask(
 /// and [`run_once_with_kask`].
 ///
 /// When `kask_health` is `Some`, also gathers and journals the
+/// `kask_mcp_reachable_ms` self-vital.
+/// and [`run_once_with_kask`].
+///
+/// When `kask_health` is `Some`, also gathers and journals the
+/// `kask_mcp_reachable_ms` self-vital.
+///
+/// When `kask_health` is `Some`, also gathers and journals the
+/// `kask_mcp_reachable_ms` self-vital.
+/// When `kask_health` is `Some`, also gathers and journals the
+/// `kask_mcp_reachable_ms` self-vital.
 /// `kask_mcp_reachable_ms` self-vital.
 fn run_once_inner(
     writer: &JournalWriter,
@@ -468,8 +513,15 @@ fn run_once_inner(
 // Vital gatherers
 // ---------------------------------------------------------------------------
 
+/// Generic vital metadata for threshold classification.
+struct VitalThresholds {
+    warn: f64,
+    alert: f64,
+}
+
 /// Classify a numeric value against warn/alert thresholds.
-/// Returns the highest severity breached. `>` (not `>=`) per ADR convention.
+/// Returns the highest severity band breached. `>` (not `>=`) per ADR convention.
+/// Returns the highest severity band breached. `>` (not `>=`) per ADR convention.
 fn classify_threshold(value: i64, warn: i64, alert: i64) -> Severity {
     if value > alert {
         Severity::Alert
@@ -491,23 +543,65 @@ fn classify_threshold_f64(value: f64, warn: f64, alert: f64) -> Severity {
     }
 }
 
+/// Gather a generic vital that returns an i64 value.
+fn gather_i64_vital(
+    writer: &JournalWriter,
+    now: i64,
+    probe_name: &str,
+    value: i64,
+    thresholds: VitalThresholds,
+    unit: &str,
+) -> Result<(Option<i64>, Severity)> {
+    writer.append_sample(
+        now,
+        Scope::Self_,
+        probe_name,
+        Some(value as f64),
+        None,
+        Some(unit),
+    )?;
+
+    let sev = classify_threshold(value, thresholds.warn as i64, thresholds.alert as i64);
+    debug!(value, severity = ?sev, "proprio: {probe_name}");
+    Ok((Some(value), sev))
+}
+
+/// Gather a generic vital that returns an f64 value.
+fn gather_f64_vital(
+    writer: &JournalWriter,
+    now: i64,
+    probe_name: &str,
+    value: Option<f64>,
+    thresholds: VitalThresholds,
+    unit: &str,
+) -> Result<(Option<f64>, Severity)> {
+    writer.append_sample(now, Scope::Self_, probe_name, value, None, Some(unit))?;
+
+    let sev = match value {
+        Some(v) => classify_threshold_f64(v, thresholds.warn, thresholds.alert),
+        None => Severity::Info,
+    };
+    debug!(value = ?value, severity = ?sev, "proprio: {probe_name}");
+    Ok((value, sev))
+}
+
 /// Gather the journal writer stall vital.
 fn gather_journal_stall(writer: &JournalWriter, now: i64) -> Result<(Option<i64>, Severity)> {
     let last_write = writer.last_write_unix_s();
     let stall_s = now.saturating_sub(last_write);
 
-    writer.append_sample(
+    let thresholds = VitalThresholds {
+        warn: STALL_WARN_THRESHOLD_S as f64,
+        alert: STALL_ALERT_THRESHOLD_S as f64,
+    };
+    gather_i64_vital(
+        writer,
         now,
-        Scope::Self_,
         PROBE_JOURNAL_STALL,
-        Some(stall_s as f64),
-        None,
-        Some("s"),
-    )?;
-
-    let sev = classify_threshold(stall_s, STALL_WARN_THRESHOLD_S, STALL_ALERT_THRESHOLD_S);
-    debug!(stall_s, severity = ?sev, "proprio: {PROBE_JOURNAL_STALL}");
-    Ok((Some(stall_s), sev))
+        stall_s,
+        thresholds,
+        "s",
+    )
 }
 
 /// Gather the LLM p95 latency vital.
@@ -518,27 +612,34 @@ fn gather_llm_p95_latency(
 ) -> Result<(Option<f64>, Severity)> {
     let p95 = reader.llm_latency_p95_ms()?;
 
-    writer.append_sample(
+    let thresholds = VitalThresholds {
+        warn: LLM_P95_WARN_THRESHOLD_MS,
+        alert: LLM_P95_ALERT_THRESHOLD_MS,
+    };
+    gather_f64_vital(
+        writer,
         now,
-        Scope::Self_,
         PROBE_LLM_P95_LATENCY,
         p95,
-        None,
-        Some("ms"),
-    )?;
-
-    let sev = match p95 {
-        Some(v) => classify_threshold_f64(v, LLM_P95_WARN_THRESHOLD_MS, LLM_P95_ALERT_THRESHOLD_MS),
-        None => Severity::Info,
-    };
-    debug!(p95_ms = ?p95, severity = ?sev, "proprio: {PROBE_LLM_P95_LATENCY}");
-    Ok((p95, sev))
+        thresholds,
+        "ms",
+    )
 }
 
 /// Gather the timer drift vital.
 ///
 /// Uses the provided [`TimerSource`] to query the sentinel timer's last
 /// trigger time. Gracefully returns `None` if the query fails or the timer
+/// doesn't exist.
+///
+/// Uses the provided [`TimerSource`] to query the sentinel timer's last
+/// trigger time. Gracefully returns `None` if the query fails or the timer
+/// doesn't exist.
+/// Uses the provided [`TimerSource`] to query the sentinel timer's last
+/// trigger time. Gracefully returns `None` if the query fails or the timer
+/// doesn't exist.
+/// trigger time. Gracefully returns `None` if the query fails or the timer
+/// doesn't exist.
 /// doesn't exist.
 fn gather_timer_drift(
     writer: &JournalWriter,
@@ -636,6 +737,9 @@ fn read_timer_last_trigger() -> std::result::Result<Option<u64>, String> {
 /// Parse a human-readable timestamp like "Sat 2026-05-09 21:55:25 PDT"
 /// into Unix seconds. Uses `date -d` as a subprocess (simplest correct
 /// parser for arbitrary locale formats).
+/// into Unix seconds. Uses `date -d` as a subprocess (simplest correct
+/// parser for arbitrary locale formats).
+/// parser for arbitrary locale formats).
 fn parse_human_timestamp(s: &str) -> std::result::Result<u64, String> {
     let output = Command::new("date")
         .args(["-d", s, "+%s"])
@@ -665,25 +769,18 @@ fn gather_help_error_rate(
 ) -> Result<(Option<f64>, Severity)> {
     let rate = reader.help_error_rate_pct()?;
 
-    writer.append_sample(
+    let thresholds = VitalThresholds {
+        warn: ERROR_RATE_WARN_THRESHOLD_PCT,
+        alert: ERROR_RATE_ALERT_THRESHOLD_PCT,
+    };
+    gather_f64_vital(
+        writer,
         now,
-        Scope::Self_,
         PROBE_HELP_ERROR_RATE,
         rate,
-        None,
-        Some("%"),
-    )?;
-
-    let sev = match rate {
-        Some(v) => classify_threshold_f64(
-            v,
-            ERROR_RATE_WARN_THRESHOLD_PCT,
-            ERROR_RATE_ALERT_THRESHOLD_PCT,
-        ),
-        None => Severity::Info,
-    };
-    debug!(rate_pct = ?rate, severity = ?sev, "proprio: {PROBE_HELP_ERROR_RATE}");
-    Ok((rate, sev))
+        thresholds,
+        "%",
+    )
 }
 
 /// Gather the Kask MCP reachability vital (Phase 4C, ADR-0025 §5).
@@ -804,6 +901,16 @@ fn emit_event(
 /// events. Returns:
 /// - `Some(true)` if intact or no chained events exist
 /// - `Some(false)` if a chain break was detected
+/// - `None` if the check could not run (DB error)
+/// events. Returns:
+/// - `Some(true)` if intact or no chained events exist
+/// - `Some(false)` if a chain break was detected
+/// - `None` if the check could not run (DB error)
+/// - `Some(true)` if intact or no chained events exist
+/// - `Some(false)` if a chain break was detected
+/// - `None` if the check could not run (DB error)
+/// - `Some(false)` if a chain break was detected
+/// - `None` if the check could not run (DB error)
 /// - `None` if the check could not run (DB error)
 fn check_journal_chain_integrity(reader: &JournalReader) -> Option<bool> {
     let conn = reader.open_ro_conn().ok()?;

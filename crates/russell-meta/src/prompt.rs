@@ -47,6 +47,12 @@ pub fn compose(
 ///
 /// Same as [`compose`] but additionally includes available Kask tools
 /// in the prompt's "Available actions" section.
+///
+/// Same as [`compose`] but additionally includes available Kask tools
+/// in the prompt's "Available actions" section.
+/// Same as [`compose`] but additionally includes available Kask tools
+/// in the prompt's "Available actions" section.
+/// in the prompt's "Available actions" section.
 pub fn compose_with_kask(
     reader: &JournalReader,
     profile: Option<&Profile>,
@@ -980,6 +986,7 @@ fn fmt_opt_f64(v: Option<f64>) -> String {
 }
 
 /// Build the reflex actions section: list reflex_proposed events from
+/// the last 7 days so Jack can see and propose the interventions.
 /// the last 7 days so Jack can see and propose the interventions.
 fn build_reflex_section(reader: &JournalReader, objective: &mut String) -> Result<()> {
     let now = russell_core::time::now_unix();

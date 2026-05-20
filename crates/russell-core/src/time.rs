@@ -18,10 +18,6 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use time::OffsetDateTime;
 
 /// Current UTC time, in RFC 3339 form, e.g. `2026-04-17T03:30:12Z`.
-///
-/// This is the single place all journal / digest / filename
-/// timestamps are produced, so a test harness can later shim it
-/// behind a trait if needed.
 pub fn now_rfc3339() -> String {
     OffsetDateTime::now_utc()
         .format(&time::format_description::well_known::Rfc3339)
@@ -53,10 +49,6 @@ pub fn now_date_iso8601() -> String {
 }
 
 /// Howard Hinnant's civil-from-days algorithm.
-///
-/// Converts a day count since 0000-03-01 into (year, month, day).
-/// Used by [`now_date_iso8601`] to produce calendar dates without
-/// pulling in a full date library.
 fn civil_from_days(z: i64) -> (i64, i64, i64) {
     let z = z - 719_468; // shift epoch to 1970-01-01
     let era = if z >= 0 { z } else { z - 146096 } / 146_097;
@@ -125,10 +117,6 @@ impl Clock for SystemClock {
 }
 
 /// Deterministic clock for testing.
-///
-/// Returns a fixed timestamp that can be advanced manually.
-/// Useful for asserting temporal invariants without flaky
-/// real-time dependencies.
 #[derive(Debug)]
 pub struct FixedClock {
     unix: AtomicI64,

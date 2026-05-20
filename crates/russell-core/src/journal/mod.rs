@@ -35,6 +35,16 @@ use crate::event::{Event, EventId, Scope, Severity};
 /// Replaces raw `String` status fields with a compiler-enforced
 /// domain enum — typos and case mismatches are caught at compile
 /// time rather than at query time.
+///
+/// Replaces raw `String` status fields with a compiler-enforced
+/// domain enum — typos and case mismatches are caught at compile
+/// time rather than at query time.
+/// Replaces raw `String` status fields with a compiler-enforced
+/// domain enum — typos and case mismatches are caught at compile
+/// time rather than at query time.
+/// domain enum — typos and case mismatches are caught at compile
+/// time rather than at query time.
+/// time rather than at query time.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum HelpSessionStatus {
@@ -79,14 +89,19 @@ impl FromStr for HelpSessionStatus {
 
 /// Write-capable journal handle. Cheap to construct; holds an
 /// open SQLite connection in WAL mode.
+/// open SQLite connection in WAL mode.
 pub struct JournalWriter {
     conn: Connection,
     path: PathBuf,
     /// Atomically updated on every write (append / append_sample).
     /// Records the unix timestamp of the most recent write.
+    /// Records the unix timestamp of the most recent write.
     last_write_unix_s: AtomicI64,
     /// Last event hash for hash-chain continuity (T6).
     /// Initialized from the latest event's hash column on open,
+    /// or from [`crate::hash_chain::genesis_hash`] if the DB is empty.
+    /// Initialized from the latest event's hash column on open,
+    /// or from [`crate::hash_chain::genesis_hash`] if the DB is empty.
     /// or from [`crate::hash_chain::genesis_hash`] if the DB is empty.
     last_hash: std::cell::RefCell<String>,
 }
@@ -100,6 +115,12 @@ pub struct JournalReader {
 /// Input struct for [`JournalWriter::append_help_session`].
 ///
 /// Replaces the 12-parameter positional call with a named-field
+/// struct for call-site clarity.
+///
+/// Replaces the 12-parameter positional call with a named-field
+/// struct for call-site clarity.
+/// Replaces the 12-parameter positional call with a named-field
+/// struct for call-site clarity.
 /// struct for call-site clarity.
 #[derive(Debug, Clone)]
 pub struct HelpSessionInput<'a> {
@@ -131,6 +152,7 @@ pub struct HelpSessionInput<'a> {
 
 /// A single `events` row, in the shape the digest / `journal_query`
 /// consumers want.
+/// consumers want.
 #[derive(Debug, Clone)]
 pub struct EventRow {
     /// ULID as string.
@@ -158,6 +180,16 @@ impl JournalWriter {
     /// # Errors
     ///
     /// Returns [`CoreError::Sqlite`] if the DB cannot be opened,
+    /// [`CoreError::Migration`] if a migration fails.
+    /// # Errors
+    ///
+    /// Returns [`CoreError::Sqlite`] if the DB cannot be opened,
+    /// [`CoreError::Migration`] if a migration fails.
+    ///
+    /// Returns [`CoreError::Sqlite`] if the DB cannot be opened,
+    /// [`CoreError::Migration`] if a migration fails.
+    /// Returns [`CoreError::Sqlite`] if the DB cannot be opened,
+    /// [`CoreError::Migration`] if a migration fails.
     /// [`CoreError::Migration`] if a migration fails.
     pub fn open(path: &Path) -> Result<Self> {
         if let Some(parent) = path.parent() {
@@ -198,6 +230,16 @@ impl JournalWriter {
     /// # Errors
     ///
     /// Returns [`CoreError::Sqlite`] on DB errors, [`CoreError::Json`]
+    /// if the event cannot be serialised.
+    /// # Errors
+    ///
+    /// Returns [`CoreError::Sqlite`] on DB errors, [`CoreError::Json`]
+    /// if the event cannot be serialised.
+    ///
+    /// Returns [`CoreError::Sqlite`] on DB errors, [`CoreError::Json`]
+    /// if the event cannot be serialised.
+    /// Returns [`CoreError::Sqlite`] on DB errors, [`CoreError::Json`]
+    /// if the event cannot be serialised.
     /// if the event cannot be serialised.
     pub fn append(&self, event: &Event) -> Result<()> {
         let payload = serde_json::to_string(event)?;
@@ -249,6 +291,16 @@ impl JournalWriter {
     /// # Errors
     ///
     /// Returns [`CoreError::Sqlite`] on DB errors.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`CoreError::Sqlite`] on DB errors.
+    /// # Errors
+    ///
+    /// Returns [`CoreError::Sqlite`] on DB errors.
+    ///
+    /// Returns [`CoreError::Sqlite`] on DB errors.
+    /// Returns [`CoreError::Sqlite`] on DB errors.
     pub fn append_sample(
         &self,
         ts_unix: i64,
@@ -276,6 +328,16 @@ impl JournalWriter {
     ///
     /// # Errors
     ///
+    /// Returns [`CoreError::Sqlite`] on DB errors.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`CoreError::Sqlite`] on DB errors.
+    /// # Errors
+    ///
+    /// Returns [`CoreError::Sqlite`] on DB errors.
+    ///
+    /// Returns [`CoreError::Sqlite`] on DB errors.
     /// Returns [`CoreError::Sqlite`] on DB errors.
     pub fn append_help_session(&self, input: &HelpSessionInput<'_>) -> Result<()> {
         let status = input.status.as_str();
@@ -307,6 +369,7 @@ impl JournalWriter {
 
     /// Return a cloneable read-only handle anchored at the same
     /// file.
+    /// file.
     #[must_use]
     pub fn reader(&self) -> JournalReader {
         JournalReader {
@@ -316,6 +379,9 @@ impl JournalWriter {
 
     /// Unix timestamp of the most recent write (append / append_sample / append_help_session).
     ///
+    /// Used by proprioception to compute `journal_writer_stall_s`.
+    ///
+    /// Used by proprioception to compute `journal_writer_stall_s`.
     /// Used by proprioception to compute `journal_writer_stall_s`.
     #[must_use]
     pub fn last_write_unix_s(&self) -> i64 {
@@ -334,6 +400,16 @@ impl JournalWriter {
     ///
     /// # Errors
     ///
+    /// Returns [`CoreError::Sqlite`] on DB errors.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`CoreError::Sqlite`] on DB errors.
+    /// # Errors
+    ///
+    /// Returns [`CoreError::Sqlite`] on DB errors.
+    ///
+    /// Returns [`CoreError::Sqlite`] on DB errors.
     /// Returns [`CoreError::Sqlite`] on DB errors.
     #[allow(clippy::too_many_arguments)]
     pub fn upsert_baseline(
@@ -362,6 +438,7 @@ impl JournalWriter {
 impl JournalReader {
     /// Construct a reader anchored at `path`. The file need not
     /// exist yet; read methods error if the journal is missing.
+    /// exist yet; read methods error if the journal is missing.
     #[must_use]
     pub fn new(path: impl Into<std::path::PathBuf>) -> Self {
         Self { path: path.into() }
@@ -372,6 +449,16 @@ impl JournalReader {
     ///
     /// # Errors
     ///
+    /// Returns [`CoreError::Sqlite`] on DB errors.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`CoreError::Sqlite`] on DB errors.
+    /// # Errors
+    ///
+    /// Returns [`CoreError::Sqlite`] on DB errors.
+    ///
+    /// Returns [`CoreError::Sqlite`] on DB errors.
     /// Returns [`CoreError::Sqlite`] on DB errors.
     pub fn count_events(
         &self,
@@ -405,6 +492,16 @@ impl JournalReader {
     /// # Errors
     ///
     /// Returns [`CoreError::Sqlite`] on DB errors.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`CoreError::Sqlite`] on DB errors.
+    /// # Errors
+    ///
+    /// Returns [`CoreError::Sqlite`] on DB errors.
+    ///
+    /// Returns [`CoreError::Sqlite`] on DB errors.
+    /// Returns [`CoreError::Sqlite`] on DB errors.
     pub fn recent(&self, limit: usize) -> Result<Vec<EventRow>> {
         let conn = self.open_ro()?;
         let mut stmt = conn.prepare(
@@ -436,6 +533,16 @@ impl JournalReader {
     ///
     /// # Errors
     ///
+    /// Returns [`CoreError::Sqlite`] on DB errors.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`CoreError::Sqlite`] on DB errors.
+    /// # Errors
+    ///
+    /// Returns [`CoreError::Sqlite`] on DB errors.
+    ///
+    /// Returns [`CoreError::Sqlite`] on DB errors.
     /// Returns [`CoreError::Sqlite`] on DB errors.
     pub fn severity_counts(&self, since_unix: i64, until_unix: i64) -> Result<SeverityCounts> {
         let conn = self.open_ro()?;
@@ -469,6 +576,16 @@ impl JournalReader {
     /// # Errors
     ///
     /// Returns [`CoreError::Sqlite`] on DB errors.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`CoreError::Sqlite`] on DB errors.
+    /// # Errors
+    ///
+    /// Returns [`CoreError::Sqlite`] on DB errors.
+    ///
+    /// Returns [`CoreError::Sqlite`] on DB errors.
+    /// Returns [`CoreError::Sqlite`] on DB errors.
     pub fn last_sample_ts(&self) -> Result<Option<i64>> {
         let conn = self.open_ro()?;
         let row: Option<Option<i64>> = conn
@@ -488,6 +605,16 @@ impl JournalReader {
     ///
     /// # Errors
     ///
+    /// Returns [`CoreError::Sqlite`] on DB errors.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`CoreError::Sqlite`] on DB errors.
+    /// # Errors
+    ///
+    /// Returns [`CoreError::Sqlite`] on DB errors.
+    ///
+    /// Returns [`CoreError::Sqlite`] on DB errors.
     /// Returns [`CoreError::Sqlite`] on DB errors.
     pub fn last_host_sample_ts(&self) -> Result<Option<i64>> {
         let conn = self.open_ro()?;
@@ -510,6 +637,16 @@ impl JournalReader {
     /// # Errors
     ///
     /// Returns [`CoreError::Sqlite`] on DB errors.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`CoreError::Sqlite`] on DB errors.
+    /// # Errors
+    ///
+    /// Returns [`CoreError::Sqlite`] on DB errors.
+    ///
+    /// Returns [`CoreError::Sqlite`] on DB errors.
+    /// Returns [`CoreError::Sqlite`] on DB errors.
     pub fn last_remote_fetch_ts(&self) -> Result<Option<i64>> {
         let conn = self.open_ro()?;
         let row: Option<Option<i64>> = conn
@@ -530,6 +667,16 @@ impl JournalReader {
     ///
     /// # Errors
     ///
+    /// Returns [`CoreError::Sqlite`] on DB errors.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`CoreError::Sqlite`] on DB errors.
+    /// # Errors
+    ///
+    /// Returns [`CoreError::Sqlite`] on DB errors.
+    ///
+    /// Returns [`CoreError::Sqlite`] on DB errors.
     /// Returns [`CoreError::Sqlite`] on DB errors.
     pub fn llm_latency_p95_ms(&self) -> Result<Option<f64>> {
         let conn = self.open_ro()?;
@@ -563,6 +710,16 @@ impl JournalReader {
     /// # Errors
     ///
     /// Returns [`CoreError::Sqlite`] on DB errors.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`CoreError::Sqlite`] on DB errors.
+    /// # Errors
+    ///
+    /// Returns [`CoreError::Sqlite`] on DB errors.
+    ///
+    /// Returns [`CoreError::Sqlite`] on DB errors.
+    /// Returns [`CoreError::Sqlite`] on DB errors.
     pub fn help_error_rate_pct(&self) -> Result<Option<f64>> {
         let conn = self.open_ro()?;
         let since = crate::time::now_unix() - 86_400;
@@ -591,6 +748,16 @@ impl JournalReader {
     ///
     /// # Errors
     ///
+    /// Returns [`CoreError::Sqlite`] on DB errors.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`CoreError::Sqlite`] on DB errors.
+    /// # Errors
+    ///
+    /// Returns [`CoreError::Sqlite`] on DB errors.
+    ///
+    /// Returns [`CoreError::Sqlite`] on DB errors.
     /// Returns [`CoreError::Sqlite`] on DB errors.
     pub fn help_sessions_in_range(
         &self,
@@ -637,6 +804,16 @@ impl JournalReader {
     ///
     /// # Errors
     ///
+    /// Returns [`CoreError::Sqlite`] on DB errors.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`CoreError::Sqlite`] on DB errors.
+    /// # Errors
+    ///
+    /// Returns [`CoreError::Sqlite`] on DB errors.
+    ///
+    /// Returns [`CoreError::Sqlite`] on DB errors.
     /// Returns [`CoreError::Sqlite`] on DB errors.
     pub fn host_samples_summary(
         &self,
@@ -706,6 +883,16 @@ impl JournalReader {
     ///
     /// # Errors
     ///
+    /// Returns [`CoreError::Sqlite`] on DB errors.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`CoreError::Sqlite`] on DB errors.
+    /// # Errors
+    ///
+    /// Returns [`CoreError::Sqlite`] on DB errors.
+    ///
+    /// Returns [`CoreError::Sqlite`] on DB errors.
     /// Returns [`CoreError::Sqlite`] on DB errors.
     pub fn self_samples_summary(
         &self,
@@ -777,6 +964,16 @@ impl JournalReader {
     ///
     /// # Errors
     ///
+    /// Returns [`CoreError::Sqlite`] on DB errors.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`CoreError::Sqlite`] on DB errors.
+    /// # Errors
+    ///
+    /// Returns [`CoreError::Sqlite`] on DB errors.
+    ///
+    /// Returns [`CoreError::Sqlite`] on DB errors.
     /// Returns [`CoreError::Sqlite`] on DB errors.
     pub fn compute_baselines(&self, window_days: u32) -> Result<Vec<BaselineRow>> {
         let conn = self.open_ro()?;
@@ -851,6 +1048,16 @@ impl JournalReader {
     /// # Errors
     ///
     /// Returns [`CoreError::Sqlite`] on DB errors.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`CoreError::Sqlite`] on DB errors.
+    /// # Errors
+    ///
+    /// Returns [`CoreError::Sqlite`] on DB errors.
+    ///
+    /// Returns [`CoreError::Sqlite`] on DB errors.
+    /// Returns [`CoreError::Sqlite`] on DB errors.
     pub fn read_baselines(&self) -> Result<Vec<BaselineRow>> {
         let conn = self.open_ro()?;
         let mut stmt = conn.prepare(
@@ -882,6 +1089,16 @@ impl JournalReader {
     /// # Errors
     ///
     /// Returns [`CoreError::Sqlite`] on DB errors.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`CoreError::Sqlite`] on DB errors.
+    /// # Errors
+    ///
+    /// Returns [`CoreError::Sqlite`] on DB errors.
+    ///
+    /// Returns [`CoreError::Sqlite`] on DB errors.
+    /// Returns [`CoreError::Sqlite`] on DB errors.
     pub fn previous_sample(&self, probe: &str, before_ts: i64) -> Option<(f64, i64)> {
         let conn = self.open_ro().ok()?;
         conn.query_row(
@@ -899,6 +1116,16 @@ impl JournalReader {
     ///
     /// # Errors
     ///
+    /// Returns [`CoreError::Sqlite`] on DB errors.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`CoreError::Sqlite`] on DB errors.
+    /// # Errors
+    ///
+    /// Returns [`CoreError::Sqlite`] on DB errors.
+    ///
+    /// Returns [`CoreError::Sqlite`] on DB errors.
     /// Returns [`CoreError::Sqlite`] on DB errors.
     pub fn count_reflex_events(&self, probe: &str, since: i64, until: i64) -> Result<i64> {
         let conn = self.open_ro()?;
@@ -919,6 +1146,16 @@ impl JournalReader {
     ///
     /// # Errors
     ///
+    /// Returns [`CoreError::Sqlite`] on DB errors.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`CoreError::Sqlite`] on DB errors.
+    /// # Errors
+    ///
+    /// Returns [`CoreError::Sqlite`] on DB errors.
+    ///
+    /// Returns [`CoreError::Sqlite`] on DB errors.
     /// Returns [`CoreError::Sqlite`] on DB errors.
     pub fn list_reflex_events(
         &self,
@@ -951,6 +1188,16 @@ impl JournalReader {
     /// # Errors
     ///
     /// Returns [`CoreError::NotFound`] if the event does not exist,
+    /// or [`CoreError::Sqlite`] on DB errors.
+    /// # Errors
+    ///
+    /// Returns [`CoreError::NotFound`] if the event does not exist,
+    /// or [`CoreError::Sqlite`] on DB errors.
+    ///
+    /// Returns [`CoreError::NotFound`] if the event does not exist,
+    /// or [`CoreError::Sqlite`] on DB errors.
+    /// Returns [`CoreError::NotFound`] if the event does not exist,
+    /// or [`CoreError::Sqlite`] on DB errors.
     /// or [`CoreError::Sqlite`] on DB errors.
     pub fn get_event(&self, id: i64) -> Result<Event> {
         let conn = self.open_ro()?;
@@ -1034,6 +1281,7 @@ impl JournalReader {
 
     /// Path the journal lives at. May not exist yet on very fresh
     /// installs.
+    /// installs.
     #[must_use]
     pub fn path(&self) -> &Path {
         &self.path
@@ -1100,6 +1348,12 @@ pub struct HelpSessionRow {
 /// time window.
 ///
 /// Queried by [`JournalReader::host_samples_summary`].
+/// time window.
+///
+/// Queried by [`JournalReader::host_samples_summary`].
+///
+/// Queried by [`JournalReader::host_samples_summary`].
+/// Queried by [`JournalReader::host_samples_summary`].
 #[derive(Debug, Clone)]
 pub struct SampleSummary {
     /// Probe name (e.g. `loadavg_1m`).
@@ -1139,6 +1393,7 @@ pub struct BaselineRow {
     pub count: i64,
     /// Unix timestamp when this baseline was last computed.
     /// Used for freshness checks (Task 4.1).
+    /// Used for freshness checks (Task 4.1).
     pub updated_ts: Option<i64>,
 }
 
@@ -1153,6 +1408,16 @@ impl BaselineRow {
     /// This implements D1 from the adversarial review: baselines
     /// now have a freshness guard. When stale, Jack's SOAP shows
     /// "baselines stale (last updated X days ago)" instead of
+    /// citing potentially obsolete statistics.
+    /// This implements D1 from the adversarial review: baselines
+    /// now have a freshness guard. When stale, Jack's SOAP shows
+    /// "baselines stale (last updated X days ago)" instead of
+    /// citing potentially obsolete statistics.
+    /// now have a freshness guard. When stale, Jack's SOAP shows
+    /// "baselines stale (last updated X days ago)" instead of
+    /// citing potentially obsolete statistics.
+    /// "baselines stale (last updated X days ago)" instead of
+    /// citing potentially obsolete statistics.
     /// citing potentially obsolete statistics.
     #[must_use]
     pub fn is_stale(&self, max_age_hours: u32) -> bool {
@@ -1193,6 +1458,16 @@ fn percentile(sorted: &[f64], pct: f64) -> Option<f64> {
 /// over a time-ordered series of (value, unix_timestamp) pairs.
 ///
 /// Uses an exponential decay kernel with the given half-life in seconds.
+/// Returns `(None, None)` if the series has fewer than 2 data points.
+/// over a time-ordered series of (value, unix_timestamp) pairs.
+///
+/// Uses an exponential decay kernel with the given half-life in seconds.
+/// Returns `(None, None)` if the series has fewer than 2 data points.
+///
+/// Uses an exponential decay kernel with the given half-life in seconds.
+/// Returns `(None, None)` if the series has fewer than 2 data points.
+/// Uses an exponential decay kernel with the given half-life in seconds.
+/// Returns `(None, None)` if the series has fewer than 2 data points.
 /// Returns `(None, None)` if the series has fewer than 2 data points.
 fn compute_ewma(series: &[(f64, i64)], half_life_s: f64) -> (Option<f64>, Option<f64>) {
     if series.len() < 2 {

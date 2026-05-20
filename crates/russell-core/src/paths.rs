@@ -171,10 +171,6 @@ impl Paths {
     }
 
     /// Ensure every well-known directory exists. Idempotent.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`CoreError::Io`] if a directory cannot be created.
     pub fn ensure_dirs(&self) -> Result<()> {
         for dir in [
             &self.config,

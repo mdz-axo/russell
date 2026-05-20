@@ -39,6 +39,9 @@ use crate::{fallback, mock, oai_client, prompt};
 /// Process-wide LLM rate limiter. Shared across `russell jack`
 /// and `russell chat` calls within the same process lifetime.
 /// Default: 3 requests/minute, burst of 3.
+/// and `russell chat` calls within the same process lifetime.
+/// Default: 3 requests/minute, burst of 3.
+/// Default: 3 requests/minute, burst of 3.
 static LLM_RATE_LIMITER: std::sync::LazyLock<RateLimiter> =
     std::sync::LazyLock::new(|| RateLimiter::new(RateLimitConfig::default()));
 
@@ -94,6 +97,9 @@ struct DispatchResult {
 /// Compose the SOAP prompt from journal state, profile, skills, and
 /// operator identity files. Also writes the raw SOAP to the evidence
 /// directory.
+/// operator identity files. Also writes the raw SOAP to the evidence
+/// directory.
+/// directory.
 fn compose_and_augment_soap(
     paths: &Paths,
     writer: &JournalWriter,
@@ -139,6 +145,9 @@ fn compose_and_augment_soap(
 
 /// Check the escalation threshold and dispatch to the LLM backend.
 /// Falls back to the offline summariser if the threshold is not met
+/// or the backend call fails.
+/// Falls back to the offline summariser if the threshold is not met
+/// or the backend call fails.
 /// or the backend call fails.
 async fn dispatch_backend(
     writer: &JournalWriter,
@@ -242,6 +251,7 @@ async fn dispatch_backend(
 // ---------------------------------------------------------------------------
 
 /// Write evidence artefacts, journal the event, and insert the
+/// help-session row. Returns the final `HelpOutcome`.
 /// help-session row. Returns the final `HelpOutcome`.
 #[allow(clippy::too_many_arguments)]
 fn persist_session(
@@ -371,6 +381,7 @@ fn persist_session(
 
 /// Same as [`run_help`] but with an explicit [`ClientConfig`]. Useful in
 /// tests where mutating process env racily is undesirable.
+/// tests where mutating process env racily is undesirable.
 pub async fn run_help_with_config(
     paths: &Paths,
     writer: &JournalWriter,
@@ -453,6 +464,7 @@ fn augment_system_prompt(
 }
 
 /// ADR-0022: append a one-line session note to the current day's daily log.
+/// Non-fatal — failures are logged but never returned as errors.
 /// Non-fatal — failures are logged but never returned as errors.
 fn append_session_note(paths: &Paths, session_id: &str, note: Option<&str>, status: &str) {
     let now = russell_core::time::now_unix();
