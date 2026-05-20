@@ -422,6 +422,7 @@ mod tests {
 /// surfacing N individual skill health warnings, the operator sees a
 /// single severity signal. Individual skill details are available on
 /// demand via `russell skill stats`.
+#[allow(clippy::items_after_test_module)]
 #[must_use]
 pub fn aggregate_alert_score(entries: &[RegistryEntry]) -> f64 {
     if entries.is_empty() {

@@ -139,36 +139,26 @@ The `okapi-watcher` skill monitors Okapi health with macaroon auth:
 - `probe-models` — lists loaded models with sizes
 - `restart-okapi` — `systemctl --user restart okapi` (risk: low)
 
-## Macaroon Example
+## Macaroon Client
 
-### Russell Requesting Inference
+Russell implements a macaroon client for hKask authentication:
 
-```go
-// Russell receives macaroon from hKask registry
-macaroon := hKask.IssueMacaroon(
-  iid: "russell-prod-1",
-  skill: "evolution-watcher",
-  before: "2026-05-21T00:00:00Z",
-)
+- **Storage:** OS keychain (production) or encrypted file (development)
+- **Auto-refresh:** 1 hour before expiry
+- **Attenuation:** Per skill invocation
+- **Discharge:** Automatic for Okapi access
 
-// Attenuate for specific endpoint
-macaroon.AddCaveat("endpoint:/api/evolution/scan")
-
-// Request discharge for Okapi access
-discharge := hKask.MCP.Discharge(
-  location: "okapi-access",
-  models: ["qwen3:8b"],
-)
-
-// Bind and send
-bound := macaroon.Bind(discharge)
-response := hKask.MCP.Call("inference/generate", bound)
-```
+See `macaroon-client.md` for detailed configuration and usage.
 
 ## Full Documentation
 
 - Agent guide: `~/Clones/Okapi/AGENTS.md`
 - API details: `~/Clones/Okapi/fork-docs/plans/KASK_INTEGRATION_POINTS.md`
+- Macaroon spec: `~/Clones/Okapi/fork-docs/MACAROON_SPEC.md`
+- Auth spec: `~/Clones/Okapi/fork-docs/AUTH_SPEC.md`
+- Deployment: `~/Clones/Okapi/fork-docs/MACAROON_DEPLOYMENT.md`
+- hKask issuer: `~/Clones/hKask/docs/integrations/macaroon-issuer.md`
+- Russell client: `~/Clones/russell/docs/macaroon-client.md`
 - Macaroon spec: `~/Clones/Okapi/fork-docs/MACAROON_SPEC.md`
 - Auth spec: `~/Clones/Okapi/fork-docs/AUTH_SPEC.md`
 

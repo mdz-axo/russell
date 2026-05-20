@@ -25,6 +25,8 @@ symptoms:
   - agent_test_scenario_failed
   - agent_concurrent_load_timeout
   - agent_resource_exhaustion_under_load
+  - capability_attenuation_failure
+  - prompt_sanitization_failure
 
 applies_when:
   - os_family: linux
@@ -64,6 +66,18 @@ probes:
     cmd: ["bash", "./scripts/scenario-full.sh"]
     capture: stdout
     timeout: 300s
+
+  # Task T3: Capability attenuation scenario test
+  - id: probe-scenario-test-capability-attenuation
+    cmd: ["bash", "./scripts/scenario-test-capability-attenuation.sh"]
+    capture: stdout
+    timeout: 60s
+
+  # Task T3: Prompt sanitization scenario test
+  - id: probe-scenario-test-prompt-sanitization
+    cmd: ["bash", "./scripts/scenario-test-prompt-sanitization.sh"]
+    capture: stdout
+    timeout: 60s
 
 interventions: []
 

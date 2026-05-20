@@ -34,6 +34,7 @@ use russell_core::paths::Paths;
 use crate::client::{Backend, ClientConfig, LlmClient, SoapPrompt};
 use crate::error::{DoctorError, Result};
 use crate::rate_limit::{RateLimitConfig, RateLimiter};
+use crate::sanitizer::PromptSanitizer;
 use crate::{fallback, mock, oai_client, prompt};
 
 /// Process-wide LLM rate limiter. Shared across `russell jack`
@@ -104,6 +105,19 @@ fn compose_and_augment_soap(
     evidence_dir: &std::path::Path,
     kask_tool_names: &[(String, Option<String>)],
 ) -> Result<SoapPrompt> {
+    // Sanitize operator note input (defense against prompt injection).
+    let sanitized_note = note.map(|n| {
+        let sanitizer = PromptSanitizer::strict();
+        let result = sanitizer.sanitize_input(n);
+        if result.was_filtered {
+            tracing::warn!(
+                reason = %result.filter_reason.unwrap_or_default(),
+                "operator note was sanitized"
+            );
+        }
+        result.text
+    });
+
     let profile_path = paths.profile();
     let profile = if profile_path.exists() {
         russell_core::Profile::load(&profile_path).ok()
@@ -121,7 +135,7 @@ fn compose_and_augment_soap(
     let soap = prompt::compose_with_kask(
         &writer.reader(),
         profile.as_ref(),
-        note,
+        sanitized_note.as_deref(),
         &loaded_skills,
         &paths.skills(),
         kask_tool_names,
@@ -263,7 +277,7 @@ fn persist_session(
     cfg: &ClientConfig,
     note: Option<&str>,
 ) -> Result<HelpOutcome> {
-    let response_text = dispatch.response.as_deref().unwrap_or("");
+    let mut response_text = dispatch.response.as_deref().unwrap_or("").to_string();
     let backend_used = dispatch.backend_label;
     let skip_reason = dispatch.skip_reason;
     let status: HelpSessionStatus = if let Some(sr) = skip_reason {
@@ -275,6 +289,32 @@ fn persist_session(
         HelpSessionStatus::Ok
     };
     let status_str = status.as_str();
+
+    // Sanitize LLM output (defense against secret exfiltration, ACTION injection).
+    // Only sanitize if LLM was actually called (not offline fallback).
+    if skip_reason.is_none() {
+        let sanitizer = PromptSanitizer::strict();
+        let mut valid_skill_ids = std::collections::HashSet::new();
+        let mut valid_action_ids = std::collections::HashSet::new();
+
+        // Collect valid skill and action IDs from loaded skills.
+        for skill in russell_skills::load_all(&paths.skills()).unwrap_or_default() {
+            valid_skill_ids.insert(skill.id.clone());
+            for step in skill.steps() {
+                valid_action_ids.insert(step.id.clone());
+            }
+        }
+
+        let sanitized =
+            sanitizer.sanitize_output(&response_text, &valid_skill_ids, &valid_action_ids);
+        if sanitized.was_filtered {
+            tracing::warn!(
+                reason = %sanitized.filter_reason.unwrap_or_default(),
+                "LLM response was sanitized"
+            );
+        }
+        response_text = sanitized.text;
+    }
 
     // Evidence files.
     let request_path = evidence_dir.join("request.json");

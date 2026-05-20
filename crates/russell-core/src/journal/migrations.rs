@@ -133,7 +133,7 @@ mod tests {
     }
 
     /// Get the current schema migration version.
-    #[cfg(any(test, feature = "testing"))]
+    #[cfg(any(test, test))]
     pub fn current_version(conn: &Connection) -> u32 {
         let v: u32 = conn
             .query_row(
