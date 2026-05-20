@@ -7,7 +7,7 @@ use rmcp::{handler::server::wrapper::Parameters, schemars, tool, tool_router};
 use russell_core::paths::Paths;
 use serde::Deserialize;
 
-use crate::RussellServer;
+use crate::server::RussellServer;
 
 // ─── Constructor (must be here to access generated tool_router()) ─
 

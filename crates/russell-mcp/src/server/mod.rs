@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
-//! `russell-mcp-server` — native MCP server for Russell.
+//! `russell-mcp::server` — native MCP server for Russell.
 //!
-//! Implements [ADR-0003](../../docs/adr/deferred/0003-mcp-transport.md):
+//! Implements [ADR-0003](../../../docs/adr/deferred/0003-mcp-transport.md):
 //! stdio-only JSON-RPC transport, read-only tools exposing Russell's
 //! journal, probe history, and health summary.
 //!

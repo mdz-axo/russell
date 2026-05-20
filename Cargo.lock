@@ -1633,7 +1633,6 @@ dependencies = [
  "rpassword",
  "russell-core",
  "russell-mcp",
- "russell-mcp-server",
  "russell-meta",
  "russell-proprio",
  "russell-sentinel",
@@ -1673,9 +1672,13 @@ dependencies = [
 name = "russell-mcp"
 version = "0.20.0"
 dependencies = [
+ "anyhow",
  "async-trait",
  "chrono",
  "reqwest",
+ "rmcp",
+ "russell-core",
+ "russell-sentinel",
  "serde",
  "serde_json",
  "tempfile",
@@ -1683,21 +1686,6 @@ dependencies = [
  "tokio",
  "tracing",
  "urlencoding",
-]
-
-[[package]]
-name = "russell-mcp-server"
-version = "0.20.0"
-dependencies = [
- "anyhow",
- "rmcp",
- "russell-core",
- "russell-sentinel",
- "serde",
- "serde_json",
- "thiserror",
- "tokio",
- "tracing",
 ]
 
 [[package]]

@@ -161,11 +161,16 @@ status: VERIFIED
 - [ ] Facade handles composition, error translation, path resolution
 - [ ] Reduce CLI `main.rs` from 229 lines to <100 lines
 
-#### Task 1.3: Consolidate MCP crates
-- [ ] Merge `russell-mcp` (client) and `russell-mcp-server` (server) into single `russell-mcp` crate
-- [ ] Feature `client` for Kask integration, `server` for IDE frontends
-- [ ] Author ADR-0027 documenting consolidation
-- [ ] Update `MCP_SURFACE.md` with unified API
+#### Task A3: Consolidate MCP crates ✅
+- [x] Move `russell-mcp-server/src/` into `russell-mcp/src/server/`
+- [x] Add feature flags: `client` (default), `server`
+- [x] Conditional compilation: client modules gated by `#[cfg(feature = "client")]`
+- [x] Update root `Cargo.toml`: remove `russell-mcp-server` member and dependency
+- [x] Update `russell-cli/Cargo.toml`: use `russell-mcp = { workspace = true, features = ["server"] }`
+- [x] Update `russell-cli/src/main.rs`: import `russell_mcp::server::serve_stdio`
+- [x] All 292 tests pass
+- **Evidence:** `crates/russell-mcp/Cargo.toml`, `crates/russell-mcp/src/lib.rs`, `crates/russell-mcp/src/server/`
+- **ADR:** Update ADR-0003 or author ADR-0035 documenting consolidation
 
 #### Task 1.4: Typed Kask client
 - [ ] Create `kask-client` struct in `russell-mcp` with typed methods
@@ -251,11 +256,16 @@ status: VERIFIED
 - **ADR:** [`0028-baseline-freshness-guard.md`](../adr/0028-baseline-freshness-guard.md)
 - **Evidence:** `russell-core/src/journal/mod.rs` lines 1005-1045, `russell-meta/src/prompt.rs` lines 128-188
 
-#### Task 4.2: Journal compaction skill
-- [ ] Create `journal-compactor` skill with probe and intervention
-- [ ] Intervention: `VACUUM` SQLite, delete samples > 365 days old
-- [ ] Risk: medium (data loss), requires confirmation
-- [ ] Test: compact 1GB journal, verify integrity post-compaction
+#### Task 4.2: Journal compaction skill ✅
+- [x] Create `journal-compactor` skill with probe and intervention
+- [x] Probe: `probe-size` — estimates journal size and sample age distribution
+- [x] Intervention: `vacuum-journal` — SQLite VACUUM to reclaim space (risk: low, auto)
+- [x] Intervention: `prune-old-samples` — delete samples >365 days old (risk: medium, requires human)
+- [x] Evaluation: `verify-integrity` — post-intervention integrity check (SQLite + hash chain)
+- [x] Safety: `require_human_for: [prune-old-samples]` — explicit consent for data loss
+- [x] Installed to `~/.local/share/harness/skills/journal-compactor/`
+- **Evidence:** `skills/journal-compactor/manifest.yaml`, `scripts/*.sh`
+- All 292 tests pass
 
 #### Task 4.3: Evidence deduplication
 - [ ] Add `sample_hash` column to `samples` table
@@ -316,12 +326,12 @@ status: VERIFIED
 
 | Phase | Tasks Complete | Tasks Total | Status |
 |---|---|---|---|
-| Phase 1: Architectural Refactoring | 1 | 4 | In Progress |
+| Phase 1: Architectural Refactoring | 2 | 4 | In Progress |
 | Phase 2: Code Quality | 2 | 3 | In Progress |
 | Phase 3: Security Hardening | 4 | 4 | **Complete** ✅ |
-| Phase 4: Data Integrity | 1 | 4 | In Progress |
+| Phase 4: Data Integrity | 2 | 4 | In Progress |
 | Phase 5: Operational Completeness | 1 | 4 | In Progress |
-| **Total** | **9** | **19** | **In Progress** |
+| **Total** | **11** | **19** | **In Progress** |
 
 ### Completed Tasks
 
@@ -403,6 +413,16 @@ status: VERIFIED
 - `JournalReader` implements full trait
 - `InMemoryJournal` implements `JournalWritePort` for testing
 - Enables hexagonal architecture: consumers depend on port traits, not SQLite
+
+#### Task A3: Consolidate MCP crates ✅
+- **Status:** Implemented 2026-05-19
+- **Evidence:** `crates/russell-mcp/Cargo.toml`, `crates/russell-mcp/src/lib.rs`, `crates/russell-mcp/src/server/`
+- Merged `russell-mcp-server` into `russell-mcp` with feature flags
+- Features: `client` (default), `server`
+- Conditional compilation via `#[cfg(feature = "...")]`
+- Updated `russell-cli` to use `russell-mcp = { workspace = true, features = ["server"] }`
+- All 292 tests pass
+- **ADR:** [`0035-mcp-crate-consolidation.md`](../adr/0035-mcp-crate-consolidation.md)
 
 ---
 

@@ -227,7 +227,7 @@ async fn main() -> Result<()> {
                 commands::mcp_tools::run().await
             }
         }
-        Command::Mcp => russell_mcp_server::serve_stdio(paths).await,
+        Command::Mcp => russell_mcp::server::serve_stdio(paths).await,
         Command::Docs { strict } => commands::docs::run(&paths, strict),
         Command::VerifyJournal => commands::verify::run(&paths),
     }

@@ -18,8 +18,7 @@ russell-sentinel.workspace = true
 russell-skills.workspace = true
 russell-meta.workspace = true
 russell-proprio.workspace = true
-russell-mcp.workspace = true
-russell-mcp-server.workspace = true
+russell-mcp = { workspace = true, features = ["server"] }
 anyhow.workspace = true
 clap.workspace = true
 tokio.workspace = true

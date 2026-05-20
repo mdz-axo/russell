@@ -1,0 +1,69 @@
+# SPDX-License-Identifier: MIT OR Apache-2.0
+# journal-compactor — compact SQLite journal and prune old samples.
+#
+# Install: copy this directory to ~/.local/share/harness/skills/journal-compactor/
+#
+# Task D2: Adversarial Review Action Plan — Journal compaction skill.
+# Prevents unbounded journal growth by:
+# 1. Probing journal size and age distribution
+# 2. Compacting via SQLite VACUUM
+# 3. Optionally pruning samples older than retention threshold
+
+id: journal-compactor
+version: 0.1.0
+authored: 2026-05-19
+min_harness_version: 0.20.0
+
+symptoms:
+  - resource_exhaustion
+  - journal_bloat
+
+applies_when:
+  - os_family: linux
+
+probes:
+  # Estimate journal size and sample age distribution.
+  - id: probe-size
+    cmd: ["bash", "./scripts/probe-size.sh"]
+    capture: stdout
+    timeout: 30s
+
+interventions:
+  # Compact journal via VACUUM — reclaims unused space.
+  # Safe operation but may take time for large journals.
+  - id: vacuum-journal
+    cmd: ["bash", "./scripts/vacuum-journal.sh"]
+    risk: low
+    idempotent: true
+    rollback: none_needed
+    timeout: 300s
+    needs_sudo: false
+
+  # Prune samples older than retention threshold (default 365 days).
+  # DATA LOSS: Old samples are permanently deleted.
+  # Rollback is not possible — operator must confirm.
+  - id: prune-old-samples
+    cmd: ["bash", "./scripts/prune-old-samples.sh", "--retention-days", "365"]
+    risk: medium
+    idempotent: true
+    rollback: none_needed
+    timeout: 300s
+    needs_sudo: false
+    # This intervention requires explicit human confirmation due to data loss.
+    # The safety.require_human_for list should include this ID.
+
+safety:
+  max_auto_risk: low
+  require_human_for:
+    - prune-old-samples
+
+evaluation:
+  after_intervention:
+    - id: verify-integrity
+      cmd: ["bash", "./scripts/verify-integrity.sh"]
+      timeout: 60s
+      expect_exit: 0
+
+references:
+  - docs/plans/ADVERSARIAL-REVIEW-ACTION-PLAN.md
+  - docs/specifications/PERSISTENCE_CATALOG.md
