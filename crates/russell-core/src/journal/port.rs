@@ -53,9 +53,32 @@ pub trait JournalWritePort: Send {
 /// Represents the capability to read history. Separated from write
 /// to enforce least-authority: sentinel can read previous samples
 /// for rate-of-change without having write access.
+///
+/// ## Task A2: Hexagonal port expansion
+///
+/// This trait now includes all read operations needed by consumers
+/// (sentinel, meta, proprio) without coupling to SQLite implementation.
 pub trait JournalReadPort: Send + Sync {
     /// Retrieve the N most recent events.
     fn recent(&self, limit: usize) -> Result<Vec<EventRow>>;
+
+    /// Count events by severity in a time window.
+    fn severity_counts(&self, since: i64, until: i64) -> Result<super::SeverityCounts>;
+
+    /// Get last host sample timestamp.
+    fn last_host_sample_ts(&self) -> Result<Option<i64>>;
+
+    /// Get previous sample value for rate-of-change calculation.
+    fn previous_sample(&self, probe: &str, now: i64) -> Result<Option<(f64, i64)>>;
+
+    /// Get host samples summary for a time window.
+    fn host_samples_summary(&self, since: i64, until: i64) -> Result<Vec<super::SampleSummary>>;
+
+    /// Read baselines for all probes.
+    fn read_baselines(&self) -> Result<Vec<super::BaselineRow>>;
+
+    /// Count reflex events for a probe in a time window.
+    fn count_reflex_events(&self, probe: &str, since: i64, until: i64) -> Result<usize>;
 }
 
 /// Implement `JournalWritePort` for the production `JournalWriter`.
@@ -81,6 +104,30 @@ impl JournalWritePort for super::JournalWriter {
 impl JournalReadPort for super::JournalReader {
     fn recent(&self, limit: usize) -> Result<Vec<EventRow>> {
         super::JournalReader::recent(self, limit)
+    }
+
+    fn severity_counts(&self, since: i64, until: i64) -> Result<super::SeverityCounts> {
+        super::JournalReader::severity_counts(self, since, until)
+    }
+
+    fn last_host_sample_ts(&self) -> Result<Option<i64>> {
+        super::JournalReader::last_host_sample_ts(self)
+    }
+
+    fn previous_sample(&self, probe: &str, now: i64) -> Result<Option<(f64, i64)>> {
+        Ok(super::JournalReader::previous_sample(self, probe, now))
+    }
+
+    fn host_samples_summary(&self, since: i64, until: i64) -> Result<Vec<super::SampleSummary>> {
+        super::JournalReader::host_samples_summary(self, since, until)
+    }
+
+    fn read_baselines(&self) -> Result<Vec<super::BaselineRow>> {
+        super::JournalReader::read_baselines(self)
+    }
+
+    fn count_reflex_events(&self, probe: &str, since: i64, until: i64) -> Result<usize> {
+        Ok(super::JournalReader::count_reflex_events(self, probe, since, until)? as usize)
     }
 }
 

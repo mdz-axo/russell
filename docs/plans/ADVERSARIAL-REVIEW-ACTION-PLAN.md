@@ -194,6 +194,14 @@ status: VERIFIED
 - [ ] Alert if any reader exceeds 5s without response
 - [ ] Test: simulate slow reader, verify alert fires
 
+#### Task A2: Explicit port interfaces ✅
+- [x] Expand `JournalReadPort` trait with 6 additional read methods
+- [x] Implement all methods for `JournalReader`
+- [x] Trait now covers: `recent`, `severity_counts`, `last_host_sample_ts`, `previous_sample`, `host_samples_summary`, `read_baselines`, `count_reflex_events`
+- [x] In-memory test double implements `JournalWritePort`
+- **Evidence:** `russell-core/src/journal/port.rs:27-85`
+- All 292 tests pass
+
 ### Phase 3: Security Hardening (Schneier / Miller)
 
 #### Task 3.1: Capability attenuation for skills ✅
@@ -308,12 +316,12 @@ status: VERIFIED
 
 | Phase | Tasks Complete | Tasks Total | Status |
 |---|---|---|---|
-| Phase 1: Architectural Refactoring | 0 | 4 | Not Started |
+| Phase 1: Architectural Refactoring | 1 | 4 | In Progress |
 | Phase 2: Code Quality | 2 | 3 | In Progress |
 | Phase 3: Security Hardening | 4 | 4 | **Complete** ✅ |
 | Phase 4: Data Integrity | 1 | 4 | In Progress |
 | Phase 5: Operational Completeness | 1 | 4 | In Progress |
-| **Total** | **8** | **19** | **In Progress** |
+| **Total** | **9** | **19** | **In Progress** |
 
 ### Completed Tasks
 
@@ -381,6 +389,20 @@ status: VERIFIED
 - Displays warning if any baselines are stale
 - Marks stale probes with ⚠️ in sample table
 - **ADR:** [`0028-baseline-freshness-guard.md`](../adr/0028-baseline-freshness-guard.md)
+
+#### Task A2: Explicit port interfaces ✅
+- **Status:** Implemented 2026-05-19
+- **Evidence:** `russell-core/src/journal/port.rs:27-85`
+- Expanded `JournalReadPort` trait with 6 additional read methods:
+  - `severity_counts()` — Count events by severity in time window
+  - `last_host_sample_ts()` — Get last host sample timestamp
+  - `previous_sample()` — Get previous sample for rate-of-change
+  - `host_samples_summary()` — Get sample summary for time window
+  - `read_baselines()` — Read all baselines
+  - `count_reflex_events()` — Count reflex events for probe
+- `JournalReader` implements full trait
+- `InMemoryJournal` implements `JournalWritePort` for testing
+- Enables hexagonal architecture: consumers depend on port traits, not SQLite
 
 ---
 
