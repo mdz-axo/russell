@@ -265,15 +265,36 @@ fn build_samples_table(reader: &JournalReader, window_start: i64) -> Result<Stri
     if summaries.is_empty() {
         return Ok("(no samples recorded)".to_string());
     }
-    let baselines: std::collections::BTreeMap<String, (Option<f64>, Option<f64>)> = reader
-        .read_baselines()
-        .unwrap_or_default()
+    let baseline_rows: Vec<russell_core::journal::BaselineRow> =
+        reader.read_baselines().unwrap_or_default();
+
+    // Task F3: Check baseline freshness (max age = 7 days = 168 hours)
+    const BASELINE_FRESHNESS_HOURS: u32 = 168;
+    let stale_count = baseline_rows
+        .iter()
+        .filter(|b| b.is_stale(BASELINE_FRESHNESS_HOURS))
+        .count();
+    let has_stale_baselines = stale_count > 0;
+
+    let baselines: std::collections::BTreeMap<String, (Option<f64>, Option<f64>)> = baseline_rows
         .into_iter()
         .map(|b| (b.probe, (b.p95, b.ewma_mean)))
         .collect();
     let has_baselines = !baselines.is_empty();
 
     let mut table = String::new();
+
+    // Task F3: Add freshness warning if baselines are stale
+    if has_stale_baselines {
+        let _ = writeln!(
+            table,
+            "> ⚠️  **Baseline freshness warning:** {} probe(s) have stale baselines (last updated >{} days ago). Interpret p95/ewma columns with caution.",
+            stale_count,
+            BASELINE_FRESHNESS_HOURS / 24
+        );
+        let _ = writeln!(table);
+    }
+
     if has_baselines {
         let _ = writeln!(
             table,

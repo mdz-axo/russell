@@ -238,7 +238,8 @@ mod tests {
 
     #[test]
     fn gpu_vram_used_pct_is_percentage_on_linux() {
-        if !std::path::Path::new(GPU_DEVICE).exists() {
+        let gpu_device = gpu_device_path();
+        if !std::path::Path::new(&gpu_device).exists() {
             return;
         }
         // The device node may exist (e.g. iGPU) without exposing
@@ -253,7 +254,8 @@ mod tests {
 
     #[test]
     fn gpu_temp_c_is_plausible_on_linux() {
-        if !std::path::Path::new(GPU_DEVICE).exists() {
+        let gpu_device = gpu_device_path();
+        if !std::path::Path::new(&gpu_device).exists() {
             return;
         }
         let temp = gpu_temp_c();
@@ -268,7 +270,8 @@ mod tests {
 
     #[test]
     fn gpu_util_pct_is_percentage_on_linux() {
-        if !std::path::Path::new(GPU_DEVICE).exists() {
+        let gpu_device = gpu_device_path();
+        if !std::path::Path::new(&gpu_device).exists() {
             return;
         }
         let util = gpu_util_pct();
