@@ -20,14 +20,26 @@
 //! Both `russell jack` and `russell chat` use this module,
 //! eliminating duplicated parsing and resolution logic.
 
-use russell_core::{HKaskToolInfo, RiskBand};
+use russell_skills::RiskBand;
 use russell_skills::{Rollback, Skill};
+
+/// Metadata for a hKask tool available in the registry, passed by
+/// the caller (keeps `russell-meta` free of `russell-mcp` dependency).
+#[derive(Debug, Clone)]
+pub struct HKaskToolInfo {
+    /// Tool name (the callable ID).
+    pub name: String,
+    /// Risk band from annotations. Defaults to `RiskBand::Medium`
+    /// when unset — safe default per IDRS. Probes should explicitly
+    /// declare `RiskBand::None`.
+    pub risk_band: RiskBand,
+    /// JSON Schema for the tool's input parameters (from `tools/list`).
+    /// Used to extract required field names for operator prompting.
+    pub input_schema: Option<serde_json::Value>,
+}
 
 /// A resolved ACTION — either a probe (read-only), an intervention
 /// (mutating, requires consent per JR-2), or a hKask MCP tool call
-/// (ADR-0025).
-/// (mutating, requires consent per JR-2), or a hKask MCP tool call
-/// (ADR-0025).
 /// (ADR-0025).
 #[derive(Debug, Clone)]
 pub enum ResolvedAction {
@@ -69,16 +81,13 @@ pub enum ResolvedAction {
     },
     /// hKask MCP tool call (ADR-0025). Executed via the MCP client,
     /// not the local skill dispatcher.
-    /// not the local skill dispatcher.
     HKaskTool {
         /// The MCP tool name (from `tools/list`).
         tool_name: String,
         /// Risk band from tool annotations. Defaults to `Medium` when
         /// unset — safe default requiring operator consent.
-        /// unset — safe default requiring operator consent.
         risk_band: RiskBand,
         /// Arguments for the tool call, parsed from the LLM response.
-        /// `None` if the LLM did not provide any.
         /// `None` if the LLM did not provide any.
         arguments: Option<serde_json::Value>,
         /// Expected arguments (required fields from inputSchema).

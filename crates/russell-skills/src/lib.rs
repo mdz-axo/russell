@@ -26,7 +26,6 @@ use std::path::{Path, PathBuf};
 
 use serde::Deserialize;
 
-use russell_core::RiskBand;
 mod symptom_catalog;
 
 /// Subprocess dispatcher for probe and intervention execution.
@@ -424,7 +423,19 @@ pub enum RiskBand {
     Critical,
 }
 
-
+impl RiskBand {
+    /// Human-readable lowercase string for journaling.
+    #[must_use]
+    pub fn as_str(self) -> &'static str {
+        match self {
+            RiskBand::None => "none",
+            RiskBand::Low => "low",
+            RiskBand::Medium => "medium",
+            RiskBand::High => "high",
+            RiskBand::Critical => "critical",
+        }
+    }
+}
 
 /// Safety constraints for a skill.
 #[derive(Debug, Clone, Deserialize)]

@@ -381,7 +381,6 @@ fn persist_session(
 
 /// Same as [`run_help`] but with an explicit [`ClientConfig`]. Useful in
 /// tests where mutating process env racily is undesirable.
-/// tests where mutating process env racily is undesirable.
 pub async fn run_help_with_config(
     paths: &Paths,
     writer: &JournalWriter,

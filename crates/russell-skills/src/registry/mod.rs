@@ -56,9 +56,6 @@ pub struct RegistryEntry {
     /// Gap 3: Execution trust tier — determines whether this skill
     /// needs consent gates, sandbox testing, or can auto-execute.
     /// Independent of `source` (a `Workshop` skill starts at T3, not T4).
-    /// needs consent gates, sandbox testing, or can auto-execute.
-    /// Independent of `source` (a `Workshop` skill starts at T3, not T4).
-    /// Independent of `source` (a `Workshop` skill starts at T3, not T4).
     #[serde(default = "default_trust_tier")]
     pub trust_tier: TrustTier,
     /// ISO 8601 date of installation.
@@ -102,9 +99,6 @@ pub struct RegistryEntry {
     /// EWMA success rate (0.0–1.0). Updated on each probe/intervention
     /// execution. More recent outcomes weigh more heavily than historical.
     /// `None` means no executions have been recorded yet.
-    /// execution. More recent outcomes weigh more heavily than historical.
-    /// `None` means no executions have been recorded yet.
-    /// `None` means no executions have been recorded yet.
     #[serde(default)]
     pub ewma_success_rate: Option<f64>,
     /// Whether this is a bundled skill (resistant to pruning).
@@ -117,16 +111,6 @@ impl RegistryEntry {
     /// for all telemetry / lifecycle metadata.
     ///
     /// This eliminates the repeated 18-field struct literals scattered
-    /// across workshop commands and skill sync code.
-    /// for all telemetry / lifecycle metadata.
-    ///
-    /// This eliminates the repeated 18-field struct literals scattered
-    /// across workshop commands and skill sync code.
-    ///
-    /// This eliminates the repeated 18-field struct literals scattered
-    /// across workshop commands and skill sync code.
-    /// This eliminates the repeated 18-field struct literals scattered
-    /// across workshop commands and skill sync code.
     /// across workshop commands and skill sync code.
     #[must_use]
     pub fn new_default(

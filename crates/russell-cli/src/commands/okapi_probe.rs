@@ -32,37 +32,10 @@ use serde::Deserialize;
 /// Okapi capabilities from `/api/engine/status`.
 #[derive(Debug, Deserialize)]
 #[allow(dead_code)]
-struct OkapiCapabilities {
-    runner_type: String,
-    lora_hot_swap: bool,
-    token_probs: bool,
-    full_metrics: bool,
-    advanced_sampling: bool,
-    grammar_native: bool,
-    speculative_decoding: bool,
-    dry_sampler: bool,
-    xtc_sampler: bool,
-    min_keep: bool,
-    chunked_prefill: bool,
-    moe_observability: bool,
-}
 
 /// Okapi engine status from `/api/engine/status`.
 #[derive(Debug, Deserialize)]
 #[allow(dead_code)]
-struct OkapiEngineStatus {
-    model_loaded: bool,
-    #[serde(default)]
-    model_name: Option<String>,
-    #[serde(default)]
-    runner_type: Option<String>,
-    #[serde(default)]
-    capabilities: Option<OkapiCapabilities>,
-    #[serde(default)]
-    degraded_mode: Option<bool>,
-    #[serde(default)]
-    feature_count: Option<u32>,
-}
 
 /// Okapi metrics from `/api/metrics/json`.
 #[derive(Debug, Deserialize)]
@@ -133,16 +106,6 @@ fn fetch_metrics(base_url: &str) -> Result<OkapiMetricsResponse> {
 }
 
 /// Fetch Okapi engine capabilities from `/api/engine/status`.
-fn fetch_capabilities(base_url: &str) -> Result<OkapiEngineStatus> {
-    let url = format!("{base_url}/api/engine/status");
-    let resp = reqwest::blocking::get(&url).with_context(|| format!("fetching {url}"))?;
-    let status = resp.status();
-    let body = resp.text().with_context(|| "reading capabilities response")?;
-    if !status.is_success() {
-        anyhow::bail!("capabilities endpoint returned {status}: {body}");
-    }
-    serde_json::from_str::<OkapiEngineStatus>(&body).with_context(|| "parsing capabilities JSON")
-}
 
 fn extract_samples(m: &OkapiMetricsResponse) -> Vec<OkapiSample> {
     let mut samples = Vec::new();

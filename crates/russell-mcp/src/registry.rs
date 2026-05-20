@@ -15,8 +15,8 @@ use crate::client::HKaskMcpClient;
 use crate::config::HKaskMcpConfig;
 use crate::error::Result;
 use crate::types::McpToolDefinition;
-use russell_core::RiskBand;
-use russell_core::HKaskToolInfo;
+use russell_skills::RiskBand;
+use russell_meta::action::HKaskToolInfo;
 
 /// Cached tool registry backed by a hKask MCP connection.
 ///

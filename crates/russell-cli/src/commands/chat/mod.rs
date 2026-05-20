@@ -872,7 +872,6 @@ async fn call_jack(
 
 /// Estimate the token count of a JSON messages array.
 /// Rough heuristic: 1 token ≈ 4 characters of content.
-/// Rough heuristic: 1 token ≈ 4 characters of content.
 fn estimate_message_tokens(messages: &[serde_json::Value]) -> usize {
     let mut total = 0;
     for msg in messages {
@@ -935,16 +934,6 @@ fn extract_manifest_block(response: &str) -> Option<String> {
 /// `Arguments --name swap-watcher --flag value` into a Vec of individual
 /// argument tokens. Handles quoted values.
 ///
-/// Searches the entire response for the first `Arguments` line.
-/// `Arguments --name swap-watcher --flag value` into a Vec of individual
-/// argument tokens. Handles quoted values.
-///
-/// Searches the entire response for the first `Arguments` line.
-/// argument tokens. Handles quoted values.
-///
-/// Searches the entire response for the first `Arguments` line.
-///
-/// Searches the entire response for the first `Arguments` line.
 /// Searches the entire response for the first `Arguments` line.
 fn extract_inline_args(response: &str) -> Vec<String> {
     let args_line = response

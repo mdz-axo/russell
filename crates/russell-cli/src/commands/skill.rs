@@ -128,24 +128,6 @@ pub async fn run(paths: &Paths, id: &str, dry_run: bool) -> Result<()> {
     Ok(())
 }
 
-fn print_skill(s: &Skill) {
-    println!("{}", s.id);
-    if !s.symptoms.is_empty() {
-        println!("  symptoms: {}", s.symptoms.join(", "));
-    }
-    for p in &s.probes {
-        println!("  probe: {} ({})", p.id, p.cmd.join(" "));
-    }
-    for i in &s.interventions {
-        println!(
-            "  intervention: {} ({}) [risk: {:?}]",
-            i.id,
-            i.cmd.join(" "),
-            i.risk
-        );
-    }
-    println!();
-}
 
 fn parse_skill_ref(id: &str) -> Result<(&str, &str)> {
     let mut parts = id.splitn(2, '/');

@@ -57,14 +57,12 @@ pub struct SudoCredential {
 impl SudoCredential {
     /// Wrap a password string. Takes ownership to ensure no copies
     /// remain in the caller's scope.
-    /// remain in the caller's scope.
     #[must_use]
     pub fn new(password: String) -> Self {
         Self { inner: password }
     }
 
     /// Borrow the credential for one-shot use (stdin piping).
-    /// The reference is short-lived — caller must not store it.
     /// The reference is short-lived — caller must not store it.
     pub(crate) fn as_str(&self) -> &str {
         &self.inner
@@ -95,12 +93,6 @@ pub enum DryRun {
 /// Outcome of a single subprocess run.
 ///
 /// For rollback-protected interventions, the `rollback` field
-/// contains the rollback run outcome (if rollback was triggered).
-///
-/// For rollback-protected interventions, the `rollback` field
-/// contains the rollback run outcome (if rollback was triggered).
-/// For rollback-protected interventions, the `rollback` field
-/// contains the rollback run outcome (if rollback was triggered).
 /// contains the rollback run outcome (if rollback was triggered).
 #[derive(Debug, Clone, PartialEq)]
 pub struct RunOutcome {
