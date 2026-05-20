@@ -260,7 +260,7 @@ aggressive intervention.
 
 Russell's journal (`~/.local/state/harness/journal.db`) is read by
 `arsenal-mcp-russell` — an MCP tool server that lives in the hKask
-repo (`~/Clones/hKask`). It exposes 7 tools:
+repo (`~/Clones/hkask`). It exposes 7 tools:
 
 | MCP tool | Purpose |
 |---|---|
@@ -281,7 +281,7 @@ produce health reports with findings and recommendations.
 Per ADR-0025, Russell's `russell-mcp` crate is a fully operational
 MCP client that calls into hKask's `stack-api` gateway
 (`http://127.0.0.1:8080`). Russell has access to 193 tools across
-16 MCP servers registered in `~/.config/stack/mcp-registry.json`:
+16 MCP servers registered in `~/.config/hkask/mcp-registry.json`:
 
 | Server | Tools | Capability |
 |---|---|---|
@@ -308,7 +308,7 @@ both directions is via HTTP REST to `stack-api` (Russell → hKask)
 and via the SQLite journal read by `arsenal-mcp-russell`
 (hKask → Russell).
 
-See [`../proposals/russell-kask-integration.md`](../proposals/russell-kask-integration.md)
+See [`../proposals/russell-hkask-integration.md`](../proposals/russell-hkask-integration.md)
 for the full design.
 
 ## 9. What this document is not

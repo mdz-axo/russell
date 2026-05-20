@@ -185,5 +185,5 @@ Command::Mcp => russell_mcp::server::serve_stdio(paths).await,
 
 - Adversarial Review Action Plan §A3 (Task A3)
 - `docs/adr/0003-mcp-transport.md` (deferred server)
-- `docs/adr/0025-kask-mcp-client-trusted-relationship.md` (client)
+- `docs/adr/0025-hkask-mcp-client-trusted-relationship.md` (client)
 - Cockburn, A. (2005). "Hexagonal Architecture"

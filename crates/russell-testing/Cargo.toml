@@ -1,0 +1,34 @@
+# SPDX-License-Identifier: MIT OR Apache-2.0
+# Test crate for Russell - excluded from line budget per AGENTS.md §12
+
+[package]
+name = "russell-testing"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+publish = false
+
+[dependencies]
+russell-core     = { workspace = true }
+russell-sentinel = { workspace = true }
+russell-skills   = { workspace = true }
+russell-meta     = { workspace = true }
+russell-proprio  = { workspace = true }
+russell-mcp      = { workspace = true }
+
+thiserror = { workspace = true }
+anyhow    = { workspace = true }
+serde     = { workspace = true }
+serde_json = { workspace = true }
+tokio     = { workspace = true }
+time      = { workspace = true }
+tempfile  = { workspace = true }
+insta     = { workspace = true }
+toml      = { workspace = true }
+rusqlite  = { workspace = true }
+
+[dev-dependencies]
+insta = { workspace = true, features = ["yaml", "json"] }

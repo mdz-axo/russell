@@ -153,12 +153,12 @@ russell_proprio::AutoimmuneGuard rdf:type struct .  # recursion guard
 russell_proprio::ProprioResult rdf:type struct .  # 5 self-vitals with severity
 ```
 
-## 6. Russell MCP — Kask Tool Interface
+## 6. Russell MCP — hKask Tool Interface
 
 ```
-russell_mcp::client::KaskMcpClient rdf:type struct .  # JSON-RPC stdio client
+russell_mcp::client::HKaskMcpClient rdf:type struct .  # JSON-RPC stdio client
 russell_mcp::registry::ToolRegistry rdf:type struct .  # tool cache with TTL
-russell_mcp::config::KaskMcpConfig rdf:type struct .  # endpoint, tool_ttl, auth
+russell_mcp::config::HKaskMcpConfig rdf:type struct .  # endpoint, tool_ttl, auth
 ```
 
 ## 7. Cross-Crate Dependencies

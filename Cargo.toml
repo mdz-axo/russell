@@ -11,6 +11,7 @@ members = [
     "crates/russell-proprio",
     "crates/russell-mcp",
     "crates/russell-cli",
+    "crates/russell-testing",
 ]
 
 [workspace.package]

@@ -1748,6 +1748,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "russell-testing"
+version = "0.20.0"
+dependencies = [
+ "anyhow",
+ "insta",
+ "rusqlite",
+ "russell-core",
+ "russell-mcp",
+ "russell-meta",
+ "russell-proprio",
+ "russell-sentinel",
+ "russell-skills",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror",
+ "time",
+ "tokio",
+ "toml",
+]
+
+[[package]]
 name = "rustc-hash"
 version = "2.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"

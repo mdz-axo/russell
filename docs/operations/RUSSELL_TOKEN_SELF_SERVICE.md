@@ -16,11 +16,11 @@ status: "Active"
 
 ## Overview
 
-Russell can now check his own Kask MCP token status through the `russell_token_status` MCP tool. This eliminates the need for manual CLI commands — Jack can check token status and guide the operator through setup.
+Russell can now check his own hKask MCP token status through the `russell_token_status` MCP tool. This eliminates the need for manual CLI commands — Jack can check token status and guide the operator through setup.
 
 ## Tool: `russell_token_status`
 
-**Description:** Check Russell's Kask MCP token status — expiry, principal info, and time until rotation needed.
+**Description:** Check Russell's hKask MCP token status — expiry, principal info, and time until rotation needed.
 
 **Input:** None (empty arguments)
 
@@ -45,7 +45,7 @@ Russell can now check his own Kask MCP token status through the `russell_token_s
 you → what's your token status?
 Jack → Let me check...
 
-ACTION: kask/russell_token_status
+ACTION: hkask/russell_token_status
 
 [Tool output shows status]
 
@@ -85,8 +85,8 @@ curl -s -X POST "http://127.0.0.1:8080/api/v1/tools/russell_token_status" \
 ```json
 {
   "status": "not_configured",
-  "message": "Token file not found. Russell is using static token from KASK_MCP_TOKEN env var.",
-  "token_path": "/home/mdz-axolotl/.local/state/kask/mcp-token.json",
+  "message": "Token file not found. Russell is using static token from HKASK_MCP_TOKEN env var.",
+  "token_path": "/home/mdz-axolotl/.local/state/hkask/mcp-token.json",
   "setup_required": true,
   "setup_command": "stack-admin key create --for russell --type service --display 'Russell (Host Curator)' --ttl 168h"
 }
@@ -132,14 +132,14 @@ curl -s -X POST "http://127.0.0.1:8080/api/v1/tools/russell_token_status" \
 
 - `kask/arsenal/crates/arsenal-mcp-russell/src/tools.rs` — Added tool definition
 - `kask/arsenal/crates/arsenal-mcp-russell/src/server.rs` — Added `handle_token_status()` handler
-- `kask/arsenal/crates/arsenal-mcp-russell/Cargo.toml` — Added `chrono` dependency
+- `hkask/arsenal/crates/arsenal-mcp-russell/Cargo.toml` — Added `chrono` dependency
 
 ### Code Location
 
 ```rust
 // arsenal-mcp-russell/src/server.rs
 async fn handle_token_status(&self, _args: &Value) -> Result<String, String> {
-    // Reads token file at ~/.local/state/kask/mcp-token.json
+    // Reads token file at ~/.local/state/hkask/mcp-token.json
     // Returns status, expiry info, and actionable commands
 }
 ```
@@ -151,13 +151,13 @@ async fn handle_token_status(&self, _args: &Value) -> Result<String, String> {
 1. Russell installed, no token file exists
 2. Jack runs `russell_token_status` → returns `not_configured`
 3. Jack shows operator the `setup_command`
-4. Operator runs command in Kask repo
+4. Operator runs command in hKask repo
 5. Token file created
 6. Russell automatically picks up new token via `FileTokenProvider`
 
 ### Ongoing Maintenance
 
-1. Weekly timer (`kask-token-rotate.timer`) rotates token automatically
+1. Weekly timer (`hkask-token-rotate.timer`) rotates token automatically
 2. OR Jack runs `russell_token_status` periodically
 3. If `status == "rotation_needed"`, Jack can prompt operator or auto-rotate
 4. Token file updated, Russell picks up automatically
@@ -166,11 +166,11 @@ async fn handle_token_status(&self, _args: &Value) -> Result<String, String> {
 
 - Token file permissions: `0600` (owner read/write only)
 - Token value NEVER exposed in tool output (only metadata)
-- Rotation requires access to Kask's `stack-admin` (operator action or automated via systemd)
+- Rotation requires access to hKask's `stack-admin` (operator action or automated via systemd)
 - 24-hour pre-expiry buffer prevents accidental expiry
 
 ## Related
 
 - `docs/operations/KASK_TOKEN_ROTATION.md` — Token rotation operational guide
 - `crates/russell-mcp/src/auth.rs` — Russell's token provider implementation
-- ADR-0025 — Kask MCP Client trusted relationship
+- ADR-0025 — hKask MCP Client trusted relationship

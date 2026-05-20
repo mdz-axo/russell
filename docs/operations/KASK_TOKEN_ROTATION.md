@@ -38,7 +38,7 @@ This document describes the token rotation mechanism for Russell's Kask MCP clie
 
 ## Token File Format
 
-Location: `~/.local/state/kask/mcp-token.json`
+Location: `~/.local/state/hkask/mcp-token.json`
 
 ```json
 {
@@ -54,7 +54,7 @@ Location: `~/.local/state/kask/mcp-token.json`
 
 The `russell-mcp` crate provides a `TokenProvider` trait with two implementations:
 
-1. **StaticTokenProvider** — Uses `KASK_MCP_TOKEN` env var (backward compatible)
+1. **StaticTokenProvider** — Uses `HKASK_MCP_TOKEN` env var (backward compatible)
 2. **FileTokenProvider** — Reads from token file with automatic refresh
 
 ### Usage
@@ -64,7 +64,7 @@ use russell_mcp::auth::{FileTokenProvider, TokenProvider};
 
 // File-based token provider (recommended)
 let provider = FileTokenProvider::new(
-    PathBuf::from("~/.local/state/kask/mcp-token.json")
+    PathBuf::from("~/.local/state/hkask/mcp-token.json")
 );
 
 // Token is automatically refreshed before expiry
@@ -92,13 +92,13 @@ stack-admin key grant --for russell --capability mcp:tools/call --scope "*"
 
 ```bash
 stack-admin key get --for russell --format json \
-  > ~/.local/state/kask/mcp-token.json
-chmod 600 ~/.local/state/kask/mcp-token.json
+  > ~/.local/state/hkask/mcp-token.json
+chmod 600 ~/.local/state/hkask/mcp-token.json
 ```
 
 ### 4. Auto-Rotation (cron/systemd timer)
 
-Create `~/.config/systemd/user/kask-token-rotate.timer`:
+Create `~/.config/systemd/user/hkask-token-rotate.timer`:
 
 ```ini
 [Unit]
@@ -116,8 +116,8 @@ Create `~/.local/bin/rotate-russell-token.sh`:
 ```bash
 #!/usr/bin/env bash
 stack-admin key rotate --for russell --format json \
-  > ~/.local/state/kask/mcp-token.json
-chmod 600 ~/.local/state/kask/mcp-token.json
+  > ~/.local/state/hkask/mcp-token.json
+chmod 600 ~/.local/state/hkask/mcp-token.json
 ```
 
 ## Security Considerations

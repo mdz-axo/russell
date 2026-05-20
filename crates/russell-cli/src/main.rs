@@ -12,7 +12,6 @@
 #![warn(missing_docs)]
 
 mod commands;
-mod cli_utils;
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};

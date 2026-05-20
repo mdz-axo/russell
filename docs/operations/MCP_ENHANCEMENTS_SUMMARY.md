@@ -84,12 +84,12 @@ systemctl --user status kask-gateway.service
   - `StaticTokenProvider` — Backward compatible (env var)
   - `FileTokenProvider` — Automatic refresh from file
   - `ChainedTokenProvider` — File with env fallback (default)
-- Token file: `~/.local/state/kask/mcp-token.json`
+- Token file: `~/.local/state/hkask/mcp-token.json`
 - Automatic refresh 24 hours before expiry
 - Weekly rotation via systemd timer
 
 **Integration:**
-- `KaskMcpClient::new()` uses `ChainedTokenProvider` by default
+- `HKaskMcpClient::new()` uses `ChainedTokenProvider` by default
 - All HTTP requests use fresh token automatically
 
 **hKask-Side Setup Required:**
@@ -104,8 +104,8 @@ stack-admin key grant --for russell --capability mcp:tools/call --scope "*"
 
 # Install initial token
 stack-admin key get --for russell --format json \
-  > ~/.local/state/kask/mcp-token.json
-chmod 600 ~/.local/state/kask/mcp-token.json
+  > ~/.local/state/hkask/mcp-token.json
+chmod 600 ~/.local/state/hkask/mcp-token.json
 ```
 
 **Tests:** ✅ 4 new auth tests passing
@@ -144,8 +144,8 @@ See `docs/operations/MCP_TOOL_CACHE_INVALIDATION.md` for complete guide on imple
 
 **Files:**
 - `kask/arsenal/crates/arsenal-mcp-russell/src/tools.rs` — Tool definition
-- `kask/arsenal/crates/arsenal-mcp-russell/src/server.rs` — `handle_token_status()` handler
-- `kask/arsenal/crates/arsenal-mcp-russell/Cargo.toml` — Added `chrono` dependency
+  - `hkask/arsenal/crates/arsenal-mcp-russell/src/server.rs` — `handle_token_status()` handler
+  - `hkask/arsenal/crates/arsenal-mcp-russell/Cargo.toml` — Added `chrono` dependency
 - `docs/operations/RUSSELL_TOKEN_SELF_SERVICE.md` — User guide
 
 **Features:**
@@ -157,7 +157,7 @@ See `docs/operations/MCP_TOOL_CACHE_INVALIDATION.md` for complete guide on imple
 **Usage:**
 ```
 you → what's your token status?
-Jack → ACTION: kask/russell_token_status
+Jack → ACTION: hkask/russell_token_status
 
 {
   "status": "valid",
@@ -212,7 +212,7 @@ test result: ok. 20 passed
 |----------|--------|
 | `docs/operations/KASK_TOKEN_ROTATION.md` | ✅ Complete |
 | `docs/operations/MCP_TOOL_CACHE_INVALIDATION.md` | ✅ Complete |
-| `docs/adr/0025-kask-mcp-client-trusted-relationship.md` | ✅ Updated |
+| `docs/adr/0025-hkask-mcp-client-trusted-relationship.md` | ✅ Updated |
 | `AGENTS.md` vocabulary | No changes needed |
 
 ---
@@ -259,7 +259,7 @@ systemctl --user status kask-token-rotate.timer
 ~/.local/bin/rotate-russell-token.sh --dry-run
 
 # Verify token file
-cat ~/.local/state/kask/mcp-token.json | python3 -m json.tool
+cat ~/.local/state/hkask/mcp-token.json | python3 -m json.tool
 
 # Run all tests
 cargo test -p russell-mcp -p russell-cli
@@ -278,5 +278,5 @@ cargo test -p russell-mcp -p russell-cli
 
 **Next Steps:**
 1. Run `./packaging/bin/install.sh --release` on fresh install
-2. Jack can check token status via `ACTION: kask/russell_token_status`
+2. Jack can check token status via `ACTION: hkask/russell_token_status`
 3. Optional: Implement `notifications/tools/list_changed` in hKask MCP servers

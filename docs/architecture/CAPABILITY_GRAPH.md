@@ -16,7 +16,7 @@ status: "Active"
 id: DIAG-CAPABILITY-001
 type: ER diagram
 verified_date: 2026-05-13
-verified_against: russell/crates/*, kask/stack/crates/*, kask/arsenal/crates/*, Okapi/server/*
+verified_against: russell/crates/*, hkask/stack/crates/*, hkask/arsenal/crates/*, Okapi/server/*
 reference_sources: AGENTS.md (all three repos), PRINCIPLES_CATALOG.md, ADR-T18
 status: VERIFIED
 -->
@@ -130,13 +130,13 @@ Capability: Agent Tool Exposition
 
 ```
 Capability: Container Management
-  Port: KaskContainer (stack/crates/kask-container/)
+  Port: HKaskContainer (stack/crates/hkask-container/)
     Contract: Typed, composable container — agents, tools, models, connectors, data
   Port: BitemporalStore (stack/crates/kask-memory/)
     Contract: Valid-time + transaction-time semantics
   Port: NeuralGraph (stack/crates/kask-neural-graph/)
     Contract: Knowledge graph with embeddings
-  Port: McpInfrastructure (stack/crates/kask-mcp/)
+  Port: McpInfrastructure (stack/crates/hkask-mcp/)
     Contract: MCP server lifecycle, tool registration, capability exposure
 
 Capability: LLM Routing
@@ -216,7 +216,7 @@ Capability: Extended API
   Endpoint: POST /api/rerank — document ranking (embedding-based or cross-encoder)
   Endpoint: GET /metrics — Prometheus metrics (KV-cache hit ratio)
   Endpoint: GET /api/metrics — JSON metrics (context utilization)
-  Endpoint: POST /api/kask/* — hKask lifecycle endpoints (routes_kask.go)
+  Endpoint: POST /api/hkask/* — hKask lifecycle endpoints (routes_hkask.go)
 ```
 
 ### 3.3 Import Pipeline

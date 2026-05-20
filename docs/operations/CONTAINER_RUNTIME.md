@@ -59,19 +59,19 @@ socket.
 
 ## Running Containers
 
-### kask-qdrant
+### hkask-qdrant
 
 | Field | Value |
 |-------|-------|
 | Image | `docker.io/qdrant/qdrant:latest` |
 | Purpose | Vector database for the hKask knowledge system |
 | Ports | 6333 (HTTP API), 6334 (gRPC) |
-| Volume | `~/Clones/kask/.data/qdrant` → `/qdrant/storage` |
+| Volume | `~/Clones/hkask/.data/qdrant` → `/qdrant/storage` |
 | Env | `RUN_MODE=production` |
 | Management | Quadlet systemd user service |
 | Auto-update | Yes (registry pull via `podman-auto-update.timer`) |
 
-Quadlet file: `~/.config/containers/systemd/kask-qdrant.container`
+Quadlet file: `~/.config/containers/systemd/hkask-qdrant.container`
 
 ## Key Configuration
 
@@ -86,16 +86,16 @@ Quadlet file: `~/.config/containers/systemd/kask-qdrant.container`
 
 ```sh
 # Status
-systemctl --user status kask-qdrant
+systemctl --user status hkask-qdrant
 podman ps
 docker ps                              # same thing
 
 # Logs
-podman logs kask-qdrant
-podman logs -f kask-qdrant             # follow
+podman logs hkask-qdrant
+podman logs -f hkask-qdrant             # follow
 
 # Restart
-systemctl --user restart kask-qdrant
+systemctl --user restart hkask-qdrant
 
 # Manual image update
 podman auto-update

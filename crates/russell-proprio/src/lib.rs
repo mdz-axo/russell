@@ -1152,6 +1152,36 @@ mod tests {
         assert_eq!(result.journal_stall_severity, Severity::Info);
     }
 
+    // -- Journal reader stall (Task 2.3) --
+
+    #[test]
+    fn journal_reader_stall_is_low_for_fast_reads() {
+        let (_tmp, w) = tmp_journal();
+        let r = w.reader();
+        let result = run_once_with(&w, &r, &no_timer()).unwrap();
+        // Fast reads should be < 3000ms (warn threshold)
+        assert!(result.journal_reader_stall_ms.unwrap() < READER_STALL_WARN_MS);
+        assert_eq!(result.journal_reader_stall_severity, Severity::Info);
+    }
+
+    #[test]
+    fn journal_reader_stall_triggers_warn() {
+        // Test warn threshold (3000ms)
+        let (_tmp, w) = tmp_journal();
+        let (latency_ms, severity) = gather_journal_reader_stall(&w, 0, 3500);
+        assert_eq!(latency_ms, Some(3500));
+        assert_eq!(severity, Severity::Warn);
+    }
+
+    #[test]
+    fn journal_reader_stall_triggers_alert() {
+        // Test alert threshold (5000ms)
+        let (_tmp, w) = tmp_journal();
+        let (latency_ms, severity) = gather_journal_reader_stall(&w, 0, 5500);
+        assert_eq!(latency_ms, Some(5500));
+        assert_eq!(severity, Severity::Alert);
+    }
+
     // -- LLM p95 latency with no data --
 
     #[test]

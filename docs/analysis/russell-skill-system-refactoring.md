@@ -115,7 +115,7 @@ flowchart LR
     subgraph "System 4 — Intelligence"
         SKILLS[SkillLoader<br/>YAML manifests]
         KNOWLEDGE[KnowledgeInjector<br/>KNOWLEDGE.md]
-        KASK[KaskMcpClient<br/>tools/list]
+        KASK[HKaskMcpClient<br/>tools/list]
     end
 
     SENTINEL -->|"writes"| JOURNAL
@@ -317,7 +317,7 @@ pub trait SkillDistribution: Send + Sync {
 | `RemoteDiscovery` | `GitRepoAdapter` | `russell-skills` | Git fetch + `skills/` directory scan (incomplete) |
 | `RemoteDiscovery` | `HttpIndexAdapter` | `russell-skills` | HTTP directory listing + download (incomplete) |
 | `SkillDistribution` | `LocalFilesystemAdapter` | `russell-skills` | Copy to `~/.local/share/harness/skills/` (current) |
-| `SkillDistribution` | `KaskMcpAdapter` | `russell-mcp` | `arsenal-mcp-russell` → expose as MCP resources |
+| `SkillDistribution` | `HKaskMcpAdapter` | `russell-mcp` | `arsenal-mcp-russell` → expose as MCP resources |
 | `SkillDistribution` | `NQuadsExporter` | `russell-skills` | Serialize skill catalog as N-Quads |
 
 ### 2.3 Type-Level Skill Taxonomy
@@ -422,7 +422,7 @@ flowchart TB
         READLINE_CONSENT["ReadlineConsentGate ::adapter::"]
         GIT_DISCOVER["GitRepoAdapter ::adapter::"]
         LOCAL_DIST["LocalFilesystemAdapter ::adapter::"]
-        KASK_MCP_ADAPTER["KaskMcpAdapter ::adapter::"]
+        HKASK_MCP_ADAPTER["HKaskMcpAdapter ::adapter::"]
         NQUADS_EXPORT["NQuadsExporter ::adapter::"]
     end
 
@@ -906,7 +906,7 @@ sequenceDiagram
 pub enum DistributionTarget {
     LocalFilesystem,
     GitRepo { url: String, branch: String },
-    KaskMcp { curator: String },
+    HKaskMcp { curator: String },
 }
 
 pub struct SkillRef {
@@ -973,7 +973,7 @@ Safety scanner blocks publishing skills containing:
 |---|---|
 | `LocalFilesystemAdapter` | Copy to `~/.local/share/harness/skills/<id>/` |
 | `GitRepoAdapter` | `git clone` + `cp -r skills/<id>/` |
-| `KaskMcpAdapter` | Expose skill manifests as MCP resources via `arsenal-mcp-russell` |
+| `HKaskMcpAdapter` | Expose skill manifests as MCP resources via `arsenal-mcp-russell` |
 | `NQuadsExporter` | Serialize skill catalog + registry entries as N-Quads |
 
 ### 6.4 Distribution Topology (Mermaid)
@@ -1591,7 +1591,7 @@ When the manifest schema evolves (adding `visibility`, `SkillKind`, `depends_on`
 ### 10.2 Multi-Host Skill Coordination
 
 - **Current:** Single-host. Registry cache is per-machine at `~/.local/share/harness/registry/local-cache.yaml`.
-- **Future:** Kask fleet orchestration. The `SkillDistribution` port's `KaskMcpAdapter` is the right boundary. Per-host registry caches remain; fleet-level catalog is via Spandrel's ontology index accessed through Kask MCP.
+- **Future:** hKask fleet orchestration. The `SkillDistribution` port's `HKaskMcpAdapter` is the right boundary. Per-host registry caches remain; fleet-level catalog is via Spandrel's ontology index accessed through hKask MCP.
 
 ### 10.3 Skill Composition and Chaining
 

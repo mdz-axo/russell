@@ -180,5 +180,5 @@ Rejected: Windows is out of charter per ADR-0001.
 
 - MCP specification: https://modelcontextprotocol.io
 - [ADR-0001](0001-scope-and-charter.md) — single-host scope.
-- [ADR-0025](0025-kask-mcp-client-trusted-relationship.md) —
+- [ADR-0025](../0025-hkask-mcp-client-trusted-relationship.md) —
   Russell as MCP *client* to Kask (orthogonal to this ADR).

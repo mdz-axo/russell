@@ -1,5 +1,5 @@
 ---
-title: "Russell Kask Token Wiring Verification"
+title: "Russell hKask Token Wiring Verification"
 audience: [operators, developers, architects]
 last_updated: 2026-05-14
 togaf_phase: "G"
@@ -12,12 +12,12 @@ status: "Active"
 <!-- STATUS: Active -->
 <!-- LAST_UPDATED: 2026-05-14 -->
 
-# Russell Kask Token Wiring Verification
+# Russell hKask Token Wiring Verification
 
 **Date:** 2026-05-14  
 **Status:** ✅ Verified Complete
 
-This document verifies the complete token lifecycle wiring for Russell's Kask MCP integration.
+This document verifies the complete token lifecycle wiring for Russell's hKask MCP integration.
 
 ---
 
@@ -29,8 +29,8 @@ This document verifies the complete token lifecycle wiring for Russell's Kask MC
 
 | Component | Purpose | Status |
 |-----------|---------|--------|
-| `StaticTokenProvider` | Reads from `KASK_MCP_TOKEN` env var | ✅ Implemented |
-| `FileTokenProvider` | Reads from `~/.local/state/kask/mcp-token.json` | ✅ Implemented |
+| `StaticTokenProvider` | Reads from `HKASK_MCP_TOKEN` env var | ✅ Implemented |
+| `FileTokenProvider` | Reads from `~/.local/state/hkask/mcp-token.json` | ✅ Implemented |
 | `ChainedTokenProvider` | File-first with env fallback | ✅ Implemented |
 
 **Key Code:**
@@ -43,7 +43,7 @@ impl ChainedTokenProvider {
             .map(FileTokenProvider::new)
             .or_else(|| FileTokenProvider::with_default_path().ok());
         
-        let fallback = StaticTokenProvider::from_env("KASK_MCP_TOKEN");
+        let fallback = StaticTokenProvider::from_env("HKASK_MCP_TOKEN");
         
         Ok(Self { file, fallback })
     }
@@ -51,8 +51,8 @@ impl ChainedTokenProvider {
 ```
 
 **Verification:**
-- ✅ Default path: `~/.local/state/kask/mcp-token.json`
-- ✅ Fallback to `KASK_MCP_TOKEN` env var
+- ✅ Default path: `~/.local/state/hkask/mcp-token.json`
+- ✅ Fallback to `HKASK_MCP_TOKEN` env var
 - ✅ Graceful degradation if neither available
 
 ---
@@ -90,7 +90,7 @@ fi
 ```
 
 **Verification:**
-- ✅ Token directory created: `mkdir -p ~/.local/state/kask`
+- ✅ Token directory created: `mkdir -p ~/.local/state/hkask`
 - ✅ Permissions set: `0600`
 - ✅ Operator guidance if principal missing
 
@@ -243,7 +243,7 @@ let needs_rotation = hours_until_rotation <= 0;
 3. Build arsenal-mcp-russell
    ↓
 4. Check if russell principal exists in Kask
-   ├─ YES → Get initial token, install to ~/.local/state/kask/mcp-token.json
+   ├─ YES → Get initial token, install to ~/.local/state/hkask/mcp-token.json
    └─ NO  → Show operator setup command
    ↓
 5. Install rotation script and timer
@@ -280,7 +280,7 @@ let needs_rotation = hours_until_rotation <= 0;
 ### Token Status Check Flow
 
 ```
-1. Jack runs: ACTION: kask/russell_token_status
+1. Jack runs: ACTION: hkask/russell_token_status
    ↓
 2. arsenal-mcp-russell reads token file
    ↓
@@ -334,15 +334,15 @@ let needs_rotation = hours_until_rotation <= 0;
 
 ```bash
 # 1. Check token file exists and permissions
-ls -la ~/.local/state/kask/mcp-token.json
+ls -la ~/.local/state/hkask/mcp-token.json
 
 # 2. Check token content (metadata only, not token value)
-cat ~/.local/state/kask/mcp-token.json | python3 -m json.tool
+cat ~/.local/state/hkask/mcp-token.json | python3 -m json.tool
 
 # 3. Test Russell can read token
 curl -s -X POST "http://127.0.0.1:8080/api/v1/tools/russell_token_status" \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer $(cat ~/.local/state/kask/mcp-token.json | python3 -c 'import sys,json; print(json.load(sys.stdin)["token"])')" \
+  -H "Authorization: Bearer $(cat ~/.local/state/hkask/mcp-token.json | python3 -c 'import sys,json; print(json.load(sys.stdin)["token"])')" \
   -d '{"arguments":{}}' | python3 -m json.tool
 
 # 4. Test rotation script (dry-run)
