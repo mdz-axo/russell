@@ -1140,7 +1140,7 @@ impl JournalReader {
         .map_err(CoreError::Sqlite)
     }
 
-/// List reflex_proposed events for a time window. Returns the
+    /// List reflex_proposed events for a time window. Returns the
     /// most recent events first (max 10). Each entry contains
     /// (severity, intervention_id, summary).
     ///
@@ -1202,11 +1202,14 @@ impl JournalReader {
         )?;
         let rows = stmt
             .query_map(params![action, since, until], |r| {
+                let sev_str: String = r.get(2)?;
+                let scope_str: String = r.get(3)?;
+
                 Ok(EventRow {
                     id: r.get(0)?,
                     ts: r.get(1)?,
-                    severity: r.get(2)?,
-                    scope: r.get(3)?,
+                    severity: sev_str.parse::<Severity>().unwrap_or(Severity::Info),
+                    scope: scope_str.parse::<Scope>().unwrap_or(Scope::Host),
                     tier: r.get(4)?,
                     module: r.get(5)?,
                     action: r.get(6)?,

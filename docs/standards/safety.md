@@ -285,6 +285,30 @@ RUSSELL_CONSENT_MODE=strict
 RUSSELL_CONSENT_MODE=conversational
 ```
 
+### 9.4 Custom Probe Registration Security (Q6)
+
+Skills can register custom probes via `ProbeCollector`. Security is enforced
+through layered defenses:
+
+**Trust tiers:**
+- Only **T4 (operator-authored)** skills may register custom probes
+- T1-T3 (bundled/discovered) skills cannot register probes
+
+**Safety scanner:**
+- Probe scripts scanned for exfiltration patterns (curl, wget, nc)
+- Network access patterns flagged even if `needs_network: false`
+- Destructive commands (rm, dd, mkfs) blocked at install time
+
+**Runtime isolation:**
+- `env_clear()` called before probe execution
+- Only declared `allowed_env_keys` propagated
+- Probes are read-only by design (no mutations allowed)
+
+**What operators see:**
+- Custom probes from T4 skills are allowed after safety scan passes
+- T1-T3 skills attempting to register probes are silently ignored
+- Probe output captured in journal for audit trail
+
 ## 10. Relationship to proprioception
 
 Self-triage (see

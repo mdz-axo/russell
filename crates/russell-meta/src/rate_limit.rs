@@ -42,7 +42,7 @@ impl Default for RateLimitConfig {
             .ok()
             .and_then(|s| s.parse::<u32>().ok())
             .unwrap_or(3);
-        
+
         Self {
             capacity,
             refill_rate: capacity as f64 / 60.0, // tokens/sec = N/min

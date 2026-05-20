@@ -85,8 +85,11 @@ OLLAMA_MODEL=deepseek-v4-pro:cloud
 # OPENROUTER_API_KEY=sk-or-v1-…
 
 # Rate limiting (default: 3 requests/minute)
+# Override for faster local Okapi or slower cloud backends
 RUSSELL_LLM_RATE_LIMIT=3
 ```
+
+**Q8 Decision:** The rate limit can be overridden via `RUSSELL_LLM_RATE_LIMIT=N` environment variable. Default is 3 req/min. Example: `RUSLL_LLM_RATE_LIMIT=5` allows 5 requests/minute.
 
 ### 3.2 Backend Precedence
 

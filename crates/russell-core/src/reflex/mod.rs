@@ -266,24 +266,24 @@ impl ReflexBudget {
     /// * `now_unix` - Current unix timestamp for window calculation
     pub fn from_journal(reader: &crate::journal::JournalReader, now_unix: i64) -> Self {
         let window_start = now_unix - 3600; // 1 hour ago
-        
+
         // Query reflex_proposed events in the last hour.
         let recent_events = reader
             .list_events_by_action("reflex_proposed", window_start, now_unix)
             .unwrap_or_default();
-        
+
         // Convert RFC 3339 timestamps to unix timestamps and populate the budget.
         let mut recent_firings: VecDeque<i64> = recent_events
             .into_iter()
             .filter_map(|e| {
                 // Parse RFC 3339 timestamp to unix timestamp.
                 // Format: 2026-05-20T12:34:56+00:00 or similar.
-                time::OffsetDateTime::parse(&e.ts)
+                time::OffsetDateTime::parse(&e.ts, &time::format_description::well_known::Rfc3339)
                     .map(|odt| odt.unix_timestamp())
                     .ok()
             })
             .collect();
-        
+
         // Sort by timestamp (oldest first) for efficient eviction.
         recent_firings.make_contiguous().sort();
 
