@@ -34,8 +34,7 @@ use russell_core::journal::port::JournalWritePort;
 use tracing::{debug, warn};
 use zeroize::Zeroize;
 
-// Re-export RiskBand from the parent crate for convenience.
-pub use crate::RiskBand;
+use crate::RiskBand;
 
 /// Errors that can occur during risk checking.
 #[derive(Debug, Clone, thiserror::Error)]

@@ -29,6 +29,10 @@ probes:
     cmd: ["bash", "./scripts/probe-gpu-libs.sh"]
     capture: stdout
     timeout: 15s
+  - id: probe-capabilities
+    cmd: ["bash", "./scripts/probe-capabilities.sh"]
+    capture: stdout
+    timeout: 10s
 
 interventions:
   - id: restart-okapi

@@ -14,7 +14,7 @@ path = "src/lib.rs"
 [features]
 default = ["client"]
 client = ["reqwest", "urlencoding", "async-trait", "chrono"]
-server = ["russell-core", "russell-sentinel", "rmcp", "tokio/io-util", "tokio/io-std", "anyhow"]
+server = ["russell-core", "russell-meta", "russell-sentinel", "russell-skills", "rmcp", "tokio/io-util", "tokio/io-std", "anyhow"]
 
 [dependencies]
 thiserror.workspace = true
@@ -31,7 +31,9 @@ chrono = { version = "0.4", features = ["serde"], optional = true }
 
 # Server dependencies (optional)
 russell-core = { workspace = true, optional = true }
+russell-meta = { workspace = true, optional = true }
 russell-sentinel = { workspace = true, optional = true }
+russell-skills = { workspace = true, optional = true }
 rmcp = { version = "1.7", features = ["server", "transport-io", "macros"], optional = true }
 anyhow = { workspace = true, optional = true }
 

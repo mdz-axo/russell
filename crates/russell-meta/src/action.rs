@@ -20,7 +20,8 @@
 //! Both `russell jack` and `russell chat` use this module,
 //! eliminating duplicated parsing and resolution logic.
 
-use russell_skills::{RiskBand, Rollback, Skill};
+use russell_core::{HKaskToolInfo, RiskBand};
+use russell_skills::{Rollback, Skill};
 
 /// A resolved ACTION — either a probe (read-only), an intervention
 /// (mutating, requires consent per JR-2), or a hKask MCP tool call
@@ -260,25 +261,6 @@ impl std::fmt::Display for ActionError {
     }
 }
 
-/// Metadata for a hKask tool available in the registry, passed by
-/// the caller (keeps `russell-meta` free of `russell-mcp` dependency).
-/// the caller (keeps `russell-meta` free of `russell-mcp` dependency).
-#[derive(Debug, Clone)]
-pub struct HKaskToolInfo {
-    /// Tool name (the callable ID).
-    pub name: String,
-    /// Risk band from annotations. Defaults to `RiskBand::Medium`
-    /// when unset — safe default per IDRS. Probes should explicitly
-    /// declare `RiskBand::None`.
-    /// when unset — safe default per IDRS. Probes should explicitly
-    /// declare `RiskBand::None`.
-    /// declare `RiskBand::None`.
-    pub risk_band: RiskBand,
-    /// JSON Schema for the tool's input parameters (from `tools/list`).
-    /// Used to extract required field names for operator prompting.
-    /// Used to extract required field names for operator prompting.
-    pub input_schema: Option<serde_json::Value>,
-}
 
 /// A post-intervention evaluation check, resolved from the skill manifest.
 #[derive(Debug, Clone)]

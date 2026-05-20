@@ -27,7 +27,7 @@ pub async fn run(paths: &Paths, note: Option<&str>) -> Result<()> {
 
     // Collect hKask MCP tool infos for the SOAP prompt and action resolver (ADR-0025 §7).
     // Graceful degradation: empty list if hKask is unreachable.
-    let hkask_tool_infos = collect_hkask_tool_infos(paths).await;
+    let hkask_tool_infos = russell_mcp::registry::collect_tool_infos(&HKaskMcpConfig::from_env(), &paths.memory_dir().join("hkask-tools.cache.json")).await;
     if !hkask_tool_infos.is_empty() {
         debug!(
             count = hkask_tool_infos.len(),
@@ -303,85 +303,3 @@ struct ProbeOutput {
     exit_code: Option<i32>,
 }
 
-/// Collect hKask MCP tool infos (name, risk, input_schema) for the SOAP prompt
-/// and action resolver (ADR-0025 §7).
-/// Returns an empty list on any failure (graceful degradation per ADR-0025 §5).
-/// Falls back to the disk cache if hKask is unreachable.
-async fn collect_hkask_tool_infos(paths: &Paths) -> Vec<HKaskToolInfo> {
-    let hkask_config = HKaskMcpConfig::from_env();
-    if hkask_config.validate().is_err() {
-        return vec![];
-    }
-
-    let mut client = match HKaskMcpClient::new(hkask_config.clone()) {
-        Ok(c) => c,
-        Err(e) => {
-            debug!(error = %e, "hKask MCP client construction failed");
-            return load_cached_tool_infos(paths);
-        }
-    };
-
-    if client.connect().await.is_err() {
-        debug!("hKask MCP connect failed — tools unavailable this session");
-        return load_cached_tool_infos(paths);
-    }
-
-    let cache_path = paths.memory_dir().join("hkask-tools.cache.json");
-    let mut registry = ToolRegistry::new(hkask_config.tool_ttl);
-    let _ = registry.load_from_disk(&cache_path);
-
-    if let Err(e) = registry.refresh(&client).await {
-        debug!(error = %e, "hKask tool registry refresh failed");
-        // Return cached if refresh failed but we have cached data.
-        if !registry.is_empty() {
-            return registry_to_hkask_infos(&registry);
-        }
-        return vec![];
-    }
-
-    // Persist fresh tools to disk.
-    let _ = registry.save_to_disk(&cache_path);
-
-    registry_to_hkask_infos(&registry)
-}
-
-/// Load cached tool infos from the disk cache as a fallback.
-fn load_cached_tool_infos(paths: &Paths) -> Vec<HKaskToolInfo> {
-    let cache_path = paths.memory_dir().join("hkask-tools.cache.json");
-    let mut registry = ToolRegistry::new(HKaskMcpConfig::from_env().tool_ttl);
-    if registry.load_from_disk(&cache_path).is_ok() && !registry.is_empty() {
-        debug!(
-            count = registry.tool_count(),
-            "loaded hKask tools from disk cache"
-        );
-        return registry_to_hkask_infos(&registry);
-    }
-    vec![]
-}
-
-/// Convert a [`ToolRegistry`] to a [`HKaskToolInfo`] list, preserving
-/// `input_schema` from the cached [`McpToolDefinition`].
-fn registry_to_hkask_infos(registry: &ToolRegistry) -> Vec<HKaskToolInfo> {
-    registry
-        .tools()
-        .iter()
-        .map(|t| {
-            let risk_band = registry
-                .tool_risk_band(&t.name)
-                .map(|s| match s.as_str() {
-                    "none" => RiskBand::None,
-                    "low" => RiskBand::Low,
-                    "medium" => RiskBand::Medium,
-                    "high" => RiskBand::High,
-                    "critical" => RiskBand::Critical,
-                    _ => RiskBand::Medium,
-                })
-                .unwrap_or(RiskBand::Medium);
-            HKaskToolInfo {
-                name: t.name.clone(),
-                risk_band,
-                input_schema: t.input_schema.clone(),
-            }
-        })
-        .collect()
-}

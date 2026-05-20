@@ -687,9 +687,8 @@ async fn call_jack(
     // `russell jack` receives in one-shot mode.
     let mut system = russell_meta::JACK_CHAT_PERSONA.to_string();
     {
-        {
-            KnowledgeSlot, score_knowledge_relevance, select_knowledge,
-        };
+        use russell_meta::prompt_registry::{KnowledgeSlot, score_knowledge_relevance, select_knowledge};
+
         // Derive active symptoms from recent events (same as compose_templated).
         let recent_events = reader.recent(20).unwrap_or_default();
         let active_symptoms: Vec<String> = recent_events
