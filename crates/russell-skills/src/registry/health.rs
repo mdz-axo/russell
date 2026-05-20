@@ -451,7 +451,7 @@ pub fn aggregate_alert_score(entries: &[RegistryEntry]) -> f64 {
             }
         };
         if score > 0.0 {
-            scores.push((score, &entry.deprecation_reason.as_deref().unwrap_or("")));
+            scores.push((score, entry.deprecation_reason.as_deref().unwrap_or("")));
         }
     }
 

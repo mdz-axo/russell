@@ -39,8 +39,11 @@ pub fn disk_root_used_pct() -> Option<f64> {
     Some((used as f64 / total as f64) * 100.0)
 }
 
+/// Disk I/O pressure "some" probe marker.
 pub struct DiskIoPressureSome;
+/// Disk I/O pressure "full" probe marker.
 pub struct DiskIoPressureFull;
+/// Disk root filesystem usage probe marker.
 pub struct DiskRootUsedPct;
 
 impl_probe!(

@@ -37,10 +37,15 @@ pub fn load_avg_1m() -> Option<f64> {
     tools::parse_loadavg_1m(&raw)
 }
 
+/// Memory available probe marker.
 pub struct MemAvailableMib;
+/// Swap used probe marker.
 pub struct SwapUsedMib;
+/// Load average 1m probe marker.
 pub struct LoadAvg1m;
+/// Memory pressure "some" probe marker.
 pub struct MemPressureSome;
+/// Memory pressure "full" probe marker.
 pub struct MemPressureFull;
 
 impl_probe!(

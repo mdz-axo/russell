@@ -233,10 +233,7 @@ fn has_destructive_rm(lower: &str) -> bool {
     let normalized = lower
         .replace("\", \"", " ")
         .replace("', '", " ")
-        .replace('"', "")
-        .replace('\'', "")
-        .replace('[', "")
-        .replace(']', "");
+        .replace(['"', '\'', '[', ']'], "");
     let check = &normalized;
 
     if check.contains("rm -rf /*")

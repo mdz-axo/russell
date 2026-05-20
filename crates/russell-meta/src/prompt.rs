@@ -40,19 +40,19 @@ pub fn compose(
     loaded_skills: &[Skill],
     skills_base_dir: &Path,
 ) -> Result<SoapPrompt> {
-    compose_with_kask(reader, profile, note, loaded_skills, skills_base_dir, &[])
+    let registry = PromptRegistry::with_defaults()?;
+    compose_templated(
+        &registry,
+        reader,
+        profile,
+        note,
+        loaded_skills,
+        skills_base_dir,
+        &[],
+        None,
+    )
 }
 
-/// Build the SOAP prompt with Kask MCP tool awareness.
-///
-/// Same as [`compose`] but additionally includes available Kask tools
-/// in the prompt's "Available actions" section.
-///
-/// Same as [`compose`] but additionally includes available Kask tools
-/// in the prompt's "Available actions" section.
-/// Same as [`compose`] but additionally includes available Kask tools
-/// in the prompt's "Available actions" section.
-/// in the prompt's "Available actions" section.
 pub fn compose_with_kask(
     reader: &JournalReader,
     profile: Option<&Profile>,
@@ -61,302 +61,18 @@ pub fn compose_with_kask(
     skills_base_dir: &Path,
     kask_tool_names: &[(String, Option<String>)],
 ) -> Result<SoapPrompt> {
-    let now = russell_core::time::now_unix();
-    let window_start = now - 24 * 3600;
-
-    let subjective = match note {
-        Some(n) if !n.trim().is_empty() => n.trim().to_string(),
-        _ => "(no operator note)".to_string(),
-    };
-
-    let mut objective = String::new();
-    writeln!(objective, "### Profile")?;
-    match profile {
-        Some(p) => {
-            writeln!(objective, "- profile_id: `{}`", p.profile_id)?;
-            writeln!(objective, "- authored_at: `{}`", p.authored_at)?;
-            if !p.host.os.distro.is_empty() {
-                writeln!(
-                    objective,
-                    "- host.os: `{}/{}` kernel `{}`",
-                    p.host.os.distro, p.host.os.version, p.host.os.kernel
-                )?;
-            }
-            if !p.host.cpu.model.is_empty() {
-                writeln!(
-                    objective,
-                    "- host.cpu: `{}` ({} cores / {} threads)",
-                    p.host.cpu.model, p.host.cpu.cores, p.host.cpu.threads
-                )?;
-            }
-            if !p.gpus.is_empty() {
-                writeln!(objective, "- gpus:")?;
-                for g in &p.gpus {
-                    writeln!(
-                        objective,
-                        "  - `{}` @ `{}` (role: {})",
-                        g.name, g.pci, g.role
-                    )?;
-                }
-            }
-        }
-        None => writeln!(objective, "- (no profile.json)")?,
-    }
-
-    writeln!(objective, "\n### Severity counts — last 24h")?;
-    let counts = reader.severity_counts(window_start, i64::MAX)?;
-    writeln!(
-        objective,
-        "- info: {} | warn: {} | alert: {} | crit: {}",
-        counts.info, counts.warn, counts.alert, counts.crit
-    )?;
-
-    // F-2: per-probe sample summary for the last 24h.
-    // Gives Jack actual telemetry to reason about, not just event counts.
-    writeln!(objective, "\n### Host probe samples — last 24h")?;
-    let summaries = reader
-        .host_samples_summary(window_start, i64::MAX)
-        .unwrap_or_default();
-    if summaries.is_empty() {
-        writeln!(objective, "- (no samples recorded)")?;
-    } else {
-        // Read 30-day baselines for deviation detection.
-        // Task 4.1: Track baseline staleness and warn if outdated.
-        let baselines: std::collections::BTreeMap<String, russell_core::journal::BaselineRow> =
-            reader
-                .read_baselines()
-                .unwrap_or_default()
-                .into_iter()
-                .map(|b| (b.probe.clone(), b))
-                .collect();
-        let has_baselines = !baselines.is_empty();
-
-        // Check for stale baselines (older than 48 hours).
-        let stale_baselines: Vec<&str> = baselines
-            .values()
-            .filter(|b| b.is_stale(48))
-            .map(|b| b.probe.as_str())
-            .collect();
-        let any_stale = !stale_baselines.is_empty();
-
-        if has_baselines {
-            if any_stale {
-                writeln!(
-                    objective,
-                    "\n⚠️ **Baseline staleness warning:** {} probes have baselines older than 48h: {}\n",
-                    stale_baselines.len(),
-                    stale_baselines.join(", ")
-                )?;
-            }
-            writeln!(
-                objective,
-                "| probe | count | min | avg | max | last | p95 (30d) | ewma (7d) | unit |"
-            )?;
-            writeln!(objective, "|---|---|---|---|---|---|---|---|---|")?;
-        } else {
-            writeln!(
-                objective,
-                "| probe | count | min | avg | max | last | unit |"
-            )?;
-            writeln!(objective, "|---|---|---|---|---|---|---|")?;
-        }
-        for s in &summaries {
-            let unit = s.unit.as_deref().unwrap_or("");
-            if has_baselines {
-                let baseline = baselines.get(&s.probe);
-                let (p95, ewma) = baseline
-                    .map(|b| (b.p95, b.ewma_mean))
-                    .unwrap_or((None, None));
-                let p95_str = p95.map(fmt_f64_baseline).unwrap_or_else(|| "—".to_string());
-                let ewma_str = ewma
-                    .map(fmt_f64_baseline)
-                    .unwrap_or_else(|| "—".to_string());
-                let stale_marker = if baseline.map(|b| b.is_stale(48)).unwrap_or(false) {
-                    " ⚠️"
-                } else {
-                    ""
-                };
-                writeln!(
-                    objective,
-                    "| {}{} | {} | {} | {} | {} | {} | {} | {} | {} |",
-                    s.probe,
-                    stale_marker,
-                    s.count,
-                    fmt_opt_f64(s.min),
-                    fmt_opt_f64(s.avg),
-                    fmt_opt_f64(s.max),
-                    fmt_opt_f64(s.last),
-                    p95_str,
-                    ewma_str,
-                    unit,
-                )?;
-            } else {
-                writeln!(
-                    objective,
-                    "| {} | {} | {} | {} | {} | {} | {} |",
-                    s.probe,
-                    s.count,
-                    fmt_opt_f64(s.min),
-                    fmt_opt_f64(s.avg),
-                    fmt_opt_f64(s.max),
-                    fmt_opt_f64(s.last),
-                    unit,
-                )?;
-            }
-        }
-    }
-
-    writeln!(objective, "\n### Sentinel freshness")?;
-    let last_sample_age_s = last_sample_age(reader).unwrap_or(-1);
-    if last_sample_age_s >= 0 {
-        writeln!(
-            objective,
-            "- Last sample {} seconds ago.",
-            last_sample_age_s
-        )?;
-    } else {
-        writeln!(objective, "- No samples recorded.")?;
-    }
-
-    // Phase 3A: available skills for LLM recommendation.
-    if !loaded_skills.is_empty() {
-        // Separate actionable skills (have probes/interventions) from knowledge-only.
-        let actionable: Vec<&Skill> = loaded_skills
-            .iter()
-            .filter(|s| !s.probes.is_empty() || !s.interventions.is_empty())
-            .collect();
-        let knowledge_only: Vec<&Skill> = loaded_skills
-            .iter()
-            .filter(|s| s.probes.is_empty() && s.interventions.is_empty())
-            .collect();
-
-        if !actionable.is_empty() {
-            writeln!(objective, "\n### Available skills")?;
-            writeln!(objective, "| skill | type | id | risk |")?;
-            writeln!(objective, "|---|---|---|---|")?;
-            for skill in &actionable {
-                for p in &skill.probes {
-                    writeln!(objective, "| {} | probe | {} | none |", skill.id, p.id,)?;
-                }
-                for iv in &skill.interventions {
-                    writeln!(
-                        objective,
-                        "| {} | intervention | {} | {:?} |",
-                        skill.id, iv.id, iv.risk,
-                    )?;
-                }
-            }
-            writeln!(
-                objective,
-                "\nWhen you identify a next step and a skill is loaded, \
-                     propose it on the final line using ACTION syntax:\n\n\
-                     For probes (read-only, auto-execute): \
-                     ACTION: <skill-id>/<probe-id>\n\
-                     (e.g. ACTION: okapi-watcher/probe-health)\n\n\
-                     For interventions (mutations, require consent): \
-                     ACTION: <skill-id>/<intervention-id>\n\
-                     (e.g. ACTION: okapi-watcher/restart-okapi)\n\n\
-                     Prefer probes first to gather evidence. \
-                     Probes run immediately. Interventions wait for the \
-                     operator to say 'ok'."
-            )?;
-        }
-
-        if !knowledge_only.is_empty() {
-            writeln!(objective, "\n### Loaded knowledge")?;
-            writeln!(
-                objective,
-                "The following knowledge skills are active (their expertise is in your system prompt):"
-            )?;
-            for skill in &knowledge_only {
-                let symptoms: String = skill
-                    .symptoms
-                    .iter()
-                    .map(|s| s.as_str())
-                    .collect::<Vec<_>>()
-                    .join(", ");
-                if symptoms.is_empty() {
-                    writeln!(objective, "- **{}**", skill.id)?;
-                } else {
-                    writeln!(objective, "- **{}** — symptoms: {}", skill.id, symptoms)?;
-                }
-            }
-        }
-    }
-
-    // Phase 4C: Kask MCP tools (ADR-0025 §7).
-    if !kask_tool_names.is_empty() {
-        writeln!(objective, "\n### Kask MCP tools")?;
-        writeln!(objective, "| tool | risk |")?;
-        writeln!(objective, "|---|---|")?;
-        for (name, risk) in kask_tool_names {
-            let risk_str = risk.as_deref().unwrap_or("medium");
-            writeln!(objective, "| {name} | {risk_str} |")?;
-        }
-        writeln!(
-            objective,
-            "\nYou can also call Kask tools via ACTION syntax:\n\
-             ACTION: kask/<tool-name>\n\
-             (e.g. ACTION: kask/paradigm_shift_query)\n\n\
-             If the tool needs arguments, add an Arguments line:\n\
-             Arguments: {{\"prompt\": \"...\", \"depth\": \"quick\"}}\n\n\
-             Tools with risk 'none' auto-execute. Others require operator consent."
-        )?;
-    }
-
-    writeln!(objective, "\n### Most-recent events (up to 20)")?;
-    let rows = reader.recent(20)?;
-    if rows.is_empty() {
-        writeln!(objective, "- (no events recorded)")?;
-    } else {
-        writeln!(
-            objective,
-            "| ts | severity | scope | module | action | summary |"
-        )?;
-        writeln!(objective, "|---|---|---|---|---|---|")?;
-        for r in rows {
-            writeln!(
-                objective,
-                "| {} | {} | {} | {} | {} | {} |",
-                r.ts,
-                r.severity.as_str(),
-                r.scope.as_str(),
-                r.module.as_deref().unwrap_or("-"),
-                r.action,
-                r.summary.as_deref().unwrap_or("")
-            )?;
-        }
-    }
-
-    // Reflex arcs: proposed interventions from the sentinel's reflex engine.
-    build_reflex_section(reader, &mut objective)?;
-
-    let mut rendered = String::new();
-    writeln!(rendered, "# SOAP — russell help\n")?;
-    writeln!(rendered, "## Subjective\n\n{subjective}\n")?;
-    writeln!(rendered, "## Objective\n\n{objective}\n")?;
-    writeln!(
-        rendered,
-        "## Assessment\n\n*(your job, Jack — fill this in based on the evidence above.)*\n"
-    )?;
-    writeln!(rendered, "## Plan\n\n*(your job, Jack — one next step.)*\n")?;
-
-    let mut system_prompt = crate::JACK_PERSONA.to_string();
-
-    // Append KNOWLEDGE.md from applicable skills.
-    append_skill_knowledge(&mut system_prompt, loaded_skills, skills_base_dir);
-
-    Ok(SoapPrompt {
-        system: system_prompt,
-        subjective,
-        objective,
-        rendered,
-        temperature: None,
-        max_tokens: None,
-    })
+    let registry = PromptRegistry::with_defaults()?;
+    compose_templated(
+        &registry,
+        reader,
+        profile,
+        note,
+        loaded_skills,
+        skills_base_dir,
+        kask_tool_names,
+        None,
+    )
 }
-
-/// Build the SOAP prompt using the MiniJinja template registry.
 pub fn compose_templated(
     registry: &PromptRegistry,
     reader: &JournalReader,

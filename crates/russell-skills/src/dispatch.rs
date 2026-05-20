@@ -113,9 +113,6 @@ pub struct RunOutcome {
     /// Rollback outcome, if this was an intervention that failed
     /// and rollback was triggered. `None` for probes and successful
     /// interventions.
-    /// and rollback was triggered. `None` for probes and successful
-    /// interventions.
-    /// interventions.
     pub rollback: Option<Box<RunOutcome>>,
 }
 
@@ -133,7 +130,6 @@ impl RunOutcome {
     }
 
     /// Whether the overall operation is safe — either forward succeeded,
-    /// or forward failed but rollback succeeded.
     /// or forward failed but rollback succeeded.
     #[must_use]
     pub fn is_safe(&self) -> bool {

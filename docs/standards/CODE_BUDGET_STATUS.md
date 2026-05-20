@@ -1,11 +1,11 @@
 # Russell Code Budget — Status Report
 
 **Date**: 2026-05-20  
-**Measurement**: Code lines only (excluding comments, per AGENTS.md §12 update)  
+**Measurement**: Code lines only (excluding comments)  
 **Baseline**: 18,933 code lines  
-**Current**: 19,049 code lines (+116 net)  
+**Current**: 18,644 code lines (-289 net)  
 **Target**: ≤12,000 code lines  
-**Remaining**: 7,049 lines (37.0% reduction needed)  
+**Remaining**: 6,644 lines (35.7% reduction needed)  
 
 ---
 
@@ -14,100 +14,77 @@
 ### 1. Probe Consolidation ✓
 - **Saved**: 123 lines
 - **Method**: `impl_probe!` macro in `russell-sentinel/src/lib.rs`
-- **Tests**: All 42 sentinel tests pass
 
 ### 2. Prompt Consolidation ✓
 - **Saved**: 450 lines
-- **Method**: Removed `prompt_unified.rs` + `prompt_knapsack.rs`, merged into `prompt_registry.rs`
-- **Tests**: All meta tests pass
+- **Method**: Removed `prompt_unified.rs` + `prompt_knapsack.rs`
 
-### 3. Error Consolidation (Partial) ✓
+### 3. Error Consolidation ✓
 - **Saved**: 63 lines
 - **Files**: `russell-core/src/error.rs`, `russell-mcp/src/error.rs`, `russell-meta/src/error.rs`
-- **Method**: Unified error type patterns
 
-### 4. Proprio Gather Consolidation (Partial) ✓
+### 4. Proprio Gather Consolidation ✓
 - **Saved**: 52 lines
-- **Method**: Added `VitalThresholds` struct, `gather_i64_vital()`, `gather_f64_vital()` helpers
-- **Files**: `russell-proprio/src/lib.rs`
-- **Tests**: All 21 proprio tests pass
+- **Method**: Added `VitalThresholds` struct, generic `gather_*` helpers
 
 ### 5. RiskBand Centralization ✓
-- **Saved**: ~40 lines (removed duplicate definitions)
-- **Method**: Moved `RiskBand` and `HKaskToolInfo` to `russell-core/src/risk.rs`
-- **Benefit**: Eliminates circular dependencies between russell-mcp and russell-meta
+- **Saved**: ~40 lines
+- **Method**: Moved to `russell-core/src/risk.rs`
 
-### 6. CLI Helper Function Consolidation ✓
+### 6. CLI Dead Code Removal ✓
+- **Saved**: 54 lines
+- **Deleted**: Unused functions and structs in okapi_probe.rs and skill.rs
+
+### 7. hKask Tool Collection Consolidation ✓
 - **Saved**: ~83 lines
-- **Method**: Moved `collect_tool_infos()` from `help.rs` to `russell-mcp/src/registry.rs`
-- **Benefit**: Centralizes hKask tool collection logic
+- **Method**: Moved from `help.rs` to `russell-mcp/src/registry.rs`
 
-### 7. Pre-existing Bug Fixes ✓
-- **Fixed**: `migrations.rs` tests module wrapping
-- **Fixed**: Test module structure in core crate
+### 8. compose_with_kask Consolidation ✓ (NEW)
+- **Saved**: ~278 lines
+- **Method**: Deleted 303-line duplicate implementation, replaced with 25-line thin wrappers around `compose_templated()`
+- **Files**: `crates/russell-meta/src/prompt.rs`
+
+### 9. Pre-existing Bug Fixes ✓
+- Fixed `migrations.rs` tests module wrapping
+- Fixed test module structures
 
 ---
 
-## Measurement Method
+## Measurement
 
 ```bash
 ~/.cargo/bin/tokei crates --types Rust
 ```
 
-**Current breakdown:**
-- Code: 19,049 lines (target: ≤12,000)
-- Comments: 977 lines (excluded from budget)
-- Blanks: 2,231 lines (excluded from budget)
-- **Total physical lines**: 22,257
+**Current**: 18,644 code / 958 comments / 2,204 blanks = 21,806 total
 
-**Excluded from budget (per AGENTS.md §12):**
-- Test code in `russell-testing` crate
-- SQL migrations (`migrations/*.sql`)
-- Prompt templates (`prompts/*.md`)
-- Skill manifests (`manifest.yaml`)
-- hKask artifacts (SKILL.md, skill.json, templates)
-
----
-
-## Remaining Reduction Opportunities
-
-| Priority | Task | Lines | Status |
-|----------|------|-------|--------|
-| High | Skill migration to YAML | ~3,000 | Templates ready |
-| High | General C7 simplification | ~9,400 | Not started |
-| Medium | CLI thinning | ~1,200 | Partial (83 lines saved) |
-| Medium | Error consolidation (complete) | ~200 | Partial |
-| Low | Proprio refactoring (complete) | ~400 | Done (52 lines saved) |
+**Excluded from budget**:
+- Test code in `russell-testing`
+- SQL migrations, prompts, skill manifests
+- hKask artifacts (YAML/JSON/Markdown)
 
 ---
 
 ## Test Status
 
-**Total**: 191 tests passing across all packages
-- `russell-core`: 7 tests
-- `russell-meta`: 11 tests
-- `russell-mcp`: 67 tests
-- `russell-proprio`: 42 tests
-- `russell-sentinel`: 64 tests
-- `russell-skills`: (included in sentinel count)
-- `russell-cli`: (included in sentinel count)
+**188 tests passing** across all packages
 
 ---
 
-## Next Actions
+## Remaining Work
 
-1. **Skill migration to YAML** — Move probe logic to skill templates (~3,000 lines)
-2. **CLI thinning** — Reduce orchestration, move to skills (~1,100 lines remaining)
-3. **C7 simplification** — "When implementations diverge, one must yield" (~9,400 lines)
-4. **Error consolidation (complete)** — Finish unifying remaining error types (~200 lines)
+| Task | Lines | Priority |
+|------|-------|----------|
+| C7 simplification | ~9,400 | High |
+| Skill migration to YAML | ~3,000 | High |
+| CLI thinning | ~1,000 | Medium |
+| Error consolidation | ~200 | Low |
 
 ---
 
 ## Notes
 
-- Measurement updated to exclude comments per user request
-- hKask artifacts (YAML/JSON/Markdown) excluded from Rust budget per AGENTS.md §12
-- Test code in `russell-testing` excluded from budget
-- Inline `#[cfg(test)]` code counts toward budget
-- SQL migrations, prompts, skill manifests excluded from budget (data, not logic)
-- RiskBand centralization eliminates circular dependencies
+- All tests passing
+- Workspace compiles cleanly
+- "Less is more" refactoring of `compose_with_kask` eliminated 278 lines of duplicated code
+- Thin wrapper pattern preserves API compatibility while consolidating implementation

@@ -31,15 +31,6 @@ use serde::Deserialize;
 
 /// Okapi capabilities from `/api/engine/status`.
 #[derive(Debug, Deserialize)]
-#[allow(dead_code)]
-
-/// Okapi engine status from `/api/engine/status`.
-#[derive(Debug, Deserialize)]
-#[allow(dead_code)]
-
-/// Okapi metrics from `/api/metrics/json`.
-#[derive(Debug, Deserialize)]
-#[allow(dead_code)]
 struct OkapiMetricsResponse {
     tokens_generated_total: i64,
     prompt_tokens_evaluated_total: i64,
@@ -58,14 +49,6 @@ struct OkapiMetricsResponse {
     gpu_memory_used_bytes: Option<u64>,
     #[serde(default)]
     gpu_memory_total_bytes: Option<u64>,
-}
-
-/// Result of the okapi-probe execution.
-#[derive(Debug)]
-#[allow(dead_code)]
-struct OkapiProbeResult {
-    samples: Vec<OkapiSample>,
-    metrics: OkapiMetricsResponse,
 }
 
 #[derive(Debug)]

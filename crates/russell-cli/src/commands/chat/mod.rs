@@ -2,21 +2,13 @@
 //! `russell chat` — interactive REPL with Jack via Okapi.
 //!
 //! This module is split into focused submodules:
-//! - [`commands`] — slash-command handlers
-//! - [`consent`] — pending action state and affirmation/refusal parsing
 //! - [`execute`] — local skill execution (probes & interventions)
-//! - [`history`] — chat history persistence
 //! - [`hkask`] — hKask MCP tool execution (ADR-0025)
 //! - [`objective`] — SOAP objective builder
-//! - [`spinner`] — LLM call with animated spinner
 
-pub mod commands;
-pub mod consent;
 pub mod execute;
-pub mod history;
 pub mod hkask;
 pub mod objective;
-pub mod spinner;
 
 use anyhow::{Context, Result};
 use russell_core::journal::{JournalReader, JournalWriter};
@@ -25,15 +17,336 @@ use russell_mcp::client::HKaskMcpClient;
 use russell_mcp::config::HKaskMcpConfig;
 use russell_mcp::registry::ToolRegistry;
 use russell_meta::action::{self, ResolvedAction};
+use russell_meta::client::LlmClient;
 use russell_skills::RiskBand;
 use rustyline::DefaultEditor;
 use rustyline::error::ReadlineError;
+use serde::{Deserialize, Serialize};
 use std::io::Write;
+use std::time::Instant;
 use tracing::{debug, info, warn};
 
-use consent::{PendingAction, is_affirmative, is_refusal};
 use execute::journal_chat_turn;
-use history::{ChatHistory, Turn, save_history};
+
+// ─── Chat history types (from history.rs) ───────────────────────────────────
+
+/// One turn in the conversation.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Turn {
+    pub role: String,
+    pub content: String,
+}
+
+/// Full conversation history (excludes the system prompt which is
+/// separate and fixed).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ChatHistory {
+    pub session_id: String,
+    pub turns: Vec<Turn>,
+}
+
+impl ChatHistory {
+    pub fn new(session_id: String) -> Self {
+        Self {
+            session_id,
+            turns: Vec::new(),
+        }
+    }
+}
+
+/// Persist the conversation history to disk.
+fn save_history(chat_path: &std::path::Path, history: &ChatHistory) -> Result<()> {
+    let json = serde_json::to_string(history)?;
+    std::fs::write(chat_path.with_extension("json"), &json)
+        .with_context(|| format!("writing {}", chat_path.display()))?;
+    Ok(())
+}
+
+// ─── Consent handling (from consent.rs) ─────────────────────────────────────
+
+/// Pending actions expire after this many seconds without operator
+/// input. Prevents a stale intervention from executing long after
+/// context has shifted.
+const CONSENT_EXPIRY_SECS: u64 = 300;
+
+/// A pending action (probe or intervention) awaiting operator consent.
+#[derive(Debug, Clone)]
+struct PendingAction {
+    action: ResolvedAction,
+    stdin_content: Option<String>,
+    proposed_at: Instant,
+}
+
+impl PendingAction {
+    fn new(action: ResolvedAction, stdin_content: Option<String>) -> Self {
+        Self {
+            action,
+            stdin_content,
+            proposed_at: Instant::now(),
+        }
+    }
+
+    fn is_expired(&self) -> bool {
+        self.proposed_at.elapsed().as_secs() >= CONSENT_EXPIRY_SECS
+    }
+
+    fn describe(&self) -> String {
+        format!("{}/{}", self.action.skill_id(), self.action.action_id())
+    }
+}
+
+/// Returns true if the input looks like natural-language consent.
+fn is_affirmative(input: &str) -> bool {
+    let lower = input.to_lowercase();
+    let lower = lower.trim();
+    matches!(
+        lower,
+        "ok" | "okay" | "yes" | "yep" | "yeah" | "yea" | "sure"
+            | "do it" | "go ahead" | "go for it" | "approved"
+            | "run it" | "execute" | "please" | "y" | "yes please"
+            | "ok do it" | "lets go" | "let's go"
+    )
+}
+
+/// Returns true if the input is a refusal.
+fn is_refusal(input: &str) -> bool {
+    matches!(
+        input.trim(),
+        "/deny" | "no" | "nope" | "cancel" | "nah" | "not now" | "later"
+    )
+}
+
+// ─── Slash command handlers (from commands.rs) ──────────────────────────────
+
+/// Prompt the operator to pick from a numbered list of models.
+fn prompt_model_selection(
+    editor: &mut DefaultEditor,
+    history_entry: &str,
+    count: usize,
+) -> Option<usize> {
+    println!("  Type a number to select, or 'cancel'.");
+    let _ = editor.add_history_entry(history_entry);
+    let sel_line = editor.readline("select → ").ok()?;
+    let sel = sel_line.trim();
+    if sel == "cancel" || sel == "/model cancel" {
+        println!("  Cancelled.");
+        return None;
+    }
+    match sel.trim_start_matches("/model ").trim().parse::<usize>() {
+        Ok(idx) if idx >= 1 && idx <= count => Some(idx - 1),
+        _ => {
+            println!("  Invalid selection. Cancelled.");
+            None
+        }
+    }
+}
+
+/// Fetch the list of available models from Okapi's `/api/tags`.
+async fn okapi_list_models(base_url: &str) -> Result<Vec<String>, String> {
+    let tags_url = format!(
+        "{}/api/tags",
+        base_url.trim_end_matches("/v1").trim_end_matches('/')
+    );
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(5))
+        .build()
+        .map_err(|e| format!("HTTP client: {e}"))?;
+    let resp = client
+        .get(&tags_url)
+        .send()
+        .await
+        .map_err(|e| format!("Okapi unreachable: {e}"))?;
+    if !resp.status().is_success() {
+        return Err(format!("Okapi returned HTTP {}", resp.status()));
+    }
+    let body: serde_json::Value = resp.json().await.map_err(|e| format!("parse error: {e}"))?;
+    Ok(body["models"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|m| m["name"].as_str().map(str::to_string))
+        .collect())
+}
+
+/// Handle `/help` command.
+fn handle_help() {
+    println!("  Commands:");
+    println!("  /exit, /quit  — end the session");
+    println!("  /refresh      — reload skills from disk");
+    println!("  /reload       — same as /refresh");
+    println!("  /history      — show conversation history summary");
+    println!("  /skills       — list available skills");
+    println!("  /model        — show current model");
+    println!("  /model list   — list available Okapi models");
+    println!("  /model <name> — switch to a model (fuzzy match)");
+    println!("  /approve      — consent to Jack's proposed action");
+    println!("                  (also: 'ok', 'yes', 'do it', 'go ahead')");
+    println!("  /deny         — refuse Jack's proposed action");
+    println!("                  (also: 'no', 'nope', 'cancel')");
+    println!();
+}
+
+/// Handle `/history` command.
+fn handle_history(session_id: &str, turns: &[Turn]) {
+    println!("  Session {} — {} turns", session_id, turns.len());
+    for (i, turn) in turns.iter().enumerate() {
+        let label = if turn.role == "user" { "you" } else { "Jack" };
+        let preview = if turn.content.len() > 80 {
+            format!("{}…", &turn.content[..80])
+        } else {
+            turn.content.clone()
+        };
+        println!("  {i:>3}. {label}: {preview}");
+    }
+    println!();
+}
+
+/// Handle `/skills` command.
+fn handle_skills(skills: &[russell_skills::Skill]) {
+    if skills.is_empty() {
+        println!("  No skills loaded.");
+    } else {
+        for s in skills {
+            println!("  {}", s.id);
+            for p in &s.probes {
+                println!("    probe: {} ({})", p.id, p.cmd.join(" "));
+            }
+            for iv in &s.interventions {
+                println!(
+                    "    intervention: {} ({}) [risk: {:?}]",
+                    iv.id,
+                    iv.cmd.join(" "),
+                    iv.risk
+                );
+            }
+        }
+    }
+    println!();
+}
+
+// ─── LLM spinner (from spinner.rs) ──────────────────────────────────────────
+
+/// Braille spinner frames for the thinking animation.
+const SPINNER_FRAMES: &[&str] = &["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+
+/// Jack's thinking expressions.
+const THINKING_EXPRESSIONS: &[&str] = &[
+    "🐶 digging digging digging",
+    "✨ hey hey! hold your kibble",
+    "🐶 *sniff* *sniff* checking things",
+    "💅 working it. just a moment.",
+    "🔍 just checking on you",
+];
+
+/// Call the LLM via Okapi with an animated thinking spinner.
+async fn call_okapi_with_spinner(
+    cfg: &russell_meta::client::ClientConfig,
+    model: &str,
+    messages: &[serde_json::Value],
+) -> std::result::Result<String, String> {
+    use rand::seq::SliceRandom;
+    use russell_meta::client::{LlmClient, SoapPrompt};
+    use russell_meta::oai_client::OkapiClient;
+    use tokio::sync::oneshot;
+
+    let expression = THINKING_EXPRESSIONS
+        .choose(&mut rand::thread_rng())
+        .unwrap_or(&"⏳");
+
+    let (tx, rx) = oneshot::channel();
+    let cfg = cfg.clone();
+    let model = model.to_string();
+    let messages = messages.to_vec();
+    tokio::spawn(async move {
+        let result = call_llm_via_port(&cfg, &model, &messages).await;
+        let _ = tx.send(result);
+    });
+
+    let mut rx = rx;
+    let mut interval = tokio::time::interval(std::time::Duration::from_millis(180));
+    let mut frame_idx = 0usize;
+
+    print!(
+        "\r\x1b[KJack → \x1b[1;36m{expression}\x1b[0m {}",
+        SPINNER_FRAMES[0]
+    );
+    std::io::stdout().flush().unwrap();
+
+    loop {
+        tokio::select! {
+            result = &mut rx => {
+                return result.unwrap_or(Err("internal error: channel closed".into()));
+            }
+            _ = interval.tick() => {
+                frame_idx = (frame_idx + 1) % SPINNER_FRAMES.len();
+                print!(
+                    "\r\x1b[KJack → \x1b[1;36m{expression}\x1b[0m {}",
+                    SPINNER_FRAMES[frame_idx]
+                );
+                std::io::stdout().flush().unwrap();
+            }
+        }
+    }
+}
+
+/// Send chat messages through the LlmClient port.
+async fn call_llm_via_port(
+    cfg: &russell_meta::client::ClientConfig,
+    model: &str,
+    messages: &[serde_json::Value],
+) -> std::result::Result<String, String> {
+    use russell_meta::client::SoapPrompt;
+    use russell_meta::oai_client::OkapiClient;
+
+    let system = messages
+        .iter()
+        .find(|m| m["role"] == "system")
+        .and_then(|m| m["content"].as_str())
+        .unwrap_or("")
+        .to_string();
+
+    let mut rendered = String::new();
+    for msg in messages.iter().filter(|m| m["role"] != "system") {
+        let role = msg["role"].as_str().unwrap_or("unknown");
+        let content = msg["content"].as_str().unwrap_or("");
+        let label = if role == "user" { "User" } else { "Jack" };
+        rendered.push_str(&format!("**{label}:** {content}\n\n"));
+    }
+
+    let soap = SoapPrompt {
+        system,
+        subjective: String::new(),
+        objective: String::new(),
+        rendered: rendered.trim_end().to_string(),
+        temperature: None,
+        max_tokens: None,
+    };
+
+    let mut chat_cfg = cfg.clone();
+    chat_cfg.model = model.to_string();
+    if chat_cfg.base_url.is_none() {
+        chat_cfg.base_url = Some(russell_meta::health::DEFAULT_BASE_URL.to_string());
+    }
+    if chat_cfg.api_key.is_none() {
+        chat_cfg.api_key = Some("okapi".into());
+    }
+
+    let base = chat_cfg
+        .base_url
+        .as_deref()
+        .unwrap_or(russell_meta::health::DEFAULT_BASE_URL);
+    if !russell_meta::health::ensure_ready(base).await {
+        return Err("can't reach Okapi (tried auto-start)".into());
+    }
+
+    let client = OkapiClient::new(&chat_cfg)
+        .await
+        .map_err(|e| format!("client error: {e}"))?;
+
+    let resp = client.chat(&soap).await.map_err(|e| format!("{e}"))?;
+
+    Ok(resp.content)
+}
 
 /// Run the chat REPL.
 pub async fn run(paths: &Paths) -> Result<()> {
@@ -162,7 +475,7 @@ pub async fn run(paths: &Paths) -> Result<()> {
                     if pa.is_expired() {
                         println!(
                             "  → Pending action expired ({}s). Please re-propose.",
-                            consent::CONSENT_EXPIRY_SECS
+                            CONSENT_EXPIRY_SECS
                         );
                         pending_action = None;
                         continue;
@@ -520,15 +833,15 @@ async fn handle_slash_command(
             true
         }
         "/help" => {
-            commands::handle_help();
+            handle_help();
             true
         }
         "/history" => {
-            commands::handle_history(session_id, &history.turns);
+            handle_history(session_id, &history.turns);
             true
         }
         "/skills" => {
-            commands::handle_skills(skills);
+            handle_skills(skills);
             true
         }
         other => {
@@ -540,7 +853,7 @@ async fn handle_slash_command(
             if other == "/model list" {
                 // Lazy-fetch Okapi models on first use.
                 if !*okapi_models_fetched {
-                    *okapi_models = commands::okapi_list_models(base_url)
+                    *okapi_models = okapi_list_models(base_url)
                         .await
                         .unwrap_or_default();
                     *okapi_models_fetched = true;
@@ -566,7 +879,7 @@ async fn handle_slash_command(
                 }
                 // Lazy-fetch Okapi models for switching.
                 if !*okapi_models_fetched {
-                    *okapi_models = commands::okapi_list_models(base_url)
+                    *okapi_models = okapi_list_models(base_url)
                         .await
                         .unwrap_or_default();
                     *okapi_models_fetched = true;
@@ -605,7 +918,7 @@ async fn handle_slash_command(
                             println!("    {}. {m}{marker}", i + 1);
                         }
                         if let Some(selected) =
-                            commands::prompt_model_selection(editor, trimmed, filtered.len())
+                            prompt_model_selection(editor, trimmed, filtered.len())
                         {
                             *current_model = filtered[selected].clone();
                             println!("  Switched to model: {current_model}");
@@ -806,7 +1119,7 @@ async fn call_jack(
 
     // Call the LLM with an animated thinking spinner.
     let cfg = russell_meta::client::ClientConfig::from_env();
-    let response = spinner::call_okapi_with_spinner(&cfg, current_model, &messages).await;
+    let response = call_okapi_with_spinner(&cfg, current_model, &messages).await;
 
     match response {
         Ok(content) => {

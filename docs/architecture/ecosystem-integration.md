@@ -1,23 +1,26 @@
 ---
 title: "Ecosystem Integration — hKask & Okapi Reference Model"
 audience: [architects, developers]
-last_updated: 2026-05-15
+last_updated: 2026-05-20
 togaf_phase: "C"
-version: "1.0.0"
+version: "1.1.0"
 status: "Active"
 ---
 
 <!-- TOGAF_DOMAIN: Application Architecture -->
-<!-- VERSION: 1.0.0 -->
+<!-- VERSION: 1.1.0 -->
 <!-- STATUS: Active -->
-<!-- LAST_UPDATED: 2026-05-15 -->
+<!-- LAST_UPDATED: 2026-05-20 -->
 
 # Ecosystem Integration — hKask & Okapi Reference Model
 
 > Defines the interfaces that make Russell's skill registry a hKask ecosystem
 > reference model: MCP tool exposure, Okapi LLM skill routing, cross-project
 > skill portability, and OKH span bridging.
-> Version: 1.0.0 | 2026-05-15
+>
+> **Architecture:** Russell → hKask → Okapi (Russell accesses Okapi through hKask as an ACP agent)
+>
+> Version: 1.1.0 | 2026-05-20
 
 ---
 
@@ -145,11 +148,64 @@ stack-control-plane
 
 ## 2. Okapi LLM Skill Routing
 
-### `skill-hint` Context Extension
+### Architecture: Russell → hKask → Okapi
+
+Russell does **not** connect directly to Okapi. All inference requests flow through hKask:
+
+```mermaid
+flowchart LR
+    Russell["Russell (ACP Agent)"]
+    hKask["hKask (MCP Server Host)"]
+    Okapi["Okapi (Inference Engine)"]
+    
+    Russell -->|"MCP tools/call"| hKask
+    hKask -->|"/api/generate"| Okapi
+    Okapi -->|response| hKask
+    hKask -->|MCP response| Russell
+```
+
+<!-- DIAGRAM_ALIGNMENT
+id: DIAG-RUSSELL-OKAPI-001
+verified_date: 2026-05-20
+verified_against: russell/docs/architecture/ecosystem-integration.md
+status: VERIFIED
+-->
+
+### MCP Server: `hkask-mcp-inference`
+
+hKask exposes inference capabilities to Russell via MCP:
+
+| MCP Tool | Okapi Endpoint | Purpose |
+|----------|----------------|---------|
+| `inference/generate` | `/api/generate` | Completion generation |
+| `inference/chat` | `/api/chat` | Chat completion |
+| `inference/embed` | `/api/embed` | Embedding generation |
+| `inference/rerank` | `/api/rerank` | Document reranking |
+
+### Russell Request Flow
+
+1. Russell sends MCP request to hKask: `inference/generate`
+2. hKask validates request, applies capability-based auth
+3. hKask routes to Okapi via HTTP POST `/api/generate`
+4. Okapi processes request, returns response
+5. hKask parses response, applies confidence routing if configured
+6. hKask returns MCP response to Russell
+
+### Benefits of Indirect Architecture
+
+| Benefit | Description |
+|---------|-------------|
+| **Unified authentication** | Russell inherits hKask's capability tokens |
+| **Centralized routing** | hKask can route to Okapi, OpenRouter, or other backends |
+| **Capability discovery** | hKask exposes Okapi capabilities via MCP |
+| **Observability** | All requests traced through hKask CNS spans |
+| **Confidence routing** | hKask can escalate low-confidence responses |
 
 Okapi's request context gains a `skill-hint` JSON field that maps active symptoms
 → loaded skill KNOWLEDGE.md injection. This enables downstream Okapi consumers
 (not just Russell) to use the skill registry for prompt augmentation.
+
+**Note:** Russell does not set `skill-hint` directly. hKask adds it when routing requests.
 
 #### Okapi API Extension
 
@@ -307,7 +363,40 @@ okh_skill_eval_reliability{reliability < 0.7}
 
 ## 5. Integration Architecture Summary
 
+### Russell → hKask → Okapi Data Flow
+
 ```
+┌─────────────────────────────────────────────────────────────────────┐
+│                        KASK ECOSYSTEM                                │
+│                                                                      │
+│  ┌──────────────┐    ┌──────────────┐    ┌──────────────────────┐   │
+│  │   Russell     │    │   hKask       │    │   Okapi              │   │
+│  │   (ACP agent) │    │   (MCP host)  │    │   (inference engine) │   │
+│  │               │    │               │    │                      │   │
+│  │  - Skills     │    │  - MCP tools  │    │  - LLM inference     │   │
+│  │  - Journal    │    │  - Routing    │    │  - LoRA adapters     │   │
+│  │  - Probes     │    │  - Auth       │    │  - Embeddings        │   │
+│  └──────┬───────┘    └──────┬───────┘    └──────────┬────────────┘   │
+│         │                   │                        │               │
+│         │ MCP tools/call    │ HTTP POST /api/*       │               │
+│         │ (loopback)        │ (127.0.0.1:11435)      │               │
+│         ▼                   ▼                        ▼               │
+│  ┌──────────────────────────────────────────────────────────────┐   │
+│  │                Shared Infrastructure                          │   │
+│  │                                                                │   │
+│  │  - Manifest YAML schema (ecosystem contract)                   │   │
+│  │  - OKH tracing spans (opentelemetry → Loki → Grafana)          │   │
+│  │  - .rsk.tar.gz bundle format (portable skill unit)             │   │
+│  │  - REUSE_MANIFEST.md (provenance across operator boundaries)   │   │
+│  └──────────────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+**Key Design Decision:** Russell does not connect directly to Okapi. All inference requests flow through hKask's MCP infrastructure. This provides:
+- Unified authentication and capability-based security
+- Centralized routing (hKask can route to Okapi, OpenRouter, or other backends)
+- Consistent observability via CNS spans
+- Confidence-based escalation handled by hKask
 ┌─────────────────────────────────────────────────────────────────────┐
 │                        KASK ECOSYSTEM                                │
 │                                                                      │

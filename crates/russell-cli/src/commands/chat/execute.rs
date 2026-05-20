@@ -9,7 +9,7 @@ use russell_core::paths::Paths;
 use russell_meta::action::ResolvedAction;
 use russell_skills::RiskBand;
 
-use super::consent::PendingAction;
+use crate::commands::chat::PendingAction;
 
 /// Execute a pending action (probe or intervention) via the skill dispatcher.
 /// Returns a formatted result string suitable for injection into the LLM

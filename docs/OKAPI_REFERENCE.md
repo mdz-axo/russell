@@ -1,29 +1,53 @@
 ---
 title: "Okapi Reference"
 audience: [operators, developers, contributors]
-last_updated: 2026-05-12
+last_updated: 2026-05-20
 togaf_phase: "D"
-version: "1.0.0"
+version: "1.1.0"
 status: "Active"
 ---
 
 <!-- TOGAF_DOMAIN: Technology -->
-<!-- VERSION: 1.0.0 -->
+<!-- VERSION: 1.1.0 -->
 <!-- STATUS: Active -->
-<!-- LAST_UPDATED: 2026-05-12 -->
+<!-- LAST_UPDATED: 2026-05-20 -->
 
 
 # Okapi Reference — For Russell
 
 Okapi is Russell's **primary local inference engine**. It is a fork of Ollama that wraps llama.cpp with additional capabilities, Rust performance optimizations, and HuggingFace integrations.
 
+## Architecture: Russell → hKask → Okapi
+
+Russell does **not** connect directly to Okapi. Instead:
+
+```
+Russell (ACP Agent) → hKask (MCP Server Host) → Okapi (Inference Engine)
+```
+
+### Data Flow
+
+1. Russell registers as an **ACP agent** with local hKask installation
+2. Russell requests inference through hKask MCP tools (`hkask-mcp-inference`)
+3. hKask routes request to Okapi via `/api/generate` or `/api/chat`
+4. Okapi responds to hKask, which responds to Russell
+
+### Why This Architecture?
+
+| Benefit | Description |
+|---------|-------------|
+| **Unified authentication** | Russell inherits hKask's auth model |
+| **Centralized routing** | hKask can route to different backends |
+| **Capability discovery** | hKask exposes Okapi capabilities via MCP |
+| **Observability** | All requests traced through hKask CNS spans |
+
 ## Connection
 
 ```
-Okapi:   http://127.0.0.1:11435   (Russell's default backend)
+Okapi:   http://127.0.0.1:11435   (hKask's inference backend)
 ```
 
-Russell connects to Okapi on port 11435. The systemd user service is `okapi.service`.
+hKask connects to Okapi on port 11435. Russell connects to hKask via MCP.
 
 ## What Okapi Adds Over Ollama
 
@@ -51,12 +75,18 @@ Okapi shares the same model store as Ollama. Any model available to `ollama list
 
 ## Russell Integration
 
-- **Default backend**: `RUSSELL_DOCTOR_BACKEND=okapi` (default when unset)
-- **Legacy alias**: Setting `RUSSELL_DOCTOR_BACKEND=ollama` routes to Okapi
-- **Base URL override**: `RUSSELL_DOCTOR_BASE_URL=http://127.0.0.1:11435/v1`
-- **Auto-start**: Russell will `systemctl --user start okapi` if not reachable
-- **Health check**: `GET /api/tags` with 3s timeout
-- **API key**: `"okapi"` (bearer token, same pattern as Ollama)
+Russell integrates with Okapi **through hKask**, not directly:
+
+| Component | Role |
+|-----------|------|
+| Russell | ACP agent registered with hKask |
+| hKask | MCP server host, routes inference requests |
+| Okapi | Inference backend for hKask |
+
+**Configuration:**
+- Russell connects to hKask via MCP
+- hKask connects to Okapi via HTTP (`http://127.0.0.1:11435`)
+- Russell inherits hKask's authentication and capability discovery
 
 ## Skill: okapi-watcher
 

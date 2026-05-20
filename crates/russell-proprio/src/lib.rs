@@ -51,16 +51,6 @@ pub trait TimerSource {
     /// # Errors
     ///
     /// Returns a human-readable error string on subprocess or parse failure.
-    ///
-    /// # Errors
-    ///
-    /// Returns a human-readable error string on subprocess or parse failure.
-    /// # Errors
-    ///
-    /// Returns a human-readable error string on subprocess or parse failure.
-    ///
-    /// Returns a human-readable error string on subprocess or parse failure.
-    /// Returns a human-readable error string on subprocess or parse failure.
     fn read_last_trigger_us(&self) -> std::result::Result<Option<u64>, String>;
 }
 
@@ -901,16 +891,6 @@ fn emit_event(
 /// events. Returns:
 /// - `Some(true)` if intact or no chained events exist
 /// - `Some(false)` if a chain break was detected
-/// - `None` if the check could not run (DB error)
-/// events. Returns:
-/// - `Some(true)` if intact or no chained events exist
-/// - `Some(false)` if a chain break was detected
-/// - `None` if the check could not run (DB error)
-/// - `Some(true)` if intact or no chained events exist
-/// - `Some(false)` if a chain break was detected
-/// - `None` if the check could not run (DB error)
-/// - `Some(false)` if a chain break was detected
-/// - `None` if the check could not run (DB error)
 /// - `None` if the check could not run (DB error)
 fn check_journal_chain_integrity(reader: &JournalReader) -> Option<bool> {
     let conn = reader.open_ro_conn().ok()?;

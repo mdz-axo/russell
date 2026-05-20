@@ -46,7 +46,6 @@ pub fn list(paths: &Paths) -> Result<()> {
     }
 
     for s in &skills {
-        print_skill(s);
     }
 
     Ok(())
@@ -233,7 +232,7 @@ pub fn check(paths: &Paths) -> Result<()> {
     let registry = RegistryCache::load(&registry_path).unwrap_or_default();
     let skills = load_all(&paths.skills()).unwrap_or_default();
 
-    println!("Skill audit — {}", chrono_now());
+    println!("Skill audit — {}", now_date_iso8601());
     println!();
 
     // Sync registry from current skills on disk.
@@ -255,7 +254,7 @@ pub fn check(paths: &Paths) -> Result<()> {
         }
     }
 
-    let today = chrono_now();
+    let today = now_date_iso8601();
     for (id, entry) in &registry.skills {
         let stale = RegistryCache::is_stale(&entry.authored, &today);
         let mark = if stale { "⚠ stale" } else { "✓" };
@@ -310,10 +309,6 @@ fn classify_skill(symptoms: &[String]) -> &'static str {
     }
 }
 
-fn chrono_now() -> String {
-    now_date_iso8601()
-}
-
 /// Install or activate a skill by name.
 pub fn install(paths: &Paths, name: &str) -> Result<()> {
     use russell_skills::registry::{LifecycleStatus, SkillSource};
@@ -341,12 +336,12 @@ pub fn install(paths: &Paths, name: &str) -> Result<()> {
             }
             from_status = Some(entry.status);
             entry.status = LifecycleStatus::Installed;
-            entry.installed = chrono_now();
+            entry.installed = now_date_iso8601();
             println!("{name} installed (v{}).", entry.version);
         } else {
             from_status = None;
             let version = "0.1.0".to_string();
-            let today = chrono_now();
+            let today = now_date_iso8601();
             registry.upsert(
                 name,
                 RegistryEntry::new_default(

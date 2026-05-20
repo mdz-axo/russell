@@ -835,6 +835,7 @@ async fn llm_call(
     _fallback_model: &str,
     prompt: &str,
 ) -> Result<String> {
+    use russell_meta::client::SoapPrompt;
     use russell_meta::oai_client::OkapiClient;
 
     let mut chat_cfg = cfg.clone();
@@ -845,16 +846,12 @@ async fn llm_call(
         chat_cfg.api_key = Some("okapi".into());
     }
 
-    let base = chat_cfg
-        .base_url
-        .as_deref()
-        .unwrap_or(russell_meta::health::DEFAULT_BASE_URL);
+    let base = chat_cfg.base_url.as_deref().unwrap_or(russell_meta::health::DEFAULT_BASE_URL);
     if !russell_meta::health::ensure_ready(base).await {
         return Err(anyhow::anyhow!("Okapi not reachable"));
     }
 
     let client = OkapiClient::new(&chat_cfg).await?;
-
     let soap = SoapPrompt {
         system: "You are a YAML editor for Russell skill manifests. Output ONLY the YAML in a code block.".into(),
         subjective: String::new(),
@@ -863,7 +860,6 @@ async fn llm_call(
         temperature: Some(0.6),
         max_tokens: None,
     };
-
     Ok(client.chat(&soap).await?.content)
 }
 

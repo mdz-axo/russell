@@ -50,8 +50,11 @@ pub fn systemd_system_failed_count() -> Option<f64> {
     Some(count as f64)
 }
 
+/// Systemd degraded state probe marker.
 pub struct SystemdDegraded;
+/// Systemd user failed units count probe marker.
 pub struct SystemdUserFailedCount;
+/// Systemd system failed units count probe marker.
 pub struct SystemdSystemFailedCount;
 
 impl_probe!(

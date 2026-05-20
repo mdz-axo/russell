@@ -76,7 +76,7 @@ fn find_gpu_hwmon() -> Option<String> {
 
 use super::descriptor::{ProbeCollector, ProbeMetadata};
 
-/// Probe descriptor.
+/// GPU VRAM usage percentage probe marker.
 pub struct GpuVramUsedPct;
 impl ProbeMetadata for GpuVramUsedPct {
     fn name(&self) -> &'static str {
@@ -92,7 +92,7 @@ impl ProbeCollector for GpuVramUsedPct {
     }
 }
 
-/// Probe descriptor.
+/// GPU VRAM usage in MiB probe marker.
 pub struct GpuVramUsedMib;
 impl ProbeMetadata for GpuVramUsedMib {
     fn name(&self) -> &'static str {
@@ -108,7 +108,7 @@ impl ProbeCollector for GpuVramUsedMib {
     }
 }
 
-/// Probe descriptor.
+/// GPU VRAM total in MiB probe marker.
 pub struct GpuVramTotalMib;
 impl ProbeMetadata for GpuVramTotalMib {
     fn name(&self) -> &'static str {
@@ -124,7 +124,7 @@ impl ProbeCollector for GpuVramTotalMib {
     }
 }
 
-/// Probe descriptor.
+/// GPU temperature probe marker.
 pub struct GpuTempC;
 impl ProbeMetadata for GpuTempC {
     fn name(&self) -> &'static str {
@@ -140,7 +140,7 @@ impl ProbeCollector for GpuTempC {
     }
 }
 
-/// Probe descriptor.
+/// GPU utilization percentage probe marker.
 pub struct GpuUtilPct;
 impl ProbeMetadata for GpuUtilPct {
     fn name(&self) -> &'static str {
