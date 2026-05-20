@@ -82,7 +82,6 @@ pub struct ReflexSet {
 
 impl ReflexSet {
     /// Create an empty reflex set.
-    #[cfg(test)]
     #[must_use]
     pub fn new() -> Self {
         Self { arcs: Vec::new() }
@@ -167,14 +166,12 @@ impl ReflexSet {
     }
 
     /// Number of loaded arcs.
-    #[cfg(test)]
     #[must_use]
     pub fn len(&self) -> usize {
         self.arcs.len()
     }
 
     /// Whether the reflex set is empty (paired with [`len`](Self::len)).
-    #[cfg(test)]
     #[must_use]
     pub fn is_empty(&self) -> bool {
         self.arcs.is_empty()
@@ -336,100 +333,3 @@ fn default_arcs() -> Vec<ReflexArc> {
     file.arc
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn empty_set_returns_none() {
-        let rs = ReflexSet::new();
-        assert!(rs.find("disk_root_used_pct", Severity::Alert).is_none());
-    }
-
-    #[test]
-    fn defaults_have_disk_arc() {
-        let rs = ReflexSet::with_defaults();
-        assert!(!rs.is_empty());
-        let arc = rs.find("disk_root_used_pct", Severity::Alert);
-        assert!(arc.is_some());
-        let arc = arc.unwrap();
-        assert_eq!(arc.probe, "disk_root_used_pct");
-        assert_eq!(arc.intervention, "sysadmin/sweep-caches");
-        assert_eq!(arc.cooldown_secs, 3600);
-        assert_eq!(arc.max_retries, 3);
-    }
-
-    #[test]
-    fn below_min_severity_returns_none() {
-        let rs = ReflexSet::with_defaults();
-        assert!(rs.find("disk_root_used_pct", Severity::Warn).is_none());
-    }
-
-    #[test]
-    fn crit_triggers_alert_arc() {
-        let rs = ReflexSet::with_defaults();
-        assert!(rs.find("disk_root_used_pct", Severity::Crit).is_some());
-    }
-
-    // --- Budget tests (T10) ---
-
-    #[test]
-    fn budget_allows_within_limit() {
-        let mut b = ReflexBudget::with_limits(3, 3);
-        let now = 1_000_000;
-        assert_eq!(b.check(now), BudgetVerdict::Allowed);
-        b.record_firing(now);
-        assert_eq!(b.check(now), BudgetVerdict::Allowed);
-        b.record_firing(now + 1);
-        assert_eq!(b.check(now + 2), BudgetVerdict::Allowed);
-        b.record_firing(now + 2);
-        // 3 firings — budget exhausted.
-        assert_eq!(b.check(now + 3), BudgetVerdict::BudgetExhausted);
-    }
-
-    #[test]
-    fn budget_window_evicts_old_firings() {
-        let mut b = ReflexBudget::with_limits(2, 3);
-        let hour_ago = 1_000_000;
-        b.record_firing(hour_ago);
-        b.record_firing(hour_ago + 1);
-        // Both within window — exhausted.
-        assert_eq!(b.check(hour_ago + 100), BudgetVerdict::BudgetExhausted);
-        // 1 hour + 1 second later — old firings evicted.
-        assert_eq!(b.check(hour_ago + 3601), BudgetVerdict::Allowed);
-    }
-
-    #[test]
-    fn breaker_trips_on_consecutive_failures() {
-        let mut b = ReflexBudget::with_limits(10, 3);
-        b.record_outcome(false);
-        assert!(!b.is_breaker_open());
-        b.record_outcome(false);
-        assert!(!b.is_breaker_open());
-        b.record_outcome(false); // 3rd consecutive failure
-        assert!(b.is_breaker_open());
-        assert_eq!(b.check(1_000_000), BudgetVerdict::BreakerOpen);
-    }
-
-    #[test]
-    fn success_resets_failure_counter() {
-        let mut b = ReflexBudget::with_limits(10, 3);
-        b.record_outcome(false);
-        b.record_outcome(false);
-        b.record_outcome(true); // resets counter
-        b.record_outcome(false);
-        b.record_outcome(false);
-        assert!(!b.is_breaker_open()); // only 2 consecutive, not 3
-    }
-
-    #[test]
-    fn breaker_reset_allows_new_firings() {
-        let mut b = ReflexBudget::with_limits(10, 2);
-        b.record_outcome(false);
-        b.record_outcome(false);
-        assert!(b.is_breaker_open());
-        b.reset_breaker();
-        assert!(!b.is_breaker_open());
-        assert_eq!(b.check(1_000_000), BudgetVerdict::Allowed);
-    }
-}

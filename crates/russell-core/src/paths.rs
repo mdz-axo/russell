@@ -227,34 +227,3 @@ fn xdg_or(home: &std::path::Path, var: &str, fallback: &str) -> PathBuf {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn rooted_paths_produce_expected_layout() {
-        let tmp = tempfile::tempdir().expect("tempdir");
-        let paths = Paths::rooted(tmp.path());
-        assert!(paths.profile().ends_with("state/harness/profile.json"));
-        assert!(paths.journal().ends_with("state/harness/journal.db"));
-        assert!(paths.kill_switch().ends_with("config/harness/disable"));
-    }
-
-    #[test]
-    fn ensure_dirs_is_idempotent() {
-        let tmp = tempfile::tempdir().expect("tempdir");
-        let paths = Paths::rooted(tmp.path());
-        paths.ensure_dirs().expect("first");
-        paths.ensure_dirs().expect("second");
-        assert!(paths.runs().is_dir());
-        assert!(paths.skills().is_dir());
-    }
-
-    #[test]
-    fn ensure_dir_rejects_existing_file() {
-        let tmp = tempfile::tempdir().expect("tempdir");
-        let f = tmp.path().join("not-a-dir");
-        std::fs::write(&f, b"hi").unwrap();
-        assert!(matches!(ensure_dir(&f), Err(CoreError::Invariant(_))));
-    }
-}

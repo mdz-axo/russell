@@ -183,30 +183,3 @@ impl ScheduleSet {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn parse_works() {
-        assert_eq!(parse_time("08:00"), Some((8, 0)));
-        assert_eq!(parse_time("23:59"), Some((23, 59)));
-        assert_eq!(parse_time("24:00"), None);
-        assert_eq!(parse_time(""), None);
-    }
-
-    #[test]
-    fn day_checks() {
-        assert!(day_matches(time::Weekday::Monday, &["Mon".into()]));
-        assert!(!day_matches(time::Weekday::Tuesday, &["Mon".into()]));
-        assert!(day_matches(
-            time::Weekday::Friday,
-            &["Mon".into(), "Fri".into()]
-        ));
-    }
-
-    #[test]
-    fn empty_set_no_active() {
-        assert!(ScheduleSet::new().active_now().is_none());
-    }
-}

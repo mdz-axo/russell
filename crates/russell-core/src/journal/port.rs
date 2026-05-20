@@ -174,34 +174,3 @@ impl JournalWritePort for InMemoryJournal {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn in_memory_journal_captures_events() {
-        let journal = InMemoryJournal::default();
-        let event = Event::new("test_action", crate::event::Severity::Info);
-        journal.append(&event).unwrap();
-        assert_eq!(journal.events.lock().unwrap().len(), 1);
-    }
-
-    #[test]
-    fn in_memory_journal_captures_samples() {
-        let journal = InMemoryJournal::default();
-        journal
-            .append_sample(
-                1000,
-                Scope::Host,
-                "test_probe",
-                Some(42.0),
-                None,
-                Some("MiB"),
-            )
-            .unwrap();
-        let samples = journal.samples.lock().unwrap();
-        assert_eq!(samples.len(), 1);
-        assert_eq!(samples[0].1, "test_probe");
-        assert_eq!(samples[0].2, Some(42.0));
-    }
-}
