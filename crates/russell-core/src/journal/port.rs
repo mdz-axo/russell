@@ -190,7 +190,14 @@ mod tests {
     fn in_memory_journal_captures_samples() {
         let journal = InMemoryJournal::default();
         journal
-            .append_sample(1000, Scope::Host, "test_probe", Some(42.0), None, Some("MiB"))
+            .append_sample(
+                1000,
+                Scope::Host,
+                "test_probe",
+                Some(42.0),
+                None,
+                Some("MiB"),
+            )
             .unwrap();
         let samples = journal.samples.lock().unwrap();
         assert_eq!(samples.len(), 1);

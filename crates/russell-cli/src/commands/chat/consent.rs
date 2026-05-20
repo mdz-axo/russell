@@ -54,11 +54,7 @@ impl PendingAction {
 
     /// Human-readable description for confirmation display.
     pub fn describe(&self) -> String {
-        format!(
-            "{}/{}",
-            self.action.skill_id(),
-            self.action.action_id()
-        )
+        format!("{}/{}", self.action.skill_id(), self.action.action_id())
     }
 }
 

@@ -231,10 +231,7 @@ impl RuleSet {
     /// This is the diagnostic version of [`load_from_dir`] — it
     /// returns a [`Vec<ConfigWarning>`] that the CLI can surface
     /// in `russell status` or feed to proprioception.
-    pub fn load_from_dir_with_warnings(
-        &mut self,
-        dir: &std::path::Path,
-    ) -> Vec<ConfigWarning> {
+    pub fn load_from_dir_with_warnings(&mut self, dir: &std::path::Path) -> Vec<ConfigWarning> {
         let mut warnings = Vec::new();
         let entries = match std::fs::read_dir(dir) {
             Ok(d) => d,
@@ -282,10 +279,7 @@ impl RuleSet {
             {
                 warnings.push(ConfigWarning {
                     path: path.display().to_string(),
-                    reason: format!(
-                        "unknown schema: expected {}, found {}",
-                        RULE_SCHEMA, schema
-                    ),
+                    reason: format!("unknown schema: expected {}, found {}", RULE_SCHEMA, schema),
                 });
                 continue;
             }

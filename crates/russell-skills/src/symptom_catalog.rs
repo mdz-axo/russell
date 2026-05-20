@@ -152,7 +152,11 @@ mod tests {
     fn compiled_in_yaml_parses() {
         let parsed = parse_symptoms_yaml(SYMPTOMS_YAML);
         // The YAML has the same entries as the SYMPTOMS constant (currently 85).
-        assert!(parsed.len() >= 70, "expected >=70 symptoms, got {}", parsed.len());
+        assert!(
+            parsed.len() >= 70,
+            "expected >=70 symptoms, got {}",
+            parsed.len()
+        );
         assert!(parsed.contains(&"vram_oom".to_string()));
         assert!(parsed.contains(&"agent_latency_spike".to_string()));
     }

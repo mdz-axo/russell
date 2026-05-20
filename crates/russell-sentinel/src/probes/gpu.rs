@@ -79,51 +79,81 @@ use super::descriptor::{ProbeCollector, ProbeMetadata};
 /// Probe descriptor.
 pub struct GpuVramUsedPct;
 impl ProbeMetadata for GpuVramUsedPct {
-    fn name(&self) -> &'static str { "gpu_vram_used_pct" }
-    fn unit(&self) -> Option<&'static str> { Some("%") }
+    fn name(&self) -> &'static str {
+        "gpu_vram_used_pct"
+    }
+    fn unit(&self) -> Option<&'static str> {
+        Some("%")
+    }
 }
 impl ProbeCollector for GpuVramUsedPct {
-    fn collect(&self) -> Option<f64> { gpu_vram_used_pct() }
+    fn collect(&self) -> Option<f64> {
+        gpu_vram_used_pct()
+    }
 }
 
 /// Probe descriptor.
 pub struct GpuVramUsedMib;
 impl ProbeMetadata for GpuVramUsedMib {
-    fn name(&self) -> &'static str { "gpu_vram_used_mib" }
-    fn unit(&self) -> Option<&'static str> { Some("MiB") }
+    fn name(&self) -> &'static str {
+        "gpu_vram_used_mib"
+    }
+    fn unit(&self) -> Option<&'static str> {
+        Some("MiB")
+    }
 }
 impl ProbeCollector for GpuVramUsedMib {
-    fn collect(&self) -> Option<f64> { gpu_vram_used_mib() }
+    fn collect(&self) -> Option<f64> {
+        gpu_vram_used_mib()
+    }
 }
 
 /// Probe descriptor.
 pub struct GpuVramTotalMib;
 impl ProbeMetadata for GpuVramTotalMib {
-    fn name(&self) -> &'static str { "gpu_vram_total_mib" }
-    fn unit(&self) -> Option<&'static str> { Some("MiB") }
+    fn name(&self) -> &'static str {
+        "gpu_vram_total_mib"
+    }
+    fn unit(&self) -> Option<&'static str> {
+        Some("MiB")
+    }
 }
 impl ProbeCollector for GpuVramTotalMib {
-    fn collect(&self) -> Option<f64> { gpu_vram_total_mib() }
+    fn collect(&self) -> Option<f64> {
+        gpu_vram_total_mib()
+    }
 }
 
 /// Probe descriptor.
 pub struct GpuTempC;
 impl ProbeMetadata for GpuTempC {
-    fn name(&self) -> &'static str { "gpu_temp_c" }
-    fn unit(&self) -> Option<&'static str> { Some("°C") }
+    fn name(&self) -> &'static str {
+        "gpu_temp_c"
+    }
+    fn unit(&self) -> Option<&'static str> {
+        Some("°C")
+    }
 }
 impl ProbeCollector for GpuTempC {
-    fn collect(&self) -> Option<f64> { gpu_temp_c() }
+    fn collect(&self) -> Option<f64> {
+        gpu_temp_c()
+    }
 }
 
 /// Probe descriptor.
 pub struct GpuUtilPct;
 impl ProbeMetadata for GpuUtilPct {
-    fn name(&self) -> &'static str { "gpu_util_pct" }
-    fn unit(&self) -> Option<&'static str> { Some("%") }
+    fn name(&self) -> &'static str {
+        "gpu_util_pct"
+    }
+    fn unit(&self) -> Option<&'static str> {
+        Some("%")
+    }
 }
 impl ProbeCollector for GpuUtilPct {
-    fn collect(&self) -> Option<f64> { gpu_util_pct() }
+    fn collect(&self) -> Option<f64> {
+        gpu_util_pct()
+    }
 }
 
 #[cfg(test)]

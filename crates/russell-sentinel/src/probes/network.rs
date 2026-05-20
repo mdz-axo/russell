@@ -28,8 +28,18 @@ pub struct NetTcpConnections;
 /// Marker struct for TCP6 connections probe.
 pub struct NetTcp6Connections;
 
-impl_probe!(NetTcpConnections, "net_tcp_connections", "count", net_tcp_connections);
-impl_probe!(NetTcp6Connections, "net_tcp6_connections", "count", net_tcp6_connections);
+impl_probe!(
+    NetTcpConnections,
+    "net_tcp_connections",
+    "count",
+    net_tcp_connections
+);
+impl_probe!(
+    NetTcp6Connections,
+    "net_tcp6_connections",
+    "count",
+    net_tcp6_connections
+);
 
 #[cfg(test)]
 mod tests {

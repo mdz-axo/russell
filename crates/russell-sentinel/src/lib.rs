@@ -25,29 +25,47 @@
 macro_rules! impl_probe {
     ($struct_name:ident, $name:literal, "unit", $func:ident) => {
         impl $crate::probes::descriptor::ProbeMetadata for $struct_name {
-            fn name(&self) -> &'static str { $name }
-            fn unit(&self) -> Option<&'static str> { Some("unit") }
+            fn name(&self) -> &'static str {
+                $name
+            }
+            fn unit(&self) -> Option<&'static str> {
+                Some("unit")
+            }
         }
         impl $crate::probes::descriptor::ProbeCollector for $struct_name {
-            fn collect(&self) -> Option<f64> { $func() }
+            fn collect(&self) -> Option<f64> {
+                $func()
+            }
         }
     };
     ($struct_name:ident, $name:literal, $unit:literal, $func:ident) => {
         impl $crate::probes::descriptor::ProbeMetadata for $struct_name {
-            fn name(&self) -> &'static str { $name }
-            fn unit(&self) -> Option<&'static str> { Some($unit) }
+            fn name(&self) -> &'static str {
+                $name
+            }
+            fn unit(&self) -> Option<&'static str> {
+                Some($unit)
+            }
         }
         impl $crate::probes::descriptor::ProbeCollector for $struct_name {
-            fn collect(&self) -> Option<f64> { $func() }
+            fn collect(&self) -> Option<f64> {
+                $func()
+            }
         }
     };
     ($struct_name:ident, $name:literal, none, $func:ident) => {
         impl $crate::probes::descriptor::ProbeMetadata for $struct_name {
-            fn name(&self) -> &'static str { $name }
-            fn unit(&self) -> Option<&'static str> { None }
+            fn name(&self) -> &'static str {
+                $name
+            }
+            fn unit(&self) -> Option<&'static str> {
+                None
+            }
         }
         impl $crate::probes::descriptor::ProbeCollector for $struct_name {
-            fn collect(&self) -> Option<f64> { $func() }
+            fn collect(&self) -> Option<f64> {
+                $func()
+            }
         }
     };
 }
@@ -58,8 +76,8 @@ use probes::Sample;
 use russell_core::Result;
 use russell_core::RuleSet;
 use russell_core::event::{Event, Scope, Severity};
-use russell_core::journal::{JournalReader, JournalWriter};
 use russell_core::journal::port::JournalWritePort;
+use russell_core::journal::{JournalReader, JournalWriter};
 use russell_core::time::Clock;
 
 /// Run the probe set once and append samples to the journal.
@@ -442,12 +460,17 @@ mod tests {
                 _value_text: Option<&str>,
                 _unit: Option<&str>,
             ) -> russell_core::Result<()> {
-                self.samples.lock().unwrap().push((ts, probe.to_string(), value_num));
+                self.samples
+                    .lock()
+                    .unwrap()
+                    .push((ts, probe.to_string(), value_num));
                 Ok(())
             }
         }
 
-        let journal = TestJournal { samples: Mutex::new(Vec::new()) };
+        let journal = TestJournal {
+            samples: Mutex::new(Vec::new()),
+        };
         let clock = FixedClock::new(1_700_000_000);
         let rules = RuleSet::with_defaults();
         let registry = probes::ProbeRegistry::with_defaults();
@@ -459,7 +482,10 @@ mod tests {
         assert!(count > 0);
         assert!(!samples.is_empty());
         for (ts, _, _) in samples.iter() {
-            assert_eq!(*ts, 1_700_000_000, "all samples should use the injected clock");
+            assert_eq!(
+                *ts, 1_700_000_000,
+                "all samples should use the injected clock"
+            );
         }
     }
 }

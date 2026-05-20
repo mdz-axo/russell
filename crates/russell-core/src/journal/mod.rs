@@ -894,8 +894,6 @@ impl JournalReader {
         .ok()
     }
 
-
-
     /// Count reflex_proposed events for a probe within a time window.
     /// Used for reflex arc cooldown enforcement.
     ///
@@ -961,59 +959,75 @@ impl JournalReader {
                FROM events
               WHERE id = ?1",
         )?;
-        let event = stmt.query_row(params![id], |r| {
-            let id: i64 = r.get(0)?;
-            let ts: String = r.get(1)?;
-            let ts_unix: i64 = r.get(2)?;
-            let schema: String = r.get(3)?;
-            let run_id: Option<String> = r.get(4)?;
-            let tier: Option<String> = r.get(5)?;
-            let module: Option<String> = r.get(6)?;
-            let severity_str: String = r.get(7)?;
-            let scope_str: String = r.get(8)?;
-            let action: String = r.get(9)?;
-            let dry_run: bool = r.get(10)?;
-            let payload: String = r.get(11)?;
+        let event = stmt
+            .query_row(params![id], |r| {
+                let id: i64 = r.get(0)?;
+                let ts: String = r.get(1)?;
+                let ts_unix: i64 = r.get(2)?;
+                let schema: String = r.get(3)?;
+                let run_id: Option<String> = r.get(4)?;
+                let tier: Option<String> = r.get(5)?;
+                let module: Option<String> = r.get(6)?;
+                let severity_str: String = r.get(7)?;
+                let scope_str: String = r.get(8)?;
+                let action: String = r.get(9)?;
+                let dry_run: bool = r.get(10)?;
+                let payload: String = r.get(11)?;
 
-            let severity = Severity::from_str(&severity_str)
-                .map_err(|e| rusqlite::Error::FromSqlConversionFailure(
-                    7,
-                    rusqlite::types::Type::Text,
-                    Box::new(std::io::Error::new(std::io::ErrorKind::InvalidData, e.to_string())),
-                ))?;
-            let scope = Scope::from_str(&scope_str)
-                .map_err(|e| rusqlite::Error::FromSqlConversionFailure(
-                    8,
-                    rusqlite::types::Type::Text,
-                    Box::new(std::io::Error::new(std::io::ErrorKind::InvalidData, e.to_string())),
-                ))?;
+                let severity = Severity::from_str(&severity_str).map_err(|e| {
+                    rusqlite::Error::FromSqlConversionFailure(
+                        7,
+                        rusqlite::types::Type::Text,
+                        Box::new(std::io::Error::new(
+                            std::io::ErrorKind::InvalidData,
+                            e.to_string(),
+                        )),
+                    )
+                })?;
+                let scope = Scope::from_str(&scope_str).map_err(|e| {
+                    rusqlite::Error::FromSqlConversionFailure(
+                        8,
+                        rusqlite::types::Type::Text,
+                        Box::new(std::io::Error::new(
+                            std::io::ErrorKind::InvalidData,
+                            e.to_string(),
+                        )),
+                    )
+                })?;
 
-            let event: Event = serde_json::from_str(&payload)
-                .map_err(|e| rusqlite::Error::FromSqlConversionFailure(
-                    11,
-                    rusqlite::types::Type::Text,
-                    Box::new(std::io::Error::new(std::io::ErrorKind::InvalidData, e.to_string())),
-                ))?;
+                let event: Event = serde_json::from_str(&payload).map_err(|e| {
+                    rusqlite::Error::FromSqlConversionFailure(
+                        11,
+                        rusqlite::types::Type::Text,
+                        Box::new(std::io::Error::new(
+                            std::io::ErrorKind::InvalidData,
+                            e.to_string(),
+                        )),
+                    )
+                })?;
 
-            // Override with row-level metadata
-            let mut event = event;
-            event.id = EventId::from(id as u128);
-            event.ts = ts;
-            event.ts_unix = ts_unix;
-            event.schema = schema;
-            event.run_id = run_id;
-            event.tier = tier;
-            event.module = module;
-            event.severity = severity;
-            event.scope = scope;
-            event.action = action;
-            event.dry_run = dry_run;
+                // Override with row-level metadata
+                let mut event = event;
+                event.id = EventId::from(id as u128);
+                event.ts = ts;
+                event.ts_unix = ts_unix;
+                event.schema = schema;
+                event.run_id = run_id;
+                event.tier = tier;
+                event.module = module;
+                event.severity = severity;
+                event.scope = scope;
+                event.action = action;
+                event.dry_run = dry_run;
 
-            Ok(event)
-        }).map_err(|e| match e {
-            rusqlite::Error::QueryReturnedNoRows => CoreError::Sqlite(rusqlite::Error::QueryReturnedNoRows),
-            other => CoreError::Sqlite(other),
-        })?;
+                Ok(event)
+            })
+            .map_err(|e| match e {
+                rusqlite::Error::QueryReturnedNoRows => {
+                    CoreError::Sqlite(rusqlite::Error::QueryReturnedNoRows)
+                }
+                other => CoreError::Sqlite(other),
+            })?;
 
         Ok(event)
     }

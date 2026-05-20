@@ -5,7 +5,6 @@
 //! in Russell's self-vital cycle. Uses a short timeout (2s) to avoid
 //! blocking the proprioception cadence.
 
-use serde::Deserialize;
 use std::time::{Duration, Instant};
 
 use tracing::debug;
@@ -56,16 +55,11 @@ pub async fn probe_reachability() -> HKaskHealthResult {
     };
 
     // Build health endpoint URL (REST API, not JSON-RPC).
-    let health_url = format!(
-        "{}/health",
-        config.endpoint.trim_end_matches('/')
-    );
+    let health_url = format!("{}/health", config.endpoint.trim_end_matches('/'));
 
     let start = Instant::now();
 
-    let mut req = http
-        .get(&health_url)
-        .header("Accept", "application/json");
+    let mut req = http.get(&health_url).header("Accept", "application/json");
 
     if let Some(ref token) = config.token {
         req = req.bearer_auth(token);

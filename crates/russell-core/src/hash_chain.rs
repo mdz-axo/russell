@@ -107,9 +107,7 @@ pub fn verify_chain(links: &[(String, String, String)]) -> ChainVerdict {
         }
     }
 
-    ChainVerdict::Intact {
-        count: links.len(),
-    }
+    ChainVerdict::Intact { count: links.len() }
 }
 
 #[cfg(test)]
@@ -183,7 +181,11 @@ mod tests {
 
         let chain = vec![
             (genesis, json1.to_string(), hash1.clone()),
-            (hash1, json2.to_string(), "tampered_hash".repeat(4) + &"ab".repeat(2)),
+            (
+                hash1,
+                json2.to_string(),
+                "tampered_hash".repeat(4) + &"ab".repeat(2),
+            ),
         ];
         match verify_chain(&chain) {
             ChainVerdict::Broken { position, .. } => assert_eq!(position, 1),

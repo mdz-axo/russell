@@ -43,11 +43,26 @@ pub struct LoadAvg1m;
 pub struct MemPressureSome;
 pub struct MemPressureFull;
 
-impl_probe!(MemAvailableMib, "mem_available_mib", "MiB", mem_available_mib);
+impl_probe!(
+    MemAvailableMib,
+    "mem_available_mib",
+    "MiB",
+    mem_available_mib
+);
 impl_probe!(SwapUsedMib, "swap_used_mib", "MiB", swap_used_mib);
 impl_probe!(LoadAvg1m, "loadavg_1m", none, load_avg_1m);
-impl_probe!(MemPressureSome, "mem_pressure_some_pct", "%", mem_pressure_some);
-impl_probe!(MemPressureFull, "mem_pressure_full_pct", "%", mem_pressure_full);
+impl_probe!(
+    MemPressureSome,
+    "mem_pressure_some_pct",
+    "%",
+    mem_pressure_some
+);
+impl_probe!(
+    MemPressureFull,
+    "mem_pressure_full_pct",
+    "%",
+    mem_pressure_full
+);
 
 fn mem_pressure_some() -> Option<f64> {
     let content = connectors::read_file_to_string("/proc/pressure/memory")?;

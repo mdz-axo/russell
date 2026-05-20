@@ -10,11 +10,11 @@
 //! the age is always ~0 s and the self-vital can never trigger.
 
 use anyhow::{Context, Result};
-use russell_core::{BudgetVerdict, ReflexBudget, ReflexSet, SystemClock};
 use russell_core::RuleSet;
 use russell_core::event::{Event, Scope, Severity};
 use russell_core::journal::{JournalReader, JournalWriter};
 use russell_core::paths::Paths;
+use russell_core::{BudgetVerdict, ReflexBudget, ReflexSet, SystemClock};
 
 pub fn run(paths: &Paths) -> Result<()> {
     let started = std::time::Instant::now();
@@ -256,8 +256,8 @@ pub fn run(paths: &Paths) -> Result<()> {
 fn reconcile_registry(paths: &Paths) {
     let skills = russell_skills::load_all(&paths.skills()).unwrap_or_default();
     let registry_path = paths.state.join("registry").join("local-cache.yaml");
-    let mut registry = russell_skills::registry::RegistryCache::load(&registry_path)
-        .unwrap_or_default();
+    let mut registry =
+        russell_skills::registry::RegistryCache::load(&registry_path).unwrap_or_default();
     if registry.reconcile(&skills) {
         if let Err(e) = registry.save(&registry_path) {
             tracing::warn!(error = %e, "registry reconcile save failed");

@@ -43,13 +43,12 @@ pub struct RussellServer {
 #[tool_handler(router = self.tool_router)]
 impl ServerHandler for RussellServer {
     fn get_info(&self) -> ServerInfo {
-        ServerInfo::new(ServerCapabilities::builder().enable_tools().build())
-            .with_instructions(
-                "Russell is a cybernetic health harness for a Linux AI/ML workstation. \
+        ServerInfo::new(ServerCapabilities::builder().enable_tools().build()).with_instructions(
+            "Russell is a cybernetic health harness for a Linux AI/ML workstation. \
                  These tools provide read-only access to system telemetry, journal events, \
                  probe history, and health baselines. All tools are risk:none — they observe \
                  but never mutate host state.",
-            )
+        )
     }
 }
 

@@ -261,9 +261,7 @@ impl PromptRegistry {
                         TemplateInfo {
                             name: template_name.to_string(),
                             inference_hint: hint,
-                            source: TemplateSource::Disk {
-                                path: path.clone(),
-                            },
+                            source: TemplateSource::Disk { path: path.clone() },
                         },
                     );
                     tracing::info!(
@@ -296,9 +294,7 @@ impl PromptRegistry {
         ctx: &HashMap<String, serde_json::Value>,
     ) -> Result<String> {
         let tmpl = self.env.get_template(template_name).map_err(|e| {
-            crate::error::DoctorError::Prompt(format!(
-                "Template '{template_name}' not found: {e}"
-            ))
+            crate::error::DoctorError::Prompt(format!("Template '{template_name}' not found: {e}"))
         })?;
 
         let jinja_ctx = minijinja::Value::from_serialize(ctx);
@@ -358,7 +354,12 @@ impl PromptRegistry {
 /// Resolve the standard config path for a Russell subdirectory.
 fn dirs_path(subdir: &str) -> Option<PathBuf> {
     let home = std::env::var("HOME").ok()?;
-    Some(PathBuf::from(home).join(".config").join("harness").join(subdir))
+    Some(
+        PathBuf::from(home)
+            .join(".config")
+            .join("harness")
+            .join(subdir),
+    )
 }
 
 /// MiniJinja filter: truncate text to approximately N tokens (4 bytes/token).
@@ -419,7 +420,11 @@ pub struct KnowledgeSlot {
 /// Select knowledge slots that fit within the token budget, ordered
 /// by relevance (highest first).
 pub fn select_knowledge(slots: &mut [KnowledgeSlot], budget_tokens: usize) -> Vec<&KnowledgeSlot> {
-    slots.sort_by(|a, b| b.relevance.partial_cmp(&a.relevance).unwrap_or(std::cmp::Ordering::Equal));
+    slots.sort_by(|a, b| {
+        b.relevance
+            .partial_cmp(&a.relevance)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
     let mut remaining = budget_tokens;
     let mut selected = Vec::new();
     for slot in slots.iter() {
@@ -446,10 +451,7 @@ pub fn select_knowledge(slots: &mut [KnowledgeSlot], budget_tokens: usize) -> Ve
 /// the runtime signals extracted from journal events.
 ///
 /// Returns 0.0 if no overlap, up to 1.0 for full coverage.
-pub fn score_knowledge_relevance(
-    skill_symptoms: &[String],
-    active_symptoms: &[String],
-) -> f64 {
+pub fn score_knowledge_relevance(skill_symptoms: &[String], active_symptoms: &[String]) -> f64 {
     if skill_symptoms.is_empty() || active_symptoms.is_empty() {
         // Knowledge with no symptoms gets a base relevance (always somewhat useful).
         return 0.3;
@@ -468,7 +470,9 @@ pub fn score_knowledge_relevance(
                     return true;
                 }
                 // Split skill symptom into keywords and check any match.
-                skill_sym.split('_').any(|kw| kw.len() >= 3 && active.contains(kw))
+                skill_sym
+                    .split('_')
+                    .any(|kw| kw.len() >= 3 && active.contains(kw))
             })
         })
         .count();
@@ -586,7 +590,10 @@ mod tests {
         let reg = PromptRegistry::with_defaults().unwrap();
         let mut ctx = HashMap::new();
         ctx.insert("subjective".to_string(), serde_json::json!("test note"));
-        ctx.insert("profile_block".to_string(), serde_json::json!("- os: linux"));
+        ctx.insert(
+            "profile_block".to_string(),
+            serde_json::json!("- os: linux"),
+        );
         ctx.insert(
             "severity_block".to_string(),
             serde_json::json!("- info: 5 | warn: 1 | alert: 0 | crit: 0"),
@@ -628,7 +635,12 @@ mod tests {
         assert_eq!(count, 1);
 
         let info = reg.template_info("soap").unwrap();
-        assert_eq!(info.source, TemplateSource::Disk { path: override_path });
+        assert_eq!(
+            info.source,
+            TemplateSource::Disk {
+                path: override_path
+            }
+        );
         assert_eq!(info.inference_hint.as_ref().unwrap().temperature, Some(0.8));
 
         let mut ctx = HashMap::new();
@@ -720,7 +732,10 @@ mod tests {
         };
         let boosted = score_knowledge_relevance_with_telemetry(&symptoms2, &active, &telemetry);
         // Reliable skill gets 1.2× multiplier: 0.7 * 1.2 = 0.84 > 0.7
-        assert!(boosted > base2, "expected boosted ({boosted}) > base ({base2})");
+        assert!(
+            boosted > base2,
+            "expected boosted ({boosted}) > base ({base2})"
+        );
     }
 
     #[test]
@@ -740,7 +755,10 @@ mod tests {
         };
         let penalized = score_knowledge_relevance_with_telemetry(&symptoms, &active, &telemetry);
         // Failing skill should be penalized below base (down to 0.7×)
-        assert!(penalized < base, "expected penalized ({penalized}) < base ({base})");
+        assert!(
+            penalized < base,
+            "expected penalized ({penalized}) < base ({base})"
+        );
     }
 
     #[test]
@@ -752,7 +770,10 @@ mod tests {
         let telemetry = SkillTelemetry::default(); // no runs
         let scored = score_knowledge_relevance_with_telemetry(&symptoms, &active, &telemetry);
         // New skill gets no modifier
-        assert!((scored - base).abs() < 0.001, "expected same as base, got {scored} vs {base}");
+        assert!(
+            (scored - base).abs() < 0.001,
+            "expected same as base, got {scored} vs {base}"
+        );
     }
 
     #[test]

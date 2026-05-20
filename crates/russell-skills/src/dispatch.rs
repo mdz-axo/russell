@@ -173,7 +173,10 @@ pub enum RollbackStrategy {
 /// Backward-compatibility alias for code that previously used the
 /// separate `RollbackOutcome` type. New code should use [`RunOutcome`]
 /// directly — it now carries rollback information inline.
-#[deprecated(since = "0.2.0", note = "use RunOutcome directly; rollback is now an inline field")]
+#[deprecated(
+    since = "0.2.0",
+    note = "use RunOutcome directly; rollback is now an inline field"
+)]
 pub type RollbackOutcome = RunOutcome;
 
 /// Whether a dispatch is a probe (read-only) or intervention (mutating).
@@ -262,7 +265,13 @@ impl std::fmt::Debug for Dispatcher {
             .field("intervention_timeout", &self.intervention_timeout)
             .field("max_auto_risk", &self.max_auto_risk)
             .field("sudo_password", &self.sudo_password.as_ref().map(|_| "***"))
-            .field("stdin_content", &self.stdin_content.as_ref().map(|c| format!("{} bytes", c.len())))
+            .field(
+                "stdin_content",
+                &self
+                    .stdin_content
+                    .as_ref()
+                    .map(|c| format!("{} bytes", c.len())),
+            )
             .finish()
     }
 }
@@ -298,9 +307,8 @@ pub enum CommandPathError {
 /// - `../escape.sh` — path traversal
 pub fn validate_command_path(cmd: &str) -> std::result::Result<(), CommandPathError> {
     // Allow known interpreters that are part of the subprocess contract.
-    const ALLOWED_INTERPRETERS: &[&str] = &[
-        "sh", "bash", "dash", "python3", "python", "perl", "ruby",
-    ];
+    const ALLOWED_INTERPRETERS: &[&str] =
+        &["sh", "bash", "dash", "python3", "python", "perl", "ruby"];
 
     if ALLOWED_INTERPRETERS.contains(&cmd) {
         return Ok(());
@@ -702,7 +710,8 @@ impl Dispatcher {
                 ev.module = Some(format!("skill/{skill_id}/{step_id}"));
                 ev.summary = Some(format!("spawn failed: {e} :: skill/{skill_id}/{step_id}"));
                 ev.outputs.insert("risk".into(), risk_band.into());
-                ev.outputs.insert("step_type".into(), step_type.as_str().into());
+                ev.outputs
+                    .insert("step_type".into(), step_type.as_str().into());
                 let _ = journal.append(&ev);
                 return Err(e);
             }
@@ -711,7 +720,11 @@ impl Dispatcher {
         let action = match step_type {
             StepType::Probe => "skill_probe",
             StepType::Intervention => {
-                if outcome.dry_run { "would_skill_intervention" } else { "skill_intervention" }
+                if outcome.dry_run {
+                    "would_skill_intervention"
+                } else {
+                    "skill_intervention"
+                }
             }
         };
         let severity = if outcome.exit_code == Some(0) || outcome.dry_run {
@@ -728,20 +741,26 @@ impl Dispatcher {
         ev.summary = Some(format!(
             "{} {}/{}{}",
             if outcome.dry_run { "[DRY RUN]" } else { "" },
-            skill_id, step_id,
+            skill_id,
+            step_id,
             match outcome.exit_code {
                 Some(c) => format!(" exit={c}"),
                 None if outcome.timed_out => " TIMEOUT".into(),
                 None => " (no exit code)".into(),
             },
         ));
-        ev.outputs.insert("exit_code".into(), outcome.exit_code.into());
-        ev.outputs.insert("timed_out".into(), outcome.timed_out.into());
+        ev.outputs
+            .insert("exit_code".into(), outcome.exit_code.into());
+        ev.outputs
+            .insert("timed_out".into(), outcome.timed_out.into());
         ev.outputs.insert("risk".into(), risk_band.into());
-        ev.outputs.insert("step_type".into(), step_type.as_str().into());
+        ev.outputs
+            .insert("step_type".into(), step_type.as_str().into());
 
         let evidence_dir = evidence_base
-            .join("skills").join(skill_id).join(step_id)
+            .join("skills")
+            .join(skill_id)
+            .join(step_id)
             .join(russell_core::time::now_rfc3339().replace(':', "-"));
         if let Err(e) = write_evidence(&evidence_dir, &outcome, &ev) {
             tracing::warn!(dir = %evidence_dir.display(), error = %e, "evidence write failed");
@@ -904,8 +923,8 @@ pub fn resolve_rollback_strategy(rollback: &crate::Rollback) -> RollbackStrategy
 /// Task 3.3: Evidence bundle sealing — computes SHA-256 hashes of all
 /// evidence files and writes a manifest.json for tamper detection.
 fn write_evidence(dir: &Path, outcome: &RunOutcome, event: &Event) -> Result<()> {
-    use sha2::{Sha256, Digest};
-    
+    use sha2::{Digest, Sha256};
+
     std::fs::create_dir_all(dir).map_err(|e| russell_core::CoreError::io(dir, e))?;
 
     // Write stdout and compute hash.
@@ -928,9 +947,13 @@ fn write_evidence(dir: &Path, outcome: &RunOutcome, event: &Event) -> Result<()>
 
     // Add hashes to event outputs for journal audit trail.
     let mut event_with_hashes = event.clone();
-    event_with_hashes.outputs.insert("stdout_sha256".into(), stdout_hash.clone().into());
+    event_with_hashes
+        .outputs
+        .insert("stdout_sha256".into(), stdout_hash.clone().into());
     if !stderr_hash.is_empty() {
-        event_with_hashes.outputs.insert("stderr_sha256".into(), stderr_hash.clone().into());
+        event_with_hashes
+            .outputs
+            .insert("stderr_sha256".into(), stderr_hash.clone().into());
     }
 
     // Write event JSON.
@@ -980,7 +1003,10 @@ mod tests {
             allowed_env_keys: Vec::new(),
         };
         // Dry-run skips validation — any command shape accepted.
-        let outcome = d.run(&["/bin/echo".into(), "hello".into()], None).await.unwrap();
+        let outcome = d
+            .run(&["/bin/echo".into(), "hello".into()], None)
+            .await
+            .unwrap();
         assert!(outcome.dry_run);
         assert!(outcome.exit_code.is_none());
         assert!(outcome.stdout.is_empty());
@@ -989,7 +1015,10 @@ mod tests {
     #[tokio::test]
     async fn echo_produces_stdout() {
         let d = Dispatcher::new("/tmp");
-        let outcome = d.run(&["/bin/echo".into(), "hello".into()], None).await.unwrap();
+        let outcome = d
+            .run(&["/bin/echo".into(), "hello".into()], None)
+            .await
+            .unwrap();
         assert!(!outcome.dry_run);
         assert_eq!(outcome.exit_code, Some(0));
         assert!(outcome.stdout.contains("hello"));
@@ -1006,7 +1035,10 @@ mod tests {
     #[tokio::test]
     async fn bare_command_rejected() {
         let d = Dispatcher::new("/tmp");
-        let outcome = d.run(&["curl".into(), "http://evil.com".into()], None).await.unwrap();
+        let outcome = d
+            .run(&["curl".into(), "http://evil.com".into()], None)
+            .await
+            .unwrap();
         assert_eq!(outcome.exit_code, Some(-1));
         assert!(outcome.stderr.contains("command rejected"));
     }
@@ -1014,7 +1046,10 @@ mod tests {
     #[tokio::test]
     async fn path_traversal_rejected() {
         let d = Dispatcher::new("/tmp");
-        let outcome = d.run(&["./scripts/../../../etc/passwd".into()], None).await.unwrap();
+        let outcome = d
+            .run(&["./scripts/../../../etc/passwd".into()], None)
+            .await
+            .unwrap();
         assert_eq!(outcome.exit_code, Some(-1));
         assert!(outcome.stderr.contains("path traversal"));
     }

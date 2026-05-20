@@ -12,7 +12,7 @@
 //! See [docs/standards/VALIDATION_RUBRIC.md] for the full rubric
 //! and [rules.d/docs.toml] for operator-overridable thresholds.
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use russell_core::paths::Paths;
 use std::process::Command;
 
@@ -23,8 +23,7 @@ use std::process::Command;
 /// Future work: integrate link checking, metric integrity,
 /// and citation density as native Rust checks.
 pub fn run(_paths: &Paths, strict: bool) -> Result<()> {
-    let project_root = std::env::current_dir()
-        .unwrap_or_else(|_| std::path::PathBuf::from("."));
+    let project_root = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
 
     let lint_script = project_root.join("scripts").join("lint_frontmatter.py");
     if !lint_script.exists() {

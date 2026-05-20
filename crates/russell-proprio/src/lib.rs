@@ -827,10 +827,7 @@ fn gather_kask_mcp_reachable(
 ///
 /// When `RemoteDiscovery` is fully wired (Gap 3), this probe will also
 /// read latency from the registry cache's `last_fetch_at` timestamp.
-fn gather_remote_discovery_latency(
-    writer: &JournalWriter,
-    now: i64,
-) -> (Option<i64>, Severity) {
+fn gather_remote_discovery_latency(writer: &JournalWriter, now: i64) -> (Option<i64>, Severity) {
     // Read the last remote discovery fetch event from the journal.
     // For now, this checks if any `remote.skill.fetch` event exists.
     // When remote discovery is wired, this will read from the registry
@@ -846,7 +843,11 @@ fn gather_remote_discovery_latency(
     };
 
     let sev = match latency {
-        Some(d) => classify_threshold(d, REMOTE_DISCOVERY_WARN_THRESHOLD_S, REMOTE_DISCOVERY_ALERT_THRESHOLD_S),
+        Some(d) => classify_threshold(
+            d,
+            REMOTE_DISCOVERY_WARN_THRESHOLD_S,
+            REMOTE_DISCOVERY_ALERT_THRESHOLD_S,
+        ),
         None => Severity::Info,
     };
 
@@ -1181,7 +1182,13 @@ mod tests {
         let now = russell_core::time::now_unix();
         // Insert 10 sessions with latencies 100, 200, ..., 1000
         for i in 0..10 {
-            insert_help_session(&w, &format!("id_{i}"), now, Some((i + 1) * 100), HelpSessionStatus::Ok);
+            insert_help_session(
+                &w,
+                &format!("id_{i}"),
+                now,
+                Some((i + 1) * 100),
+                HelpSessionStatus::Ok,
+            );
         }
         let r = w.reader();
         let result = run_once_with(&w, &r, &no_timer()).unwrap();
@@ -1196,7 +1203,13 @@ mod tests {
         let now = russell_core::time::now_unix();
         // Insert 4 sessions with high latencies to trigger warn (>8000 ms)
         for i in 0..4 {
-            insert_help_session(&w, &format!("id_{i}"), now, Some(9_000 + i * 100), HelpSessionStatus::Ok);
+            insert_help_session(
+                &w,
+                &format!("id_{i}"),
+                now,
+                Some(9_000 + i * 100),
+                HelpSessionStatus::Ok,
+            );
         }
         let r = w.reader();
         let result = run_once_with(&w, &r, &no_timer()).unwrap();

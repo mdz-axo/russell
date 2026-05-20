@@ -145,7 +145,8 @@ pub async fn execute_pending_action(
         }
         match verify.wait().await {
             Ok(s) if s.success() => {
-                dispatcher.sudo_password = Some(russell_skills::dispatch::SudoCredential::new(password));
+                dispatcher.sudo_password =
+                    Some(russell_skills::dispatch::SudoCredential::new(password));
             }
             _ => {
                 println!("  → Wrong sudo password. Aborting action.");
@@ -176,12 +177,22 @@ pub async fn execute_pending_action(
             .await;
 
         // Update registry telemetry.
-        let probe_success = result.as_ref().is_ok_and(|o| o.exit_code == Some(0) && !o.timed_out);
-        let probe_duration_ms = result.as_ref().map(|o| o.duration.as_millis() as u64).unwrap_or(0);
+        let probe_success = result
+            .as_ref()
+            .is_ok_and(|o| o.exit_code == Some(0) && !o.timed_out);
+        let probe_duration_ms = result
+            .as_ref()
+            .map(|o| o.duration.as_millis() as u64)
+            .unwrap_or(0);
         let probe_error = result.as_ref().err().map(|e| e.to_string());
         let registry_path = paths.state.join("registry").join("local-cache.yaml");
         let _ = RegistryCache::with_update(&registry_path, |cache| {
-            cache.record_execution(&skill_id, probe_success, probe_duration_ms, probe_error.as_deref());
+            cache.record_execution(
+                &skill_id,
+                probe_success,
+                probe_duration_ms,
+                probe_error.as_deref(),
+            );
         });
 
         return format_probe_result(result, &skill_id, &action_id);
@@ -215,7 +226,11 @@ pub async fn execute_pending_action(
         Ok(outcome) => {
             let success = outcome.succeeded();
             let error_msg = if !success {
-                Some(format!("exit {:?}, stderr: {}", outcome.exit_code, outcome.stderr.trim()))
+                Some(format!(
+                    "exit {:?}, stderr: {}",
+                    outcome.exit_code,
+                    outcome.stderr.trim()
+                ))
             } else {
                 None
             };

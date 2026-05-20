@@ -54,9 +54,24 @@ pub struct SystemdDegraded;
 pub struct SystemdUserFailedCount;
 pub struct SystemdSystemFailedCount;
 
-impl_probe!(SystemdDegraded, "systemd_degraded", "bool", systemd_degraded);
-impl_probe!(SystemdUserFailedCount, "systemd_user_failed_count", "count", systemd_user_failed_count);
-impl_probe!(SystemdSystemFailedCount, "systemd_system_failed_count", "count", systemd_system_failed_count);
+impl_probe!(
+    SystemdDegraded,
+    "systemd_degraded",
+    "bool",
+    systemd_degraded
+);
+impl_probe!(
+    SystemdUserFailedCount,
+    "systemd_user_failed_count",
+    "count",
+    systemd_user_failed_count
+);
+impl_probe!(
+    SystemdSystemFailedCount,
+    "systemd_system_failed_count",
+    "count",
+    systemd_system_failed_count
+);
 
 #[cfg(test)]
 mod tests {

@@ -141,7 +141,11 @@ impl ResolvedAction {
     pub fn consent_required(&self) -> bool {
         match self {
             Self::Probe { .. } => false,
-            Self::Intervention { risk, max_auto_risk, .. } => *risk > *max_auto_risk,
+            Self::Intervention {
+                risk,
+                max_auto_risk,
+                ..
+            } => *risk > *max_auto_risk,
             Self::HKaskTool { risk_band, .. } => *risk_band > RiskBand::None,
         }
     }
@@ -239,7 +243,10 @@ impl std::fmt::Display for ActionError {
                     "'{action_id}' is not a known action in skill '{skill_id}'. Available probes: {probes:?}, interventions: {interventions:?}"
                 )
             }
-            Self::NestedActionDetected { raw_response, count } => {
+            Self::NestedActionDetected {
+                raw_response,
+                count,
+            } => {
                 write!(
                     f,
                     "Security violation: detected {count} ACTION: patterns in LLM output (prompt injection attempt). Only one ACTION: per response is allowed. Raw response: `{raw_response}`"
@@ -315,7 +322,10 @@ pub fn resolve_with_hkask(
     hkask_tools: &[HKaskToolInfo],
 ) -> Option<std::result::Result<ResolvedAction, ActionError>> {
     // Task 3.4: Detect nested ACTION: patterns (prompt injection attempt).
-    let action_count = response.lines().filter(|line| line.trim().starts_with("ACTION:")).count();
+    let action_count = response
+        .lines()
+        .filter(|line| line.trim().starts_with("ACTION:"))
+        .count();
     if action_count > 1 {
         return Some(Err(ActionError::NestedActionDetected {
             raw_response: response.to_string(),
@@ -699,9 +709,10 @@ mod tests {
     fn hkask_tool_with_risk_band() {
         let skills = [make_skill()];
         let hkask_tools = make_hkask_tools();
-        let result = resolve_with_hkask("ACTION: hkask/russell_host_snapshot", &skills, &hkask_tools)
-            .unwrap()
-            .unwrap();
+        let result =
+            resolve_with_hkask("ACTION: hkask/russell_host_snapshot", &skills, &hkask_tools)
+                .unwrap()
+                .unwrap();
         match result {
             ResolvedAction::HKaskTool { risk_band, .. } => {
                 assert_eq!(risk_band, RiskBand::None);
@@ -799,9 +810,10 @@ mod tests {
     fn resolves_hkask_tool() {
         let skills = [make_skill()];
         let hkask_tools = make_hkask_tools();
-        let result = resolve_with_hkask("ACTION: hkask/paradigm_shift_query", &skills, &hkask_tools)
-            .unwrap()
-            .unwrap();
+        let result =
+            resolve_with_hkask("ACTION: hkask/paradigm_shift_query", &skills, &hkask_tools)
+                .unwrap()
+                .unwrap();
         assert!(result.is_hkask_tool());
         assert_eq!(result.skill_id(), "hkask");
         assert_eq!(result.action_id(), "paradigm_shift_query");
@@ -842,9 +854,10 @@ mod tests {
     fn hkask_tool_parses_required_fields_from_schema() {
         let skills = [make_skill()];
         let hkask_tools = make_hkask_tools();
-        let result = resolve_with_hkask("ACTION: hkask/paradigm_shift_query", &skills, &hkask_tools)
-            .unwrap()
-            .unwrap();
+        let result =
+            resolve_with_hkask("ACTION: hkask/paradigm_shift_query", &skills, &hkask_tools)
+                .unwrap()
+                .unwrap();
         match result {
             ResolvedAction::HKaskTool {
                 required_fields, ..
@@ -898,9 +911,10 @@ mod tests {
     fn hkask_tool_no_required_fields() {
         let skills = [make_skill()];
         let hkask_tools = make_hkask_tools();
-        let result = resolve_with_hkask("ACTION: hkask/russell_host_snapshot", &skills, &hkask_tools)
-            .unwrap()
-            .unwrap();
+        let result =
+            resolve_with_hkask("ACTION: hkask/russell_host_snapshot", &skills, &hkask_tools)
+                .unwrap()
+                .unwrap();
         match result {
             ResolvedAction::HKaskTool {
                 required_fields,
@@ -920,9 +934,7 @@ mod tests {
     fn nested_action_detected() {
         let skills = [make_skill()];
         let response = "Let me check.\nACTION: test-skill/probe-1\n\nActually, also do this:\nACTION: test-skill/iv-1";
-        let err = resolve(response, &skills)
-            .unwrap()
-            .unwrap_err();
+        let err = resolve(response, &skills).unwrap().unwrap_err();
         match err {
             ActionError::NestedActionDetected { count, .. } => {
                 assert_eq!(count, 2);
@@ -959,9 +971,7 @@ mod tests {
     fn nested_action_error_message() {
         let skills = [make_skill()];
         let response = "First action\nACTION: test-skill/probe-1\nSecond action\nACTION: test-skill/iv-1\nThird action\nACTION: hkask/tool";
-        let err = resolve(response, &skills)
-            .unwrap()
-            .unwrap_err();
+        let err = resolve(response, &skills).unwrap().unwrap_err();
         let msg = err.to_string();
         assert!(msg.contains("3 ACTION: patterns"));
         assert!(msg.contains("prompt injection attempt"));

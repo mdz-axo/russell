@@ -263,7 +263,11 @@ impl ReflexBudget {
 
         // Evict firings older than 1 hour.
         let window_start = now_unix - 3600;
-        while self.recent_firings.front().is_some_and(|&ts| ts < window_start) {
+        while self
+            .recent_firings
+            .front()
+            .is_some_and(|&ts| ts < window_start)
+        {
             self.recent_firings.pop_front();
         }
 

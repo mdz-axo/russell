@@ -4,10 +4,10 @@
 use anyhow::{Context, Result};
 use russell_core::journal::JournalWriter;
 use russell_core::paths::Paths;
-use russell_meta::action::{self, HKaskToolInfo, ResolvedAction};
 use russell_mcp::client::HKaskMcpClient;
 use russell_mcp::config::HKaskMcpConfig;
 use russell_mcp::registry::ToolRegistry;
+use russell_meta::action::{self, HKaskToolInfo, ResolvedAction};
 use russell_skills::RiskBand;
 use tracing::debug;
 
@@ -53,8 +53,8 @@ pub async fn run(paths: &Paths, note: Option<&str>) -> Result<()> {
     // Reconcile registry against disk (fix stale/orphan entries).
     {
         let registry_path = paths.state.join("registry").join("local-cache.yaml");
-        let mut registry = russell_skills::registry::RegistryCache::load(&registry_path)
-            .unwrap_or_default();
+        let mut registry =
+            russell_skills::registry::RegistryCache::load(&registry_path).unwrap_or_default();
         if registry.reconcile(&skills) {
             let _ = registry.save(&registry_path);
         }
@@ -78,7 +78,15 @@ pub async fn run(paths: &Paths, note: Option<&str>) -> Result<()> {
                     );
                     let probe_output = execute_probe_capture(paths, &writer, &action).await;
                     // Feed probe results back to Jack for analysis.
-                    match analyze_probe_result(paths, &writer, &outcome.response, &probe_output, &hkask_tool_names).await {
+                    match analyze_probe_result(
+                        paths,
+                        &writer,
+                        &outcome.response,
+                        &probe_output,
+                        &hkask_tool_names,
+                    )
+                    .await
+                    {
                         Ok(analysis) => analysis,
                         Err(e) => {
                             debug!(error = %e, "probe analysis failed, using original response");
@@ -188,11 +196,19 @@ async fn execute_probe_capture(
 
     // Update registry telemetry.
     let probe_success = result.as_ref().is_ok_and(|o| o.exit_code == Some(0));
-    let probe_duration_ms = result.as_ref().map(|o| o.duration.as_millis() as u64).unwrap_or(0);
+    let probe_duration_ms = result
+        .as_ref()
+        .map(|o| o.duration.as_millis() as u64)
+        .unwrap_or(0);
     let probe_error = result.as_ref().err().map(|e| e.to_string());
     let registry_path = paths.state.join("registry").join("local-cache.yaml");
     let _ = RegistryCache::with_update(&registry_path, |cache| {
-        cache.record_execution(action.skill_id(), probe_success, probe_duration_ms, probe_error.as_deref());
+        cache.record_execution(
+            action.skill_id(),
+            probe_success,
+            probe_duration_ms,
+            probe_error.as_deref(),
+        );
     });
 
     match result {
@@ -265,7 +281,8 @@ async fn analyze_probe_result(
                      You previously proposed running a probe. Here are the results.\n\n\
                      Analyze what this result means in the context of your previous analysis. \
                      What does this tell us about the system? What should we do next?\n\n\
-                     If you identify another probe to run, propose it with ACTION: syntax.".into(),
+                     If you identify another probe to run, propose it with ACTION: syntax."
+                .into(),
             subjective: "Probe results".into(),
             objective: probe_summary.clone(),
             rendered: format!("Probe results:\n\n{}", probe_summary),

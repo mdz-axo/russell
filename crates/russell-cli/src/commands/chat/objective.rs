@@ -77,7 +77,10 @@ pub fn build_objective(
 
         let _ = writeln!(obj, "\n### Host samples — last 24h");
         if has_baselines {
-            let _ = writeln!(obj, "| probe | count | min | avg | max | last | p95 (30d) | ewma (7d) | unit |");
+            let _ = writeln!(
+                obj,
+                "| probe | count | min | avg | max | last | p95 (30d) | ewma (7d) | unit |"
+            );
             let _ = writeln!(obj, "|---|---|---|---|---|---|---|---|---|");
         } else {
             let _ = writeln!(obj, "| probe | count | min | avg | max | last | unit |");
@@ -86,21 +89,40 @@ pub fn build_objective(
         for s in &summaries {
             let unit = s.unit.as_deref().unwrap_or("");
             if has_baselines {
-                let (p95, ewma) = baselines.get(&s.probe).map(|(p, e)| (*p, *e)).unwrap_or((None, None));
-                let p95_str = p95.map(|v| fmt_f64(Some(v))).unwrap_or_else(|| "—".to_string());
-                let ewma_str = ewma.map(|v| fmt_f64(Some(v))).unwrap_or_else(|| "—".to_string());
+                let (p95, ewma) = baselines
+                    .get(&s.probe)
+                    .map(|(p, e)| (*p, *e))
+                    .unwrap_or((None, None));
+                let p95_str = p95
+                    .map(|v| fmt_f64(Some(v)))
+                    .unwrap_or_else(|| "—".to_string());
+                let ewma_str = ewma
+                    .map(|v| fmt_f64(Some(v)))
+                    .unwrap_or_else(|| "—".to_string());
                 let _ = writeln!(
                     obj,
                     "| {} | {} | {} | {} | {} | {} | {} | {} | {} |",
-                    s.probe, s.count, fmt_f64(s.min), fmt_f64(s.avg),
-                    fmt_f64(s.max), fmt_f64(s.last), p95_str, ewma_str, unit,
+                    s.probe,
+                    s.count,
+                    fmt_f64(s.min),
+                    fmt_f64(s.avg),
+                    fmt_f64(s.max),
+                    fmt_f64(s.last),
+                    p95_str,
+                    ewma_str,
+                    unit,
                 );
             } else {
                 let _ = writeln!(
                     obj,
                     "| {} | {} | {} | {} | {} | {} | {} |",
-                    s.probe, s.count, fmt_f64(s.min), fmt_f64(s.avg),
-                    fmt_f64(s.max), fmt_f64(s.last), unit,
+                    s.probe,
+                    s.count,
+                    fmt_f64(s.min),
+                    fmt_f64(s.avg),
+                    fmt_f64(s.max),
+                    fmt_f64(s.last),
+                    unit,
                 );
             }
         }
@@ -124,7 +146,10 @@ pub fn build_objective(
             let _ = writeln!(
                 obj,
                 "| {} | {} | {} | {} |",
-                s.probe, fmt_f64(s.last), fmt_f64(s.avg), unit,
+                s.probe,
+                fmt_f64(s.last),
+                fmt_f64(s.avg),
+                unit,
             );
         }
     }
@@ -139,7 +164,10 @@ pub fn build_objective(
         for (sev, intervention, summary, _ts) in &rows {
             let _ = writeln!(obj, "| {} | `{}` | {} |", sev, intervention, summary);
         }
-        let _ = writeln!(obj, "\nIf a reflex arc above is within the risk cap, you can propose it via ACTION syntax.");
+        let _ = writeln!(
+            obj,
+            "\nIf a reflex arc above is within the risk cap, you can propose it via ACTION syntax."
+        );
     }
 
     // ── Recent events ───────────────────────────────────────────────
@@ -161,7 +189,10 @@ pub fn build_objective(
     // ── Skill telemetry (expanded) ──────────────────────────────────
     if !registry.skills.is_empty() {
         let _ = writeln!(obj, "\n### Skill Performance");
-        let _ = writeln!(obj, "| skill | probes | p.fails | interventions | i.fails | success rate | last run |");
+        let _ = writeln!(
+            obj,
+            "| skill | probes | p.fails | interventions | i.fails | success rate | last run |"
+        );
         let _ = writeln!(obj, "|---|---|---|---|---|---|---|");
         for (id, entry) in &registry.skills {
             let last = entry.last_probe_run_at.as_deref().unwrap_or("never");

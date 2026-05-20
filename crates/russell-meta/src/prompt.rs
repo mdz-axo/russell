@@ -19,15 +19,18 @@
 use std::fmt::Write as _;
 use std::path::Path;
 
-use russell_core::journal::JournalReader;
 use russell_core::Profile;
 #[cfg(test)]
 use russell_core::event::Scope;
+use russell_core::journal::JournalReader;
 use russell_skills::Skill;
 
 use crate::client::SoapPrompt;
 use crate::error::Result;
-use crate::prompt_registry::{PromptRegistry, KnowledgeSlot, SkillTelemetry, score_knowledge_relevance, score_knowledge_relevance_with_telemetry, select_knowledge};
+use crate::prompt_registry::{
+    KnowledgeSlot, PromptRegistry, SkillTelemetry, score_knowledge_relevance,
+    score_knowledge_relevance_with_telemetry, select_knowledge,
+};
 
 /// Build the SOAP prompt. The system prompt is always the
 /// embedded Jack persona.
@@ -128,14 +131,15 @@ pub fn compose_with_kask(
     } else {
         // Read 30-day baselines for deviation detection.
         // Task 4.1: Track baseline staleness and warn if outdated.
-        let baselines: std::collections::BTreeMap<String, russell_core::journal::BaselineRow> = reader
-            .read_baselines()
-            .unwrap_or_default()
-            .into_iter()
-            .map(|b| (b.probe.clone(), b))
-            .collect();
+        let baselines: std::collections::BTreeMap<String, russell_core::journal::BaselineRow> =
+            reader
+                .read_baselines()
+                .unwrap_or_default()
+                .into_iter()
+                .map(|b| (b.probe.clone(), b))
+                .collect();
         let has_baselines = !baselines.is_empty();
-        
+
         // Check for stale baselines (older than 48 hours).
         let stale_baselines: Vec<&str> = baselines
             .values()
@@ -172,9 +176,7 @@ pub fn compose_with_kask(
                 let (p95, ewma) = baseline
                     .map(|b| (b.p95, b.ewma_mean))
                     .unwrap_or((None, None));
-                let p95_str = p95
-                    .map(fmt_f64_baseline)
-                    .unwrap_or_else(|| "—".to_string());
+                let p95_str = p95.map(fmt_f64_baseline).unwrap_or_else(|| "—".to_string());
                 let ewma_str = ewma
                     .map(fmt_f64_baseline)
                     .unwrap_or_else(|| "—".to_string());
@@ -440,16 +442,34 @@ pub fn compose_templated(
     // ── Render template ─────────────────────────────────────────────
     let mut ctx = HashMap::new();
     ctx.insert("subjective".to_string(), serde_json::json!(subjective));
-    ctx.insert("profile_block".to_string(), serde_json::json!(profile_block));
-    ctx.insert("severity_block".to_string(), serde_json::json!(severity_block));
-    ctx.insert("samples_table".to_string(), serde_json::json!(samples_table));
-    ctx.insert("freshness_block".to_string(), serde_json::json!(freshness_block));
+    ctx.insert(
+        "profile_block".to_string(),
+        serde_json::json!(profile_block),
+    );
+    ctx.insert(
+        "severity_block".to_string(),
+        serde_json::json!(severity_block),
+    );
+    ctx.insert(
+        "samples_table".to_string(),
+        serde_json::json!(samples_table),
+    );
+    ctx.insert(
+        "freshness_block".to_string(),
+        serde_json::json!(freshness_block),
+    );
     ctx.insert("events_table".to_string(), serde_json::json!(events_table));
     if !reflex_section.is_empty() {
-        ctx.insert("reflex_section".to_string(), serde_json::json!(reflex_section));
+        ctx.insert(
+            "reflex_section".to_string(),
+            serde_json::json!(reflex_section),
+        );
     }
     if !actionable.is_empty() {
-        ctx.insert("actionable_skills".to_string(), serde_json::json!(actionable));
+        ctx.insert(
+            "actionable_skills".to_string(),
+            serde_json::json!(actionable),
+        );
     }
     if !knowledge.is_empty() {
         ctx.insert("knowledge_skills".to_string(), serde_json::json!(knowledge));
@@ -462,7 +482,14 @@ pub fn compose_templated(
 
     // ── System prompt: persona + relevance-scored knowledge ──────────
     let mut system_prompt = crate::JACK_PERSONA.to_string();
-    append_skill_knowledge_scored(&mut system_prompt, loaded_skills, skills_base_dir, reader, window_start, skill_registry);
+    append_skill_knowledge_scored(
+        &mut system_prompt,
+        loaded_skills,
+        skills_base_dir,
+        reader,
+        window_start,
+        skill_registry,
+    );
 
     // ── Extract inference parameters from hint ──────────────────────
     let temperature = hint.as_ref().and_then(|h| h.temperature);
@@ -492,10 +519,18 @@ fn build_profile_block(profile: Option<&Profile>) -> String {
             let _ = writeln!(block, "- profile_id: `{}`", p.profile_id);
             let _ = writeln!(block, "- authored_at: `{}`", p.authored_at);
             if !p.host.os.distro.is_empty() {
-                let _ = writeln!(block, "- host.os: `{}/{}` kernel `{}`", p.host.os.distro, p.host.os.version, p.host.os.kernel);
+                let _ = writeln!(
+                    block,
+                    "- host.os: `{}/{}` kernel `{}`",
+                    p.host.os.distro, p.host.os.version, p.host.os.kernel
+                );
             }
             if !p.host.cpu.model.is_empty() {
-                let _ = writeln!(block, "- host.cpu: `{}` ({} cores / {} threads)", p.host.cpu.model, p.host.cpu.cores, p.host.cpu.threads);
+                let _ = writeln!(
+                    block,
+                    "- host.cpu: `{}` ({} cores / {} threads)",
+                    p.host.cpu.model, p.host.cpu.cores, p.host.cpu.threads
+                );
             }
             if !p.gpus.is_empty() {
                 let _ = writeln!(block, "- gpus:");
@@ -504,18 +539,25 @@ fn build_profile_block(profile: Option<&Profile>) -> String {
                 }
             }
         }
-        None => { let _ = writeln!(block, "- (no profile.json)"); }
+        None => {
+            let _ = writeln!(block, "- (no profile.json)");
+        }
     }
     block.trim_end().to_string()
 }
 
 fn build_severity_block(reader: &JournalReader, window_start: i64) -> Result<String> {
     let counts = reader.severity_counts(window_start, i64::MAX)?;
-    Ok(format!("- info: {} | warn: {} | alert: {} | crit: {}", counts.info, counts.warn, counts.alert, counts.crit))
+    Ok(format!(
+        "- info: {} | warn: {} | alert: {} | crit: {}",
+        counts.info, counts.warn, counts.alert, counts.crit
+    ))
 }
 
 fn build_samples_table(reader: &JournalReader, window_start: i64) -> Result<String> {
-    let summaries = reader.host_samples_summary(window_start, i64::MAX).unwrap_or_default();
+    let summaries = reader
+        .host_samples_summary(window_start, i64::MAX)
+        .unwrap_or_default();
     if summaries.is_empty() {
         return Ok("(no samples recorded)".to_string());
     }
@@ -529,7 +571,10 @@ fn build_samples_table(reader: &JournalReader, window_start: i64) -> Result<Stri
 
     let mut table = String::new();
     if has_baselines {
-        let _ = writeln!(table, "| probe | count | min | avg | max | last | p95 (30d) | ewma (7d) | unit |");
+        let _ = writeln!(
+            table,
+            "| probe | count | min | avg | max | last | p95 (30d) | ewma (7d) | unit |"
+        );
         let _ = writeln!(table, "|---|---|---|---|---|---|---|---|---|");
     } else {
         let _ = writeln!(table, "| probe | count | min | avg | max | last | unit |");
@@ -538,12 +583,39 @@ fn build_samples_table(reader: &JournalReader, window_start: i64) -> Result<Stri
     for s in &summaries {
         let unit = s.unit.as_deref().unwrap_or("");
         if has_baselines {
-            let (p95, ewma) = baselines.get(&s.probe).map(|(p, e)| (*p, *e)).unwrap_or((None, None));
+            let (p95, ewma) = baselines
+                .get(&s.probe)
+                .map(|(p, e)| (*p, *e))
+                .unwrap_or((None, None));
             let p95_str = p95.map(fmt_f64_baseline).unwrap_or_else(|| "—".to_string());
-            let ewma_str = ewma.map(fmt_f64_baseline).unwrap_or_else(|| "—".to_string());
-            let _ = writeln!(table, "| {} | {} | {} | {} | {} | {} | {} | {} | {} |", s.probe, s.count, fmt_opt_f64(s.min), fmt_opt_f64(s.avg), fmt_opt_f64(s.max), fmt_opt_f64(s.last), p95_str, ewma_str, unit);
+            let ewma_str = ewma
+                .map(fmt_f64_baseline)
+                .unwrap_or_else(|| "—".to_string());
+            let _ = writeln!(
+                table,
+                "| {} | {} | {} | {} | {} | {} | {} | {} | {} |",
+                s.probe,
+                s.count,
+                fmt_opt_f64(s.min),
+                fmt_opt_f64(s.avg),
+                fmt_opt_f64(s.max),
+                fmt_opt_f64(s.last),
+                p95_str,
+                ewma_str,
+                unit
+            );
         } else {
-            let _ = writeln!(table, "| {} | {} | {} | {} | {} | {} | {} |", s.probe, s.count, fmt_opt_f64(s.min), fmt_opt_f64(s.avg), fmt_opt_f64(s.max), fmt_opt_f64(s.last), unit);
+            let _ = writeln!(
+                table,
+                "| {} | {} | {} | {} | {} | {} | {} |",
+                s.probe,
+                s.count,
+                fmt_opt_f64(s.min),
+                fmt_opt_f64(s.avg),
+                fmt_opt_f64(s.max),
+                fmt_opt_f64(s.last),
+                unit
+            );
         }
     }
     Ok(table.trim_end().to_string())
@@ -564,10 +636,22 @@ fn build_events_table(reader: &JournalReader) -> Result<String> {
         return Ok("- (no events recorded)".to_string());
     }
     let mut table = String::new();
-    let _ = writeln!(table, "| ts | severity | scope | module | action | summary |");
+    let _ = writeln!(
+        table,
+        "| ts | severity | scope | module | action | summary |"
+    );
     let _ = writeln!(table, "|---|---|---|---|---|---|");
     for r in rows {
-        let _ = writeln!(table, "| {} | {} | {} | {} | {} | {} |", r.ts, r.severity.as_str(), r.scope.as_str(), r.module.as_deref().unwrap_or("-"), r.action, r.summary.as_deref().unwrap_or(""));
+        let _ = writeln!(
+            table,
+            "| {} | {} | {} | {} | {} | {} |",
+            r.ts,
+            r.severity.as_str(),
+            r.scope.as_str(),
+            r.module.as_deref().unwrap_or("-"),
+            r.action,
+            r.summary.as_deref().unwrap_or("")
+        );
     }
     Ok(table.trim_end().to_string())
 }
@@ -586,7 +670,10 @@ fn build_reflex_block(reader: &JournalReader) -> Result<String> {
     for (sev, intervention, summary, ts) in &rows {
         let _ = writeln!(block, "| {ts} | {sev} | `{intervention}` | {summary} |");
     }
-    let _ = writeln!(block, "- If any reflex arc above is within the risk cap, propose it via ACTION: <intervention>.");
+    let _ = writeln!(
+        block,
+        "- If any reflex arc above is within the risk cap, propose it via ACTION: <intervention>."
+    );
     Ok(block.trim_end().to_string())
 }
 
@@ -635,9 +722,21 @@ fn derive_active_symptoms(events: &[russell_core::journal::EventRow]) -> Vec<Str
         if let Some(summary) = &ev.summary {
             let lower = summary.to_lowercase();
             for keyword in [
-                "oom", "swap", "gpu", "vram", "timeout", "stall",
-                "degraded", "slow", "zombie", "pressure", "exhaustion",
-                "drift", "skew", "bloat", "corruption",
+                "oom",
+                "swap",
+                "gpu",
+                "vram",
+                "timeout",
+                "stall",
+                "degraded",
+                "slow",
+                "zombie",
+                "pressure",
+                "exhaustion",
+                "drift",
+                "skew",
+                "bloat",
+                "corruption",
             ] {
                 if lower.contains(keyword) {
                     symptoms.push(keyword.to_string());
@@ -667,8 +766,17 @@ fn extract_keywords(name: &str, out: &mut Vec<String>) {
         if keyword.len() >= 3
             && !matches!(
                 keyword,
-                "used" | "pct" | "mib" | "avg" | "max" | "min"
-                    | "total" | "count" | "the" | "last" | "run"
+                "used"
+                    | "pct"
+                    | "mib"
+                    | "avg"
+                    | "max"
+                    | "min"
+                    | "total"
+                    | "count"
+                    | "the"
+                    | "last"
+                    | "run"
             )
         {
             out.push(keyword.to_string());
@@ -746,10 +854,7 @@ fn append_skill_knowledge_scored(
                         &telemetry,
                     )
                 }
-                None => score_knowledge_relevance(
-                    &skill.symptoms,
-                    &active_symptoms,
-                ),
+                None => score_knowledge_relevance(&skill.symptoms, &active_symptoms),
             };
 
             let token_estimate = content.len() / 4;

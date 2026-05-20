@@ -130,7 +130,7 @@ impl HKaskMcpClient {
     /// Transport or authentication errors.
     pub async fn connect(&mut self) -> Result<()> {
         let health_url = format!("{}/health", self.config.endpoint.trim_end_matches('/'));
-        
+
         let mut req = self
             .http
             .get(&health_url)
@@ -141,10 +141,7 @@ impl HKaskMcpClient {
             req = req.bearer_auth(token);
         }
 
-        let resp = req
-            .send()
-            .await
-            .map_err(|e| map_reqwest_error(&e))?;
+        let resp = req.send().await.map_err(|e| map_reqwest_error(&e))?;
 
         let status = resp.status();
 
@@ -169,11 +166,15 @@ impl HKaskMcpClient {
             version: Option<String>,
         }
 
-        let health: HealthResponse = resp.json().await.map_err(|e| McpError::InvalidResponse(
-            format!("health response parse: {e}"),
-        ))?;
+        let health: HealthResponse = resp
+            .json()
+            .await
+            .map_err(|e| McpError::InvalidResponse(format!("health response parse: {e}")))?;
 
-        self.server_name = Some(format!("hkask-api-{}", health.version.unwrap_or_else(|| "unknown".into())));
+        self.server_name = Some(format!(
+            "hkask-api-{}",
+            health.version.unwrap_or_else(|| "unknown".into())
+        ));
         self.initialized = true;
 
         debug!(server = ?self.server_name, "hKask API connection established");
@@ -187,12 +188,17 @@ impl HKaskMcpClient {
     pub async fn list_tools(&self) -> Result<Vec<McpToolDefinition>> {
         // Acquire rate limit permit (held for duration of request).
         if let Some(ref semaphore) = self.rate_limit {
-            let _permit = semaphore.acquire().await
+            let _permit = semaphore
+                .acquire()
+                .await
                 .map_err(|e| McpError::Config(format!("rate limiter closed: {e}")))?;
         }
 
-        let tools_url = format!("{}/api/v1/tools", self.config.endpoint.trim_end_matches('/'));
-        
+        let tools_url = format!(
+            "{}/api/v1/tools",
+            self.config.endpoint.trim_end_matches('/')
+        );
+
         let mut req = self
             .http
             .get(&tools_url)
@@ -203,10 +209,7 @@ impl HKaskMcpClient {
             req = req.bearer_auth(token);
         }
 
-        let resp = req
-            .send()
-            .await
-            .map_err(|e| map_reqwest_error(&e))?;
+        let resp = req.send().await.map_err(|e| map_reqwest_error(&e))?;
 
         let status = resp.status();
 
@@ -233,9 +236,10 @@ impl HKaskMcpClient {
             server: Option<String>,
         }
 
-        let tools: Vec<ToolInfo> = resp.json().await.map_err(|e| McpError::InvalidResponse(
-            format!("tools response parse: {e}"),
-        ))?;
+        let tools: Vec<ToolInfo> = resp
+            .json()
+            .await
+            .map_err(|e| McpError::InvalidResponse(format!("tools response parse: {e}")))?;
 
         // Convert to McpToolDefinition format.
         let definitions: Vec<McpToolDefinition> = tools
@@ -264,7 +268,9 @@ impl HKaskMcpClient {
     ) -> Result<ToolCallResult> {
         // Acquire rate limit permit (held for duration of request).
         if let Some(ref semaphore) = self.rate_limit {
-            let _permit = semaphore.acquire().await
+            let _permit = semaphore
+                .acquire()
+                .await
                 .map_err(|e| McpError::Config(format!("rate limiter closed: {e}")))?;
         }
 
@@ -330,13 +336,15 @@ impl HKaskMcpClient {
             extra: serde_json::Value,
         }
 
-        let tool_resp: ToolResponse = resp.json().await.map_err(|e| McpError::InvalidResponse(
-            format!("tool call response parse: {e}"),
-        ))?;
+        let tool_resp: ToolResponse = resp
+            .json()
+            .await
+            .map_err(|e| McpError::InvalidResponse(format!("tool call response parse: {e}")))?;
 
         // Convert to ToolCallResult format.
         Ok(ToolCallResult {
-            content: tool_resp.content
+            content: tool_resp
+                .content
                 .into_iter()
                 .map(|c| crate::types::ToolContent {
                     content_type: c.content_type,
@@ -353,7 +361,7 @@ impl HKaskMcpClient {
     /// Returns `Ok(())` if the server responds.
     pub async fn ping(&self) -> Result<()> {
         let health_url = format!("{}/health", self.config.endpoint.trim_end_matches('/'));
-        
+
         let mut req = self
             .http
             .get(&health_url)

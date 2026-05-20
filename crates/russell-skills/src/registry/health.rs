@@ -357,7 +357,10 @@ mod tests {
             (LifecycleStatus::StaleWarning, 10, 8),
             (LifecycleStatus::Deprecated, 50, 25),
             (LifecycleStatus::Retired, 0, 0),
-        ].iter().enumerate() {
+        ]
+        .iter()
+        .enumerate()
+        {
             let mut entry = RegistryEntry::new_default(
                 *status,
                 "1.0.0",
@@ -373,7 +376,10 @@ mod tests {
         }
         let score = aggregate_alert_score(&entries);
         // Retired + deprecated + high failure rate should push score above threshold
-        assert!(score > 0.5, "aggregate alert should detect unhealthy skills, got {score}");
+        assert!(
+            score > 0.5,
+            "aggregate alert should detect unhealthy skills, got {score}"
+        );
     }
 
     #[test]
@@ -395,7 +401,10 @@ mod tests {
             entries.push(entry);
         }
         let score = aggregate_alert_score(&entries);
-        assert!((score - 0.0).abs() < 0.01, "all healthy should score 0, got {score}");
+        assert!(
+            (score - 0.0).abs() < 0.01,
+            "all healthy should score 0, got {score}"
+        );
     }
 }
 

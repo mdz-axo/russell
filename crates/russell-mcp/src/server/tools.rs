@@ -77,12 +77,11 @@ pub(crate) struct RunSentinelParams {
 impl RussellServer {
     /// Current system probe values with min/avg/max over the requested
     /// time window and 30-day EWMA baselines for comparison.
-    #[tool(description = "Get a snapshot of current host telemetry: per-probe last value, \
-        min/avg/max over the time window, and 30-day p95 baselines for anomaly detection.")]
-    fn russell_host_snapshot(
-        &self,
-        Parameters(params): Parameters<HostSnapshotParams>,
-    ) -> String {
+    #[tool(
+        description = "Get a snapshot of current host telemetry: per-probe last value, \
+        min/avg/max over the time window, and 30-day p95 baselines for anomaly detection."
+    )]
+    fn russell_host_snapshot(&self, Parameters(params): Parameters<HostSnapshotParams>) -> String {
         let hours = params.hours.unwrap_or(24);
         let now = russell_core::time::now_unix();
         let since = now - (hours as i64 * 3600);
@@ -136,12 +135,11 @@ impl RussellServer {
     }
 
     /// Recent journal events (newest first).
-    #[tool(description = "List the most recent journal events. Returns timestamp, severity, \
-        scope, module, action, and summary for each event.")]
-    fn russell_recent_events(
-        &self,
-        Parameters(params): Parameters<RecentEventsParams>,
-    ) -> String {
+    #[tool(
+        description = "List the most recent journal events. Returns timestamp, severity, \
+        scope, module, action, and summary for each event."
+    )]
+    fn russell_recent_events(&self, Parameters(params): Parameters<RecentEventsParams>) -> String {
         let limit = params.limit.unwrap_or(20).min(100);
 
         let journal_path = self.paths.journal();
@@ -178,12 +176,11 @@ impl RussellServer {
     }
 
     /// Query journal events filtered by time, severity, and scope.
-    #[tool(description = "Query journal events within a time window, optionally filtered by \
-        minimum severity (info/warn/alert/crit) and scope (host/self).")]
-    fn russell_journal_query(
-        &self,
-        Parameters(params): Parameters<JournalQueryParams>,
-    ) -> String {
+    #[tool(
+        description = "Query journal events within a time window, optionally filtered by \
+        minimum severity (info/warn/alert/crit) and scope (host/self)."
+    )]
+    fn russell_journal_query(&self, Parameters(params): Parameters<JournalQueryParams>) -> String {
         let hours = params.hours.unwrap_or(24);
         let now = russell_core::time::now_unix();
         let since = now - (hours as i64 * 3600);
@@ -248,12 +245,11 @@ impl RussellServer {
     }
 
     /// Per-probe sample summaries (min/avg/max/last) over the time window.
-    #[tool(description = "Get per-probe sample statistics (min, avg, max, last value, count) \
-        over the requested time window. Optionally filter to a single probe name.")]
-    fn russell_probe_history(
-        &self,
-        Parameters(params): Parameters<ProbeHistoryParams>,
-    ) -> String {
+    #[tool(
+        description = "Get per-probe sample statistics (min, avg, max, last value, count) \
+        over the requested time window. Optionally filter to a single probe name."
+    )]
+    fn russell_probe_history(&self, Parameters(params): Parameters<ProbeHistoryParams>) -> String {
         let hours = params.hours.unwrap_or(24);
         let now = russell_core::time::now_unix();
         let since = now - (hours as i64 * 3600);
@@ -300,9 +296,11 @@ impl RussellServer {
     }
 
     /// Overall health summary: severity breakdown, staleness, baseline deviations.
-    #[tool(description = "Get an overall health summary: severity breakdown over the time \
+    #[tool(
+        description = "Get an overall health summary: severity breakdown over the time \
         window, data freshness (seconds since last sample), and probes that exceed \
-        their 30-day p95 baseline by more than 1.5x.")]
+        their 30-day p95 baseline by more than 1.5x."
+    )]
     fn russell_health_summary(
         &self,
         Parameters(params): Parameters<HealthSummaryParams>,
@@ -374,13 +372,12 @@ impl RussellServer {
     }
 
     /// Run the Sentinel once and return fresh probe samples.
-    #[tool(description = "Run Russell's Sentinel telemetry collector once, writing fresh \
+    #[tool(
+        description = "Run Russell's Sentinel telemetry collector once, writing fresh \
         samples to the journal and returning the collected values. This is a read-only \
-        observation — it never mutates host state beyond appending to Russell's own journal.")]
-    fn russell_run_sentinel(
-        &self,
-        Parameters(params): Parameters<RunSentinelParams>,
-    ) -> String {
+        observation — it never mutates host state beyond appending to Russell's own journal."
+    )]
+    fn russell_run_sentinel(&self, Parameters(params): Parameters<RunSentinelParams>) -> String {
         let dry_run = params.dry_run.unwrap_or(false);
 
         if dry_run {

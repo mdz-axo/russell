@@ -193,14 +193,7 @@ async fn handle_builtin(
         }
         _ if input.starts_with("adapt ") => {
             let name = input.strip_prefix("adapt ").unwrap_or("");
-            do_adapt(
-                registry,
-                skills_dir,
-                name,
-                client_cfg,
-                fallback_model,
-            )
-            .await;
+            do_adapt(registry, skills_dir, name, client_cfg, fallback_model).await;
             true
         }
         _ if input.starts_with("evaluate ") => {
@@ -451,7 +444,10 @@ fn print_evaluate(registry: &RegistryCache, skills_dir: &std::path::Path, name: 
             println!("  Valid until: {vu}");
         }
         if entry.probe_runs > 0 {
-            println!("  Probes run: {} ({} failures)", entry.probe_runs, entry.recent_probe_failures);
+            println!(
+                "  Probes run: {} ({} failures)",
+                entry.probe_runs, entry.recent_probe_failures
+            );
         }
         if let Some(ref last) = entry.last_probe_run_at {
             println!("  Last probe: {last}");
@@ -708,7 +704,9 @@ async fn do_fetch(
                 version,
                 authored,
                 symptoms,
-                SkillSource::Remote { url: url.to_string() },
+                SkillSource::Remote {
+                    url: url.to_string(),
+                },
                 today.clone(),
                 false,
             );
@@ -1035,7 +1033,10 @@ fn do_delete(registry: &mut RegistryCache, skills_dir: &std::path::Path, name: &
 
     let skill_dir = skills_dir.join(name);
     if !skill_dir.exists() {
-        println!("Skill directory for '{name}' does not exist at {}", skill_dir.display());
+        println!(
+            "Skill directory for '{name}' does not exist at {}",
+            skill_dir.display()
+        );
         // Still remove from cache if present.
         if registry.remove_entry(name).is_some() {
             println!("  Removed from registry cache.");

@@ -229,7 +229,9 @@ async fn main() -> Result<()> {
             SkillCmd::Retire { name } => commands::skill::retire(&paths, &name),
             SkillCmd::Build { name } => commands::skill::build(&paths, &name),
             SkillCmd::Put { name } => commands::skill::put(&paths, name.as_deref()),
-            SkillCmd::RestoreFromArchive { name } => commands::skill::restore_from_archive(&paths, &name),
+            SkillCmd::RestoreFromArchive { name } => {
+                commands::skill::restore_from_archive(&paths, &name)
+            }
         },
         Command::Chat => commands::chat::run(&paths).await,
         Command::Workshop => commands::workshop::run(&paths).await,
@@ -244,7 +246,10 @@ async fn main() -> Result<()> {
         Command::Mcp => russell_mcp::server::serve_stdio(paths).await,
         Command::Docs { strict } => commands::docs::run(&paths, strict),
         Command::VerifyJournal => commands::verify::run(&paths),
-        Command::Confirm { event_or_list, deny } => {
+        Command::Confirm {
+            event_or_list,
+            deny,
+        } => {
             let args = if deny {
                 vec![event_or_list, "--deny".to_string()]
             } else {

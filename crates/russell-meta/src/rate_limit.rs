@@ -81,8 +81,8 @@ impl RateLimiter {
         // Refill based on elapsed time.
         let now = Instant::now();
         let elapsed = now.duration_since(state.last_refill).as_secs_f64();
-        state.tokens = (state.tokens + elapsed * self.config.refill_rate)
-            .min(self.config.capacity as f64);
+        state.tokens =
+            (state.tokens + elapsed * self.config.refill_rate).min(self.config.capacity as f64);
         state.last_refill = now;
 
         if state.tokens >= 1.0 {
@@ -135,7 +135,9 @@ mod tests {
         rl.try_acquire().unwrap(); // deplete
         let err = rl.try_acquire().unwrap_err();
         match err {
-            DoctorError::RateLimited { retry_after_seconds } => {
+            DoctorError::RateLimited {
+                retry_after_seconds,
+            } => {
                 assert!(retry_after_seconds.unwrap() >= 1);
             }
             _ => panic!("expected RateLimited error"),

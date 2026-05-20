@@ -2,9 +2,7 @@
 //! Integration test: verify the full telemetry pipeline — registry cache
 //! mutation, persistence, score computation, and freshness tracking.
 
-use russell_skills::registry::{
-    LifecycleStatus, RegistryCache, RegistryEntry, SkillSource,
-};
+use russell_skills::registry::{LifecycleStatus, RegistryCache, RegistryEntry, SkillSource};
 use std::path::Path;
 
 fn test_entry() -> RegistryEntry {

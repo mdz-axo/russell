@@ -578,7 +578,10 @@ pub fn load_all(skills_dir: &Path) -> Result<Vec<Skill>, LoadError> {
         let entry = match entry {
             Ok(e) => e,
             Err(e) => {
-                eprintln!("warning: skipping unreadable entry in {}: {e}", skills_dir.display());
+                eprintln!(
+                    "warning: skipping unreadable entry in {}: {e}",
+                    skills_dir.display()
+                );
                 continue;
             }
         };
@@ -634,11 +637,10 @@ fn load_one(skill_dir: &Path, dir_name: &str) -> Result<Skill, LoadError> {
         source: e,
     })?;
 
-    let skill = parse_manifest(&yaml, dir_name)
-        .map_err(|message| LoadError::InvalidManifest {
-            path: manifest_path.clone(),
-            message,
-        })?;
+    let skill = parse_manifest(&yaml, dir_name).map_err(|message| LoadError::InvalidManifest {
+        path: manifest_path.clone(),
+        message,
+    })?;
 
     // Additional check that only applies when loading from disk:
     // every script file in scripts/ must be referenced by a probe or
@@ -762,8 +764,8 @@ pub fn extract_manifest_id(yaml: &str) -> Option<String> {
 /// the id doesn't match, a symptom is unknown, or a rollback references
 /// a nonexistent intervention.
 pub fn parse_manifest(yaml: &str, dir_name: &str) -> std::result::Result<Skill, String> {
-    let raw: RawManifest = serde_yaml::from_str(yaml)
-        .map_err(|e| format!("YAML parse error: {e}"))?;
+    let raw: RawManifest =
+        serde_yaml::from_str(yaml).map_err(|e| format!("YAML parse error: {e}"))?;
 
     // Validate id match.
     if raw.id != dir_name {

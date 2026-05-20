@@ -184,8 +184,7 @@ impl Clock for FixedClock {
 
     fn now_date_iso8601(&self) -> String {
         let ts = self.now_unix();
-        let dt = OffsetDateTime::from_unix_timestamp(ts)
-            .unwrap_or(OffsetDateTime::UNIX_EPOCH);
+        let dt = OffsetDateTime::from_unix_timestamp(ts).unwrap_or(OffsetDateTime::UNIX_EPOCH);
         format!("{:04}-{:02}-{:02}", dt.year(), dt.month() as u8, dt.day())
     }
 }

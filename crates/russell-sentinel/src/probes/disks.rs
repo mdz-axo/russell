@@ -43,9 +43,24 @@ pub struct DiskIoPressureSome;
 pub struct DiskIoPressureFull;
 pub struct DiskRootUsedPct;
 
-impl_probe!(DiskIoPressureSome, "disk_io_pressure_some_pct", "%", disk_io_pressure_some_pct);
-impl_probe!(DiskIoPressureFull, "disk_io_pressure_full_pct", "%", disk_io_pressure_full_pct);
-impl_probe!(DiskRootUsedPct, "disk_root_used_pct", "%", disk_root_used_pct);
+impl_probe!(
+    DiskIoPressureSome,
+    "disk_io_pressure_some_pct",
+    "%",
+    disk_io_pressure_some_pct
+);
+impl_probe!(
+    DiskIoPressureFull,
+    "disk_io_pressure_full_pct",
+    "%",
+    disk_io_pressure_full_pct
+);
+impl_probe!(
+    DiskRootUsedPct,
+    "disk_root_used_pct",
+    "%",
+    disk_root_used_pct
+);
 
 #[cfg(test)]
 mod tests {

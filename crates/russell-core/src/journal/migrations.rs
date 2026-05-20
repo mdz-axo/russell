@@ -142,10 +142,16 @@ mod tests {
     fn runs_once_then_noop() {
         let c = fresh();
         run(&c).unwrap();
-        assert_eq!(current_version(&c).unwrap(), MIGRATIONS.last().unwrap().version);
+        assert_eq!(
+            current_version(&c).unwrap(),
+            MIGRATIONS.last().unwrap().version
+        );
         // Second run must not re-apply.
         run(&c).unwrap();
-        assert_eq!(current_version(&c).unwrap(), MIGRATIONS.last().unwrap().version);
+        assert_eq!(
+            current_version(&c).unwrap(),
+            MIGRATIONS.last().unwrap().version
+        );
     }
 
     #[test]

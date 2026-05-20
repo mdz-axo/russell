@@ -21,10 +21,10 @@ pub mod spinner;
 use anyhow::{Context, Result};
 use russell_core::journal::{JournalReader, JournalWriter};
 use russell_core::paths::Paths;
-use russell_meta::action::{self, ResolvedAction};
 use russell_mcp::client::HKaskMcpClient;
 use russell_mcp::config::HKaskMcpConfig;
 use russell_mcp::registry::ToolRegistry;
+use russell_meta::action::{self, ResolvedAction};
 use russell_skills::RiskBand;
 use rustyline::DefaultEditor;
 use rustyline::error::ReadlineError;
@@ -94,8 +94,8 @@ pub async fn run(paths: &Paths) -> Result<()> {
 
     // Load skill registry cache for telemetry display and lifecycle management.
     let registry_path = paths.state.join("registry").join("local-cache.yaml");
-    let mut registry = russell_skills::registry::RegistryCache::load(&registry_path)
-        .unwrap_or_default();
+    let mut registry =
+        russell_skills::registry::RegistryCache::load(&registry_path).unwrap_or_default();
 
     // Reconcile registry against disk (fix stale/orphan entries).
     if registry.reconcile(&skills) {
@@ -160,7 +160,10 @@ pub async fn run(paths: &Paths) -> Result<()> {
                     // T5: Expiry guard — stale pending actions are
                     // discarded to prevent delayed approvals.
                     if pa.is_expired() {
-                        println!("  → Pending action expired ({}s). Please re-propose.", consent::CONSENT_EXPIRY_SECS);
+                        println!(
+                            "  → Pending action expired ({}s). Please re-propose.",
+                            consent::CONSENT_EXPIRY_SECS
+                        );
                         pending_action = None;
                         continue;
                     }
@@ -173,9 +176,14 @@ pub async fn run(paths: &Paths) -> Result<()> {
                                 "install" | "build" | "create-manifest" | "delete"
                             );
                         let action_result = execute_action(
-                            &journal, &hkask_client, &pa.action, &session_id,
-                            &current_model, paths,
-                        ).await;
+                            &journal,
+                            &hkask_client,
+                            &pa.action,
+                            &session_id,
+                            &current_model,
+                            paths,
+                        )
+                        .await;
                         if let Some(result_text) = action_result {
                             history.turns.push(Turn {
                                 role: "user".into(),
@@ -187,12 +195,16 @@ pub async fn run(paths: &Paths) -> Result<()> {
                             match russell_skills::load_all(&paths.skills()) {
                                 Ok(fresh) => {
                                     skills = fresh;
-                                    match russell_skills::registry::RegistryCache::load(&registry_path) {
+                                    match russell_skills::registry::RegistryCache::load(
+                                        &registry_path,
+                                    ) {
                                         Ok(fresh_reg) => registry = fresh_reg,
                                         Err(e) => warn!(error = %e, "registry reload failed"),
                                     }
                                 }
-                                Err(e) => warn!(error = %e, "skills reload after skill-manager intervention failed"),
+                                Err(e) => {
+                                    warn!(error = %e, "skills reload after skill-manager intervention failed")
+                                }
                             }
                         }
                         pending_action = None;
@@ -207,9 +219,14 @@ pub async fn run(paths: &Paths) -> Result<()> {
                                 "install" | "build" | "create-manifest" | "delete"
                             );
                         let action_result = execute_action(
-                            &journal, &hkask_client, &pa.action, &session_id,
-                            &current_model, paths,
-                        ).await;
+                            &journal,
+                            &hkask_client,
+                            &pa.action,
+                            &session_id,
+                            &current_model,
+                            paths,
+                        )
+                        .await;
                         if let Some(result_text) = action_result {
                             history.turns.push(Turn {
                                 role: "user".into(),
@@ -221,12 +238,16 @@ pub async fn run(paths: &Paths) -> Result<()> {
                             match russell_skills::load_all(&paths.skills()) {
                                 Ok(fresh) => {
                                     skills = fresh;
-                                    match russell_skills::registry::RegistryCache::load(&registry_path) {
+                                    match russell_skills::registry::RegistryCache::load(
+                                        &registry_path,
+                                    ) {
                                         Ok(fresh_reg) => registry = fresh_reg,
                                         Err(e) => warn!(error = %e, "registry reload failed"),
                                     }
                                 }
-                                Err(e) => warn!(error = %e, "skills reload after skill-manager intervention failed"),
+                                Err(e) => {
+                                    warn!(error = %e, "skills reload after skill-manager intervention failed")
+                                }
                             }
                         }
                         pending_action = None;
@@ -234,7 +255,9 @@ pub async fn run(paths: &Paths) -> Result<()> {
                     }
                     if is_refusal(trimmed) {
                         let denied_action = match &pending_action {
-                            Some(pa) => format!("{}/{}", pa.action.skill_id(), pa.action.action_id()),
+                            Some(pa) => {
+                                format!("{}/{}", pa.action.skill_id(), pa.action.action_id())
+                            }
                             None => "unknown".to_string(),
                         };
                         println!("  Denied.");
@@ -261,13 +284,15 @@ pub async fn run(paths: &Paths) -> Result<()> {
                             &reader,
                             &skills,
                             profile.as_ref(),
-&hkask_registry,
+                            &hkask_registry,
                             &registry,
                             paths,
                             &mut pending_action,
-&hkask_client,
+                            &hkask_client,
                             &client_cfg,
-                        ).await {
+                        )
+                        .await
+                        {
                             Ok(()) => {}
                             Err(_) => {
                                 println!("  → Jack couldn't suggest an alternative right now.");
@@ -293,7 +318,9 @@ pub async fn run(paths: &Paths) -> Result<()> {
                         &session_id,
                         &history,
                         paths,
-                    ).await {
+                    )
+                    .await
+                    {
                         continue;
                     }
                 }
@@ -318,7 +345,7 @@ pub async fn run(paths: &Paths) -> Result<()> {
                     &registry,
                     paths,
                     &mut pending_action,
-&hkask_client,
+                    &hkask_client,
                     &client_cfg,
                 )
                 .await?;
@@ -390,8 +417,14 @@ async fn handle_action_proposal(
             // Auto-execute (probe-equivalent).
             println!("  → Calling hKask tool: {}…", action.action_id());
             let result = hkask::execute_hkask_tool(
-                journal, hkask_client, &action, session_id, current_model, paths,
-            ).await;
+                journal,
+                hkask_client,
+                &action,
+                session_id,
+                current_model,
+                paths,
+            )
+            .await;
             if let Some(result_text) = result {
                 history.turns.push(Turn {
                     role: "user".into(),
@@ -403,7 +436,8 @@ async fn handle_action_proposal(
             // Requires consent.
             println!(
                 "  → Jack proposes kask tool: {} (risk: {}).",
-                action.action_id(), risk.as_str()
+                action.action_id(),
+                risk.as_str()
             );
             println!("  → Say 'ok' to approve, or 'no' to refuse.");
             *pending_action = Some(PendingAction::new(action, None));
@@ -412,12 +446,12 @@ async fn handle_action_proposal(
         // Probes are read-only — auto-execute immediately.
         println!(
             "  → Running probe: {}/{}…",
-            action.skill_id(), action.action_id()
+            action.skill_id(),
+            action.action_id()
         );
         let pa = PendingAction::new(action, None);
-        let probe_result = execute::execute_pending_action(
-            journal, paths, &pa, session_id, current_model,
-        ).await;
+        let probe_result =
+            execute::execute_pending_action(journal, paths, &pa, session_id, current_model).await;
         if let Some(result_text) = probe_result {
             history.turns.push(Turn {
                 role: "user".into(),
@@ -433,7 +467,10 @@ async fn handle_action_proposal(
                 let sudo_tag = if *needs_sudo { " [needs sudo]" } else { "" };
                 println!(
                     "  → Jack proposes: {}/{} (risk: {:?}{}).",
-                    action.skill_id(), action.action_id(), risk, sudo_tag
+                    action.skill_id(),
+                    action.action_id(),
+                    risk,
+                    sudo_tag
                 );
             }
             _ => unreachable!(),
@@ -502,7 +539,9 @@ async fn handle_slash_command(
             if other == "/model list" {
                 // Lazy-fetch Okapi models on first use.
                 if !*okapi_models_fetched {
-                    *okapi_models = commands::okapi_list_models(base_url).await.unwrap_or_default();
+                    *okapi_models = commands::okapi_list_models(base_url)
+                        .await
+                        .unwrap_or_default();
                     *okapi_models_fetched = true;
                 }
                 println!("  Available models ({}):", okapi_models.len());
@@ -526,7 +565,9 @@ async fn handle_slash_command(
                 }
                 // Lazy-fetch Okapi models for switching.
                 if !*okapi_models_fetched {
-                    *okapi_models = commands::okapi_list_models(base_url).await.unwrap_or_default();
+                    *okapi_models = commands::okapi_list_models(base_url)
+                        .await
+                        .unwrap_or_default();
                     *okapi_models_fetched = true;
                 }
                 // If Okapi is unreachable, trust the operator's input directly.
@@ -562,9 +603,9 @@ async fn handle_slash_command(
                             };
                             println!("    {}. {m}{marker}", i + 1);
                         }
-                        if let Some(selected) = commands::prompt_model_selection(
-                            editor, trimmed, filtered.len(),
-                        ) {
+                        if let Some(selected) =
+                            commands::prompt_model_selection(editor, trimmed, filtered.len())
+                        {
                             *current_model = filtered[selected].clone();
                             println!("  Switched to model: {current_model}");
                         }
@@ -585,9 +626,8 @@ async fn handle_slash_command(
                     }
                 };
                 // We need to block on the async resolve — use a nested block.
-                let resolved = russell_meta::oai_client::resolve_model_name(
-                    base_url, name, &http,
-                ).await;
+                let resolved =
+                    russell_meta::oai_client::resolve_model_name(base_url, name, &http).await;
                 if resolved == name {
                     println!("  No model found matching \"{name}\". Try /model list.");
                 } else {
@@ -637,7 +677,7 @@ async fn call_jack(
     let mut system = russell_meta::JACK_CHAT_PERSONA.to_string();
     {
         use russell_meta::prompt_registry::{
-            KnowledgeSlot, select_knowledge, score_knowledge_relevance,
+            KnowledgeSlot, score_knowledge_relevance, select_knowledge,
         };
         // Derive active symptoms from recent events (same as compose_templated).
         let recent_events = reader.recent(20).unwrap_or_default();
@@ -653,7 +693,9 @@ async fn call_jack(
                 if let Some(probe) = m.strip_prefix("sentinel/threshold/") {
                     syms.push(probe.to_string());
                     for kw in probe.split('_') {
-                        if kw.len() >= 3 { syms.push(kw.to_string()); }
+                        if kw.len() >= 3 {
+                            syms.push(kw.to_string());
+                        }
                     }
                 } else if let Some(probe) = m.strip_prefix("sentinel/rate/") {
                     syms.push(probe.to_string());
@@ -734,7 +776,9 @@ async fn call_jack(
         // Attenuate conversation history to preserve reasoning budget.
         // Remove oldest turns (keeping the system/objective messages first).
         let history_start = 2; // system + objective messages
-        while estimate_message_tokens(&messages) > max_history_tokens && messages.len() > history_start + 2 {
+        while estimate_message_tokens(&messages) > max_history_tokens
+            && messages.len() > history_start + 2
+        {
             messages.remove(history_start);
             if messages.len() > history_start + 1 {
                 messages.remove(history_start);
@@ -794,7 +838,8 @@ async fn call_jack(
                         chat_path,
                         pending_action,
                         manifest,
-                    ).await?;
+                    )
+                    .await?;
                 }
                 Some(Err(e)) => {
                     println!("  → {e}");
@@ -874,7 +919,13 @@ fn extract_inline_args(response: &str) -> Vec<String> {
     let args_line = response
         .lines()
         .find(|l| l.trim().starts_with("Arguments"))
-        .map(|l| l.trim().strip_prefix("Arguments").unwrap_or(l).trim().to_string());
+        .map(|l| {
+            l.trim()
+                .strip_prefix("Arguments")
+                .unwrap_or(l)
+                .trim()
+                .to_string()
+        });
 
     let line = match args_line {
         Some(ref l) if !l.is_empty() => l,
