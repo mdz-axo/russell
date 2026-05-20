@@ -1631,6 +1631,7 @@ dependencies = [
  "rand 0.8.6",
  "reqwest",
  "rpassword",
+ "rusqlite",
  "russell-core",
  "russell-mcp",
  "russell-meta",

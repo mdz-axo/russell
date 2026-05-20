@@ -5,6 +5,7 @@
 //! `/proc/net/sockstat6`. Lightweight, no subprocess needed.
 
 use super::connectors;
+use super::descriptor::impl_probe;
 use super::tools;
 
 /// Probe: total TCP sockets in use (IPv4).
@@ -23,29 +24,13 @@ pub fn net_tcp6_connections() -> Option<f64> {
     tools::parse_sockstat(&content, "TCP6")
 }
 
-// -- ProbeDescriptor impls (T13 split form) --
-
-use super::descriptor::{ProbeCollector, ProbeMetadata};
-
-/// Probe descriptor.
+/// Marker struct for TCP connections probe.
 pub struct NetTcpConnections;
-impl ProbeMetadata for NetTcpConnections {
-    fn name(&self) -> &'static str { "net_tcp_connections" }
-    fn unit(&self) -> Option<&'static str> { Some("count") }
-}
-impl ProbeCollector for NetTcpConnections {
-    fn collect(&self) -> Option<f64> { net_tcp_connections() }
-}
-
-/// Probe descriptor.
+/// Marker struct for TCP6 connections probe.
 pub struct NetTcp6Connections;
-impl ProbeMetadata for NetTcp6Connections {
-    fn name(&self) -> &'static str { "net_tcp6_connections" }
-    fn unit(&self) -> Option<&'static str> { Some("count") }
-}
-impl ProbeCollector for NetTcp6Connections {
-    fn collect(&self) -> Option<f64> { net_tcp6_connections() }
-}
+
+impl_probe!(NetTcpConnections, "net_tcp_connections", "count", net_tcp_connections);
+impl_probe!(NetTcp6Connections, "net_tcp6_connections", "count", net_tcp6_connections);
 
 #[cfg(test)]
 mod tests {

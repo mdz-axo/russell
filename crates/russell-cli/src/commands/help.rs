@@ -4,9 +4,9 @@
 use anyhow::{Context, Result};
 use russell_core::journal::JournalWriter;
 use russell_core::paths::Paths;
-use russell_meta::action::{self, KaskToolInfo, ResolvedAction};
-use russell_mcp::client::KaskMcpClient;
-use russell_mcp::config::KaskMcpConfig;
+use russell_meta::action::{self, HKaskToolInfo, ResolvedAction};
+use russell_mcp::client::HKaskMcpClient;
+use russell_mcp::config::HKaskMcpConfig;
 use russell_mcp::registry::ToolRegistry;
 use russell_skills::RiskBand;
 use tracing::debug;

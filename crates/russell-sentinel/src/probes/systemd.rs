@@ -15,8 +15,6 @@ use super::connectors;
 pub fn systemd_degraded() -> Option<f64> {
     let output = connectors::run_command_stdout_always(&["systemctl", "is-system-running"])?;
     let state = output.trim();
-    // "running" and "starting" are normal. "degraded", "maintenance",
-    // and "unknown" are problematic.
     Some(match state {
         "degraded" | "maintenance" | "unknown" => 1.0,
         _ => 0.0,
@@ -52,39 +50,9 @@ pub fn systemd_system_failed_count() -> Option<f64> {
     Some(count as f64)
 }
 
-// -- ProbeDescriptor impls (T13 split form) --
-
-use super::descriptor::{ProbeCollector, ProbeMetadata};
-
-/// Probe descriptor.
-pub struct SystemdDegraded;
-impl ProbeMetadata for SystemdDegraded {
-    fn name(&self) -> &'static str { "systemd_degraded" }
-    fn unit(&self) -> Option<&'static str> { Some("bool") }
-}
-impl ProbeCollector for SystemdDegraded {
-    fn collect(&self) -> Option<f64> { systemd_degraded() }
-}
-
-/// Probe descriptor.
-pub struct SystemdUserFailedCount;
-impl ProbeMetadata for SystemdUserFailedCount {
-    fn name(&self) -> &'static str { "systemd_user_failed_count" }
-    fn unit(&self) -> Option<&'static str> { Some("count") }
-}
-impl ProbeCollector for SystemdUserFailedCount {
-    fn collect(&self) -> Option<f64> { systemd_user_failed_count() }
-}
-
-/// Probe descriptor.
-pub struct SystemdSystemFailedCount;
-impl ProbeMetadata for SystemdSystemFailedCount {
-    fn name(&self) -> &'static str { "systemd_system_failed_count" }
-    fn unit(&self) -> Option<&'static str> { Some("count") }
-}
-impl ProbeCollector for SystemdSystemFailedCount {
-    fn collect(&self) -> Option<f64> { systemd_system_failed_count() }
-}
+impl_probe!(SystemdDegraded, "systemd_degraded", "bool", systemd_degraded);
+impl_probe!(SystemdUserFailedCount, "systemd_user_failed_count", "count", systemd_user_failed_count);
+impl_probe!(SystemdSystemFailedCount, "systemd_system_failed_count", "count", systemd_system_failed_count);
 
 #[cfg(test)]
 mod tests {

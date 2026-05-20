@@ -77,30 +77,30 @@ of every meaningful development session.
   `last_probe_run_at` updated on every execution in chat and CLI.
 - Quality scoring operational via `compute_score()`.
 
-### Kask Integration
+### hKask Integration
 
 - **Bidirectional MCP integration** (ADR-0025). Russell is both
-  a server and a client to Kask:
-  - **Kask → Russell:** `arsenal-mcp-russell` MCP tool server
+  a server and a client to hKask:
+  - **hKask → Russell:** `arsenal-mcp-russell` MCP tool server
     (7 tools: `russell_host_snapshot`, `russell_self_vital`,
     `russell_journal_query`, `russell_help_sessions`,
     `russell_curator_assess`, `russell_cadence_health`,
-    `russell_token_status`). Lives in Kask repo
-    (`~/Clones/kask`); reads Russell's SQLite journal read-only.
-  - **Russell → Kask:** `russell-mcp` client crate connects to
-    Kask's `stack-api` gateway (`http://127.0.0.1:8080`) with
+    `russell_token_status`). Lives in hKask repo
+    (`~/Clones/hKask`); reads Russell's SQLite journal read-only.
+  - **Russell → hKask:** `russell-mcp` client crate connects to
+    hKask's `stack-api` gateway (`http://127.0.0.1:8080`) with
     bearer-token auth. 193 tools across 16 MCP servers: web
     search, scholar, RSS, finance, image/video generation, email,
     SMS/voice, embeddings, document knowledge, capability
     ontology, fine-tuning, Okapi metrics, gallery, maintenance,
     and Russell telemetry.
 - 16 MCP servers registered in `~/.config/stack/mcp-registry.json`.
-- **Duncan** — infrastructure Curator in Kask's
+- **Duncan** — infrastructure Curator in hKask's
   `stack-control-plane`. Calls `russell_curator_assess` to produce
   health reports from Russell's telemetry.
 - **Integration boundary:** no cross-crate dependency between Russell
-  and Kask. Communication is via SQLite journal (Kask reads Russell)
-  + HTTP REST to stack-api (Russell calls Kask tools).
+  and hKask. Communication is via SQLite journal (hKask reads Russell)
+  + HTTP REST to stack-api (Russell calls hKask tools).
 
 ### Not yet
 

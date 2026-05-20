@@ -45,6 +45,14 @@ impl std::fmt::Display for EventId {
     }
 }
 
+impl From<u128> for EventId {
+    fn from(id: u128) -> Self {
+        // ULID from u128 - this is a convenience conversion for
+        // reconstructing events from row IDs
+        Self(Ulid::from(id))
+    }
+}
+
 /// Five-valued severity band used across journal events.
 ///
 /// See `cybernetic-health-harness.md` §8 for the symptom ladder.

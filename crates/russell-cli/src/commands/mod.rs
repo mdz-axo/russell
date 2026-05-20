@@ -2,6 +2,7 @@
 //! Subcommand handlers. One module per verb.
 
 pub mod chat;
+pub mod confirm;
 pub mod digest;
 pub mod docs;
 pub mod help;

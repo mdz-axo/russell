@@ -126,7 +126,7 @@ may exist but must not contradict these.
 - [`adr/0022-markdown-memory-layer.md`](adr/0022-markdown-memory-layer.md)
 - [`adr/0023-lift-adr-0007-phase3-skills.md`](adr/0023-lift-adr-0007-phase3-skills.md)
 - [`adr/0024-skill-registry-workshop-lifecycle.md`](adr/0024-skill-registry-workshop-lifecycle.md)
-- [`adr/0025-kask-mcp-client-trusted-relationship.md`](adr/0025-kask-mcp-client-trusted-relationship.md)
+- [`adr/0025-hkask-mcp-client-trusted-relationship.md`](adr/0025-hkask-mcp-client-trusted-relationship.md)
 - [`adr/0026-metacognitive-layer.md`](adr/0026-metacognitive-layer.md)
 
 ### 2.8 ADRs (deferred — not MVP-load-bearing but retained)

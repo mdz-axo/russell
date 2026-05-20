@@ -37,71 +37,18 @@ pub fn load_avg_1m() -> Option<f64> {
     tools::parse_loadavg_1m(&raw)
 }
 
-// -- ProbeDescriptor impls (T13: split into Metadata + Collector) --
-// MemAvailableMib uses the NEW split form (ProbeMetadata + ProbeCollector).
-// Others retain the old unified form (directly impl ProbeDescriptor)
-// until migrated.
+impl_probe!(MemAvailableMib, "mem_available_mib", "MiB", mem_available_mib);
+impl_probe!(SwapUsedMib, "swap_used_mib", "MiB", swap_used_mib);
+impl_probe!(LoadAvg1m, "loadavg_1m", none, load_avg_1m);
+impl_probe!(MemPressureSome, "mem_pressure_some_pct", "%", mem_pressure_some);
+impl_probe!(MemPressureFull, "mem_pressure_full_pct", "%", mem_pressure_full);
 
-use super::descriptor::{ProbeCollector, ProbeMetadata};
-
-/// Probe descriptor for `mem_available_mib`.
-pub struct MemAvailableMib;
-impl ProbeMetadata for MemAvailableMib {
-    fn name(&self) -> &'static str {
-        "mem_available_mib"
-    }
-    fn unit(&self) -> Option<&'static str> {
-        Some("MiB")
-    }
-}
-impl ProbeCollector for MemAvailableMib {
-    fn collect(&self) -> Option<f64> {
-        mem_available_mib()
-    }
+fn mem_pressure_some() -> Option<f64> {
+    let content = connectors::read_file_to_string("/proc/pressure/memory")?;
+    tools::parse_memory_pressure_some(&content)
 }
 
-/// Probe descriptor for `swap_used_mib`.
-pub struct SwapUsedMib;
-impl ProbeMetadata for SwapUsedMib {
-    fn name(&self) -> &'static str { "swap_used_mib" }
-    fn unit(&self) -> Option<&'static str> { Some("MiB") }
-}
-impl ProbeCollector for SwapUsedMib {
-    fn collect(&self) -> Option<f64> { swap_used_mib() }
-}
-
-/// Probe descriptor for `loadavg_1m`.
-pub struct LoadAvg1m;
-impl ProbeMetadata for LoadAvg1m {
-    fn name(&self) -> &'static str { "loadavg_1m" }
-    fn unit(&self) -> Option<&'static str> { None }
-}
-impl ProbeCollector for LoadAvg1m {
-    fn collect(&self) -> Option<f64> { load_avg_1m() }
-}
-
-/// Probe descriptor for memory pressure "some".
-pub struct MemPressureSome;
-impl ProbeMetadata for MemPressureSome {
-    fn name(&self) -> &'static str { "mem_pressure_some_pct" }
-    fn unit(&self) -> Option<&'static str> { Some("%") }
-}
-impl ProbeCollector for MemPressureSome {
-    fn collect(&self) -> Option<f64> {
-        let content = connectors::read_file_to_string("/proc/pressure/memory")?;
-        tools::parse_memory_pressure_some(&content)
-    }
-}
-
-/// Probe descriptor for memory pressure "full".
-pub struct MemPressureFull;
-impl ProbeMetadata for MemPressureFull {
-    fn name(&self) -> &'static str { "mem_pressure_full_pct" }
-    fn unit(&self) -> Option<&'static str> { Some("%") }
-}
-impl ProbeCollector for MemPressureFull {
-    fn collect(&self) -> Option<f64> {
-        let content = connectors::read_file_to_string("/proc/pressure/memory")?;
-        tools::parse_memory_pressure_full(&content)
-    }
+fn mem_pressure_full() -> Option<f64> {
+    let content = connectors::read_file_to_string("/proc/pressure/memory")?;
+    tools::parse_memory_pressure_full(&content)
 }

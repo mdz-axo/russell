@@ -44,6 +44,7 @@ pub use error::{CoreError, Result};
 pub use event::{Event, EventId, Severity};
 pub use journal::port::{InMemoryJournal, JournalReadPort, JournalWritePort};
 pub use profile::Profile;
+pub use journal::{JournalReader, JournalWriter};
 pub use reflex::{BudgetVerdict, ReflexBudget, ReflexSet};
 pub use rule::{ConfigWarning, RuleSet};
 pub use time::{Clock, FixedClock, SystemClock};

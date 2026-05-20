@@ -114,6 +114,14 @@ enum Command {
     /// SHA-256 hash links and reports any tamper-evidence breaks.
     #[command(name = "verify-journal")]
     VerifyJournal,
+    /// Approve or deny reflex arc interventions (Andon cord).
+    Confirm {
+        /// Event ID to confirm, or "list" to show pending interventions.
+        event_or_list: String,
+        /// Deny the intervention instead of approving.
+        #[arg(long, short = 'd')]
+        deny: bool,
+    },
 }
 
 #[derive(Subcommand, Debug)]
@@ -166,6 +174,11 @@ enum SkillCmd {
         /// Skill name (optional — extracted from YAML `id` if not given).
         name: Option<String>,
     },
+    /// Restore a retired skill from archive back to active.
+    RestoreFromArchive {
+        /// Skill name to restore from archive.
+        name: String,
+    },
 }
 
 #[tokio::main(flavor = "multi_thread")]
@@ -216,6 +229,7 @@ async fn main() -> Result<()> {
             SkillCmd::Retire { name } => commands::skill::retire(&paths, &name),
             SkillCmd::Build { name } => commands::skill::build(&paths, &name),
             SkillCmd::Put { name } => commands::skill::put(&paths, name.as_deref()),
+            SkillCmd::RestoreFromArchive { name } => commands::skill::restore_from_archive(&paths, &name),
         },
         Command::Chat => commands::chat::run(&paths).await,
         Command::Workshop => commands::workshop::run(&paths).await,
@@ -230,5 +244,13 @@ async fn main() -> Result<()> {
         Command::Mcp => russell_mcp::server::serve_stdio(paths).await,
         Command::Docs { strict } => commands::docs::run(&paths, strict),
         Command::VerifyJournal => commands::verify::run(&paths),
+        Command::Confirm { event_or_list, deny } => {
+            let args = if deny {
+                vec![event_or_list, "--deny".to_string()]
+            } else {
+                vec![event_or_list]
+            };
+            commands::confirm::run(&paths, &args)
+        }
     }
 }

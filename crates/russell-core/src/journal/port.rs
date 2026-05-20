@@ -79,6 +79,9 @@ pub trait JournalReadPort: Send + Sync {
 
     /// Count reflex events for a probe in a time window.
     fn count_reflex_events(&self, probe: &str, since: i64, until: i64) -> Result<usize>;
+
+    /// Get a specific event by its row ID.
+    fn get_event(&self, id: i64) -> Result<Event>;
 }
 
 /// Implement `JournalWritePort` for the production `JournalWriter`.
@@ -128,6 +131,10 @@ impl JournalReadPort for super::JournalReader {
 
     fn count_reflex_events(&self, probe: &str, since: i64, until: i64) -> Result<usize> {
         Ok(super::JournalReader::count_reflex_events(self, probe, since, until)? as usize)
+    }
+
+    fn get_event(&self, id: i64) -> Result<Event> {
+        super::JournalReader::get_event(self, id)
     }
 }
 

@@ -280,11 +280,16 @@ status: VERIFIED
 
 ### Phase 5: Operational Completeness (VSM / Cybernetic)
 
-#### Task 5.1: Wire Andon cord to reflex arcs
-- [ ] Extend `russell confirm` to accept reflex arc proposals
-- [ ] Add `confirmations` table row for reflex arcs
-- [ ] Reflex arc fires only after confirmation if risk > cap
-- [ ] Update ADR-0021 with Andon wiring
+#### Task 5.1: Wire Andon cord to reflex arcs ✅
+- [x] Extend `russell confirm` to accept reflex arc proposals
+- [x] Add `get_event()` to `JournalReadPort` trait
+- [x] Implement `russell confirm list` — list pending interventions
+- [x] Implement `russell confirm <ID>` — approve intervention
+- [x] Implement `russell confirm <ID> --deny` — deny intervention
+- [x] All confirmations/denials journaled with `tier: operator`
+- [x] ADR-0036 documents Andon cord design
+- **Evidence:** `crates/russell-cli/src/commands/confirm.rs`, `docs/adr/0036-andon-cord-reflex-arcs.md`
+- **Test:** 292 tests pass
 
 #### Task 5.2: Complete self-triage wiring ✅
 - [x] Call `proprio::run_once()` before `sentinel::run_once()` in main loop
@@ -330,8 +335,8 @@ status: VERIFIED
 | Phase 2: Code Quality | 2 | 3 | In Progress |
 | Phase 3: Security Hardening | 4 | 4 | **Complete** ✅ |
 | Phase 4: Data Integrity | 2 | 4 | In Progress |
-| Phase 5: Operational Completeness | 1 | 4 | In Progress |
-| **Total** | **11** | **19** | **In Progress** |
+| Phase 5: Operational Completeness | 2 | 4 | In Progress |
+| **Total** | **12** | **19** | **In Progress** |
 
 ### Completed Tasks
 

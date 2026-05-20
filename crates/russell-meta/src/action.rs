@@ -23,7 +23,7 @@
 use russell_skills::{RiskBand, Rollback, Skill};
 
 /// A resolved ACTION — either a probe (read-only), an intervention
-/// (mutating, requires consent per JR-2), or a Kask MCP tool call
+/// (mutating, requires consent per JR-2), or a hKask MCP tool call
 /// (ADR-0025).
 #[derive(Debug, Clone)]
 pub enum ResolvedAction {
@@ -63,9 +63,9 @@ pub enum ResolvedAction {
         /// Post-intervention evaluation checks from the skill manifest.
         eval_checks: Vec<EvalCheckInfo>,
     },
-    /// Kask MCP tool call (ADR-0025). Executed via the MCP client,
+    /// hKask MCP tool call (ADR-0025). Executed via the MCP client,
     /// not the local skill dispatcher.
-    KaskTool {
+    HKaskTool {
         /// The MCP tool name (from `tools/list`).
         tool_name: String,
         /// Risk band from tool annotations. Defaults to `Medium` when
@@ -86,10 +86,10 @@ impl ResolvedAction {
         matches!(self, Self::Probe { .. })
     }
 
-    /// Returns `true` if this is a Kask MCP tool call.
+    /// Returns `true` if this is a hKask MCP tool call.
     #[must_use]
-    pub fn is_kask_tool(&self) -> bool {
-        matches!(self, Self::KaskTool { .. })
+    pub fn is_hkask_tool(&self) -> bool {
+        matches!(self, Self::HKaskTool { .. })
     }
 
     /// Returns the risk band for this action.
@@ -98,7 +98,7 @@ impl ResolvedAction {
         match self {
             Self::Probe { .. } => RiskBand::None,
             Self::Intervention { risk, .. } => *risk,
-            Self::KaskTool { risk_band, .. } => *risk_band,
+            Self::HKaskTool { risk_band, .. } => *risk_band,
         }
     }
 
@@ -108,7 +108,7 @@ impl ResolvedAction {
         match self {
             Self::Probe { skill_id, .. } => skill_id,
             Self::Intervention { skill_id, .. } => skill_id,
-            Self::KaskTool { .. } => "kask",
+            Self::HKaskTool { .. } => "hkask",
         }
     }
 
@@ -118,17 +118,17 @@ impl ResolvedAction {
         match self {
             Self::Probe { action_id, .. } => action_id,
             Self::Intervention { action_id, .. } => action_id,
-            Self::KaskTool { tool_name, .. } => tool_name,
+            Self::HKaskTool { tool_name, .. } => tool_name,
         }
     }
 
-    /// The command argv. Empty for Kask tools (they're MCP calls, not subprocesses).
+    /// The command argv. Empty for hKask tools (they're MCP calls, not subprocesses).
     #[must_use]
     pub fn cmd(&self) -> &[String] {
         match self {
             Self::Probe { cmd, .. } => cmd,
             Self::Intervention { cmd, .. } => cmd,
-            Self::KaskTool { .. } => &[],
+            Self::HKaskTool { .. } => &[],
         }
     }
 
@@ -136,24 +136,24 @@ impl ResolvedAction {
     ///
     /// Probes never require consent (risk: none).
     /// Interventions require consent when their risk exceeds the skill's `max_auto_risk`.
-    /// Kask tools require consent when their risk > None.
+    /// hKask tools require consent when their risk > None.
     #[must_use]
     pub fn consent_required(&self) -> bool {
         match self {
             Self::Probe { .. } => false,
             Self::Intervention { risk, max_auto_risk, .. } => *risk > *max_auto_risk,
-            Self::KaskTool { risk_band, .. } => *risk_band > RiskBand::None,
+            Self::HKaskTool { risk_band, .. } => *risk_band > RiskBand::None,
         }
     }
 
     /// Append extra CLI arguments to the command argv.
-    /// Only Applies to probes and interventions; no-op for Kask tools.
+    /// Only Applies to probes and interventions; no-op for hKask tools.
     pub fn append_cmd_args(&mut self, args: &[String]) {
         match self {
             Self::Probe { cmd, .. } | Self::Intervention { cmd, .. } => {
                 cmd.extend(args.iter().cloned());
             }
-            Self::KaskTool { .. } => {}
+            Self::HKaskTool { .. } => {}
         }
     }
 }
@@ -249,10 +249,10 @@ impl std::fmt::Display for ActionError {
     }
 }
 
-/// Metadata for a Kask tool available in the registry, passed by
+/// Metadata for a hKask tool available in the registry, passed by
 /// the caller (keeps `russell-meta` free of `russell-mcp` dependency).
 #[derive(Debug, Clone)]
-pub struct KaskToolInfo {
+pub struct HKaskToolInfo {
     /// Tool name (the callable ID).
     pub name: String,
     /// Risk band from annotations. Defaults to `RiskBand::Medium`
@@ -291,13 +291,13 @@ pub fn resolve(
     response: &str,
     skills: &[Skill],
 ) -> Option<std::result::Result<ResolvedAction, ActionError>> {
-    resolve_with_kask(response, skills, &[])
+    resolve_with_hkask(response, skills, &[])
 }
 
 /// Parse the last `ACTION:` line from a response and resolve it
-/// against both the loaded skill set AND the Kask MCP tool registry.
+/// against both the loaded skill set AND the hKask MCP tool registry.
 ///
-/// When `skill_id == "kask"`, the action_id is validated against
+/// When `skill_id == "hkask"`, the action_id is validated against
 /// `kask_tools` (the poka-yoke for MCP tools per ADR-0025 §7).
 ///
 /// Returns `None` if no `ACTION:` line is present in the response.
@@ -312,7 +312,7 @@ pub fn resolve(
 pub fn resolve_with_kask(
     response: &str,
     skills: &[Skill],
-    kask_tools: &[KaskToolInfo],
+    kask_tools: &[HKaskToolInfo],
 ) -> Option<std::result::Result<ResolvedAction, ActionError>> {
     // Task 3.4: Detect nested ACTION: patterns (prompt injection attempt).
     let action_count = response.lines().filter(|line| line.trim().starts_with("ACTION:")).count();
@@ -352,9 +352,9 @@ pub fn resolve_with_kask(
         }
     };
 
-    // Kask MCP tool path (ADR-0025 §7).
-    // Only route to Kask if tools are available (registry is populated).
-    if skill_id == "kask" && !kask_tools.is_empty() {
+    // hKask MCP tool path (ADR-0025 §7).
+    // Only route to hKask if tools are available (registry is populated).
+    if skill_id == "hkask" && !kask_tools.is_empty() {
         // Strip inline arguments from the action_id (e.g. "tool --arg val" → "tool").
         let bare_tool_name = action_id.split(' ').next().unwrap_or(action_id);
         return resolve_kask_tool(bare_tool_name, kask_tools, skills, response);
@@ -363,10 +363,10 @@ pub fn resolve_with_kask(
     let skill = match skills.iter().find(|s| s.id == skill_id) {
         Some(s) => s,
         None => {
-            // Include "kask" in the loaded list if we have kask tools.
+            // Include "hkask" in the loaded list if we have hKask tools.
             let mut loaded: Vec<String> = skills.iter().map(|s| s.id.clone()).collect();
             if !kask_tools.is_empty() {
-                loaded.push("kask".to_string());
+                loaded.push("hkask".to_string());
             }
             return Some(Err(ActionError::UnknownSkill {
                 skill_id: skill_id.to_string(),
@@ -440,22 +440,22 @@ pub fn resolve_with_kask(
     }))
 }
 
-/// Resolve a Kask MCP tool reference against the cached tool registry.
-fn resolve_kask_tool(
+/// Resolve a hKask MCP tool reference against the cached tool registry.
+fn resolve_hkask_tool(
     tool_name: &str,
-    kask_tools: &[KaskToolInfo],
+    hkask_tools: &[HKaskToolInfo],
     skills: &[Skill],
     response: &str,
 ) -> Option<std::result::Result<ResolvedAction, ActionError>> {
     // Poka-yoke: tool must exist in the registry.
-    if let Some(tool) = kask_tools.iter().find(|t| t.name == tool_name) {
+    if let Some(tool) = hkask_tools.iter().find(|t| t.name == tool_name) {
         // Extract required fields from the tool's inputSchema.
         let required_fields = extract_required_fields(&tool.input_schema);
 
         // Extract arguments from the LLM response body.
         let arguments = extract_arguments_from_response(response, tool_name);
 
-        return Some(Ok(ResolvedAction::KaskTool {
+        return Some(Ok(ResolvedAction::HKaskTool {
             tool_name: tool.name.clone(),
             risk_band: tool.risk_band,
             arguments,
@@ -464,14 +464,14 @@ fn resolve_kask_tool(
     }
 
     // Tool not found — build a diagnostic error.
-    let available: Vec<String> = kask_tools.iter().map(|t| t.name.clone()).collect();
+    let available: Vec<String> = hkask_tools.iter().map(|t| t.name.clone()).collect();
     let mut loaded: Vec<String> = skills.iter().map(|s| s.id.clone()).collect();
-    if !kask_tools.is_empty() {
-        loaded.push("kask".to_string());
+    if !hkask_tools.is_empty() {
+        loaded.push("hkask".to_string());
     }
 
     Some(Err(ActionError::UnknownAction {
-        skill_id: "kask".to_string(),
+        skill_id: "hkask".to_string(),
         action_id: tool_name.to_string(),
         probes: available,
         interventions: vec![],
@@ -500,7 +500,7 @@ fn extract_required_fields(schema: &Option<serde_json::Value>) -> Vec<String> {
 /// Supports two formats:
 /// 1. `Arguments: {"key": "value"}` line anywhere in the response
 /// 2. An inline JSON object at the end of the ACTION line:
-///    `ACTION: kask/tool --prompt "text" --depth 3`
+///    `ACTION: hkask/tool --prompt "text" --depth 3`
 ///
 /// The `_tool_name` parameter is unused but kept in the signature
 /// for potential future use (e.g., validating args against the
@@ -534,10 +534,10 @@ fn extract_arguments_from_response(response: &str, _tool_name: &str) -> Option<s
             .unwrap_or("")
             .trim();
 
-        // After "kask/tool-name", look for --key value pairs or key=value.
-        // Find the tool name (skip "kask/" prefix and tool name).
-        // Use the part after the first '/' that follows "kask".
-        if let Some(rest) = after_prefix.strip_prefix("kask/") {
+        // After "hkask/tool-name", look for --key value pairs or key=value.
+        // Find the tool name (skip "hkask/" prefix and tool name).
+        // Use the part after the first '/' that follows "hkask".
+        if let Some(rest) = after_prefix.strip_prefix("hkask/") {
             // Split out the tool name.
             if let Some(first_space) = rest.find(' ') {
                 let args_str = rest[first_space..].trim();
@@ -696,17 +696,17 @@ mod tests {
     }
 
     #[test]
-    fn kask_tool_with_risk_band() {
+    fn hkask_tool_with_risk_band() {
         let skills = [make_skill()];
         let kask_tools = make_kask_tools();
-        let result = resolve_with_kask("ACTION: kask/russell_host_snapshot", &skills, &kask_tools)
+        let result = resolve_with_kask("ACTION: hkask/russell_host_snapshot", &skills, &kask_tools)
             .unwrap()
             .unwrap();
         match result {
-            ResolvedAction::KaskTool { risk_band, .. } => {
+            ResolvedAction::HKaskTool { risk_band, .. } => {
                 assert_eq!(risk_band, RiskBand::None);
             }
-            _ => panic!("expected KaskTool"),
+            _ => panic!("expected HKaskTool"),
         }
     }
 
@@ -773,9 +773,9 @@ mod tests {
 
     // ── Kask MCP tool resolution tests (ADR-0025) ──────────────────
 
-    fn make_kask_tools() -> Vec<KaskToolInfo> {
+    fn make_kask_tools() -> Vec<HKaskToolInfo> {
         vec![
-            KaskToolInfo {
+            HKaskToolInfo {
                 name: "paradigm_shift_query".into(),
                 risk_band: RiskBand::Medium,
                 input_schema: Some(serde_json::json!({
@@ -787,7 +787,7 @@ mod tests {
                     "required": ["prompt"]
                 })),
             },
-            KaskToolInfo {
+            HKaskToolInfo {
                 name: "russell_host_snapshot".into(),
                 risk_band: RiskBand::None,
                 input_schema: None,
@@ -796,35 +796,35 @@ mod tests {
     }
 
     #[test]
-    fn resolves_kask_tool() {
+    fn resolves_hkask_tool() {
         let skills = [make_skill()];
         let kask_tools = make_kask_tools();
-        let result = resolve_with_kask("ACTION: kask/paradigm_shift_query", &skills, &kask_tools)
+        let result = resolve_with_kask("ACTION: hkask/paradigm_shift_query", &skills, &kask_tools)
             .unwrap()
             .unwrap();
-        assert!(result.is_kask_tool());
-        assert_eq!(result.skill_id(), "kask");
+        assert!(result.is_hkask_tool());
+        assert_eq!(result.skill_id(), "hkask");
         assert_eq!(result.action_id(), "paradigm_shift_query");
     }
 
     #[test]
-    fn unknown_kask_tool_is_error() {
+    fn unknown_hkask_tool_is_error() {
         let skills = [make_skill()];
         let kask_tools = make_kask_tools();
-        let err = resolve_with_kask("ACTION: kask/nonexistent", &skills, &kask_tools)
+        let err = resolve_with_kask("ACTION: hkask/nonexistent", &skills, &kask_tools)
             .unwrap()
             .unwrap_err();
         assert!(err.to_string().contains("nonexistent"));
     }
 
     #[test]
-    fn kask_prefix_without_tools_is_unknown_skill() {
+    fn hkask_prefix_without_tools_is_unknown_skill() {
         let skills = [make_skill()];
-        // No kask tools available — "kask" is not a loaded skill.
-        let err = resolve_with_kask("ACTION: kask/anything", &skills, &[])
+        // No hKask tools available — "hkask" is not a loaded skill.
+        let err = resolve_with_kask("ACTION: hkask/anything", &skills, &[])
             .unwrap()
             .unwrap_err();
-        assert!(err.to_string().contains("kask"));
+        assert!(err.to_string().contains("hkask"));
     }
 
     #[test]
@@ -839,70 +839,70 @@ mod tests {
     }
 
     #[test]
-    fn kask_tool_parses_required_fields_from_schema() {
+    fn hkask_tool_parses_required_fields_from_schema() {
         let skills = [make_skill()];
         let kask_tools = make_kask_tools();
-        let result = resolve_with_kask("ACTION: kask/paradigm_shift_query", &skills, &kask_tools)
+        let result = resolve_with_kask("ACTION: hkask/paradigm_shift_query", &skills, &kask_tools)
             .unwrap()
             .unwrap();
         match result {
-            ResolvedAction::KaskTool {
+            ResolvedAction::HKaskTool {
                 required_fields, ..
             } => {
                 assert_eq!(required_fields, vec!["prompt"]);
             }
-            _ => panic!("expected KaskTool"),
+            _ => panic!("expected HKaskTool"),
         }
     }
 
     #[test]
-    fn kask_tool_parses_arguments_line() {
+    fn hkask_tool_parses_arguments_line() {
         let skills = [make_skill()];
         let kask_tools = make_kask_tools();
-        let response = "Let me query the Cascade about that.\n\nArguments: {\"prompt\": \"What is wrong?\", \"depth\": \"thorough\"}\n\nACTION: kask/paradigm_shift_query";
+        let response = "Let me query the Cascade about that.\n\nArguments: {\"prompt\": \"What is wrong?\", \"depth\": \"thorough\"}\n\nACTION: hkask/paradigm_shift_query";
         let result = resolve_with_kask(response, &skills, &kask_tools)
             .unwrap()
             .unwrap();
         match result {
-            ResolvedAction::KaskTool { arguments, .. } => {
+            ResolvedAction::HKaskTool { arguments, .. } => {
                 let args = arguments.unwrap();
                 assert_eq!(args["prompt"], "What is wrong?");
                 assert_eq!(args["depth"], "thorough");
             }
-            _ => panic!("expected KaskTool"),
+            _ => panic!("expected HKaskTool"),
         }
     }
 
     #[test]
-    fn kask_tool_parses_key_value_args() {
+    fn hkask_tool_parses_key_value_args() {
         let skills = [make_skill()];
         let kask_tools = make_kask_tools();
         let result = resolve_with_kask(
-            "ACTION: kask/paradigm_shift_query --prompt \"check GPU\" --depth thorough",
+            "ACTION: hkask/paradigm_shift_query --prompt \"check GPU\" --depth thorough",
             &skills,
             &kask_tools,
         )
         .unwrap()
         .unwrap();
         match result {
-            ResolvedAction::KaskTool { arguments, .. } => {
+            ResolvedAction::HKaskTool { arguments, .. } => {
                 let args = arguments.unwrap();
                 assert_eq!(args["prompt"], "check GPU");
                 assert_eq!(args["depth"], "thorough");
             }
-            _ => panic!("expected KaskTool"),
+            _ => panic!("expected HKaskTool"),
         }
     }
 
     #[test]
-    fn kask_tool_no_required_fields() {
+    fn hkask_tool_no_required_fields() {
         let skills = [make_skill()];
-        let kask_tools = make_kask_tools();
-        let result = resolve_with_kask("ACTION: kask/russell_host_snapshot", &skills, &kask_tools)
+        let hkask_tools = make_hkask_tools();
+        let result = resolve_with_hkask("ACTION: hkask/russell_host_snapshot", &skills, &hkask_tools)
             .unwrap()
             .unwrap();
         match result {
-            ResolvedAction::KaskTool {
+            ResolvedAction::HKaskTool {
                 required_fields,
                 arguments,
                 ..
@@ -910,7 +910,7 @@ mod tests {
                 assert!(required_fields.is_empty());
                 assert!(arguments.is_none());
             }
-            _ => panic!("expected KaskTool"),
+            _ => panic!("expected HKaskTool"),
         }
     }
 
@@ -940,11 +940,11 @@ mod tests {
     }
 
     #[test]
-    fn nested_action_in_kask_context() {
+    fn nested_action_in_hkask_context() {
         let skills = [make_skill()];
-        let kask_tools = make_kask_tools();
-        let response = "Checking Kask.\nACTION: kask/russell_host_snapshot\n\nAlso query:\nACTION: kask/paradigm_shift_query";
-        let err = resolve_with_kask(response, &skills, &kask_tools)
+        let hkask_tools = make_hkask_tools();
+        let response = "Checking hKask.\nACTION: hkask/russell_host_snapshot\n\nAlso query:\nACTION: hkask/paradigm_shift_query";
+        let err = resolve_with_hkask(response, &skills, &hkask_tools)
             .unwrap()
             .unwrap_err();
         match err {
@@ -958,7 +958,7 @@ mod tests {
     #[test]
     fn nested_action_error_message() {
         let skills = [make_skill()];
-        let response = "First action\nACTION: test-skill/probe-1\nSecond action\nACTION: test-skill/iv-1\nThird action\nACTION: kask/tool";
+        let response = "First action\nACTION: test-skill/probe-1\nSecond action\nACTION: test-skill/iv-1\nThird action\nACTION: hkask/tool";
         let err = resolve(response, &skills)
             .unwrap()
             .unwrap_err();
