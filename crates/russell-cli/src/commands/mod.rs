@@ -13,6 +13,7 @@ pub mod profile;
 pub mod proprio;
 pub mod sentinel_once;
 pub mod skill;
+pub mod skill_lifecycle;
 pub mod status;
 pub mod utils;
 pub mod verify;

@@ -1641,6 +1641,7 @@ dependencies = [
  "rustyline",
  "serde",
  "serde_json",
+ "serde_yaml",
  "tempfile",
  "time",
  "tokio",

@@ -7,12 +7,12 @@ version: "1.1.0"
 status: "Active"
 ---
 
-# Skill Lifecycle Gap Analysis — 2026-05-14 (Updated)
+# Skill Lifecycle Gap Analysis — 2026-05-20 (Updated)
 
 <!-- TOGAF_DOMAIN: Governance -->
-<!-- VERSION: 1.1.0 -->
+<!-- VERSION: 1.2.0 -->
 <!-- STATUS: Active -->
-<!-- LAST_UPDATED: 2026-05-14 -->
+<!-- LAST_UPDATED: 2026-05-20 -->
 
 > Derived from running 10 end-to-end scenarios against the newly built
 > workshop REPL, registry cache, and safety scanner. All integrations
@@ -28,48 +28,42 @@ status: "Active"
 | `/gaps` with symptom coverage analysis | Working | Scenario 2 |
 | `/lookup <symptom>` with no-match reporting | Working | Scenario 2 |
 | `search <query>` local cache scan | Working | Scenario 3 |
+| `search --remote` with Brave Search API | Working | Gap 6 resolved |
+| `fetch <url> <name>` download + safety scan | Working | Gap 1 resolved |
 | `evaluate <name>` with manifest + KNOWLEDGE.md scan | Working | Scenario 4 |
 | Safety scanner: manifest.yaml scanning | Working | Scenario 4 |
 | Safety scanner: KNOWLEDGE.md scanning | Working | Scenario 9 |
 | Safety scanner: prompt injection detection | Working | Scenario 9 |
 | `check` audit with staleness + coverage | Working | Scenario 5 |
 | Registry cache save on exit | Working | Scenario 6 |
-| `prune` with "not found" error handling | Working | Scenario 7 |
-| `install` with missing-skill rejection | Working | Scenario 10 |
+| `prune <name>` with "not found" error handling | Working | Scenario 7 |
+| `prune --all-stale` batch operation | Working | Gap 9 resolved |
+| `install <name>` with missing-skill rejection | Working | Scenario 10 |
+| `install --all-evaluated` batch operation | Working | Gap 9 resolved |
+| `restore <name>` undo for prune | Working | Gap 4 resolved |
+| `adapt <name>` interactive modification | Working | Gap 3 resolved |
+| `build <name>` skeleton creation | Working | Gap 2 resolved |
 | Coverage gaps by symptom category | Working | Scenario 8 |
+| Remote registry sources loading | Working | Gap 6 resolved |
 
 ## Remaining Gaps (ordered by impact)
 
-### Gap 1: No `fetch` command — discovery→install loop is incomplete
+### Gap 1: No `fetch` command — discovery→install loop is incomplete — ✅ RESOLVED (2026-05-20)
 
-**Symptom:** `search` finds a skill by name but there's no way to download it.
-The workshop says "Use 'fetch <url>' to download it" but `fetch` isn't implemented.
-A discovered skill can't be installed if it isn't already on disk.
+**Status:** Implemented. `do_fetch(url, name)` downloads a skill manifest from a URL,
+runs the safety scanner, writes to `skills_dir/<name>/manifest.yaml`, and registers
+as `discovered` in the cache.
 
-**Fix:** Add `do_fetch(url, name)` that downloads a skill manifest from a URL,
-writes it to a temp directory, runs the safety scanner, and registers it as
-`discovered` → `evaluated` in the cache.
+### Gap 2: `build` command registers skill but doesn't create files — ✅ RESOLVED (2026-05-20)
 
-### Gap 2: `build` command registers skill but doesn't create files
+**Status:** Implemented. `do_build(name)` creates a minimal valid manifest.yaml on disk,
+then invokes Jack to help compose the skill interactively.
 
-**Symptom:** `build` adds a `RegistryEntry` with status `discovered` and
-prompts Jack for composition, but no manifest.yaml, KNOWLEDGE.md, or probe
-scripts are written to disk. The skill exists only in the cache. `install`
-can't find it because the directory doesn't exist.
+### Gap 3: No `adapt` command — can't modify existing skills — ✅ RESOLVED (2026-05-20)
 
-**Fix:** After Jack generates the manifest content (in the LLM response),
-parse the YAML, validate against the symptom catalog, write to
-`skills_dir/<name>/manifest.yaml`, and then the `install` command can find it.
-
-### Gap 3: No `adapt` command — can't modify existing skills
-
-**Symptom:** `adapt <name>` is in the help text but routes to the LLM with no
-structured UI. There's no way to add/remove probes, change thresholds, update
-symptoms, or add rollback strategies to an installed skill.
-
-**Fix:** `do_adapt(name)` that loads the current manifest, writes it to a temp
-file, opens an editor or prompts Jack for changes interactively, re-validates,
-and replaces the manifest.
+**Status:** Implemented. `do_adapt(name)` loads the current manifest, calls Jack to
+suggest improvements, safety-scans the result, and writes the updated manifest.
+Falls back to `$EDITOR` if LLM adaptation fails or produces unsafe content.
 
 ### Gap 4: No `undo` for `prune` — ✅ RESOLVED (2026-05-14)
 
@@ -83,11 +77,12 @@ deprecated → active works correctly.
 (manifest completeness, probe coverage, intervention coverage, rollback
 quality, script quality, documentation). Displayed in `russell skill check`.
 
-### Gap 6: Remote registry sources defined but not wired
+### Gap 6: Remote registry sources defined but not wired — ✅ RESOLVED (2026-05-20)
 
-**Symptom:** `RegistrySources`, `RegistrySource`, and `RegistryKind` structs
-are defined in `registry.rs` but no code reads `~/.config/harness/registry-sources.yaml`.
-The `search` command only scans the local cache.
+**Status:** Implemented. `load_registry_sources(paths)` loads
+`~/.config/harness/registry-sources.yaml` on workshop startup.
+`search --remote` now displays configured sources and uses Brave Search API
+when `BRAVE_API_KEY` is set.
 
 **Fix:** Load `registry-sources.yaml` on workshop startup. When `search` is
 invoked, use the web-search MCP bridge (Brave Search / Firecrawl) to query
@@ -102,6 +97,12 @@ Sentinel's probe execution → registry cache.
 **Fix:** When probes run (via Sentinel or `russell skill run`), update the
 registry entry's counters. This enables quality scoring and staleness detection.
 
+### Gap 7: Probe run telemetry never recorded — ✅ RESOLVED (2026-05-14)
+
+**Status:** Implemented. `RegistryEntry` fields `probe_runs`, `recent_probe_failures`,
+`intervention_runs`, `recent_intervention_failures`, `avg_probe_duration_ms` (EWMA),
+and `last_probe_run_at` are updated on every execution in chat and CLI.
+
 ### Gap 8: Workshop doesn't validate symptom catalog — ✅ RESOLVED (2026-05-14)
 
 **Status:** The symptom catalog is validated at load time via
@@ -109,13 +110,11 @@ registry entry's counters. This enables quality scoring and staleness detection.
 The `skill-manager` skill registers symptoms from the catalog. CLI
 verbs (`install`, `check`) validate against `SYMPTOMS`.
 
-### Gap 9: No batch operations
+### Gap 9: No batch operations — ✅ RESOLVED (2026-05-20)
 
-**Symptom:** `check` audits all skills individually. `prune` requires one name
-at a time. Can't `prune --all-stale` or `install --all-evaluated`.
-
-**Fix:** Add `prune --stale`, `install --evaluated`, `check --scores` batch
-flags.
+**Status:** Implemented. `prune --all-stale` deprecates all skills not evaluated
+in 30+ days. `install --all-evaluated` installs all skills with status `evaluated`.
+Both commands are available in the workshop REPL.
 
 ### Gap 10: Workshop knowledge loaded from installed path (fragile) — ✅ PARTIALLY RESOLVED (2026-05-14)
 

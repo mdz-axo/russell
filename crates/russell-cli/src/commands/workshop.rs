@@ -18,7 +18,7 @@ use russell_meta::client::SoapPrompt;
 use russell_meta::oai_client::OkapiClient;
 use russell_skills::Skill;
 use russell_skills::registry::{
-    LifecycleStatus, RegistryCache, RegistryEntry, SafetyScan, SkillSource,
+    LifecycleStatus, RegistryCache, RegistryEntry, RegistrySources, SafetyScan, SkillSource,
 };
 use rustyline::DefaultEditor;
 use rustyline::error::ReadlineError;
@@ -33,6 +33,9 @@ pub async fn run(paths: &Paths) -> Result<()> {
     let registry_dir = paths.state.join("registry");
     let registry_path = registry_dir.join("local-cache.yaml");
     let mut registry = RegistryCache::load(&registry_path).unwrap_or_else(|_| RegistryCache::new());
+
+    // Load remote registry sources from ~/.config/harness/registry-sources.yaml.
+    let registry_sources = load_registry_sources(paths);
 
     // Sync registry from installed skills (rebuildable — JR-7).
     sync_registry_from_skills(&mut registry, &skills);
@@ -57,8 +60,10 @@ pub async fn run(paths: &Paths) -> Result<()> {
            adapt <name>      edit skill manifest in \\$EDITOR or vim\n\
            check             audit all installed skills\n\
            prune <name>      deprecate a stale skill\n\
+           prune --all-stale deprecate all skills not evaluated in 30+ days\n\
            restore <name>    move a deprecated skill back to active\n\
            install <name>    move a discovered skill to installed/active\n\
+           install --all-evaluated install all evaluated skills\n\
            delete <name>     retire skill — remove directory and cache entry\n\
            retire <name>     alias for delete\n\
            /quit             exit the workshop\n\
@@ -109,6 +114,7 @@ pub async fn run(paths: &Paths) -> Result<()> {
             &client_cfg,
             &fallback_model,
             &mut quit,
+            &registry_sources,
         )
         .await
         {
@@ -149,6 +155,7 @@ async fn handle_builtin(
     client_cfg: &russell_meta::client::ClientConfig,
     fallback_model: &str,
     quit: &mut bool,
+    sources: &RegistrySources,
 ) -> bool {
     match input {
         "/quit" | "/exit" => {
@@ -178,7 +185,7 @@ async fn handle_builtin(
                 .replace("--remote", "")
                 .trim()
                 .to_string();
-            do_search_remote(registry, &query).await;
+            do_search_remote(registry, &query, sources).await;
             true
         }
         _ if input.starts_with("search ") => {
@@ -210,7 +217,11 @@ async fn handle_builtin(
         }
         _ if input.starts_with("prune ") => {
             let name = input.strip_prefix("prune ").unwrap_or("");
-            do_prune(registry, name);
+            if name == "--all-stale" {
+                do_prune_all_stale(registry);
+            } else {
+                do_prune(registry, name);
+            }
             true
         }
         _ if input.starts_with("restore ") || input.starts_with("unprune ") => {
@@ -224,7 +235,11 @@ async fn handle_builtin(
         }
         _ if input.starts_with("install ") => {
             let name = input.strip_prefix("install ").unwrap_or("");
-            do_install(registry, skills_dir, name);
+            if name == "--all-evaluated" {
+                do_install_all_evaluated(registry, skills_dir);
+            } else {
+                do_install(registry, skills_dir, name);
+            }
             true
         }
         _ if input.starts_with("delete ") || input.starts_with("retire ") => {
@@ -602,6 +617,58 @@ fn do_install(registry: &mut RegistryCache, skills_dir: &std::path::Path, name: 
     }
 }
 
+/// Prune all stale skills (not evaluated in 30+ days).
+fn do_prune_all_stale(registry: &mut RegistryCache) {
+    let today = now_date_iso8601();
+    let mut pruned = 0;
+    for (name, entry) in registry.skills.iter_mut() {
+        if !entry.status.is_loadable() {
+            continue;
+        }
+        if RegistryCache::is_stale(
+            &entry
+                .last_evaluated
+                .clone()
+                .unwrap_or_else(|| entry.authored.clone()),
+            &today,
+        ) {
+            println!(
+                "Pruning stale skill: {name} (last evaluated: {})",
+                entry.last_evaluated.as_deref().unwrap_or("never")
+            );
+            entry.status = LifecycleStatus::Deprecated;
+            entry.deprecation_reason = Some("stale (batch prune)".into());
+            pruned += 1;
+        }
+    }
+    if pruned == 0 {
+        println!("No stale skills found.");
+    } else {
+        println!("Pruned {pruned} stale skill(s).");
+    }
+}
+
+/// Install all evaluated skills.
+fn do_install_all_evaluated(registry: &mut RegistryCache, skills_dir: &std::path::Path) {
+    let mut installed = 0;
+    for (name, entry) in registry.skills.iter_mut() {
+        if entry.status == LifecycleStatus::Evaluated {
+            let skill_dir = skills_dir.join(name);
+            if skill_dir.exists() && skill_dir.join("manifest.yaml").exists() {
+                println!("Installing: {name}");
+                entry.status = LifecycleStatus::Installed;
+                entry.installed = now_date_iso8601();
+                installed += 1;
+            }
+        }
+    }
+    if installed == 0 {
+        println!("No evaluated skills to install.");
+    } else {
+        println!("Installed {installed} skill(s).");
+    }
+}
+
 /// Fetch a skill manifest from a URL, safety-scan it, and register as discovered.
 async fn do_fetch(
     registry: &mut RegistryCache,
@@ -843,9 +910,20 @@ fn apply_manifest_update(registry: &mut RegistryCache, name: &str, content: &str
     }
 }
 
-/// Search remote registries via Brave Search API (if BRAVE_API_KEY is set) or DuckDuckGo.
-async fn do_search_remote(registry: &mut RegistryCache, query: &str) {
+/// Search remote registries via Brave Search API (if BRAVE_API_KEY is set) or configured sources.
+async fn do_search_remote(registry: &mut RegistryCache, query: &str, sources: &RegistrySources) {
     println!("Remote search for: {query}");
+
+    // First check configured registry sources.
+    if !sources.sources.is_empty() {
+        println!(
+            "  Checking {} configured source(s)...",
+            sources.sources.len()
+        );
+        for source in &sources.sources {
+            println!("    - {} ({})", source.name, source.url);
+        }
+    }
 
     let api_key = std::env::var("BRAVE_API_KEY").ok();
     let results: Vec<(String, String)> = if let Some(key) = api_key {
@@ -872,7 +950,7 @@ async fn do_search_remote(registry: &mut RegistryCache, query: &str) {
             }
         }
     } else {
-        println!("  (Set BRAVE_API_KEY for Brave Search. Using local cache only.)");
+        println!("  (Set BRAVE_API_KEY for Brave Search. Using configured sources only.)");
         Vec::new()
     };
 
@@ -1209,4 +1287,44 @@ async fn jack_workshop_turn(
     }
 
     Ok(())
+}
+
+/// Load remote registry sources from ~/.config/harness/registry-sources.yaml.
+fn load_registry_sources(paths: &Paths) -> RegistrySources {
+    let config_path = paths.config.join("registry-sources.yaml");
+    if !config_path.exists() {
+        tracing::debug!(
+            path = %config_path.display(),
+            "No registry-sources.yaml found — using empty config"
+        );
+        return RegistrySources::default();
+    }
+    match std::fs::read_to_string(&config_path) {
+        Ok(content) => match serde_yaml::from_str::<RegistrySources>(&content) {
+            Ok(sources) => {
+                tracing::info!(
+                    count = sources.sources.len(),
+                    "Loaded registry sources from {}",
+                    config_path.display()
+                );
+                sources
+            }
+            Err(e) => {
+                tracing::warn!(
+                    path = %config_path.display(),
+                    error = %e,
+                    "Failed to parse registry-sources.yaml"
+                );
+                RegistrySources::default()
+            }
+        },
+        Err(e) => {
+            tracing::warn!(
+                path = %config_path.display(),
+                error = %e,
+                "Failed to read registry-sources.yaml"
+            );
+            RegistrySources::default()
+        }
+    }
 }

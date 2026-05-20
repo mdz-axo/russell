@@ -1,0 +1,22 @@
+# Russell Skill Registry Sources
+# 
+# Place this file at ~/.config/harness/registry-sources.yaml
+# to configure remote skill registries for `search --remote`.
+#
+# Each source has:
+#   - name: Display name for the source
+#   - url: Base URL (GitHub repo, HTTP index, or local path)
+#   - kind: One of github-repo, http-index, or local-dir
+
+sources:
+  - name: "Russell Official Skills"
+    url: "https://github.com/russell-harness/skills"
+    kind: github-repo
+
+  - name: "Community Skills"
+    url: "https://raw.githubusercontent.com/russell-community/skills/main/"
+    kind: http-index
+
+  - name: "Local Lab Skills"
+    url: "~/lab/russell-skills/"
+    kind: local-dir
