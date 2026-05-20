@@ -1140,22 +1140,12 @@ impl JournalReader {
         .map_err(CoreError::Sqlite)
     }
 
-    /// List reflex_proposed events for a time window. Returns the
+/// List reflex_proposed events for a time window. Returns the
     /// most recent events first (max 10). Each entry contains
     /// (severity, intervention_id, summary).
     ///
     /// # Errors
     ///
-    /// Returns [`CoreError::Sqlite`] on DB errors.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`CoreError::Sqlite`] on DB errors.
-    /// # Errors
-    ///
-    /// Returns [`CoreError::Sqlite`] on DB errors.
-    ///
-    /// Returns [`CoreError::Sqlite`] on DB errors.
     /// Returns [`CoreError::Sqlite`] on DB errors.
     pub fn list_reflex_events(
         &self,
@@ -1178,6 +1168,50 @@ impl JournalReader {
                 let summary: String = r.get(2)?;
                 let ts: i64 = r.get(3)?;
                 Ok((sev, intervention, summary, ts))
+            })?
+            .collect::<std::result::Result<Vec<_>, _>>()?;
+        Ok(rows)
+    }
+
+    /// List events by action type within a time window.
+    ///
+    /// Used by [`ReflexBudget::from_journal`] to initialize the budget
+    /// from persisted `reflex_proposed` events.
+    ///
+    /// # Arguments
+    ///
+    /// * `action` - Action name to filter by (e.g., "reflex_proposed")
+    /// * `since` - Start of time window (unix timestamp)
+    /// * `until` - End of time window (unix timestamp)
+    ///
+    /// # Errors
+    ///
+    /// Returns [`CoreError::Sqlite`] on DB errors.
+    pub fn list_events_by_action(
+        &self,
+        action: &str,
+        since: i64,
+        until: i64,
+    ) -> Result<Vec<EventRow>> {
+        let conn = self.open_ro()?;
+        let mut stmt = conn.prepare(
+            "SELECT id, ts, severity, scope, tier, module, action, summary
+               FROM events
+              WHERE action = ?1 AND ts_unix >= ?2 AND ts_unix <= ?3
+              ORDER BY ts_unix ASC",
+        )?;
+        let rows = stmt
+            .query_map(params![action, since, until], |r| {
+                Ok(EventRow {
+                    id: r.get(0)?,
+                    ts: r.get(1)?,
+                    severity: r.get(2)?,
+                    scope: r.get(3)?,
+                    tier: r.get(4)?,
+                    module: r.get(5)?,
+                    action: r.get(6)?,
+                    summary: r.get(7)?,
+                })
             })?
             .collect::<std::result::Result<Vec<_>, _>>()?;
         Ok(rows)

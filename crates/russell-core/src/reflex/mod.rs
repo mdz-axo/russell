@@ -224,6 +224,13 @@ pub enum BudgetVerdict {
 
 impl ReflexBudget {
     /// Create a budget with default thresholds.
+    ///
+    /// ## Q10: Reflex Budget Persistence
+    ///
+    /// The budget is now journal-backed — it queries for `reflex_proposed`
+    /// events in the last hour to enforce the hourly limit across
+    /// `sentinel-once` invocations. Without this, each invocation would
+    /// start with a fresh budget (ineffective rate limiting).
     #[must_use]
     pub fn new() -> Self {
         Self {
@@ -243,6 +250,48 @@ impl ReflexBudget {
             recent_firings: VecDeque::new(),
             consecutive_failures: 0,
             breaker_threshold,
+            breaker_open: false,
+        }
+    }
+
+    /// Create a budget initialized from the journal.
+    ///
+    /// Queries the journal for `reflex_proposed` events in the last hour
+    /// and pre-populates `recent_firings`. This makes the budget effective
+    /// across multiple `sentinel-once` invocations.
+    ///
+    /// # Arguments
+    ///
+    /// * `reader` - Journal reader to query for recent reflex events
+    /// * `now_unix` - Current unix timestamp for window calculation
+    pub fn from_journal(reader: &crate::journal::JournalReader, now_unix: i64) -> Self {
+        let window_start = now_unix - 3600; // 1 hour ago
+        
+        // Query reflex_proposed events in the last hour.
+        let recent_events = reader
+            .list_events_by_action("reflex_proposed", window_start, now_unix)
+            .unwrap_or_default();
+        
+        // Convert RFC 3339 timestamps to unix timestamps and populate the budget.
+        let mut recent_firings: VecDeque<i64> = recent_events
+            .into_iter()
+            .filter_map(|e| {
+                // Parse RFC 3339 timestamp to unix timestamp.
+                // Format: 2026-05-20T12:34:56+00:00 or similar.
+                time::OffsetDateTime::parse(&e.ts)
+                    .map(|odt| odt.unix_timestamp())
+                    .ok()
+            })
+            .collect();
+        
+        // Sort by timestamp (oldest first) for efficient eviction.
+        recent_firings.make_contiguous().sort();
+
+        Self {
+            max_per_hour: DEFAULT_BUDGET_PER_HOUR,
+            recent_firings,
+            consecutive_failures: 0,
+            breaker_threshold: DEFAULT_BREAKER_THRESHOLD,
             breaker_open: false,
         }
     }

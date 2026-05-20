@@ -31,10 +31,21 @@ pub struct RateLimitConfig {
 
 impl Default for RateLimitConfig {
     /// Default: 3 requests per minute (0.05 per second), burst of 3.
+    ///
+    /// ## Q8: Rate Limiter Configuration
+    ///
+    /// Override via `RUSSELL_LLM_RATE_LIMIT=N` environment variable.
+    /// Example: `RUSSELL_LLL_RATE_LIMIT=5` allows 5 requests/minute.
     fn default() -> Self {
+        // Q8: Read from env var if set.
+        let capacity = std::env::var("RUSSELL_LLM_RATE_LIMIT")
+            .ok()
+            .and_then(|s| s.parse::<u32>().ok())
+            .unwrap_or(3);
+        
         Self {
-            capacity: 3,
-            refill_rate: 3.0 / 60.0, // 0.05 tokens/sec = 3/min
+            capacity,
+            refill_rate: capacity as f64 / 60.0, // tokens/sec = N/min
         }
     }
 }

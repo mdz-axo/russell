@@ -132,8 +132,11 @@ pub fn run(paths: &Paths) -> Result<()> {
     //
     //    Budget (T10): Global cap prevents cascading intervention storms.
     //    Circuit breaker halts all reflexes after 3 consecutive failures.
+    //
+    //    Q10: Budget is now journal-backed — initialized from recent
+    //    reflex_proposed events to enforce limits across invocations.
     let now = russell_core::time::now_unix();
-    let mut budget = ReflexBudget::new();
+    let mut budget = ReflexBudget::from_journal(&journal.reader(), now);
 
     for ev in threshold_events.iter().chain(scenario_events.iter()) {
         let Some(probe) = ev.outputs.get("probe").and_then(|v| v.as_str()) else {
