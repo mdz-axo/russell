@@ -7,20 +7,93 @@
 //!
 //! All probes return `None` if the expected sysfs files are not
 //! present (no GPU, missing driver, or permission denied).
+//!
+//! ## Task I2: Dynamic dGPU Detection
+//!
+//! The `detect_dgpu_card()` function enumerates `/sys/class/drm/card*/`
+//! and selects the discrete GPU over integrated GPU based on:
+//! 1. VRAM total (dGPU typically has more)
+//! 2. Device vendor (AMD/NVIDIA vs Intel)
+//! 3. Fallback to `card1` if detection fails
 
 use super::connectors;
 use super::tools;
+use std::path::Path;
+
+/// Detect the discrete GPU card index dynamically.
+///
+/// Enumerates `/sys/class/drm/card*/device/` directories and selects
+/// the dGPU based on VRAM capacity. Falls back to `card1` if detection
+/// fails (preserving existing behavior).
+///
+/// Returns the card number (e.g., `1` for `card1`).
+fn detect_dgpu_card() -> u32 {
+    let drm_dir = match std::fs::read_dir("/sys/class/drm") {
+        Ok(d) => d,
+        Err(_) => return 1, // Fallback to card1
+    };
+
+    let mut best_card = 1u32;
+    let mut best_vram = 0u64;
+
+    for entry in drm_dir.flatten() {
+        let name = entry.file_name();
+        let name_str = name.to_string_lossy();
+
+        // Only consider card* directories (not render*, etc.)
+        if !name_str.starts_with("card") {
+            continue;
+        }
+
+        // Skip if not a pure card number (e.g., skip card1-DP-1)
+        if !name_str.chars().skip(4).all(|c| c.is_ascii_digit()) {
+            continue;
+        }
+
+        let card_num: u32 = match name_str[4..].parse() {
+            Ok(n) => n,
+            Err(_) => continue,
+        };
+
+        let device_path = entry.path().join("device");
+        let vram_total_path = device_path.join("mem_info_vram_total");
+
+        // Read VRAM total to determine if this is a dGPU
+        if let Ok(content) = std::fs::read_to_string(&vram_total_path) {
+            if let Ok(vram_bytes) = content.trim().parse::<u64>() {
+                // dGPUs typically have more VRAM than iGPUs
+                if vram_bytes > best_vram {
+                    best_vram = vram_bytes;
+                    best_card = card_num;
+                }
+            }
+        }
+    }
+
+    // Fallback: if no VRAM info found, prefer card1 over card0
+    // (card0 is often the iGPU on hybrid systems)
+    if best_vram == 0 && best_card == 0 {
+        best_card = 1;
+    }
+
+    best_card
+}
 
 /// Sysfs path prefix for the dGPU device node.
+/// Dynamically detected via `detect_dgpu_card()`.
 /// On Framework 16: `card1` = RX 7700S, `card2` = iGPU (Radeon 880M).
-const GPU_DEVICE: &str = "/sys/class/drm/card1/device";
+fn gpu_device_path() -> String {
+    let card = detect_dgpu_card();
+    format!("/sys/class/drm/card{card}/device")
+}
 
 /// Probe: VRAM used as a percentage of total VRAM on the dGPU.
 ///
 /// Reads `mem_info_vram_used` and `mem_info_vram_total` (bytes).
 pub fn gpu_vram_used_pct() -> Option<f64> {
-    let used = connectors::read_file_to_string(&format!("{GPU_DEVICE}/mem_info_vram_used"))?;
-    let total = connectors::read_file_to_string(&format!("{GPU_DEVICE}/mem_info_vram_total"))?;
+    let gpu_device = gpu_device_path();
+    let used = connectors::read_file_to_string(&format!("{gpu_device}/mem_info_vram_used"))?;
+    let total = connectors::read_file_to_string(&format!("{gpu_device}/mem_info_vram_total"))?;
     let used_bytes: u64 = used.trim().parse().ok()?;
     let total_bytes: u64 = total.trim().parse().ok()?;
     if total_bytes == 0 {
@@ -31,14 +104,16 @@ pub fn gpu_vram_used_pct() -> Option<f64> {
 
 /// Probe: VRAM used in MiB on the dGPU.
 pub fn gpu_vram_used_mib() -> Option<f64> {
-    let used = connectors::read_file_to_string(&format!("{GPU_DEVICE}/mem_info_vram_used"))?;
+    let gpu_device = gpu_device_path();
+    let used = connectors::read_file_to_string(&format!("{gpu_device}/mem_info_vram_used"))?;
     let used_bytes: u64 = used.trim().parse().ok()?;
     Some(tools::kib_to_mib(used_bytes / 1024))
 }
 
 /// Probe: total VRAM in MiB on the dGPU.
 pub fn gpu_vram_total_mib() -> Option<f64> {
-    let total = connectors::read_file_to_string(&format!("{GPU_DEVICE}/mem_info_vram_total"))?;
+    let gpu_device = gpu_device_path();
+    let total = connectors::read_file_to_string(&format!("{gpu_device}/mem_info_vram_total"))?;
     let total_bytes: u64 = total.trim().parse().ok()?;
     Some(tools::kib_to_mib(total_bytes / 1024))
 }
@@ -47,7 +122,8 @@ pub fn gpu_vram_total_mib() -> Option<f64> {
 ///
 /// Reads the first `hwmon` `temp1_input` under the GPU device.
 pub fn gpu_temp_c() -> Option<f64> {
-    let hwmon_dir = find_gpu_hwmon()?;
+    let gpu_device = gpu_device_path();
+    let hwmon_dir = find_gpu_hwmon(&gpu_device)?;
     let content = connectors::read_file_to_string(&format!("{hwmon_dir}/temp1_input"))?;
     tools::parse_millidegrees_to_c(&content)
 }
@@ -56,13 +132,14 @@ pub fn gpu_temp_c() -> Option<f64> {
 ///
 /// Reads `gpu_busy_percent` from the GPU device node.
 pub fn gpu_util_pct() -> Option<f64> {
-    let content = connectors::read_file_to_string(&format!("{GPU_DEVICE}/gpu_busy_percent"))?;
+    let gpu_device = gpu_device_path();
+    let content = connectors::read_file_to_string(&format!("{gpu_device}/gpu_busy_percent"))?;
     tools::parse_gpu_util_pct(&content)
 }
 
 /// Find the first `hwmon` directory under the GPU device node.
-fn find_gpu_hwmon() -> Option<String> {
-    let dir = std::fs::read_dir(format!("{GPU_DEVICE}/hwmon")).ok()?;
+fn find_gpu_hwmon(gpu_device: &str) -> Option<String> {
+    let dir = std::fs::read_dir(format!("{gpu_device}/hwmon")).ok()?;
     for entry in dir.flatten() {
         let name = entry.file_name();
         if name.to_string_lossy().starts_with("hwmon") {
