@@ -10,7 +10,7 @@
 //! the age is always ~0 s and the self-vital can never trigger.
 
 use anyhow::{Context, Result};
-use russell_core::{BudgetVerdict, ReflexBudget, ReflexSet};
+use russell_core::{BudgetVerdict, ReflexBudget, ReflexSet, SystemClock};
 use russell_core::RuleSet;
 use russell_core::event::{Event, Scope, Severity};
 use russell_core::journal::{JournalReader, JournalWriter};
@@ -59,8 +59,9 @@ pub fn run(paths: &Paths) -> Result<()> {
         journal.append(ev)?;
     }
 
-    // 3. Cycle event.
-    let mut ev = Event::new("observe", Severity::Info);
+    // 3. Cycle event — uses injected clock (T2).
+    let clock = SystemClock;
+    let mut ev = Event::new_with_clock("observe", Severity::Info, &clock);
     ev.tier = Some("sentinel".into());
     ev.module = Some("sentinel/cycle".into());
     ev.summary = Some(format!(

@@ -52,50 +52,38 @@ pub fn systemd_system_failed_count() -> Option<f64> {
     Some(count as f64)
 }
 
-// -- ProbeDescriptor impls --
+// -- ProbeDescriptor impls (T13 split form) --
 
-use super::descriptor::ProbeDescriptor;
+use super::descriptor::{ProbeCollector, ProbeMetadata};
 
-/// Probe descriptor for `systemd_degraded`.
+/// Probe descriptor.
 pub struct SystemdDegraded;
-impl ProbeDescriptor for SystemdDegraded {
-    fn name(&self) -> &'static str {
-        "systemd_degraded"
-    }
-    fn unit(&self) -> Option<&'static str> {
-        Some("bool")
-    }
-    fn collect(&self) -> Option<f64> {
-        systemd_degraded()
-    }
+impl ProbeMetadata for SystemdDegraded {
+    fn name(&self) -> &'static str { "systemd_degraded" }
+    fn unit(&self) -> Option<&'static str> { Some("bool") }
+}
+impl ProbeCollector for SystemdDegraded {
+    fn collect(&self) -> Option<f64> { systemd_degraded() }
 }
 
-/// Probe descriptor for `systemd_user_failed_count`.
+/// Probe descriptor.
 pub struct SystemdUserFailedCount;
-impl ProbeDescriptor for SystemdUserFailedCount {
-    fn name(&self) -> &'static str {
-        "systemd_user_failed_count"
-    }
-    fn unit(&self) -> Option<&'static str> {
-        Some("count")
-    }
-    fn collect(&self) -> Option<f64> {
-        systemd_user_failed_count()
-    }
+impl ProbeMetadata for SystemdUserFailedCount {
+    fn name(&self) -> &'static str { "systemd_user_failed_count" }
+    fn unit(&self) -> Option<&'static str> { Some("count") }
+}
+impl ProbeCollector for SystemdUserFailedCount {
+    fn collect(&self) -> Option<f64> { systemd_user_failed_count() }
 }
 
-/// Probe descriptor for `systemd_system_failed_count`.
+/// Probe descriptor.
 pub struct SystemdSystemFailedCount;
-impl ProbeDescriptor for SystemdSystemFailedCount {
-    fn name(&self) -> &'static str {
-        "systemd_system_failed_count"
-    }
-    fn unit(&self) -> Option<&'static str> {
-        Some("count")
-    }
-    fn collect(&self) -> Option<f64> {
-        systemd_system_failed_count()
-    }
+impl ProbeMetadata for SystemdSystemFailedCount {
+    fn name(&self) -> &'static str { "systemd_system_failed_count" }
+    fn unit(&self) -> Option<&'static str> { Some("count") }
+}
+impl ProbeCollector for SystemdSystemFailedCount {
+    fn collect(&self) -> Option<f64> { systemd_system_failed_count() }
 }
 
 #[cfg(test)]

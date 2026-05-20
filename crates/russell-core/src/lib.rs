@@ -42,7 +42,7 @@ pub mod time;
 
 pub use error::{CoreError, Result};
 pub use event::{Event, EventId, Severity};
-pub use journal::port::{JournalReadPort, JournalWritePort};
+pub use journal::port::{InMemoryJournal, JournalReadPort, JournalWritePort};
 pub use profile::Profile;
 pub use reflex::{BudgetVerdict, ReflexBudget, ReflexSet};
 pub use rule::{ConfigWarning, RuleSet};

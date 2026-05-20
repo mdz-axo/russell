@@ -30,6 +30,7 @@ use std::time::Duration;
 use russell_core::Result;
 use russell_core::event::{Event, Severity};
 use russell_core::journal::JournalWriter;
+use russell_core::journal::port::JournalWritePort;
 use tracing::{debug, warn};
 use zeroize::Zeroize;
 
@@ -660,6 +661,81 @@ impl Dispatcher {
             "dispatched skill step",
         );
 
+        Ok(outcome)
+    }
+
+    /// Port-based variant of [`run_and_journal`] — accepts any
+    /// `JournalWritePort` implementation (T1 hexagonal pattern).
+    ///
+    /// This enables testing skill dispatch with `InMemoryJournal`
+    /// instead of requiring a real SQLite database.
+    #[allow(clippy::too_many_arguments)]
+    pub async fn run_and_journal_port(
+        &self,
+        journal: &dyn JournalWritePort,
+        evidence_base: &Path,
+        cmd: &[String],
+        skill_id: &str,
+        step_id: &str,
+        step_type: StepType,
+        risk_band: &str,
+        timeout_override: Option<Duration>,
+    ) -> Result<RunOutcome> {
+        let outcome = match self.run(cmd, timeout_override).await {
+            Ok(o) => o,
+            Err(e) => {
+                let mut ev = Event::new("skill_intervention", Severity::Warn);
+                ev.tier = Some("skill".into());
+                ev.module = Some(format!("skill/{skill_id}/{step_id}"));
+                ev.summary = Some(format!("spawn failed: {e} :: skill/{skill_id}/{step_id}"));
+                ev.outputs.insert("risk".into(), risk_band.into());
+                ev.outputs.insert("step_type".into(), step_type.as_str().into());
+                let _ = journal.append(&ev);
+                return Err(e);
+            }
+        };
+
+        let action = match step_type {
+            StepType::Probe => "skill_probe",
+            StepType::Intervention => {
+                if outcome.dry_run { "would_skill_intervention" } else { "skill_intervention" }
+            }
+        };
+        let severity = if outcome.exit_code == Some(0) || outcome.dry_run {
+            Severity::Info
+        } else {
+            Severity::Warn
+        };
+
+        let mut ev = Event::new(action, severity);
+        ev.tier = Some("skill".into());
+        ev.module = Some(format!("skill/{skill_id}/{step_id}"));
+        ev.dry_run = outcome.dry_run;
+        ev.duration_ms = Some(outcome.duration.as_millis() as u64);
+        ev.summary = Some(format!(
+            "{} {}/{}{}",
+            if outcome.dry_run { "[DRY RUN]" } else { "" },
+            skill_id, step_id,
+            match outcome.exit_code {
+                Some(c) => format!(" exit={c}"),
+                None if outcome.timed_out => " TIMEOUT".into(),
+                None => " (no exit code)".into(),
+            },
+        ));
+        ev.outputs.insert("exit_code".into(), outcome.exit_code.into());
+        ev.outputs.insert("timed_out".into(), outcome.timed_out.into());
+        ev.outputs.insert("risk".into(), risk_band.into());
+        ev.outputs.insert("step_type".into(), step_type.as_str().into());
+
+        let evidence_dir = evidence_base
+            .join("skills").join(skill_id).join(step_id)
+            .join(russell_core::time::now_rfc3339().replace(':', "-"));
+        if let Err(e) = write_evidence(&evidence_dir, &outcome, &ev) {
+            tracing::warn!(dir = %evidence_dir.display(), error = %e, "evidence write failed");
+        }
+        ev.evidence_ref = Some(evidence_dir.display().to_string());
+
+        journal.append(&ev)?;
         Ok(outcome)
     }
 

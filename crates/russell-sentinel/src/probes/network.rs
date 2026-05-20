@@ -23,36 +23,28 @@ pub fn net_tcp6_connections() -> Option<f64> {
     tools::parse_sockstat(&content, "TCP6")
 }
 
-// -- ProbeDescriptor impls --
+// -- ProbeDescriptor impls (T13 split form) --
 
-use super::descriptor::ProbeDescriptor;
+use super::descriptor::{ProbeCollector, ProbeMetadata};
 
-/// Probe descriptor for `net_tcp_connections`.
+/// Probe descriptor.
 pub struct NetTcpConnections;
-impl ProbeDescriptor for NetTcpConnections {
-    fn name(&self) -> &'static str {
-        "net_tcp_connections"
-    }
-    fn unit(&self) -> Option<&'static str> {
-        Some("count")
-    }
-    fn collect(&self) -> Option<f64> {
-        net_tcp_connections()
-    }
+impl ProbeMetadata for NetTcpConnections {
+    fn name(&self) -> &'static str { "net_tcp_connections" }
+    fn unit(&self) -> Option<&'static str> { Some("count") }
+}
+impl ProbeCollector for NetTcpConnections {
+    fn collect(&self) -> Option<f64> { net_tcp_connections() }
 }
 
-/// Probe descriptor for `net_tcp6_connections`.
+/// Probe descriptor.
 pub struct NetTcp6Connections;
-impl ProbeDescriptor for NetTcp6Connections {
-    fn name(&self) -> &'static str {
-        "net_tcp6_connections"
-    }
-    fn unit(&self) -> Option<&'static str> {
-        Some("count")
-    }
-    fn collect(&self) -> Option<f64> {
-        net_tcp6_connections()
-    }
+impl ProbeMetadata for NetTcp6Connections {
+    fn name(&self) -> &'static str { "net_tcp6_connections" }
+    fn unit(&self) -> Option<&'static str> { Some("count") }
+}
+impl ProbeCollector for NetTcp6Connections {
+    fn collect(&self) -> Option<f64> { net_tcp6_connections() }
 }
 
 #[cfg(test)]

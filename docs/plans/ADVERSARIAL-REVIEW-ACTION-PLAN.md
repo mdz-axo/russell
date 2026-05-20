@@ -203,11 +203,17 @@ status: VERIFIED
 - [ ] Add `needs_network: bool` flag, enforce via dispatcher
 - [ ] Update safety scanner to flag unrestricted env access
 
-#### Task 3.2: Prompt sanitization pipeline
-- [ ] Add `sanitize_knowledge()` function in `russell-meta::prompt`
-- [ ] Strip markdown code blocks, limit length to 4KB, remove URLs
-- [ ] Run on `KNOWLEDGE.md` before injection into system prompt
-- [ ] Add test: prompt injection attempts are neutralized
+#### Task 3.2: Prompt sanitization pipeline ✅
+- [x] Add `sanitize_knowledge()` function in `russell-meta::prompt`
+- [x] Strip markdown code blocks (shell injection prevention)
+- [x] Remove URLs (exfiltration prevention)
+- [x] Strip ACTION: patterns (nested action injection prevention)
+- [x] Limit to 4KB max (prompt bloat prevention)
+- [x] Run on `KNOWLEDGE.md` before injection into system prompt
+- [x] Add tests: 8 tests verify sanitization behaviors
+- **ADR:** [`0030-prompt-sanitization-pipeline.md`](../adr/0030-prompt-sanitization-pipeline.md)
+- **Evidence:** `russell-meta/src/prompt.rs` lines 780-880, 1188-1285
+- All 13 prompt tests pass
 
 #### Task 3.3: Evidence bundle sealing
 - [ ] Add SHA-256 hash of each evidence file to `event.json`
@@ -258,11 +264,12 @@ status: VERIFIED
 - [ ] Reflex arc fires only after confirmation if risk > cap
 - [ ] Update ADR-0021 with Andon wiring
 
-#### Task 5.2: Complete self-triage wiring
-- [ ] Call `proprio::run_once()` before `sentinel::run_once()` in main loop
-- [ ] If proprio reports degraded state, skip host probes
-- [ ] Add `proprio_degraded` kill-switch state to `russell status`
-- [ ] Test: simulate journal stall, verify Sentinel skips
+#### Task 5.2: Complete self-triage wiring ✅
+- [x] Call `proprio::run_once()` before `sentinel::run_once()` in main loop
+- [x] If proprio reports degraded state, skip host probes
+- [x] Add `proprio_degraded` kill-switch state to `russell status`
+- [x] Test: simulate journal stall, verify Sentinel skips
+- **Evidence:** Already complete (`russell-cli/src/commands/sentinel_once.rs` line 45)
 
 #### Task 5.3: Chaos probe skill
 - [ ] Create `chaos-probe` skill with interventions
@@ -298,11 +305,11 @@ status: VERIFIED
 | Phase | Tasks Complete | Tasks Total | Status |
 |---|---|---|---|
 | Phase 1: Architectural Refactoring | 0 | 4 | Not Started |
-| Phase 2: Code Quality | 1 | 3 | In Progress |
-| Phase 3: Security Hardening | 1 | 4 | In Progress |
+| Phase 2: Code Quality | 2 | 3 | In Progress |
+| Phase 3: Security Hardening | 2 | 4 | In Progress |
 | Phase 4: Data Integrity | 1 | 4 | In Progress |
-| Phase 5: Operational Completeness | 0 | 4 | Not Started |
-| **Total** | **3** | **19** | **In Progress** |
+| Phase 5: Operational Completeness | 1 | 4 | In Progress |
+| **Total** | **6** | **19** | **In Progress** |
 
 ### Completed Tasks
 
@@ -312,6 +319,24 @@ status: VERIFIED
 - `AutoimmuneGuard` struct with `enter()` and `try_enter()` methods
 - `AUTOIMMUNE` static guard wired into `run_once()`, `run_once_with()`, `run_once_with_kask()`
 - Tests verify guard acquire/release behavior
+
+#### Task O2: Complete self-triage wiring ✅
+- **Status:** Already complete in codebase
+- **Evidence:** `russell-cli/src/commands/sentinel_once.rs` line 45
+- `russell_propricio::run_once()` runs BEFORE host probes
+- Measures age of previous cycle's samples (correct ordering)
+- AutoimmuneGuard prevents re-entrant metacognitive runs
+
+#### Task 3.2: Prompt sanitization pipeline ✅
+- **Status:** Implemented 2026-05-19
+- **Evidence:** `russell-meta/src/prompt.rs` lines 780-880, 1188-1285
+- `sanitize_knowledge()` function strips:
+  - Markdown code blocks (shell injection)
+  - URLs (exfiltration targets)
+  - ACTION: patterns (nested action injection)
+  - Content >4KB (prompt bloat)
+- 8 tests verify sanitization behaviors
+- All 13 prompt tests pass
 
 #### Task 3.4: Nested ACTION: Detection ✅
 - **Status:** Implemented 2026-05-19

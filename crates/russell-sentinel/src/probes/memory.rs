@@ -42,7 +42,7 @@ pub fn load_avg_1m() -> Option<f64> {
 // Others retain the old unified form (directly impl ProbeDescriptor)
 // until migrated.
 
-use super::descriptor::{ProbeCollector, ProbeDescriptor, ProbeMetadata};
+use super::descriptor::{ProbeCollector, ProbeMetadata};
 
 /// Probe descriptor for `mem_available_mib`.
 pub struct MemAvailableMib;
@@ -62,41 +62,31 @@ impl ProbeCollector for MemAvailableMib {
 
 /// Probe descriptor for `swap_used_mib`.
 pub struct SwapUsedMib;
-impl ProbeDescriptor for SwapUsedMib {
-    fn name(&self) -> &'static str {
-        "swap_used_mib"
-    }
-    fn unit(&self) -> Option<&'static str> {
-        Some("MiB")
-    }
-    fn collect(&self) -> Option<f64> {
-        swap_used_mib()
-    }
+impl ProbeMetadata for SwapUsedMib {
+    fn name(&self) -> &'static str { "swap_used_mib" }
+    fn unit(&self) -> Option<&'static str> { Some("MiB") }
+}
+impl ProbeCollector for SwapUsedMib {
+    fn collect(&self) -> Option<f64> { swap_used_mib() }
 }
 
 /// Probe descriptor for `loadavg_1m`.
 pub struct LoadAvg1m;
-impl ProbeDescriptor for LoadAvg1m {
-    fn name(&self) -> &'static str {
-        "loadavg_1m"
-    }
-    fn unit(&self) -> Option<&'static str> {
-        None
-    }
-    fn collect(&self) -> Option<f64> {
-        load_avg_1m()
-    }
+impl ProbeMetadata for LoadAvg1m {
+    fn name(&self) -> &'static str { "loadavg_1m" }
+    fn unit(&self) -> Option<&'static str> { None }
+}
+impl ProbeCollector for LoadAvg1m {
+    fn collect(&self) -> Option<f64> { load_avg_1m() }
 }
 
 /// Probe descriptor for memory pressure "some".
 pub struct MemPressureSome;
-impl ProbeDescriptor for MemPressureSome {
-    fn name(&self) -> &'static str {
-        "mem_pressure_some_pct"
-    }
-    fn unit(&self) -> Option<&'static str> {
-        Some("%")
-    }
+impl ProbeMetadata for MemPressureSome {
+    fn name(&self) -> &'static str { "mem_pressure_some_pct" }
+    fn unit(&self) -> Option<&'static str> { Some("%") }
+}
+impl ProbeCollector for MemPressureSome {
     fn collect(&self) -> Option<f64> {
         let content = connectors::read_file_to_string("/proc/pressure/memory")?;
         tools::parse_memory_pressure_some(&content)
@@ -105,13 +95,11 @@ impl ProbeDescriptor for MemPressureSome {
 
 /// Probe descriptor for memory pressure "full".
 pub struct MemPressureFull;
-impl ProbeDescriptor for MemPressureFull {
-    fn name(&self) -> &'static str {
-        "mem_pressure_full_pct"
-    }
-    fn unit(&self) -> Option<&'static str> {
-        Some("%")
-    }
+impl ProbeMetadata for MemPressureFull {
+    fn name(&self) -> &'static str { "mem_pressure_full_pct" }
+    fn unit(&self) -> Option<&'static str> { Some("%") }
+}
+impl ProbeCollector for MemPressureFull {
     fn collect(&self) -> Option<f64> {
         let content = connectors::read_file_to_string("/proc/pressure/memory")?;
         tools::parse_memory_pressure_full(&content)

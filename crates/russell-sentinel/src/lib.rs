@@ -23,6 +23,8 @@ use russell_core::Result;
 use russell_core::RuleSet;
 use russell_core::event::{Event, Scope, Severity};
 use russell_core::journal::{JournalReader, JournalWriter};
+use russell_core::journal::port::JournalWritePort;
+use russell_core::time::Clock;
 
 /// Run the probe set once and append samples to the journal.
 /// No rule evaluation — samples only.
@@ -96,11 +98,48 @@ pub fn run_once_with_rules_and_registry(
     Ok((samples.len(), events))
 }
 
+/// Fully-injectable sentinel cycle: custom probe registry, custom
+/// journal port, custom clock. This is the "pure hexagonal" entry
+/// point for testing — all dependencies are explicit capabilities.
+///
+/// Returns (sample_count, threshold_events).
+pub fn run_once_injectable(
+    writer: &dyn JournalWritePort,
+    clock: &dyn Clock,
+    rules: &RuleSet,
+    registry: &probes::ProbeRegistry,
+) -> Result<(usize, Vec<Event>)> {
+    let samples = probes::collect_with(registry);
+    journal_samples_via_port(writer, clock, &samples)?;
+    let events = evaluate_samples_basic(rules, &samples);
+    Ok((samples.len(), events))
+}
+
 /// Write samples to the journal in one batch.
 ///
 /// All samples share the same timestamp (the start of this cycle).
 fn journal_samples(writer: &JournalWriter, samples: &[Sample]) -> Result<()> {
     let ts = russell_core::time::now_unix();
+    for s in samples {
+        writer.append_sample(
+            ts,
+            Scope::Host,
+            &s.name,
+            s.value_num,
+            s.value_text.as_deref(),
+            s.unit,
+        )?;
+    }
+    Ok(())
+}
+
+/// Port-based sample writing (T1/T2 — injectable journal + clock).
+fn journal_samples_via_port(
+    writer: &dyn JournalWritePort,
+    clock: &dyn Clock,
+    samples: &[Sample],
+) -> Result<()> {
+    let ts = clock.now_unix();
     for s in samples {
         writer.append_sample(
             ts,
@@ -340,5 +379,51 @@ mod tests {
             Some("loadavg_1m")
         );
         assert!(!ev.outputs.contains_key("unit"));
+    }
+
+    // --- Integration test: fully-injectable sentinel cycle (T1/T2/T8/T13) ---
+
+    #[test]
+    fn injectable_sentinel_cycle_with_test_doubles() {
+        use russell_core::event::Scope;
+        use russell_core::time::FixedClock;
+        use std::sync::Mutex;
+
+        // In-memory journal (test double).
+        struct TestJournal {
+            samples: Mutex<Vec<(i64, String, Option<f64>)>>,
+        }
+        impl russell_core::journal::port::JournalWritePort for TestJournal {
+            fn append(&self, _event: &Event) -> russell_core::Result<()> {
+                Ok(())
+            }
+            fn append_sample(
+                &self,
+                ts: i64,
+                _scope: Scope,
+                probe: &str,
+                value_num: Option<f64>,
+                _value_text: Option<&str>,
+                _unit: Option<&str>,
+            ) -> russell_core::Result<()> {
+                self.samples.lock().unwrap().push((ts, probe.to_string(), value_num));
+                Ok(())
+            }
+        }
+
+        let journal = TestJournal { samples: Mutex::new(Vec::new()) };
+        let clock = FixedClock::new(1_700_000_000);
+        let rules = RuleSet::with_defaults();
+        let registry = probes::ProbeRegistry::with_defaults();
+
+        let (count, _events) = run_once_injectable(&journal, &clock, &rules, &registry).unwrap();
+
+        // All samples should have the fixed timestamp.
+        let samples = journal.samples.lock().unwrap();
+        assert!(count > 0);
+        assert!(!samples.is_empty());
+        for (ts, _, _) in samples.iter() {
+            assert_eq!(*ts, 1_700_000_000, "all samples should use the injected clock");
+        }
     }
 }

@@ -296,6 +296,12 @@ pub struct ProprioResult {
     pub remote_discovery_latency_s: Option<i64>,
     /// Severity of the remote discovery latency vital.
     pub remote_discovery_latency_severity: Severity,
+
+    // -- Journal chain integrity (T6) --
+    /// Whether the journal hash chain is intact. `true` if verification
+    /// passed (or no chained events exist yet). `false` if a break was
+    /// detected. `None` if verification could not run.
+    pub journal_chain_intact: Option<bool>,
 }
 
 /// Input from the async Kask MCP health probe, passed into the proprio cycle
@@ -425,6 +431,10 @@ fn run_once_inner(
     // 7. Remote discovery latency (Gap 5).
     let (remote_latency_s, remote_latency_severity) = gather_remote_discovery_latency(writer, now);
 
+    // 8. Journal chain integrity (T6). Quick spot-check: verify only
+    //    the last 10 events (full verification is via `russell verify-journal`).
+    let journal_chain_intact = check_journal_chain_integrity(reader);
+
     // Emit events for any vital that breached threshold.
     // Descriptors: (severity, module, probe_name, value_f64, warn_threshold, alert_threshold, json_key)
     let vitals: &[(Severity, &str, &str, f64, f64, f64, &str)] = &[
@@ -521,6 +531,7 @@ fn run_once_inner(
         kask_mcp_reachable_severity: kask_mcp_severity,
         remote_discovery_latency_s: remote_latency_s,
         remote_discovery_latency_severity: remote_latency_severity,
+        journal_chain_intact,
     })
 }
 
@@ -872,6 +883,55 @@ fn emit_event(
         ev.outputs.insert((*k).into(), v.clone());
     }
     writer.append(&ev)
+}
+
+// ---------------------------------------------------------------------------
+// Journal chain integrity check (T6)
+// ---------------------------------------------------------------------------
+
+/// Quick spot-check of the journal hash chain. Verifies the last 10
+/// events. Returns:
+/// - `Some(true)` if intact or no chained events exist
+/// - `Some(false)` if a chain break was detected
+/// - `None` if the check could not run (DB error)
+fn check_journal_chain_integrity(reader: &JournalReader) -> Option<bool> {
+    let conn = reader.open_ro_conn().ok()?;
+    let mut stmt = conn
+        .prepare(
+            "SELECT prev_hash, payload, hash FROM events \
+             WHERE hash IS NOT NULL \
+             ORDER BY ts_unix DESC, id DESC \
+             LIMIT 10",
+        )
+        .ok()?;
+
+    let links: Vec<(String, String, String)> = stmt
+        .query_map([], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, String>(2)?,
+            ))
+        })
+        .ok()?
+        .filter_map(|r| r.ok())
+        .collect();
+
+    if links.is_empty() {
+        return Some(true); // No chained events yet — not a failure.
+    }
+
+    // Reverse to chronological order for verification.
+    let links: Vec<_> = links.into_iter().rev().collect();
+
+    match russell_core::hash_chain::verify_chain(&links) {
+        russell_core::hash_chain::ChainVerdict::Intact { .. } => Some(true),
+        russell_core::hash_chain::ChainVerdict::Empty => Some(true),
+        russell_core::hash_chain::ChainVerdict::Broken { .. } => {
+            warn!("journal hash chain BROKEN — tamper evidence detected");
+            Some(false)
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------

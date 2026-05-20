@@ -84,40 +84,45 @@ impl JournalReadPort for super::JournalReader {
     }
 }
 
+/// In-memory journal for tests — captures writes without
+/// requiring a real SQLite database.
+///
+/// Available to all crates in the workspace for integration testing.
+/// Implements [`JournalWritePort`] with simple `Mutex<Vec<_>>` storage.
+#[derive(Default)]
+pub struct InMemoryJournal {
+    /// Captured events.
+    pub events: std::sync::Mutex<Vec<Event>>,
+    /// Captured samples as (ts, probe_name, value).
+    pub samples: std::sync::Mutex<Vec<(i64, String, Option<f64>)>>,
+}
+
+impl JournalWritePort for InMemoryJournal {
+    fn append(&self, event: &Event) -> Result<()> {
+        self.events.lock().unwrap().push(event.clone());
+        Ok(())
+    }
+
+    fn append_sample(
+        &self,
+        ts: i64,
+        _scope: Scope,
+        probe: &str,
+        value_num: Option<f64>,
+        _value_text: Option<&str>,
+        _unit: Option<&str>,
+    ) -> Result<()> {
+        self.samples
+            .lock()
+            .unwrap()
+            .push((ts, probe.to_string(), value_num));
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    /// In-memory journal for tests — captures writes without
-    /// requiring a real SQLite database.
-    #[derive(Default)]
-    pub struct InMemoryJournal {
-        pub events: std::sync::Mutex<Vec<Event>>,
-        pub samples: std::sync::Mutex<Vec<(i64, String, Option<f64>)>>,
-    }
-
-    impl JournalWritePort for InMemoryJournal {
-        fn append(&self, event: &Event) -> Result<()> {
-            self.events.lock().unwrap().push(event.clone());
-            Ok(())
-        }
-
-        fn append_sample(
-            &self,
-            ts: i64,
-            _scope: Scope,
-            probe: &str,
-            value_num: Option<f64>,
-            _value_text: Option<&str>,
-            _unit: Option<&str>,
-        ) -> Result<()> {
-            self.samples
-                .lock()
-                .unwrap()
-                .push((ts, probe.to_string(), value_num));
-            Ok(())
-        }
-    }
 
     #[test]
     fn in_memory_journal_captures_events() {

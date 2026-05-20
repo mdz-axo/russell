@@ -39,52 +39,44 @@ pub fn disk_root_used_pct() -> Option<f64> {
     Some((used as f64 / total as f64) * 100.0)
 }
 
-// -- ProbeDescriptor impls --
+// -- ProbeDescriptor impls (T13 split form) --
 
-use super::descriptor::ProbeDescriptor;
+use super::descriptor::{ProbeCollector, ProbeMetadata};
 
-/// Probe descriptor for `disk_io_pressure_some_pct`.
+/// Probe descriptor.
 pub struct DiskIoPressureSome;
-impl ProbeDescriptor for DiskIoPressureSome {
-    fn name(&self) -> &'static str {
-        "disk_io_pressure_some_pct"
-    }
-    fn unit(&self) -> Option<&'static str> {
-        Some("%")
-    }
+impl ProbeMetadata for DiskIoPressureSome {
+    fn name(&self) -> &'static str { "disk_io_pressure_some_pct" }
+    fn unit(&self) -> Option<&'static str> { Some("%") }
+}
+impl ProbeCollector for DiskIoPressureSome {
     fn collect(&self) -> Option<f64> {
         let content = connectors::read_file_to_string("/proc/pressure/io")?;
         tools::parse_io_pressure_some(&content)
     }
 }
 
-/// Probe descriptor for `disk_io_pressure_full_pct`.
+/// Probe descriptor.
 pub struct DiskIoPressureFull;
-impl ProbeDescriptor for DiskIoPressureFull {
-    fn name(&self) -> &'static str {
-        "disk_io_pressure_full_pct"
-    }
-    fn unit(&self) -> Option<&'static str> {
-        Some("%")
-    }
+impl ProbeMetadata for DiskIoPressureFull {
+    fn name(&self) -> &'static str { "disk_io_pressure_full_pct" }
+    fn unit(&self) -> Option<&'static str> { Some("%") }
+}
+impl ProbeCollector for DiskIoPressureFull {
     fn collect(&self) -> Option<f64> {
         let content = connectors::read_file_to_string("/proc/pressure/io")?;
         tools::parse_io_pressure_full(&content)
     }
 }
 
-/// Probe descriptor for `disk_root_used_pct`.
+/// Probe descriptor.
 pub struct DiskRootUsedPct;
-impl ProbeDescriptor for DiskRootUsedPct {
-    fn name(&self) -> &'static str {
-        "disk_root_used_pct"
-    }
-    fn unit(&self) -> Option<&'static str> {
-        Some("%")
-    }
-    fn collect(&self) -> Option<f64> {
-        disk_root_used_pct()
-    }
+impl ProbeMetadata for DiskRootUsedPct {
+    fn name(&self) -> &'static str { "disk_root_used_pct" }
+    fn unit(&self) -> Option<&'static str> { Some("%") }
+}
+impl ProbeCollector for DiskRootUsedPct {
+    fn collect(&self) -> Option<f64> { disk_root_used_pct() }
 }
 
 #[cfg(test)]
