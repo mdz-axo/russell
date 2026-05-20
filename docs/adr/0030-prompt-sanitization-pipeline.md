@@ -106,36 +106,42 @@ Implement runtime prompt sanitization:
 
 ## Implementation
 
-### Sanitization Pipeline
+**Location:** `crates/russell-meta/src/sanitizer.rs` (451 lines)
 
-```rust
-fn sanitize_knowledge(content: &str) -> Option<String> {
-    // 1. Strip markdown code blocks (fence-style: ``` ... ```)
-    // 2. Remove URLs (http://, https://)
-    // 3. Strip ACTION: patterns
-    // 4. Limit to 4KB max
-    // Return None if empty after sanitization
-}
-```
+**Key types:**
+- `PromptSanitizer` — main sanitization engine with configurable strictness
+- `SanitizationResult` — returns sanitized text + metadata about filtering
+- `SanitizerPatterns` — compiled regex patterns (lazy_static, shared)
 
-### Code Changes
+**Input sanitization** (`sanitize_input()`):
+- Redacts `RUSSELL_*` environment variable references → `[REDACTED]`
+- Strips shell metacharacters (`;|&$\`(){}\)
+- Detects prompt injection phrases ("ignore previous", "disregard all", etc.)
+- Enforces 4000 character max length
 
-| File | Change |
-|---|---|
-| `russell-meta/src/prompt.rs` | Add `sanitize_knowledge()` function, call in `append_skill_knowledge()` |
+**Output sanitization** (`sanitize_output()`):
+- Redacts secret patterns (API keys, tokens, passwords) → `[SECRET REDACTED]`
+- Validates `ACTION: skill/action` syntax against registered skill manifests
+- Replaces invalid ACTION directives with warnings
+- Strips shell metacharacters from output
 
-### Test Coverage
+**Integration points:**
+- `russell-meta/src/help.rs:compose_and_augment_soap()` — sanitizes operator note input
+- `russell-meta/src/help.rs:persist_session()` — sanitizes LLM response output
 
-- `sanitize_knowledge_strips_code_blocks` — Verifies shell injection blocked
-- `sanitize_knowledge_removes_urls` — Verifies exfiltration URLs removed
-- `sanitize_knowledge_strips_action_patterns` — Verifies nested ACTION: blocked
-- `sanitize_knowledge_limits_to_4kb` — Verifies size limit enforced
-- `sanitize_knowledge_returns_none_if_empty` — Verifies empty result handling
-- `sanitize_knowledge_returns_none_if_only_urls` — Verifies URL-only content blocked
-- `sanitize_knowledge_preserves_normal_content` — Verifies legitimate content passes
-- `sanitize_knowledge_complex_injection_attempt` — Verifies multi-vector attack blocked
+**Unit tests** (7 tests in `sanitizer::tests`):
+- `sanitize_input_redacts_russell_env` — Verifies RUSSELL_* variables blocked
+- `sanitize_input_strips_shell_metachars` — Verifies shell operators removed
+- `sanitize_input_detects_injection` — Verifies injection phrases detected
+- `sanitize_output_redacts_secrets` — Verifies API key patterns redacted
+- `sanitize_output_validates_action_syntax` — Verifies ACTION validation
+- `validate_action_format` — Verifies action ID format validation
+- `max_input_length_truncates` — Verifies length limit enforced
 
-All 13 prompt tests pass.
+All 7 sanitizer tests pass.
+
+**Scenario tests:**
+- `skills/scenario-tester/scripts/scenario-test-prompt-sanitization.sh` — end-to-end validation
 
 ## Compliance
 

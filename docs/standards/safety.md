@@ -216,7 +216,76 @@ author. See [ADR-0008](../adr/0008-llm-triage-never-emits-shell.md).
 - Two consecutive intervention failures force human handoff,
   regardless of risk band.
 
-## 9. Relationship to proprioception
+## 9. Runtime Security Features
+
+These runtime defenses complement the install-time safety
+scanner (see [`../adr/0024-skill-registry-workshop-lifecycle.md`](../adr/0024-skill-registry-workshop-lifecycle.md)).
+
+### 9.1 Prompt Sanitization Pipeline
+
+All LLM input/output is sanitized to prevent injection and
+exfiltration. See [ADR-0030](../adr/0030-prompt-sanitization-pipeline.md).
+
+**Input sanitization** (operator notes, skill knowledge):
+- Redacts `RUSSELL_*` environment variable references
+- Strips shell metacharacters (`;|&$()\``)
+- Detects prompt injection phrases ("ignore previous", etc.)
+- Enforces 4KB max length per input
+
+**Output sanitization** (LLM responses):
+- Redacts secret patterns (API keys, tokens, passwords)
+- Validates `ACTION: skill/action` syntax against registered skills
+- Replaces invalid ACTION directives with warnings
+- Strips shell metacharacters from output
+
+**What operators see:**
+```
+[LLM response was sanitized: redacted RUSHELL_* references]
+```
+
+This is normal — Russell is protecting your environment.
+
+### 9.2 Capability Attenuation
+
+Skills only receive declared environment variables. See
+[ADR-0031](../adr/0031-capability-attenuation.md).
+
+**Manifest declaration:**
+```yaml
+safety:
+  allowed_env_keys: ["HOME", "LANG", "PATH"]
+  needs_network: false
+```
+
+**Runtime enforcement:**
+- `env_clear()` called before every skill subprocess
+- Only `allowed_env_keys` + default allowlist propagated
+- Default PATH restricted to `/usr/local/bin:/usr/bin:/bin`
+- Skills with `needs_network: false` may be blocked in air-gapped environments
+
+**What operators see:**
+- Skills cannot access undeclared env vars (API keys, tokens)
+- Safety scanner flags skills with network patterns but `needs_network: false`
+
+### 9.3 Consent Expiry
+
+All intervention approvals expire after **5 minutes (300 seconds)**.
+
+**Enforcement:**
+- `PendingAction::is_expired()` checked before dispatch
+- Expiry prevents stale approvals executing after context shifts
+- Error message: "Approval expired; please re-confirm"
+
+**Configuration:**
+```bash
+# Strict mode (only /approve accepted)
+RUSSELL_CONSENT_MODE=strict
+
+# Conversational mode (default — "ok", "yes", "go ahead" accepted)
+RUSSELL_CONSENT_MODE=conversational
+```
+
+## 10. Relationship to proprioception
 
 Self-triage (see
 [`../archive/proprioception.md`](../archive/proprioception.md))

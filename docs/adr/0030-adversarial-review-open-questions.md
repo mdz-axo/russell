@@ -1,19 +1,33 @@
 # ADR-0030: Adversarial Review — Open Architectural Questions
 
-**Status:** Proposed  
+**Status:** Active (tasks complete)  
 **Date:** 2026-05-19  
+**Last Updated:** 2026-05-20  
 **Context:** Multi-perspective adversarial review (T16)
 
-## Context
+## Completed Tasks
 
-An adversarial multi-perspective review of the Russell codebase identified
-15 concrete weaknesses and implemented remediations for tasks T1–T14.
-Several design decisions remain open — they require operator input or
-cross-project coordination that exceeds a single review cycle.
+The following tasks from the adversarial review action plan are **complete**:
 
-This ADR records these open questions so they are not lost.
+| Task | Description | Status | Location |
+|---|---|---|---|
+| **S1** | Capability Attenuation | ✓ Complete | `russell-skills/src/dispatch.rs:426-436` |
+| **S3** | Prompt Sanitization Pipeline | ✓ Complete | `russell-meta/src/sanitizer.rs` |
+| **A1** | Explicit Port Interfaces | ✓ Complete | `russell-core/src/journal/port.rs` (ADR-0033) |
+| **P1** | Baseline Freshness Guard | ✓ Complete | `russell-core/src/journal/mod.rs:1423` |
+| **C2** | Consent Expiry (5-min TTL) | ✓ Complete | `russell-cli/src/commands/chat/mod.rs:70,89` |
+| **I2** | Dynamic GPU Detection | ✓ Complete | `russell-sentinel/src/probes/gpu.rs:28-79` |
+| **F3** | EWMA Cold Start Acknowledgment | ✓ Complete | `russell-meta/src/prompt.rs:274-295` |
+| **T3** | Scenario Tests | ✓ Complete | `skills/scenario-tester/scripts/scenario-test-*.sh` |
+
+**Verification:**
+- `cargo test --workspace`: 255 tests pass
+- `cargo clippy -- -D warnings`: clean
+- Scenario tests: `scenario-test-prompt-sanitization.sh`, `scenario-test-capability-attenuation.sh`
 
 ## Open Questions
+
+The following design decisions remain open:
 
 ### Q1: Journal Port Granularity
 
