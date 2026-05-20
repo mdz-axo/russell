@@ -547,7 +547,7 @@ impl PromptAssembler for TemplatedPromptAssembler {
 
 ```rust
 /// Legacy procedural prompt assembler.
-/// Wraps compose_with_kask() at prompt.rs:62.
+/// Wraps compose_with_hkask() at prompt.rs:62.
 /// Marked #[deprecated] — will be removed in Task 7.
 pub struct LegacyPromptAssembler;
 

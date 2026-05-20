@@ -11,8 +11,8 @@
 //!
 //! ## Template integration
 //!
-//! The `compose_with_kask_templated` function uses the prompt registry
-//! to render templates from `.md.j2` files. The legacy `compose_with_kask`
+//! The `compose_with_hkask_templated` function uses the prompt registry
+//! to render templates from `.md.j2` files. The legacy `compose_with_hkask`
 //! function retains the original `writeln!()` approach for backward
 //! compatibility while callers migrate.
 
@@ -53,17 +53,17 @@ pub fn compose(
     )
 }
 
-/// Compose a SOAP prompt with Kask MCP tools available.
+/// Compose a SOAP prompt with HKask MCP tools available.
 ///
 /// Loads all templates, gathers journal data, and renders the SOAP
-/// prompt with Kask tool names included in the prompt context.
-pub fn compose_with_kask(
+/// prompt with HKask tool names included in the prompt context.
+pub fn compose_with_hkask(
     reader: &JournalReader,
     profile: Option<&Profile>,
     note: Option<&str>,
     loaded_skills: &[Skill],
     skills_base_dir: &Path,
-    kask_tool_names: &[(String, Option<String>)],
+    hkask_tool_names: &[(String, Option<String>)],
 ) -> Result<SoapPrompt> {
     let registry = PromptRegistry::with_defaults()?;
     compose_templated(
@@ -73,7 +73,7 @@ pub fn compose_with_kask(
         note,
         loaded_skills,
         skills_base_dir,
-        kask_tool_names,
+        hkask_tool_names,
         None,
     )
 }
@@ -90,7 +90,7 @@ pub fn compose_templated(
     note: Option<&str>,
     loaded_skills: &[Skill],
     skills_base_dir: &Path,
-    kask_tool_names: &[(String, Option<String>)],
+    hkask_tool_names: &[(String, Option<String>)],
     skill_registry: Option<&russell_skills::registry::RegistryCache>,
 ) -> Result<SoapPrompt> {
     use std::collections::HashMap;
@@ -133,7 +133,7 @@ pub fn compose_templated(
         })
         .collect();
 
-    let kask_tools: Vec<serde_json::Value> = kask_tool_names
+    let hkask_tools: Vec<serde_json::Value> = hkask_tool_names
         .iter()
         .map(|(name, risk)| {
             serde_json::json!({
@@ -178,8 +178,8 @@ pub fn compose_templated(
     if !knowledge.is_empty() {
         ctx.insert("knowledge_skills".to_string(), serde_json::json!(knowledge));
     }
-    if !kask_tools.is_empty() {
-        ctx.insert("kask_tools".to_string(), serde_json::json!(kask_tools));
+    if !hkask_tools.is_empty() {
+        ctx.insert("hkask_tools".to_string(), serde_json::json!(hkask_tools));
     }
 
     let (rendered, hint) = registry.render_with_hint("soap", &ctx)?;
@@ -765,7 +765,7 @@ mod tests {
     }
 
     #[test]
-    fn compose_with_kask_includes_kask_tools_section() {
+    fn compose_with_hkask_includes_hkask_tools_section() {
         let tmp = tempfile::tempdir().unwrap();
         let db = tmp.path().join("journal.db");
         let w = JournalWriter::open(&db).unwrap();
@@ -773,7 +773,7 @@ mod tests {
         let skills_dir = tmp.path().join("skills");
         std::fs::create_dir_all(&skills_dir).unwrap();
 
-        let kask_tools = vec![
+        let hkask_tools = vec![
             (
                 "paradigm_shift_query".to_string(),
                 Some("medium".to_string()),
@@ -784,19 +784,19 @@ mod tests {
             ),
         ];
 
-        let prompt = compose_with_kask(
+        let prompt = compose_with_hkask(
             &reader,
             None,
-            Some("test kask tools"),
+            Some("test hkask tools"),
             &[],
             Path::new("/nonexistent"),
-            &kask_tools,
+            &hkask_tools,
         )
         .unwrap();
 
         assert!(
-            prompt.rendered.contains("### Kask MCP tools"),
-            "should include Kask MCP tools section"
+            prompt.rendered.contains("### HKask MCP tools"),
+            "should include HKask MCP tools section"
         );
         assert!(
             prompt.rendered.contains("paradigm_shift_query"),
@@ -807,33 +807,33 @@ mod tests {
             "should list russell_host_snapshot"
         );
         assert!(
-            prompt.rendered.contains("ACTION: kask/"),
-            "should include Kask ACTION syntax"
+            prompt.rendered.contains("ACTION: hkask/"),
+            "should include HKask ACTION syntax"
         );
     }
 
     #[test]
-    fn compose_with_kask_empty_tools_no_section() {
+    fn compose_with_hkask_empty_tools_no_section() {
         let tmp = tempfile::tempdir().unwrap();
         let db = tmp.path().join("journal.db");
         let w = JournalWriter::open(&db).unwrap();
         let reader = w.reader();
 
-        let kask_tools: Vec<(String, Option<String>)> = vec![];
+        let hkask_tools: Vec<(String, Option<String>)> = vec![];
 
-        let prompt = compose_with_kask(
+        let prompt = compose_with_hkask(
             &reader,
             None,
-            Some("test empty kask"),
+            Some("test empty hkask"),
             &[],
             Path::new("/nonexistent"),
-            &kask_tools,
+            &hkask_tools,
         )
         .unwrap();
 
         assert!(
-            !prompt.rendered.contains("### Kask MCP tools"),
-            "should NOT include Kask section when no tools available"
+            !prompt.rendered.contains("### HKask MCP tools"),
+            "should NOT include HKask section when no tools available"
         );
     }
 }

@@ -76,9 +76,9 @@ probes:
     capture: stdout
     timeout: 10s
 
-  # --- Kask services -------------------------------------------------
-  - id: probe-kask-services
-    cmd: ["bash", "./scripts/probe-kask-services.sh"]
+  # --- HKask services -------------------------------------------------
+  - id: probe-hkask-services
+    cmd: ["bash", "./scripts/probe-hkask-services.sh"]
     capture: stdout
     timeout: 10s
 

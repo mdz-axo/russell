@@ -4,21 +4,21 @@
 use anyhow::{Context, Result};
 use russell_core::journal::{JournalReader, JournalWriter};
 use russell_core::paths::Paths;
-use russell_proprio::KaskHealthInput;
+use russell_proprio::HkaskHealthInput;
 
 pub async fn run(paths: &Paths) -> Result<()> {
     let journal = JournalWriter::open(&paths.journal())
         .with_context(|| format!("opening journal {}", paths.journal().display()))?;
     let reader = JournalReader::new(paths.journal());
 
-    // Perform Kask MCP health probe asynchronously before the sync proprio cycle.
-    let kask_health_raw = russell_mcp::health::probe_reachability().await;
-    let kask_input = KaskHealthInput {
-        reachable: kask_health_raw.reachable,
-        latency_ms: kask_health_raw.latency_ms,
+    // Perform HKask MCP health probe asynchronously before the sync proprio cycle.
+    let hkask_health_raw = russell_mcp::health::probe_reachability().await;
+    let hkask_input = HkaskHealthInput {
+        reachable: hkask_health_raw.reachable,
+        latency_ms: hkask_health_raw.latency_ms,
     };
 
-    let result = russell_proprio::run_once_with_kask(&journal, &reader, kask_input)
+    let result = russell_proprio::run_once_with_hkask(&journal, &reader, hkask_input)
         .context("running proprioception")?;
 
     println!("Proprioception results:");
@@ -52,18 +52,18 @@ pub async fn run(paths: &Paths) -> Result<()> {
         );
     }
 
-    // Kask MCP reachability (Phase 4C, ADR-0025 §5 — now journaled by proprio).
-    match result.kask_mcp_reachable_ms {
+    // HKask MCP reachability (Phase 4C, ADR-0025 §5 — now journaled by proprio).
+    match result.hkask_mcp_reachable_ms {
         Some(ms) => {
             println!(
-                "  kask_mcp_reachable_ms:    {ms}ms ({:?})",
-                result.kask_mcp_reachable_severity
+                "  hkask_mcp_reachable_ms:    {ms}ms ({:?})",
+                result.hkask_mcp_reachable_severity
             );
         }
         None => {
             println!(
-                "  kask_mcp_reachable_ms:    unreachable ({:?})",
-                result.kask_mcp_reachable_severity
+                "  hkask_mcp_reachable_ms:    unreachable ({:?})",
+                result.hkask_mcp_reachable_severity
             );
         }
     }

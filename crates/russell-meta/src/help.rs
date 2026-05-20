@@ -72,10 +72,10 @@ pub async fn run_help(
     paths: &Paths,
     writer: &JournalWriter,
     note: Option<&str>,
-    kask_tool_names: &[(String, Option<String>)],
+    hkask_tool_names: &[(String, Option<String>)],
 ) -> Result<HelpOutcome> {
     let cfg = ClientConfig::from_env();
-    run_help_with_config(paths, writer, note, cfg, kask_tool_names).await
+    run_help_with_config(paths, writer, note, cfg, hkask_tool_names).await
 }
 
 /// Dispatch result from calling the LLM backend.
@@ -103,7 +103,7 @@ fn compose_and_augment_soap(
     writer: &JournalWriter,
     note: Option<&str>,
     evidence_dir: &std::path::Path,
-    kask_tool_names: &[(String, Option<String>)],
+    hkask_tool_names: &[(String, Option<String>)],
 ) -> Result<SoapPrompt> {
     // Sanitize operator note input (defense against prompt injection).
     let sanitized_note = note.map(|n| {
@@ -128,17 +128,17 @@ fn compose_and_augment_soap(
     let loaded_skills = russell_skills::load_all(&paths.skills()).unwrap_or_default();
     tracing::debug!(
         count = loaded_skills.len(),
-        kask_tools = kask_tool_names.len(),
-        "loaded skills and kask tools for help session"
+        hkask_tools = hkask_tool_names.len(),
+        "loaded skills and hkask tools for help session"
     );
 
-    let soap = prompt::compose_with_kask(
+    let soap = prompt::compose_with_hkask(
         &writer.reader(),
         profile.as_ref(),
         sanitized_note.as_deref(),
         &loaded_skills,
         &paths.skills(),
-        kask_tool_names,
+        hkask_tool_names,
     )?;
 
     // ADR-0022: augment the system prompt with operator identity files.
@@ -423,7 +423,7 @@ pub async fn run_help_with_config(
     writer: &JournalWriter,
     note: Option<&str>,
     cfg: ClientConfig,
-    kask_tool_names: &[(String, Option<String>)],
+    hkask_tool_names: &[(String, Option<String>)],
 ) -> Result<HelpOutcome> {
     let session_id = Ulid::new().to_string();
     let ts_unix = russell_core::time::now_unix();
@@ -435,7 +435,7 @@ pub async fn run_help_with_config(
     info!(backend = %cfg.backend.label(), model = %cfg.model, session = %session_id, "russell help starting");
 
     // Stage 1: compose + augment SOAP.
-    let soap = compose_and_augment_soap(paths, writer, note, &evidence_dir, kask_tool_names)?;
+    let soap = compose_and_augment_soap(paths, writer, note, &evidence_dir, hkask_tool_names)?;
 
     // Stage 2: threshold gate + backend dispatch.
     let counts = {

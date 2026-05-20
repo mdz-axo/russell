@@ -173,7 +173,7 @@ status: VERIFIED
 - **ADR:** Update ADR-0003 or author ADR-0035 documenting consolidation
 
 #### Task 1.4: Typed Kask client
-- [ ] Create `kask-client` struct in `russell-mcp` with typed methods
+- [ ] Create `hkask-client` struct in `russell-mcp` with typed methods
 - [ ] Methods: `list_tools()`, `call_tool(name, args)`, `get_metrics()`
 - [ ] Deserialize `mcp-registry.json` into typed config
 - [ ] Add bearer token from env, not file
@@ -344,7 +344,7 @@ status: VERIFIED
 - **Status:** Already complete in codebase
 - **Evidence:** `russell-proprio/src/lib.rs` lines 188-237
 - `AutoimmuneGuard` struct with `enter()` and `try_enter()` methods
-- `AUTOIMMUNE` static guard wired into `run_once()`, `run_once_with()`, `run_once_with_kask()`
+- `AUTOIMMUNE` static guard wired into `run_once()`, `run_once_with()`, `run_once_with_hkask()`
 - Tests verify guard acquire/release behavior
 
 #### Task O2: Complete self-triage wiring ✅
@@ -388,7 +388,7 @@ status: VERIFIED
 - **Status:** Implemented 2026-05-19
 - **Evidence:** `russell-meta/src/action.rs`
 - Added `ActionError::NestedActionDetected` variant
-- `resolve_with_kask()` counts ACTION: lines, rejects if >1
+- `resolve_with_hkask()` counts ACTION: lines, rejects if >1
 - 4 new tests verify detection and error messages
 - All 22 action parser tests pass
 - **ADR:** [`0029-nested-action-detection.md`](../adr/0029-nested-action-detection.md)

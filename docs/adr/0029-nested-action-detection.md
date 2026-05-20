@@ -100,13 +100,13 @@ Implement nested ACTION: detection:
 
 | File | Change |
 |---|---|
-| `russell-meta/src/action.rs` | Add `NestedActionDetected` error variant, count ACTION: lines in `resolve_with_kask()` |
+| `russell-meta/src/action.rs` | Add `NestedActionDetected` error variant, count ACTION: lines in `resolve_with_hkask()` |
 
 ### Test Coverage
 
 - `nested_action_detected` — Two ACTION: patterns in response
 - `single_action_is_ok` — One ACTION: pattern (expected case)
-- `nested_action_in_kask_context` — Two ACTION: with kask tools
+- `nested_action_in_hkask_context` — Two ACTION: with hkask tools
 - `nested_action_error_message` — Verify error message mentions "prompt injection attempt"
 
 All 22 action parser tests pass.

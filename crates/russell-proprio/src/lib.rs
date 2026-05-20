@@ -83,8 +83,8 @@ pub const PROBE_TIMER_DRIFT: &str = "timer_drift_s";
 /// Probe name for the help error rate self-vital.
 pub const PROBE_HELP_ERROR_RATE: &str = "help_error_rate_pct";
 
-/// Probe name for the Kask MCP reachability self-vital (Phase 4C, ADR-0025 §5).
-pub const PROBE_KASK_MCP_REACHABLE: &str = "kask_mcp_reachable_ms";
+/// Probe name for the HKask MCP reachability self-vital (Phase 4C, ADR-0025 §5).
+pub const PROBE_HKASK_MCP_REACHABLE: &str = "hkask_mcp_reachable_ms";
 
 /// Gap 5: Probe name for remote skill discovery latency self-vital.
 pub const PROBE_REMOTE_DISCOVERY_LATENCY: &str = "remote_discovery_latency_s";
@@ -149,10 +149,10 @@ pub const ERROR_RATE_ALERT_THRESHOLD_PCT: f64 = 50.0;
 // Kask MCP reachability thresholds
 // ---------------------------------------------------------------------------
 
-/// Threshold (milliseconds) above which the kask MCP latency vital emits `warn`.
+/// Threshold (milliseconds) above which the hkask MCP latency vital emits `warn`.
 /// 2× the 2s health probe timeout.
 /// 2× the 2s health probe timeout.
-pub const KASK_LATENCY_WARN_THRESHOLD_MS: u64 = 2_000;
+pub const HKASK_LATENCY_WARN_THRESHOLD_MS: u64 = 2_000;
 
 // ---------------------------------------------------------------------------
 // Remote discovery thresholds (Gap 5)
@@ -266,13 +266,13 @@ pub struct ProprioResult {
     /// Severity of the help error rate vital.
     pub help_error_rate_severity: Severity,
 
-    // -- Kask MCP reachability (Phase 4C, ADR-0025 §5) --
-    /// Kask MCP latency in milliseconds, or `None` if the probe was not
-    /// run (no kask config) or the endpoint was unreachable.
-    /// run (no kask config) or the endpoint was unreachable.
-    pub kask_mcp_reachable_ms: Option<u64>,
-    /// Severity of the kask MCP reachability vital.
-    pub kask_mcp_reachable_severity: Severity,
+    // -- HKask MCP reachability (Phase 4C, ADR-0025 §5) --
+    /// HKask MCP latency in milliseconds, or `None` if the probe was not
+    /// run (no hkask config) or the endpoint was unreachable.
+    /// run (no hkask config) or the endpoint was unreachable.
+    pub hkask_mcp_reachable_ms: Option<u64>,
+    /// Severity of the hkask MCP reachability vital.
+    pub hkask_mcp_reachable_severity: Severity,
 
     // -- Remote discovery latency (Gap 5) --
     /// Time since last successful remote skill registry fetch, in seconds.
@@ -292,11 +292,11 @@ pub struct ProprioResult {
     pub journal_chain_intact: Option<bool>,
 }
 
-/// Input from the async Kask MCP health probe, passed into the proprio cycle
+/// Input from the async HKask MCP health probe, passed into the proprio cycle
 /// by the CLI layer (which performs the async HTTP check).
 /// by the CLI layer (which performs the async HTTP check).
 #[derive(Debug, Clone, Copy)]
-pub struct KaskHealthInput {
+pub struct HkaskHealthInput {
     /// Whether the endpoint responded.
     pub reachable: bool,
     /// Round-trip latency in milliseconds.
@@ -323,36 +323,36 @@ pub fn run_once_with(
     run_once_inner(writer, reader, timer, None)
 }
 
-/// Run the proprioception cycle once with Kask MCP health data.
-pub fn run_once_with_kask(
+/// Run the proprioception cycle once with HKask MCP health data.
+pub fn run_once_with_hkask(
     writer: &JournalWriter,
     reader: &JournalReader,
-    kask_health: KaskHealthInput,
+    hkask_health: HkaskHealthInput,
 ) -> Result<ProprioResult> {
     let _guard = AUTOIMMUNE.enter();
-    run_once_inner(writer, reader, &SystemdTimerSource, Some(kask_health))
+    run_once_inner(writer, reader, &SystemdTimerSource, Some(hkask_health))
 }
 
 /// Core proprioception logic. Called by [`run_once`], [`run_once_with`],
-/// and [`run_once_with_kask`].
+/// and [`run_once_with_hkask`].
 ///
-/// When `kask_health` is `Some`, also gathers and journals the
-/// `kask_mcp_reachable_ms` self-vital.
-/// and [`run_once_with_kask`].
+/// When `hkask_health` is `Some`, also gathers and journals the
+/// `hkask_mcp_reachable_ms` self-vital.
+/// and [`run_once_with_hkask`].
 ///
-/// When `kask_health` is `Some`, also gathers and journals the
-/// `kask_mcp_reachable_ms` self-vital.
+/// When `hkask_health` is `Some`, also gathers and journals the
+/// `hkask_mcp_reachable_ms` self-vital.
 ///
-/// When `kask_health` is `Some`, also gathers and journals the
-/// `kask_mcp_reachable_ms` self-vital.
-/// When `kask_health` is `Some`, also gathers and journals the
-/// `kask_mcp_reachable_ms` self-vital.
-/// `kask_mcp_reachable_ms` self-vital.
+/// When `hkask_health` is `Some`, also gathers and journals the
+/// `hkask_mcp_reachable_ms` self-vital.
+/// When `hkask_health` is `Some`, also gathers and journals the
+/// `hkask_mcp_reachable_ms` self-vital.
+/// `hkask_mcp_reachable_ms` self-vital.
 fn run_once_inner(
     writer: &JournalWriter,
     reader: &JournalReader,
     timer: &dyn TimerSource,
-    kask_health: Option<KaskHealthInput>,
+    hkask_health: Option<HkaskHealthInput>,
 ) -> Result<ProprioResult> {
     let now = russell_core::time::now_unix();
 
@@ -389,8 +389,8 @@ fn run_once_inner(
     // 5. Help error rate.
     let (help_error_rate_pct, error_rate_severity) = gather_help_error_rate(writer, reader, now)?;
 
-    // 6. Kask MCP reachability (Phase 4C, ADR-0025 §5).
-    let (kask_mcp_ms, kask_mcp_severity) = gather_kask_mcp_reachable(writer, now, kask_health);
+    // 6. HKask MCP reachability (Phase 4C, ADR-0025 §5).
+    let (hkask_mcp_ms, hkask_mcp_severity) = gather_hkask_mcp_reachable(writer, now, hkask_health);
 
     // 7. Remote discovery latency (Gap 5).
     let (remote_latency_s, remote_latency_severity) = gather_remote_discovery_latency(writer, now);
@@ -403,13 +403,13 @@ fn run_once_inner(
     // Descriptors: (severity, module, probe_name, value_f64, warn_threshold, alert_threshold, json_key)
     let vitals: &[(Severity, &str, &str, f64, f64, f64, &str)] = &[
         (
-            sentinel_severity,
-            "proprio/sentinel_age",
-            PROBE_SENTINEL_AGE,
-            age_s.unwrap_or(-1) as f64,
-            SENTINEL_WARN_THRESHOLD_S as f64,
-            SENTINEL_ALERT_THRESHOLD_S as f64,
-            "age_s",
+            hkask_mcp_severity,
+            "proprio/hkask_mcp",
+            PROBE_HKASK_MCP_REACHABLE,
+            hkask_mcp_ms.map(|v| v as f64).unwrap_or(-1.0),
+            HKASK_LATENCY_WARN_THRESHOLD_MS as f64,
+            HKASK_LATENCY_WARN_THRESHOLD_MS as f64,
+            "latency_ms",
         ),
         (
             stall_severity,
@@ -491,8 +491,8 @@ fn run_once_inner(
         timer_drift_severity: drift_severity,
         help_error_rate_pct,
         help_error_rate_severity: error_rate_severity,
-        kask_mcp_reachable_ms: kask_mcp_ms,
-        kask_mcp_reachable_severity: kask_mcp_severity,
+        hkask_mcp_reachable_ms: hkask_mcp_ms,
+        hkask_mcp_reachable_severity: hkask_mcp_severity,
         remote_discovery_latency_s: remote_latency_s,
         remote_discovery_latency_severity: remote_latency_severity,
         journal_chain_intact,
@@ -752,17 +752,17 @@ fn gather_help_error_rate(
     gather_f64_vital(writer, now, PROBE_HELP_ERROR_RATE, rate, thresholds, "%")
 }
 
-/// Gather the Kask MCP reachability vital (Phase 4C, ADR-0025 §5).
-fn gather_kask_mcp_reachable(
+/// Gather the HKask MCP reachability vital (Phase 4C, ADR-0025 §5).
+fn gather_hkask_mcp_reachable(
     writer: &JournalWriter,
     now: i64,
-    kask_health: Option<KaskHealthInput>,
+    hkask_health: Option<HkaskHealthInput>,
 ) -> (Option<u64>, Severity) {
-    let (kask_ms, sev) = match kask_health {
+    let (hkask_ms, sev) = match hkask_health {
         Some(h) => {
             match (h.reachable, h.latency_ms) {
                 (true, Some(ms)) => {
-                    let sev = if ms > KASK_LATENCY_WARN_THRESHOLD_MS {
+                    let sev = if ms > HKASK_LATENCY_WARN_THRESHOLD_MS {
                         Severity::Warn
                     } else {
                         Severity::Info
@@ -780,26 +780,26 @@ fn gather_kask_mcp_reachable(
             }
         }
         None => {
-            // No kask health probe run — don't journal.
+            // No hkask health probe run — don't journal.
             return (None, Severity::Info);
         }
     };
 
     // Write sample: value is latency_ms when known, -1 when unreachable.
-    let sample_value = kask_ms.map(|v| v as f64).unwrap_or(-1.0);
+    let sample_value = hkask_ms.map(|v| v as f64).unwrap_or(-1.0);
     if let Err(e) = writer.append_sample(
         now,
         Scope::Self_,
-        PROBE_KASK_MCP_REACHABLE,
+        PROBE_HKASK_MCP_REACHABLE,
         Some(sample_value),
         None,
         Some("ms"),
     ) {
-        warn!(error = %e, "proprio: failed to write {PROBE_KASK_MCP_REACHABLE} sample");
+        warn!(error = %e, "proprio: failed to write {PROBE_HKASK_MCP_REACHABLE} sample");
     }
 
-    debug!(latency_ms = ?kask_ms, reachable = kask_health.map(|h| h.reachable), severity = ?sev, "proprio: {PROBE_KASK_MCP_REACHABLE}");
-    (kask_ms, sev)
+    debug!(latency_ms = ?hkask_ms, reachable = hkask_health.map(|h| h.reachable), severity = ?sev, "proprio: {PROBE_HKASK_MCP_REACHABLE}");
+    (hkask_ms, sev)
 }
 
 /// Gap 5: Gather the remote discovery latency vital.

@@ -39,7 +39,7 @@
 - **Saved**: ~83 lines
 - **Method**: Moved from `help.rs` to `russell-mcp/src/registry.rs`
 
-### 8. compose_with_kask Consolidation ✓ (NEW)
+### 8. compose_with_hkask Consolidation ✓ (NEW)
 - **Saved**: ~278 lines
 - **Method**: Deleted 303-line duplicate implementation, replaced with 25-line thin wrappers around `compose_templated()`
 - **Files**: `crates/russell-meta/src/prompt.rs`
@@ -86,5 +86,5 @@
 
 - All tests passing
 - Workspace compiles cleanly
-- "Less is more" refactoring of `compose_with_kask` eliminated 278 lines of duplicated code
+- "Less is more" refactoring of `compose_with_hkask` eliminated 278 lines of duplicated code
 - Thin wrapper pattern preserves API compatibility while consolidating implementation

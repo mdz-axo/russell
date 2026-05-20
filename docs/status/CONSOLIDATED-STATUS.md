@@ -64,7 +64,7 @@ of every meaningful development session.
   `install`, `prune`, `restore`, `retire`), `workshop`,
   `okapi-probe`, `proprio`, `mcp-tools`.
   `chat` is split into 7 submodules (consent, commands, execute,
-  kask, objective, spinner, history) for maintainability.
+  hkask, objective, spinner, history) for maintainability.
 - 218 tests passing.
 - 21 scenario tests passing (`scenario-tests.sh`).
 - 12 skills loaded (okapi-watcher, web-search, skill-discovery,
@@ -240,11 +240,11 @@ build→install→test→sentinel flow.
   used in chat.rs consent path; `eval_checks` resolved from skill manifests and
   passed through `ResolvedAction::Intervention`. Rollback strategies
   (RollbackId, NoneNeeded, Reboot) propagated from manifest to dispatcher.
-- [x] **KaskTool IDRS parity**: evidence bundles for Kask MCP tool calls
-  (`evidence/kask/<tool>/<ts>/result.txt + event.json`), per-tool timeout (30s/120s),
+- [x] **HKaskTool IDRS parity**: evidence bundles for HKask MCP tool calls
+  (`evidence/hkask/<tool>/<ts>/result.txt + event.json`), per-tool timeout (30s/120s),
   unified `RiskBand` enum (no more string comparison).
 - [x] **AutoimmuneGuard wired**: `AUTOIMMUNE` static guard acquired in
-  `run_once()`, `run_once_with()`, and `run_once_with_kask()`.
+  `run_once()`, `run_once_with()`, and `run_once_with_hkask()`.
 - [x] **Sentinel watchdog**: `TimeoutStartSec=120` on `russell-sentinel.service`.
 
 ## 4. Open questions
