@@ -24,13 +24,6 @@ struct OkapiTagsResponse {
 }
 
 /// OpenAI-compatible LLM client. Targets Okapi at localhost:11435.
-///
-/// Construction via [`OkapiClient::new`] **validates the model name**
-/// against Okapi's actual loaded model list (`/api/tags`). If the
-/// candidate model name does not match any loaded model exactly, the
-/// constructor performs a fuzzy match and returns the closest real
-/// model name. If Okapi is unreachable, the candidate is used as-is
-/// with a warning logged.
 #[derive(Debug, Clone)]
 pub struct OkapiClient {
     base_url: String,
@@ -41,16 +34,6 @@ pub struct OkapiClient {
 
 impl OkapiClient {
     /// Construct from a resolved [`ClientConfig`], **resolving the
-    /// model name** against Okapi's `/api/tags` list.
-    ///
-    /// The model name in `cfg` is treated as a candidate. The
-    /// constructor queries Okapi for loaded models, finds the best
-    /// fuzzy match, and stores the **exact** model name reported by
-    /// Okapi. This prevents stale or misspelled model names from
-    /// reaching the chat-completions endpoint.
-    ///
-    /// # Errors
-    /// Returns [`DoctorError::Config`] if the HTTP client cannot be built.
     pub async fn new(cfg: &ClientConfig) -> Result<Self> {
         let base_url = cfg
             .base_url
@@ -157,16 +140,6 @@ impl LlmClient for OkapiClient {
 }
 
 /// Resolve a candidate model name against Okapi's actual model list.
-///
-/// Queries `/api/tags` to get the set of loaded models,
-/// then finds the best fuzzy match (Jaro-Winkler ≥ 0.80).
-/// Returns the exact model name from Okapi on match, or the
-/// original candidate if Okapi is unreachable or has no models.
-///
-/// This is the **single resolution gate**. Every model name passed
-/// to Okapi's chat-completions endpoint must go through this function
-/// (via [`OkapiClient::new`], [`resolve_and_correct_model`], or direct
-/// call for model-listing UIs).
 pub async fn resolve_model_name(base_url: &str, candidate: &str, http: &reqwest::Client) -> String {
     let tags_url = format!(
         "{}/api/tags",
@@ -247,16 +220,6 @@ pub async fn resolve_model_name(base_url: &str, candidate: &str, http: &reqwest:
 }
 
 /// Resolve the model name against Okapi's actual model list, and if
-/// the resolved name differs from the configured name, **correct the
-/// env file** so the fix persists across restarts.
-///
-/// Searches Russell's env-file discovery order (config dir first,
-/// then repo root, then cwd). If a `russell.env` or `.env` file
-/// contains `RUSSELL_DOCTOR_MODEL=<old value>`, the line is
-/// replaced with the resolved name. Also updates the process
-/// environment so subsequent reads see the correction.
-///
-/// Returns the resolved (actual) model name.
 pub async fn resolve_and_correct_model(
     cfg: &ClientConfig,
     config_harness_dir: &std::path::Path,
@@ -458,4 +421,74 @@ fn parse_completion(body: &str) -> Result<ParsedCompletion> {
         prompt_tokens,
         completion_tokens,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parses_standard_openai_response() {
+        let body = r#"{
+            "id":"x",
+            "model":"deepseekv4pro",
+            "choices":[{"message":{"role":"assistant","content":"hello"}}],
+            "usage":{"prompt_tokens":10,"completion_tokens":2}
+        }"#;
+        let p = parse_completion(body).unwrap();
+        assert_eq!(p.content, "hello");
+        assert_eq!(p.model.as_deref(), Some("deepseekv4pro"));
+        assert_eq!(p.prompt_tokens, Some(10));
+    }
+
+    #[test]
+    fn promotes_reasoning_details_when_content_null() {
+        let body = r#"{
+            "choices":[{"message":{"role":"assistant","content":null,
+              "reasoning_details":[{"text":"thought"}]}}]
+        }"#;
+        let p = parse_completion(body).unwrap();
+        assert_eq!(p.content, "thought");
+    }
+
+    #[test]
+    fn promotes_reasoning_content_when_content_missing() {
+        let body = r#"{
+            "choices":[{"message":{"role":"assistant",
+              "reasoning_content":"thought2"}}]
+        }"#;
+        let p = parse_completion(body).unwrap();
+        assert_eq!(p.content, "thought2");
+    }
+
+    #[test]
+    fn rejects_response_with_no_content() {
+        let body = r#"{"choices":[{"message":{"role":"assistant"}}]}"#;
+        assert!(matches!(
+            parse_completion(body),
+            Err(DoctorError::BadResponse(_))
+        ));
+    }
+
+    #[test]
+    fn maps_404_to_model_not_found() {
+        let err = map_http_status_error(
+            404,
+            "no such model".into(),
+            None,
+            "http://127.0.0.1:11435/v1/chat/completions",
+        );
+        assert!(matches!(err, DoctorError::ModelNotFound(_)));
+    }
+
+    #[test]
+    fn maps_429_with_retry_after() {
+        let err = map_http_status_error(429, "rate".into(), Some(30), "");
+        assert!(matches!(
+            err,
+            DoctorError::RateLimited {
+                retry_after_seconds: Some(30)
+            }
+        ));
+    }
 }

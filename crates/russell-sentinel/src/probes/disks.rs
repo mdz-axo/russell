@@ -61,3 +61,25 @@ impl_probe!(
     "%",
     disk_root_used_pct
 );
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn disk_io_pressure_returns_something_on_linux() {
+        if !std::path::Path::new("/proc/pressure/io").exists() {
+            return;
+        }
+        let some = disk_io_pressure_some_pct();
+        assert!(some.is_some(), "io pressure some should be readable");
+        if let Some(v) = some {
+            assert!((0.0..=100.0).contains(&v), "pressure pct 0-100, got {v}");
+        }
+        let full = disk_io_pressure_full_pct();
+        assert!(full.is_some(), "io pressure full should be readable");
+        if let Some(v) = full {
+            assert!((0.0..=100.0).contains(&v), "pressure pct 0-100, got {v}");
+        }
+    }
+}

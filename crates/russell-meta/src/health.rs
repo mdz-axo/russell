@@ -32,14 +32,6 @@ pub fn health_url_from_base(base_url: &str) -> String {
 }
 
 /// Ensure Okapi is reachable, starting it if necessary.
-///
-/// Returns `true` if Okapi responded to a health check (either
-/// immediately or after an auto-start attempt). Returns `false` if
-/// Okapi could not be reached even after attempting to start it.
-///
-/// After a cold start, Okapi needs time for GPU discovery before it
-/// can route inference requests (~10 s). This function polls until the
-/// completions endpoint responds (up to ~15 s post-start).
 pub async fn ensure_ready(base_url: &str) -> bool {
     let tags_url = health_url_from_base(base_url);
 
@@ -110,5 +102,34 @@ async fn start_service() {
         Err(e) => {
             warn!(error = %e, "failed to run systemctl --user start okapi");
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn health_url_strips_v1() {
+        assert_eq!(
+            health_url_from_base("http://127.0.0.1:11435/v1"),
+            "http://127.0.0.1:11435/api/tags"
+        );
+    }
+
+    #[test]
+    fn health_url_no_v1() {
+        assert_eq!(
+            health_url_from_base("http://127.0.0.1:11435"),
+            "http://127.0.0.1:11435/api/tags"
+        );
+    }
+
+    #[test]
+    fn health_url_trailing_slash() {
+        assert_eq!(
+            health_url_from_base("http://127.0.0.1:11435/v1/"),
+            "http://127.0.0.1:11435/api/tags"
+        );
     }
 }

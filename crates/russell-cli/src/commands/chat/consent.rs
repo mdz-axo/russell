@@ -107,3 +107,37 @@ pub fn is_refusal(input: &str) -> bool {
             | "hold on"
     )
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn affirmative_matches_exact_only() {
+        assert!(is_affirmative("yes"));
+        assert!(is_affirmative("  ok  "));
+        assert!(is_affirmative("DO IT"));
+        // These must NOT match — they're phrases that could appear
+        // in LLM output embedded in longer text.
+        assert!(!is_affirmative("If you'd like to do it, type /approve"));
+        assert!(!is_affirmative("yes but also no"));
+        assert!(!is_affirmative("okay sure whatever you say"));
+    }
+
+    #[test]
+    fn refusal_matches() {
+        assert!(is_refusal("/deny"));
+        assert!(is_refusal("no"));
+        assert!(is_refusal("cancel"));
+        assert!(!is_refusal("no way jose")); // not exact match
+    }
+
+    #[test]
+    fn consent_expiry_constant_is_reasonable() {
+        // 5 minutes — long enough for the operator to read and decide,
+        // short enough to prevent stale approvals.
+        assert_eq!(CONSENT_EXPIRY_SECS, 300);
+        assert!(CONSENT_EXPIRY_SECS >= 60);
+        assert!(CONSENT_EXPIRY_SECS <= 600);
+    }
+}

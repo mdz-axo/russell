@@ -44,9 +44,4 @@ pub use help::{HelpOutcome, run_help};
 pub const JACK_PERSONA: &str = include_str!("../prompts/jack.md");
 
 /// The Jack chat persona — used in `russell chat` interactive mode.
-///
-/// More conversational, supports multi-turn dialogue, and gives Jack
-/// permission to ask clarifying questions and design probes.
-///
-/// Source of truth: `crates/russell-meta/prompts/jack-chat.md`.
 pub const JACK_CHAT_PERSONA: &str = include_str!("../prompts/jack-chat.md");

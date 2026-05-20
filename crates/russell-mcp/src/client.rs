@@ -34,23 +34,23 @@ use crate::types::{McpToolDefinition, ToolCallResult};
 pub trait McpClient: Send + Sync {
     /// Connect to the MCP endpoint and perform health check.
     async fn connect(&mut self) -> Result<()>;
-
+    
     /// List available MCP tools.
     async fn list_tools(&self) -> Result<Vec<McpToolDefinition>>;
-
+    
     /// Call an MCP tool by name with optional arguments.
     async fn call_tool(
         &self,
         name: &str,
         arguments: Option<serde_json::Value>,
     ) -> Result<ToolCallResult>;
-
+    
     /// Server name from last successful connection.
     fn server_name(&self) -> Option<&str>;
-
+    
     /// Whether the client is initialized (completed health check).
     fn is_initialized(&self) -> bool;
-
+    
     /// The configured endpoint URL.
     fn endpoint(&self) -> &str;
 }
@@ -60,11 +60,11 @@ impl McpClient for HKaskMcpClient {
     async fn connect(&mut self) -> Result<()> {
         self.connect().await
     }
-
+    
     async fn list_tools(&self) -> Result<Vec<McpToolDefinition>> {
         self.list_tools().await
     }
-
+    
     async fn call_tool(
         &self,
         name: &str,
@@ -72,15 +72,15 @@ impl McpClient for HKaskMcpClient {
     ) -> Result<ToolCallResult> {
         self.call_tool(name, arguments).await
     }
-
+    
     fn server_name(&self) -> Option<&str> {
         self.server_name()
     }
-
+    
     fn is_initialized(&self) -> bool {
         self.is_initialized()
     }
-
+    
     fn endpoint(&self) -> &str {
         self.endpoint()
     }
@@ -477,3 +477,64 @@ fn map_reqwest_error(e: &reqwest::Error) -> McpError {
 }
 
 // ── Tests ──────────────────────────────────────────────────────────
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn loopback_ipv4_accepted() {
+        assert!(validate_endpoint("http://127.0.0.1:18100").is_ok());
+    }
+
+    #[test]
+    fn loopback_ipv6_accepted() {
+        assert!(validate_endpoint("http://[::1]:18100").is_ok());
+    }
+
+    #[test]
+    fn localhost_accepted() {
+        assert!(validate_endpoint("http://localhost:18100").is_ok());
+    }
+
+    #[test]
+    fn remote_ipv4_rejected() {
+        assert!(validate_endpoint("http://192.168.1.100:18100").is_err());
+        assert!(validate_endpoint("http://10.0.0.1:18100").is_err());
+        assert!(validate_endpoint("http://8.8.8.8:18100").is_err());
+    }
+
+    #[test]
+    fn remote_hostname_rejected() {
+        assert!(validate_endpoint("http://kask.example.com:18100").is_err());
+    }
+
+    #[test]
+    fn https_loopback_accepted() {
+        assert!(validate_endpoint("https://127.0.0.1:18100").is_ok());
+    }
+
+    #[test]
+    fn client_construction_validates_endpoint() {
+        let cfg = HKaskMcpConfig {
+            endpoint: "http://192.168.1.1:18100".into(),
+            token: None,
+            tool_ttl: std::time::Duration::from_secs(300),
+            timeout: std::time::Duration::from_secs(30),
+        };
+        assert!(HKaskMcpClient::new(cfg).is_err());
+    }
+
+    #[test]
+    fn client_construction_succeeds_for_loopback() {
+        let cfg = HKaskMcpConfig {
+            endpoint: "http://127.0.0.1:18100".into(),
+            token: Some("test-token".into()),
+            tool_ttl: std::time::Duration::from_secs(300),
+            timeout: std::time::Duration::from_secs(30),
+        };
+        let client = HKaskMcpClient::new(cfg).unwrap();
+        assert!(!client.is_initialized());
+        assert_eq!(client.endpoint(), "http://127.0.0.1:18100");
+    }
+}

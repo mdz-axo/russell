@@ -157,3 +157,4 @@ fn find_repo_root(start: &std::path::Path) -> Option<std::path::PathBuf> {
     }
     None
 }
+

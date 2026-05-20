@@ -557,3 +557,218 @@ pub enum RegistryError {
 
 // Safety scanner types and functions are now in safety.rs.
 // They are re-exported at the top of this module for backward compatibility.
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn test_entry(
+        status: LifecycleStatus,
+        version: &str,
+        symptoms: Vec<&str>,
+        source: SkillSource,
+    ) -> RegistryEntry {
+        let bundled = matches!(source, SkillSource::Bundled);
+        RegistryEntry::new_default(
+            status,
+            version,
+            "2026-05-01",
+            symptoms.into_iter().map(String::from).collect(),
+            source,
+            "2026-05-01",
+            bundled,
+        )
+    }
+
+    #[test]
+    fn empty_cache_has_no_gaps() {
+        let cache = RegistryCache::new();
+        let gaps = cache.coverage_gaps(&["vram_oom"]);
+        assert_eq!(gaps.len(), 1);
+        assert_eq!(gaps[0], "vram_oom");
+    }
+
+    #[test]
+    fn cache_detects_coverage() {
+        let mut cache = RegistryCache::new();
+        cache.upsert(
+            "test-skill",
+            test_entry(
+                LifecycleStatus::Active,
+                "0.1.0",
+                vec!["vram_oom"],
+                SkillSource::Bundled,
+            ),
+        );
+        let gaps = cache.coverage_gaps(&["vram_oom", "swap_pressure"]);
+        assert_eq!(gaps, vec!["swap_pressure"]);
+    }
+
+    #[test]
+    fn lookup_symptom_finds_active() {
+        let mut cache = RegistryCache::new();
+        cache.upsert(
+            "active-skill",
+            test_entry(
+                LifecycleStatus::Active,
+                "1.0.0",
+                vec!["vram_oom"],
+                SkillSource::Bundled,
+            ),
+        );
+        cache.upsert(
+            "retired-skill",
+            test_entry(
+                LifecycleStatus::Retired,
+                "0.0.1",
+                vec!["vram_oom"],
+                SkillSource::Manual,
+            ),
+        );
+        let results = cache.lookup_symptom("vram_oom");
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].version, "1.0.0");
+    }
+
+    #[test]
+    fn staleness_detection_works() {
+        assert!(RegistryCache::is_stale("2025-11-01", "2026-05-13"));
+        assert!(!RegistryCache::is_stale("2026-05-01", "2026-05-13"));
+    }
+
+    // Safety scanner tests have moved to registry::safety::tests.
+
+    #[test]
+    fn record_execution_increments_probe_runs() {
+        let mut cache = RegistryCache::new();
+        cache.upsert(
+            "test-skill",
+            test_entry(
+                LifecycleStatus::Active,
+                "0.1.0",
+                vec!["vram_oom"],
+                SkillSource::Bundled,
+            ),
+        );
+        cache.record_execution("test-skill", true, 50, None);
+        assert_eq!(cache.skills["test-skill"].probe_runs, 1);
+        assert_eq!(cache.skills["test-skill"].recent_probe_failures, 0);
+        assert!(cache.skills["test-skill"].last_probe_run_at.is_some());
+        assert!(cache.skills["test-skill"].avg_probe_duration_ms.is_some());
+    }
+
+    #[test]
+    fn record_execution_tracks_failures() {
+        let mut cache = RegistryCache::new();
+        let mut entry = test_entry(
+            LifecycleStatus::Active,
+            "0.1.0",
+            vec!["vram_oom"],
+            SkillSource::Bundled,
+        );
+        entry.probe_runs = 5;
+        entry.recent_probe_failures = 1;
+        cache.upsert("test-skill", entry);
+        cache.record_execution("test-skill", false, 120, Some("connection refused"));
+        assert_eq!(cache.skills["test-skill"].probe_runs, 6);
+        assert_eq!(cache.skills["test-skill"].recent_probe_failures, 2);
+        assert_eq!(
+            cache.skills["test-skill"].last_error.as_deref(),
+            Some("connection refused")
+        );
+    }
+
+    #[test]
+    fn record_execution_updates_ewma() {
+        let mut cache = RegistryCache::new();
+        let mut entry = test_entry(
+            LifecycleStatus::Active,
+            "0.1.0",
+            vec!["vram_oom"],
+            SkillSource::Bundled,
+        );
+        entry.probe_runs = 1;
+        entry.avg_probe_duration_ms = Some(100.0);
+        cache.upsert("test-skill", entry);
+        cache.record_execution("test-skill", true, 200, None);
+        let ewma = cache.skills["test-skill"].avg_probe_duration_ms.unwrap();
+        assert!(
+            (ewma - 120.0).abs() < 0.01,
+            "EWMA should be ~120 (0.2*200 + 0.8*100), got {ewma}"
+        );
+    }
+
+    #[test]
+    fn record_execution_noop_on_missing_skill() {
+        let mut cache = RegistryCache::new();
+        cache.record_execution("nonexistent", false, 0, None);
+        assert!(cache.skills.is_empty());
+        cache.record_execution("nonexistent", true, 10, None);
+        assert!(cache.skills.is_empty());
+    }
+
+    #[test]
+    fn record_intervention_increments() {
+        let mut cache = RegistryCache::new();
+        cache.upsert(
+            "test-skill",
+            test_entry(
+                LifecycleStatus::Active,
+                "0.1.0",
+                vec!["vram_oom"],
+                SkillSource::Bundled,
+            ),
+        );
+        cache.record_intervention("test-skill", true, None);
+        assert_eq!(cache.skills["test-skill"].intervention_runs, 1);
+        assert_eq!(cache.skills["test-skill"].recent_intervention_failures, 0);
+        cache.record_intervention("test-skill", false, Some("timeout"));
+        assert_eq!(cache.skills["test-skill"].intervention_runs, 2);
+        assert_eq!(cache.skills["test-skill"].recent_intervention_failures, 1);
+        assert_eq!(
+            cache.skills["test-skill"].last_error.as_deref(),
+            Some("timeout")
+        );
+    }
+
+    #[test]
+    fn remove_entry_returns_entry() {
+        let mut cache = RegistryCache::new();
+        cache.upsert(
+            "test-skill",
+            test_entry(
+                LifecycleStatus::Active,
+                "0.1.0",
+                vec![],
+                SkillSource::Workshop,
+            ),
+        );
+        let removed = cache.remove_entry("test-skill");
+        assert!(removed.is_some());
+        assert!(!cache.skills.contains_key("test-skill"));
+    }
+
+    // Quality scoring and freshness tests have moved to registry::health::tests.
+    // The delegating methods on RegistryCache are tested transitively.
+
+    #[test]
+    fn with_update_persists_changes() {
+        let tmp = tempfile::tempdir().unwrap();
+        let path = tmp.path().join("local-cache.yaml");
+        RegistryCache::with_update(&path, |cache| {
+            cache.upsert(
+                "test-skill",
+                test_entry(
+                    LifecycleStatus::Active,
+                    "0.1.0",
+                    vec!["test"],
+                    SkillSource::Workshop,
+                ),
+            );
+        })
+        .unwrap();
+        let loaded = RegistryCache::load(&path).unwrap();
+        assert!(loaded.skills.contains_key("test-skill"));
+        assert_eq!(loaded.skills["test-skill"].probe_runs, 0);
+    }
+}

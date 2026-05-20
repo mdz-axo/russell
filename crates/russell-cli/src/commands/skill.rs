@@ -643,13 +643,6 @@ fn list_archived_skills(paths: &Paths) -> Result<String> {
 }
 
 /// Write a full skill manifest from stdin.
-/// Reads YAML from stdin, safety-scans it, validates it against the
-/// manifest schema, writes it to `skills/<name>/manifest.yaml`, and
-/// registers the skill in the registry cache.
-///
-/// If `name` is provided, it must match the `id` field in the YAML.
-/// If `name` is `None`, the skill name is extracted from the YAML's
-/// `id` field.
 pub fn put(paths: &Paths, name: Option<&str>) -> Result<()> {
     use russell_skills::registry::{
         LifecycleStatus, RegistryCache, RegistryEntry, SafetyScan, SkillSource,

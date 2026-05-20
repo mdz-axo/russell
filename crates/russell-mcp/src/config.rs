@@ -16,13 +16,13 @@ use crate::error::Result;
 pub trait McpConfig {
     /// Get the endpoint URL.
     fn endpoint(&self) -> &str;
-
+    
     /// Get the bearer token (if configured).
     fn token(&self) -> Option<&str>;
-
+    
     /// Validate the configuration (e.g., loopback check).
     fn validate(&self) -> Result<()>;
-
+    
     /// Whether a token is configured (can authenticate).
     fn has_token(&self) -> bool;
 }
@@ -31,15 +31,15 @@ impl McpConfig for HKaskMcpConfig {
     fn endpoint(&self) -> &str {
         &self.endpoint
     }
-
+    
     fn token(&self) -> Option<&str> {
         self.token.as_deref()
     }
-
+    
     fn validate(&self) -> Result<()> {
         self.validate()
     }
-
+    
     fn has_token(&self) -> bool {
         self.has_token()
     }
@@ -127,5 +127,32 @@ impl HKaskMcpConfig {
     /// Whether the client has a token configured (can authenticate).
     pub fn has_token(&self) -> bool {
         self.token.is_some()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn default_config_is_loopback() {
+        let cfg = HKaskMcpConfig {
+            endpoint: DEFAULT_ENDPOINT.to_owned(),
+            token: Some("test-token".into()),
+            tool_ttl: Duration::from_secs(DEFAULT_TOOL_TTL_SECS),
+            timeout: Duration::from_secs(DEFAULT_TIMEOUT_SECS),
+        };
+        assert!(cfg.validate().is_ok());
+    }
+
+    #[test]
+    fn remote_endpoint_rejected() {
+        let cfg = HKaskMcpConfig {
+            endpoint: "http://192.168.1.100:9500/mcp".to_owned(),
+            token: Some("test-token".into()),
+            tool_ttl: Duration::from_secs(300),
+            timeout: Duration::from_secs(30),
+        };
+        assert!(cfg.validate().is_err());
     }
 }

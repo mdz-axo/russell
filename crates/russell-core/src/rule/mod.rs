@@ -403,6 +403,17 @@ fn default_rules() -> Vec<Rule> {
     file.rule
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::event::Severity;
+
+    #[test]
+    fn empty_ruleset_returns_info() {
+        let rs = RuleSet::new();
+        assert_eq!(rs.evaluate("mem_available_mib", 100.0), Severity::Info);
+    }
+
     #[test]
     fn defaults_mem_warn_below() {
         let rs = RuleSet::with_defaults();

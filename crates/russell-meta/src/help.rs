@@ -67,18 +67,6 @@ pub struct HelpOutcome {
 }
 
 /// Run the Nurse flow end to end: compose SOAP, call LLM (or fall
-/// back), journal the session, return a print-ready response.
-///
-/// `paths` and `writer` come from the CLI. The CLI is the only caller.
-///
-/// `kask_tool_names` is a list of (tool_name, risk_band) pairs from
-/// the Kask MCP tool registry (ADR-0025). Empty if Kask is unreachable.
-///
-/// # Errors
-///
-/// Returns a crate error if the filesystem write or journal write fails.
-/// Provider errors are *caught* — the fallback handles them and
-/// the function returns success with `skip_reason` set.
 pub async fn run_help(
     paths: &Paths,
     writer: &JournalWriter,
@@ -524,5 +512,65 @@ fn error_kind_of(e: &DoctorError) -> String {
         DoctorError::Skill(_) => "skill".into(),
         DoctorError::RiskGate(_) => "risk_gate".into(),
         DoctorError::Other(_) => "other".into(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::client::EscalateMin;
+
+    #[tokio::test]
+    async fn offline_path_produces_fallback_outcome() {
+        let tmp = tempfile::tempdir().unwrap();
+        let paths = Paths::rooted(tmp.path());
+        paths.ensure_dirs().unwrap();
+        let writer = JournalWriter::open(&paths.journal()).unwrap();
+
+        let cfg = ClientConfig {
+            backend: Backend::Offline,
+            model: "test".into(),
+            base_url: None,
+            api_key: None,
+            timeout: std::time::Duration::from_secs(5),
+            escalate_min: EscalateMin::Alert,
+        };
+        let out = run_help_with_config(&paths, &writer, Some("unit test"), cfg, &[])
+            .await
+            .unwrap();
+
+        assert!(out.skip_reason.is_some());
+        assert_eq!(out.backend, "offline");
+        assert!(out.response.contains("Offline"));
+        assert!(out.evidence_dir.join("soap.md").exists());
+        assert!(out.evidence_dir.join("transcript.jsonl").exists());
+
+        // Verify the help_sessions row landed.
+        let reader = russell_core::journal::JournalReader::new(paths.journal());
+        assert!(reader.recent(1).unwrap().iter().any(|r| r.action == "help"));
+    }
+
+    #[tokio::test]
+    async fn mock_path_produces_ok_outcome() {
+        let tmp = tempfile::tempdir().unwrap();
+        let paths = Paths::rooted(tmp.path());
+        paths.ensure_dirs().unwrap();
+        let writer = JournalWriter::open(&paths.journal()).unwrap();
+
+        let cfg = ClientConfig {
+            backend: Backend::Mock,
+            model: "test".into(),
+            base_url: None,
+            api_key: None,
+            timeout: std::time::Duration::from_secs(5),
+            escalate_min: EscalateMin::Always,
+        };
+        let out = run_help_with_config(&paths, &writer, None, cfg, &[])
+            .await
+            .unwrap();
+
+        assert!(out.skip_reason.is_none());
+        assert_eq!(out.backend, "mock");
+        assert!(out.response.contains("Mock Jack"));
     }
 }

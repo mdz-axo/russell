@@ -221,3 +221,72 @@ impl ProbeCollector for ProcTopMemPct {
         proc_top_mem_pct()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn proc_total_count_returns_something_on_linux() {
+        if !std::path::Path::new("/proc").exists() {
+            return;
+        }
+        let count = proc_total_count();
+        assert!(count.is_some());
+        assert!(count.unwrap() > 0.0, "expected at least one process");
+    }
+
+    #[test]
+    fn proc_zombie_count_is_non_negative() {
+        if !std::path::Path::new("/proc").exists() {
+            return;
+        }
+        let count = proc_zombie_count();
+        assert!(count.is_some());
+        assert!(count.unwrap() >= 0.0);
+    }
+
+    #[test]
+    fn proc_stuck_count_is_non_negative() {
+        if !std::path::Path::new("/proc").exists() {
+            return;
+        }
+        let count = proc_stuck_count();
+        assert!(count.is_some());
+        assert!(count.unwrap() >= 0.0);
+    }
+
+    #[test]
+    fn proc_top_cpu_name_returns_something_on_linux() {
+        if !std::path::Path::new("/proc").exists() {
+            return;
+        }
+        let name = proc_top_cpu_name();
+        assert!(name.is_some());
+        assert!(!name.unwrap().is_empty());
+    }
+
+    #[test]
+    fn proc_top_mem_name_returns_something_on_linux() {
+        if !std::path::Path::new("/proc").exists() {
+            return;
+        }
+        let name = proc_top_mem_name();
+        assert!(name.is_some());
+        assert!(!name.unwrap().is_empty());
+    }
+
+    #[test]
+    fn proc_top_mem_pct_is_percentage() {
+        if !std::path::Path::new("/proc").exists() {
+            return;
+        }
+        let pct = proc_top_mem_pct();
+        assert!(pct.is_some());
+        let v = pct.unwrap();
+        assert!(
+            (0.0..=100.0).contains(&v),
+            "memory pct should be 0-100, got {v}"
+        );
+    }
+}

@@ -72,13 +72,6 @@ impl InferenceHint {
 }
 
 /// Parse the `[inference]` TOML-style header from a template body.
-///
-/// Returns `(hint, stripped_body)`. If no header is present, hint is None
-/// and the body is returned unchanged.
-///
-/// The `[inference]` block may be preceded by a Jinja comment `{# ... #}`.
-/// The parser skips any such comment and leading whitespace before looking
-/// for the `[inference]` tag.
 fn parse_inference_header(body: &str) -> (Option<InferenceHint>, &str) {
     // Skip leading Jinja comment block if present.
     let mut search_start = body;
@@ -418,21 +411,6 @@ pub struct KnowledgeSlot {
 }
 
 /// Select knowledge slots that fit within the token budget using
-/// 0/1 knapsack optimization. Maximizes total value (relevance × token_estimate)
-/// while respecting the budget constraint.
-///
-/// # Algorithm
-///
-/// Standard 0/1 knapsack DP. O(n × budget_tokens) time and space.
-/// For typical inputs (n ≤ 20 skills, budget ≤ 3000 tokens), this
-/// is negligible (~60k operations).
-///
-/// # Value calculation
-///
-/// `slot_value = relevance × token_estimate × 1_000_000` (scaled to u64)
-///
-/// This ensures high-relevance knowledge gets priority, but token-heavy
-/// knowledge is penalized proportionally.
 pub fn select_knowledge(slots: &[KnowledgeSlot], budget_tokens: usize) -> Vec<&KnowledgeSlot> {
     let n = slots.len();
     if n == 0 || budget_tokens == 0 {
@@ -440,10 +418,7 @@ pub fn select_knowledge(slots: &[KnowledgeSlot], budget_tokens: usize) -> Vec<&K
     }
 
     let budget = budget_tokens.min(65535);
-    let weights: Vec<usize> = slots
-        .iter()
-        .map(|s| s.token_estimate.min(budget + 1))
-        .collect();
+    let weights: Vec<usize> = slots.iter().map(|s| s.token_estimate.min(budget + 1)).collect();
     let values: Vec<u64> = slots
         .iter()
         .map(|s| (s.relevance * s.token_estimate as f64 * 1_000_000.0) as u64)
@@ -474,19 +449,6 @@ pub fn select_knowledge(slots: &[KnowledgeSlot], budget_tokens: usize) -> Vec<&K
 }
 
 /// Score a knowledge skill's relevance based on symptom overlap
-/// with the current alert state.
-///
-/// `skill_symptoms` — symptoms the knowledge skill covers (catalog entries
-/// like "vram_oom", "llm_slow").
-/// `active_symptoms` — signals derived from recent events (probe names,
-/// keywords like "vram", "gpu", "swap", "timeout").
-///
-/// Matching is **keyword-based**: a skill symptom "vram_oom" matches if
-/// any active symptom contains "vram" or "oom" as a substring, or vice versa.
-/// This bridges the vocabulary gap between the formal symptom catalog and
-/// the runtime signals extracted from journal events.
-///
-/// Returns 0.0 if no overlap, up to 1.0 for full coverage.
 pub fn score_knowledge_relevance(skill_symptoms: &[String], active_symptoms: &[String]) -> f64 {
     if skill_symptoms.is_empty() || active_symptoms.is_empty() {
         // Knowledge with no symptoms gets a base relevance (always somewhat useful).
@@ -538,20 +500,6 @@ pub struct SkillTelemetry {
 }
 
 /// Score knowledge relevance with inter-session telemetry feedback.
-///
-/// This is the **closed-loop** version of `score_knowledge_relevance`:
-/// it incorporates runtime execution history to boost skills that have
-/// been reliable and penalize those that have been failing.
-///
-/// Scoring formula:
-/// ```text
-/// final_score = symptom_score * reliability_modifier
-/// ```
-///
-/// Where `reliability_modifier`:
-/// - 1.0 if no telemetry (new skill, benefit of the doubt)
-/// - 1.0 + 0.2 * freshness for battle-tested reliable skills (up to 1.2×)
-/// - 1.0 - 0.3 * failure_rate for failing skills (down to 0.7×)
 pub fn score_knowledge_relevance_with_telemetry(
     skill_symptoms: &[String],
     active_symptoms: &[String],
@@ -589,3 +537,246 @@ pub fn score_knowledge_relevance_with_telemetry(
 }
 
 // ─── Tests ────────────────────────────────────────────────────────────────
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_inference_header_extracts_params() {
+        let body = "[inference]\ntemperature = 0.2\nmax_tokens = 4096\n\n# Hello\n{{ var }}";
+        let (hint, stripped) = parse_inference_header(body);
+        let hint = hint.unwrap();
+        assert_eq!(hint.temperature, Some(0.2));
+        assert_eq!(hint.max_tokens, Some(4096));
+        assert!(stripped.contains("# Hello"));
+        assert!(!stripped.contains("[inference]"));
+    }
+
+    #[test]
+    fn parse_inference_header_no_header() {
+        let body = "# Just a template\n{{ var }}";
+        let (hint, stripped) = parse_inference_header(body);
+        assert!(hint.is_none());
+        assert_eq!(stripped, body);
+    }
+
+    #[test]
+    fn registry_loads_defaults() {
+        let reg = PromptRegistry::with_defaults().unwrap();
+        assert!(reg.templates.contains_key("soap"));
+        assert!(reg.templates.contains_key("chat_objective"));
+        assert!(reg.templates.contains_key("workshop"));
+    }
+
+    #[test]
+    fn registry_renders_soap_template() {
+        let reg = PromptRegistry::with_defaults().unwrap();
+        let mut ctx = HashMap::new();
+        ctx.insert("subjective".to_string(), serde_json::json!("test note"));
+        ctx.insert(
+            "profile_block".to_string(),
+            serde_json::json!("- os: linux"),
+        );
+        ctx.insert(
+            "severity_block".to_string(),
+            serde_json::json!("- info: 5 | warn: 1 | alert: 0 | crit: 0"),
+        );
+        ctx.insert(
+            "samples_table".to_string(),
+            serde_json::json!("(no samples recorded)"),
+        );
+        ctx.insert(
+            "freshness_block".to_string(),
+            serde_json::json!("- Last sample 180 seconds ago."),
+        );
+        ctx.insert(
+            "events_table".to_string(),
+            serde_json::json!("- (no events recorded)"),
+        );
+
+        let (rendered, hint) = reg.render_with_hint("soap", &ctx).unwrap();
+        assert!(rendered.contains("## Subjective"));
+        assert!(rendered.contains("test note"));
+        assert!(rendered.contains("## Assessment"));
+        let hint = hint.unwrap();
+        assert_eq!(hint.temperature, Some(0.2));
+        assert_eq!(hint.max_tokens, Some(4096));
+    }
+
+    #[test]
+    fn disk_override_replaces_template() {
+        let tmp = tempfile::tempdir().unwrap();
+        let override_path = tmp.path().join("soap.md.j2");
+        std::fs::write(
+            &override_path,
+            "[inference]\ntemperature = 0.8\n\nCustom: {{ subjective }}",
+        )
+        .unwrap();
+
+        let mut reg = PromptRegistry::with_defaults().unwrap();
+        let count = reg.load_disk_overrides(tmp.path()).unwrap();
+        assert_eq!(count, 1);
+
+        let info = reg.template_info("soap").unwrap();
+        assert_eq!(
+            info.source,
+            TemplateSource::Disk {
+                path: override_path
+            }
+        );
+        assert_eq!(info.inference_hint.as_ref().unwrap().temperature, Some(0.8));
+
+        let mut ctx = HashMap::new();
+        ctx.insert("subjective".to_string(), serde_json::json!("hello"));
+        let rendered = reg.render("soap", &ctx).unwrap();
+        assert!(rendered.contains("Custom: hello"));
+    }
+
+    #[test]
+    fn knowledge_relevance_scoring() {
+        let skill_symptoms = vec!["llm_slow".to_string(), "gpu_fallback_to_cpu".to_string()];
+        let active = vec!["llm_slow".to_string(), "swap_pressure".to_string()];
+        let score = score_knowledge_relevance(&skill_symptoms, &active);
+        // "llm_slow" exact match → 1 overlap out of 2 → 0.4 + 0.6*(1/2) = 0.7
+        assert!((score - 0.7).abs() < 0.01, "expected ~0.7, got {score}");
+    }
+
+    #[test]
+    fn knowledge_relevance_keyword_match() {
+        // "vram_oom" should match active signal "vram" via keyword extraction.
+        let skill_symptoms = vec!["vram_oom".to_string()];
+        let active = vec!["vram".to_string(), "gpu".to_string()];
+        let score = score_knowledge_relevance(&skill_symptoms, &active);
+        // "vram_oom" contains "vram" → 1 overlap out of 1 → 0.4 + 0.6 = 1.0
+        assert!((score - 1.0).abs() < 0.01, "expected 1.0, got {score}");
+    }
+
+    #[test]
+    fn knowledge_relevance_no_active_symptoms() {
+        let skill_symptoms = vec!["llm_slow".to_string()];
+        let active: Vec<String> = vec![];
+        let score = score_knowledge_relevance(&skill_symptoms, &active);
+        // Empty active → base relevance 0.3 (always somewhat useful)
+        assert!((score - 0.3).abs() < 0.01, "expected 0.3, got {score}");
+    }
+
+    #[test]
+    fn knowledge_relevance_both_empty() {
+        let skill_symptoms: Vec<String> = vec![];
+        let active: Vec<String> = vec![];
+        let score = score_knowledge_relevance(&skill_symptoms, &active);
+        // Both empty → 0.3 base relevance
+        assert!((score - 0.3).abs() < 0.01, "expected 0.3, got {score}");
+    }
+
+    #[test]
+    fn select_knowledge_knapsack_selects_optimal() {
+        let slots = vec![
+            KnowledgeSlot {
+                skill_id: "a".to_string(),
+                content: "high relevance".to_string(),
+                relevance: 0.9,
+                token_estimate: 500,
+            },
+            KnowledgeSlot {
+                skill_id: "b".to_string(),
+                content: "medium".to_string(),
+                relevance: 0.8,
+                token_estimate: 200,
+            },
+            KnowledgeSlot {
+                skill_id: "c".to_string(),
+                content: "medium".to_string(),
+                relevance: 0.7,
+                token_estimate: 400,
+            },
+        ];
+        // Knapsack: maximize value = relevance × tokens
+        // a: 0.9 × 500 = 450
+        // b: 0.8 × 200 = 160
+        // c: 0.7 × 400 = 280
+        // Budget 700: a+b = 700 tokens, value = 610 (optimal)
+        // a+c = 900 tokens (exceeds budget!)
+        // b+c = 600 tokens, value = 440
+        let selected = select_knowledge(&slots, 700);
+        assert_eq!(selected.len(), 2);
+        assert!(selected.iter().any(|s| s.skill_id == "a"));
+        assert!(selected.iter().any(|s| s.skill_id == "b"));
+    }
+
+    #[test]
+    fn telemetry_boosts_reliable_skill() {
+        // Use no structural floor so base < 1.0, making the boost visible.
+        let active = vec!["llm_slow".to_string()];
+        let symptoms2 = vec!["llm_slow".to_string(), "gpu_fallback_to_cpu".to_string()];
+        let base2 = score_knowledge_relevance(&symptoms2, &active);
+        // Without structural floor: 0.4 + 0.6*(1/2) = 0.7
+
+        let telemetry = SkillTelemetry {
+            freshness: 1.0, // perfect freshness
+            probe_runs: 100,
+            recent_failures: 0,
+            intervention_runs: 10,
+            recent_intervention_failures: 0,
+        };
+        let boosted = score_knowledge_relevance_with_telemetry(&symptoms2, &active, &telemetry);
+        // Reliable skill gets 1.2× multiplier: 0.7 * 1.2 = 0.84 > 0.7
+        assert!(
+            boosted > base2,
+            "expected boosted ({boosted}) > base ({base2})"
+        );
+    }
+
+    #[test]
+    fn telemetry_penalizes_failing_skill() {
+        // Use no structural floor + 2 symptoms with 1 overlap for visible penalty.
+        let symptoms = vec!["llm_slow".to_string(), "gpu_fallback_to_cpu".to_string()];
+        let active = vec!["llm_slow".to_string()];
+        let base = score_knowledge_relevance(&symptoms, &active);
+        // base = 0.4 + 0.6*(1/2) = 0.7
+
+        let telemetry = SkillTelemetry {
+            freshness: 0.4,
+            probe_runs: 100,
+            recent_failures: 60,
+            intervention_runs: 10,
+            recent_intervention_failures: 8,
+        };
+        let penalized = score_knowledge_relevance_with_telemetry(&symptoms, &active, &telemetry);
+        // Failing skill should be penalized below base (down to 0.7×)
+        assert!(
+            penalized < base,
+            "expected penalized ({penalized}) < base ({base})"
+        );
+    }
+
+    #[test]
+    fn telemetry_neutral_for_new_skill() {
+        let symptoms = vec!["llm_slow".to_string(), "gpu_fallback_to_cpu".to_string()];
+        let active = vec!["llm_slow".to_string()];
+        let base = score_knowledge_relevance(&symptoms, &active);
+
+        let telemetry = SkillTelemetry::default(); // no runs
+        let scored = score_knowledge_relevance_with_telemetry(&symptoms, &active, &telemetry);
+        // New skill gets no modifier
+        assert!(
+            (scored - base).abs() < 0.001,
+            "expected same as base, got {scored} vs {base}"
+        );
+    }
+
+    #[test]
+    fn truncate_tokens_filter_short_passthrough() {
+        let s = "hello world".to_string();
+        assert_eq!(truncate_tokens_filter(s.clone(), 100), s);
+    }
+
+    #[test]
+    fn truncate_tokens_filter_truncates() {
+        let s = "a".repeat(500);
+        let result = truncate_tokens_filter(s, 10); // 10 tokens = ~40 chars
+        assert!(result.len() < 50);
+        assert!(result.ends_with("..."));
+    }
+}

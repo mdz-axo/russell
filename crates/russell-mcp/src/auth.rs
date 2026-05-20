@@ -260,3 +260,80 @@ impl TokenProvider for ChainedTokenProvider {
         false
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Write;
+    use tempfile::NamedTempFile;
+
+    fn make_token_file(expires_in_hours: i64) -> (NamedTempFile, TokenFile) {
+        let file = NamedTempFile::new().unwrap();
+        let now = chrono::Utc::now();
+        let expires = now + chrono::Duration::hours(expires_in_hours);
+
+        let token_data = TokenFile {
+            token: "test-token-123".into(),
+            issued_at: now.to_rfc3339(),
+            expires_at: expires.to_rfc3339(),
+            scope: "user".into(),
+            principal: "russell".into(),
+        };
+
+        let content = serde_json::to_string_pretty(&token_data).unwrap();
+        file.as_file().write_all(content.as_bytes()).unwrap();
+
+        (file, token_data)
+    }
+
+    #[test]
+    fn static_provider_returns_token() {
+        let provider = StaticTokenProvider::new("test-token".into());
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        let token = rt.block_on(provider.get_token()).unwrap();
+        assert_eq!(token, "test-token");
+    }
+
+    #[tokio::test]
+    async fn file_provider_reads_token() {
+        let (temp_file, _) = make_token_file(24);
+        let provider = FileTokenProvider::new(temp_file.path());
+
+        let token = provider.get_token().await.unwrap();
+        assert_eq!(token, "test-token-123");
+    }
+
+    #[tokio::test]
+    async fn file_provider_detects_expiry() {
+        let (temp_file, _) = make_token_file(-1); // Expired 1 hour ago
+        let provider = FileTokenProvider::new(temp_file.path());
+
+        let result = provider.get_token().await;
+        assert!(matches!(result, Err(McpError::Unauthenticated)));
+    }
+
+    #[tokio::test]
+    async fn file_provider_refreshes_near_expiry() {
+        let (temp_file, _) = make_token_file(12); // Expires in 12 hours (< 24h buffer)
+        let provider = FileTokenProvider::new(temp_file.path());
+
+        // First call loads token.
+        let _token1 = provider.get_token().await.unwrap();
+
+        // Modify the token file by writing a new file.
+        let new_token_data = TokenFile {
+            token: "new-token-456".into(),
+            issued_at: chrono::Utc::now().to_rfc3339(),
+            expires_at: (chrono::Utc::now() + chrono::Duration::hours(48)).to_rfc3339(),
+            scope: "user".into(),
+            principal: "russell".into(),
+        };
+        let content = serde_json::to_string_pretty(&new_token_data).unwrap();
+        std::fs::write(temp_file.path(), content).unwrap();
+
+        // Second call should refresh (within buffer window).
+        let token2 = provider.get_token().await.unwrap();
+
+        assert_eq!(token2, "new-token-456");
+    }
+}

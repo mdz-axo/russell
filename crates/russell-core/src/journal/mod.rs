@@ -1238,3 +1238,4 @@ fn configure_pragmas(conn: &Connection) -> Result<()> {
     )?;
     Ok(())
 }
+

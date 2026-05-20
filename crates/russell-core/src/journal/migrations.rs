@@ -119,7 +119,21 @@ fn apply_one(conn: &Connection, m: &Migration) -> Result<()> {
     }
 }
 
-    fn current_version(conn: &Connection) -> Result<u32> {
+#[cfg(test)]
+mod tests {
+    use rusqlite::{Connection, params};
+
+    use crate::journal::migrations::{run, MIGRATIONS};
+
+    fn fresh() -> Connection {
+        let c = Connection::open_in_memory().unwrap();
+        c.execute_batch("PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL;").unwrap();
+        c
+    }
+
+    /// Get the current schema migration version.
+    #[cfg(any(test, feature = "testing"))]
+    pub fn current_version(conn: &Connection) -> u32 {
         let v: u32 = conn
             .query_row(
                 "SELECT COALESCE(MAX(version), 0) FROM schema_migrations",
@@ -127,7 +141,7 @@ fn apply_one(conn: &Connection, m: &Migration) -> Result<()> {
                 |r| r.get(0),
             )
             .unwrap_or(0);
-        Ok(v)
+        v
     }
 
     #[test]
@@ -135,13 +149,13 @@ fn apply_one(conn: &Connection, m: &Migration) -> Result<()> {
         let c = fresh();
         run(&c).unwrap();
         assert_eq!(
-            current_version(&c).unwrap(),
+            current_version(&c),
             MIGRATIONS.last().unwrap().version
         );
         // Second run must not re-apply.
         run(&c).unwrap();
         assert_eq!(
-            current_version(&c).unwrap(),
+            current_version(&c),
             MIGRATIONS.last().unwrap().version
         );
     }

@@ -51,15 +51,6 @@ pub enum RiskError {
 }
 
 /// A sudo password that zeroes its memory on drop.
-///
-/// Prevents credentials from lingering in heap allocations after use.
-/// Intentionally not `Clone` or `Serialize` — the credential flows
-/// linearly from acquisition to single-use consumption.
-///
-/// ## Security properties
-/// - Memory is zeroed on drop (even on panic unwind)
-/// - Cannot be cloned, serialized, or displayed
-/// - `Debug` impl redacts the value
 pub struct SudoCredential {
     inner: String,
 }
@@ -199,13 +190,6 @@ impl StepType {
 }
 
 /// Input struct for [`Dispatcher::dispatch`] — the structured
-/// alternative to the multi-parameter [`Dispatcher::run_and_journal`].
-///
-/// Using named fields prevents positional-argument confusion at
-/// call sites with 8+ parameters.
-///
-/// Currently only consumed within this crate. External callers use
-/// `run_and_journal` or `run_intervention_with_rollback` directly.
 pub struct DispatchRequest<'a> {
     /// Journal to write evidence events to.
     pub journal: &'a JournalWriter,
@@ -296,15 +280,6 @@ pub enum CommandPathError {
 }
 
 /// Validate that a command path is acceptable for skill execution.
-///
-/// Acceptable forms:
-/// - `./scripts/foo.sh` — relative to skill dir
-/// - `/usr/bin/python3` — absolute (known interpreter)
-/// - `sh`, `bash`, `python3` — allowed shell interpreters
-///
-/// Rejected forms:
-/// - `curl`, `wget`, `nc` — bare names resolved via PATH
-/// - `../escape.sh` — path traversal
 pub fn validate_command_path(cmd: &str) -> std::result::Result<(), CommandPathError> {
     // Allow known interpreters that are part of the subprocess contract.
     const ALLOWED_INTERPRETERS: &[&str] =
@@ -338,11 +313,6 @@ pub fn validate_command_path(cmd: &str) -> std::result::Result<(), CommandPathEr
 
 impl Dispatcher {
     /// Environment variables safe to propagate to skill subprocesses.
-    ///
-    /// This allowlist prevents leaking secrets (`RUSSELL_DOCTOR_API_KEY`,
-    /// `.env` contents, `OPENROUTER_*` keys, etc.) to skill scripts.
-    /// Skills that need additional vars should declare them in their
-    /// manifest `env:` section (future — currently unsupported).
     const ENV_ALLOWLIST: [&str; 6] = ["HOME", "USER", "LANG", "LC_ALL", "TERM", "SHELL"];
 
     /// Create a new dispatcher for a given skill.
@@ -361,13 +331,6 @@ impl Dispatcher {
     }
 
     /// Check whether an intervention at the given risk band may auto-execute.
-    ///
-    /// Returns `Ok(())` if the risk is at or below `max_auto_risk`.
-    /// Returns `Err(RiskError::RiskTooHigh)` if the risk exceeds the cap
-    /// — the caller should refuse to dispatch and instead flag for human
-    /// confirmation.
-    ///
-    /// Dry-run is always allowed regardless of risk (it doesn't mutate).
     pub fn check_risk(&self, risk: RiskBand, dry_run: bool) -> std::result::Result<(), RiskError> {
         if dry_run {
             return Ok(());
@@ -387,18 +350,6 @@ impl Dispatcher {
     }
 
     /// Run a command and return its output.
-    ///
-    /// `timeout_override` may override the default timeout. Pass `None`
-    /// to use the default (30s).
-    ///
-    /// If the dispatcher has a `sudo_password` set, the command is
-    /// executed via `sudo -S` with the password piped to stdin.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`russell_core::CoreError::Io`] if the subprocess cannot be
-    /// spawned. Timeout kills are NOT errors — they're captured in
-    /// [`RunOutcome::timed_out`].
     pub async fn run(
         &self,
         cmd: &[String],
@@ -568,26 +519,6 @@ impl Dispatcher {
     }
 
     /// Run a command and journal the result.
-    ///
-    /// This is the IDRS-compliant entry point for skill execution.
-    /// See [`docs/standards/safety.md`](../../../docs/standards/safety.md)
-    /// for the full IDRS contract.
-    ///
-    /// 1. Calls [`run`] to execute the command (or dry-run).
-    /// 2. Writes a `harness.event.v1` event to the journal with
-    ///    action `"skill_probe"` (risk=none) or `"skill_intervention"`
-    ///    (risk from manifest).
-    /// 3. Writes an evidence bundle to
-    ///    `evidence/skills/<skill_id>/<step_id>/<ts>/`.
-    ///
-    /// `step_type` distinguishes probes from interventions for the
-    /// event action field. `risk_band` is the risk level from the
-    /// manifest (probes are always `none`).
-    ///
-    /// # Errors
-    ///
-    ///    Returns [`russell_core::CoreError`] on journal I/O failure
-    /// or subprocess spawn failure.
     #[allow(clippy::too_many_arguments)]
     pub async fn run_and_journal(
         &self,
@@ -772,13 +703,6 @@ impl Dispatcher {
     }
 
     /// Run a skill step with journaling, using a structured request.
-    ///
-    /// Prefer this over [`run_and_journal`](Self::run_and_journal) for
-    /// new code — the named fields prevent positional argument errors.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`russell_core::CoreError`] on journal I/O or spawn failure.
     pub async fn dispatch(&self, req: &DispatchRequest<'_>) -> Result<RunOutcome> {
         self.run_and_journal(
             req.journal,
@@ -794,23 +718,6 @@ impl Dispatcher {
     }
 
     /// Run an intervention with automatic rollback on failure.
-    ///
-    /// This is the IDRS-compliant entry point for mutating steps
-    /// (see [`docs/standards/safety.md`](../../../docs/standards/safety.md)):
-    ///
-    /// 1. Runs the forward intervention via [`run_and_journal`].
-    /// 2. If it succeeds (exit=0), returns the outcome.
-    /// 3. If it fails, runs the rollback (if one is configured)
-    ///    and journals both the failure and the rollback.
-    ///
-    /// `rollback` is the rollback strategy from the manifest.
-    /// `get_rollback_cmd` is a callback that resolves a `rollback_id`
-    /// to the actual command argv. It's called only when rollback is
-    /// needed, so the caller (manifest loader) provides the lookup.
-    ///
-    /// Returns the rollback outcome on forward failure, or the forward
-    /// outcome on success. `rollback_applied` in the outcome indicates
-    /// whether rollback was triggered.
     #[allow(clippy::too_many_arguments)]
     pub async fn run_intervention_with_rollback<F>(
         &self,
@@ -984,4 +891,414 @@ fn write_evidence(dir: &Path, outcome: &RunOutcome, event: &Event) -> Result<()>
         .map_err(|e| russell_core::CoreError::io(dir, e))?;
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn dry_run_does_not_execute() {
+        let d = Dispatcher {
+            skill_dir: "/tmp".into(),
+            dry_run: DryRun::Enabled,
+            probe_timeout: Duration::from_secs(5),
+            intervention_timeout: Duration::from_secs(5),
+            max_auto_risk: RiskBand::Low,
+            sudo_password: None,
+            stdin_content: None,
+            allowed_env_keys: Vec::new(),
+        };
+        // Dry-run skips validation — any command shape accepted.
+        let outcome = d
+            .run(&["/bin/echo".into(), "hello".into()], None)
+            .await
+            .unwrap();
+        assert!(outcome.dry_run);
+        assert!(outcome.exit_code.is_none());
+        assert!(outcome.stdout.is_empty());
+    }
+
+    #[tokio::test]
+    async fn echo_produces_stdout() {
+        let d = Dispatcher::new("/tmp");
+        let outcome = d
+            .run(&["/bin/echo".into(), "hello".into()], None)
+            .await
+            .unwrap();
+        assert!(!outcome.dry_run);
+        assert_eq!(outcome.exit_code, Some(0));
+        assert!(outcome.stdout.contains("hello"));
+    }
+
+    #[tokio::test]
+    async fn empty_cmd_returns_error() {
+        let d = Dispatcher::new("/tmp");
+        let outcome = d.run(&[], None).await.unwrap();
+        assert_eq!(outcome.exit_code, Some(-1));
+        assert!(outcome.stderr.contains("empty command"));
+    }
+
+    #[tokio::test]
+    async fn bare_command_rejected() {
+        let d = Dispatcher::new("/tmp");
+        let outcome = d
+            .run(&["curl".into(), "http://evil.com".into()], None)
+            .await
+            .unwrap();
+        assert_eq!(outcome.exit_code, Some(-1));
+        assert!(outcome.stderr.contains("command rejected"));
+    }
+
+    #[tokio::test]
+    async fn path_traversal_rejected() {
+        let d = Dispatcher::new("/tmp");
+        let outcome = d
+            .run(&["./scripts/../../../etc/passwd".into()], None)
+            .await
+            .unwrap();
+        assert_eq!(outcome.exit_code, Some(-1));
+        assert!(outcome.stderr.contains("path traversal"));
+    }
+
+    #[tokio::test]
+    async fn timeout_kills_process() {
+        let d = Dispatcher {
+            skill_dir: "/tmp".into(),
+            dry_run: DryRun::Disabled,
+            probe_timeout: Duration::from_secs(1),
+            intervention_timeout: Duration::from_secs(1),
+            max_auto_risk: RiskBand::Low,
+            sudo_password: None,
+            stdin_content: None,
+            allowed_env_keys: Vec::new(),
+        };
+        // Sleep longer than the timeout — uses allowed interpreter `sh`.
+        let outcome = d
+            .run(
+                &["sh".into(), "-c".into(), "sleep 5".into()],
+                Some(Duration::from_millis(100)),
+            )
+            .await
+            .unwrap();
+        assert!(outcome.timed_out);
+        assert!(outcome.exit_code.is_none());
+    }
+
+    // --- IDRS journaling tests ---
+
+    #[tokio::test]
+    async fn run_and_journal_writes_event_and_evidence() {
+        let tmp = tempfile::tempdir().unwrap();
+        let journal_path = tmp.path().join("journal.db");
+        let journal = JournalWriter::open(&journal_path).unwrap();
+        let evidence_base = tmp.path().join("evidence");
+
+        let d = Dispatcher::new("/tmp");
+        let outcome = d
+            .run_and_journal(
+                &journal,
+                &evidence_base,
+                &["/bin/echo".into(), "hello".into()],
+                "test-skill",
+                "probe-1",
+                StepType::Probe,
+                "none",
+                None,
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(outcome.exit_code, Some(0));
+        assert!(!outcome.dry_run);
+
+        // Journal should have the event.
+        let reader = journal.reader();
+        let rows = reader.recent(5).unwrap();
+        assert!(!rows.is_empty());
+        let row = &rows[0];
+        assert_eq!(row.action, "skill_probe");
+        assert_eq!(row.severity, russell_core::event::Severity::Info);
+
+        // Evidence bundle should exist.
+        let evidence_root = std::fs::read_dir(evidence_base.join("skills/test-skill/probe-1"))
+            .unwrap()
+            .next()
+            .unwrap()
+            .unwrap()
+            .path();
+        assert!(evidence_root.join("stdout.txt").exists());
+        assert!(evidence_root.join("event.json").exists());
+
+        // stdout should contain "hello".
+        let stdout = std::fs::read_to_string(evidence_root.join("stdout.txt")).unwrap();
+        assert!(stdout.contains("hello"));
+    }
+
+    #[tokio::test]
+    async fn dry_run_journals_would_action() {
+        let tmp = tempfile::tempdir().unwrap();
+        let journal_path = tmp.path().join("journal.db");
+        let journal = JournalWriter::open(&journal_path).unwrap();
+        let evidence_base = tmp.path().join("evidence");
+
+        let d = Dispatcher {
+            skill_dir: "/tmp".into(),
+            dry_run: DryRun::Enabled,
+            probe_timeout: Duration::from_secs(5),
+            intervention_timeout: Duration::from_secs(5),
+            max_auto_risk: RiskBand::Low,
+            sudo_password: None,
+            stdin_content: None,
+            allowed_env_keys: Vec::new(),
+        };
+        let outcome = d
+            .run_and_journal(
+                &journal,
+                &evidence_base,
+                &["/bin/echo".into(), "would-have-run".into()],
+                "test-skill",
+                "iv-1",
+                StepType::Intervention,
+                "low",
+                None,
+            )
+            .await
+            .unwrap();
+
+        assert!(outcome.dry_run);
+
+        let reader = journal.reader();
+        let rows = reader.recent(5).unwrap();
+        assert_eq!(rows[0].action, "would_skill_intervention");
+    }
+
+    // --- Risk-band enforcement tests ---
+
+    #[test]
+    fn low_risk_allowed_at_low_cap() {
+        let d = Dispatcher {
+            skill_dir: "/tmp".into(),
+            dry_run: DryRun::Disabled,
+            probe_timeout: Duration::from_secs(5),
+            intervention_timeout: Duration::from_secs(5),
+            max_auto_risk: RiskBand::Low,
+            sudo_password: None,
+            stdin_content: None,
+            allowed_env_keys: Vec::new(),
+        };
+        assert!(d.check_risk(RiskBand::None, false).is_ok());
+        assert!(d.check_risk(RiskBand::Low, false).is_ok());
+        assert!(d.check_risk(RiskBand::Medium, false).is_err());
+        assert!(d.check_risk(RiskBand::High, false).is_err());
+        assert!(d.check_risk(RiskBand::Critical, false).is_err());
+    }
+
+    #[test]
+    fn dry_run_bypasses_risk_cap() {
+        let d = Dispatcher {
+            skill_dir: "/tmp".into(),
+            dry_run: DryRun::Disabled,
+            probe_timeout: Duration::from_secs(5),
+            intervention_timeout: Duration::from_secs(5),
+            max_auto_risk: RiskBand::Low,
+            sudo_password: None,
+            stdin_content: None,
+            allowed_env_keys: Vec::new(),
+        };
+        // High risk in dry-run mode should still pass — no mutation occurs.
+        assert!(d.check_risk(RiskBand::Critical, true).is_ok());
+    }
+
+    #[test]
+    fn medium_risk_allowed_at_medium_cap() {
+        let d = Dispatcher {
+            skill_dir: "/tmp".into(),
+            dry_run: DryRun::Disabled,
+            probe_timeout: Duration::from_secs(5),
+            intervention_timeout: Duration::from_secs(5),
+            max_auto_risk: RiskBand::Medium,
+            sudo_password: None,
+            stdin_content: None,
+            allowed_env_keys: Vec::new(),
+        };
+        assert!(d.check_risk(RiskBand::Medium, false).is_ok());
+        assert!(d.check_risk(RiskBand::High, false).is_err());
+    }
+
+    #[test]
+    fn risk_too_high_error_is_descriptive() {
+        let d = Dispatcher {
+            skill_dir: "/tmp".into(),
+            dry_run: DryRun::Disabled,
+            probe_timeout: Duration::from_secs(5),
+            intervention_timeout: Duration::from_secs(5),
+            max_auto_risk: RiskBand::Low,
+            sudo_password: None,
+            stdin_content: None,
+            allowed_env_keys: Vec::new(),
+        };
+        let err = d.check_risk(RiskBand::High, false).unwrap_err();
+        let msg = err.to_string();
+        assert!(msg.contains("High"));
+        assert!(msg.contains("Low"));
+    }
+
+    // --- Rollback tests ---
+
+    #[tokio::test]
+    async fn rollback_runs_on_forward_failure() {
+        let tmp = tempfile::tempdir().unwrap();
+        let journal_path = tmp.path().join("journal.db");
+        let journal = JournalWriter::open(&journal_path).unwrap();
+        let evidence_base = tmp.path().join("evidence");
+
+        let d = Dispatcher::new("/tmp");
+
+        // Forward: a command that exits non-zero.
+        // Rollback: echo "rolled back".
+        let outcome = d
+            .run_intervention_with_rollback(
+                &journal,
+                &evidence_base,
+                "test-skill",
+                "iv-bad",
+                &["sh".into(), "-c".into(), "exit 1".into()],
+                "low",
+                RollbackStrategy::RollbackId {
+                    id: "iv-revert".into(),
+                },
+                |_id| Some(vec!["/bin/echo".into(), "rolled-back".into()]),
+                None,
+            )
+            .await
+            .unwrap();
+
+        // Forward failed.
+        assert_eq!(outcome.exit_code, Some(1));
+        // Rollback was applied.
+        assert!(outcome.rollback_applied());
+        let rb = outcome.rollback.unwrap();
+        assert_eq!(rb.exit_code, Some(0));
+        assert!(rb.stdout.contains("rolled-back"));
+    }
+
+    #[tokio::test]
+    async fn no_rollback_when_forward_succeeds() {
+        let tmp = tempfile::tempdir().unwrap();
+        let journal_path = tmp.path().join("journal.db");
+        let journal = JournalWriter::open(&journal_path).unwrap();
+        let evidence_base = tmp.path().join("evidence");
+
+        let d = Dispatcher::new("/tmp");
+
+        let outcome = d
+            .run_intervention_with_rollback(
+                &journal,
+                &evidence_base,
+                "test-skill",
+                "iv-good",
+                &["/bin/echo".into(), "ok".into()],
+                "low",
+                RollbackStrategy::NoneNeeded,
+                |_id| None,
+                None,
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(outcome.exit_code, Some(0));
+        assert!(!outcome.rollback_applied());
+        assert!(outcome.rollback.is_none());
+        assert!(outcome.is_safe());
+    }
+
+    #[tokio::test]
+    async fn none_needed_skips_rollback() {
+        let tmp = tempfile::tempdir().unwrap();
+        let journal_path = tmp.path().join("journal.db");
+        let journal = JournalWriter::open(&journal_path).unwrap();
+        let evidence_base = tmp.path().join("evidence");
+
+        let d = Dispatcher::new("/tmp");
+
+        let outcome = d
+            .run_intervention_with_rollback(
+                &journal,
+                &evidence_base,
+                "test-skill",
+                "iv-restart",
+                &["sh".into(), "-c".into(), "exit 2".into()],
+                "low",
+                RollbackStrategy::NoneNeeded,
+                |_id| None,
+                None,
+            )
+            .await
+            .unwrap();
+
+        // Forward failed but rollback is none_needed.
+        assert_eq!(outcome.exit_code, Some(2));
+        assert!(!outcome.rollback_applied());
+        assert!(outcome.rollback.is_none());
+    }
+
+    #[tokio::test]
+    async fn reboot_skips_rollback_and_warns() {
+        let tmp = tempfile::tempdir().unwrap();
+        let journal_path = tmp.path().join("journal.db");
+        let journal = JournalWriter::open(&journal_path).unwrap();
+        let evidence_base = tmp.path().join("evidence");
+
+        let d = Dispatcher::new("/tmp");
+
+        let outcome = d
+            .run_intervention_with_rollback(
+                &journal,
+                &evidence_base,
+                "test-skill",
+                "iv-reboot",
+                &["sh".into(), "-c".into(), "exit 3".into()],
+                "high",
+                RollbackStrategy::Reboot,
+                |_id| None,
+                None,
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(outcome.exit_code, Some(3));
+        assert!(!outcome.rollback_applied());
+        assert!(outcome.rollback.is_none());
+    }
+
+    #[test]
+    fn resolve_rollback_strategy_converts_correctly() {
+        use crate::{Rollback, RollbackNone, RollbackReboot};
+
+        let with_id = Rollback::RollbackId {
+            rollback_id: "revert-id".into(),
+        };
+        if let RollbackStrategy::RollbackId { id } = resolve_rollback_strategy(&with_id) {
+            assert_eq!(id, "revert-id");
+        } else {
+            panic!("expected RollbackId");
+        }
+
+        let none_needed = Rollback::NoneNeeded {
+            rollback: RollbackNone::NoneNeeded,
+        };
+        assert!(matches!(
+            resolve_rollback_strategy(&none_needed),
+            RollbackStrategy::NoneNeeded
+        ));
+
+        let reboot = Rollback::Reboot {
+            rollback: RollbackReboot::Reboot,
+        };
+        assert!(matches!(
+            resolve_rollback_strategy(&reboot),
+            RollbackStrategy::Reboot
+        ));
+    }
 }

@@ -193,11 +193,11 @@ status: VERIFIED
 - [x] Update ADR-0021 with wiring evidence
 - **Evidence:** Already complete in codebase (`russell-proprio/src/lib.rs` lines 188-237)
 
-#### Task 2.3: Add deadlock detection — DEFERRED (low value)
-- **Status:** Deferred — single-host architecture makes this unnecessary
-- **Rationale:** SQLite reads are local, sub-millisecond. No concurrent readers. Writer stall (already implemented) is the critical metric.
-- **Decision:** Per JR-1 (austere by default), skip features that solve non-existent problems.
-- **If revisited:** Would need evidence of actual read timeouts in production logs.
+#### Task 2.3: Add deadlock detection
+- [ ] Use `tokio::task::spawn` with timeout for journal readers
+- [ ] Add `journal_reader_stall_s` vital (already defined, not computed)
+- [ ] Alert if any reader exceeds 5s without response
+- [ ] Test: simulate slow reader, verify alert fires
 
 #### Task A2: Explicit port interfaces ✅
 - [x] Expand `JournalReadPort` trait with 6 additional read methods
@@ -337,8 +337,6 @@ status: VERIFIED
 | Phase 4: Data Integrity | 2 | 4 | In Progress |
 | Phase 5: Operational Completeness | 2 | 4 | **Complete** ✅ |
 | **Total** | **12** | **19** | **63% Complete** |
-
-**Note:** Task 2.3 deferred — single-host architecture makes reader stall detection unnecessary. Per JR-1, skip features solving non-existent problems.
 
 ### Completed Tasks
 

@@ -261,3 +261,4 @@ impl Event {
         self.schema == EVENT_SCHEMA
     }
 }
+

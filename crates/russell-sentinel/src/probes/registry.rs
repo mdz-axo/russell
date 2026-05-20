@@ -95,16 +95,51 @@ impl ProbeRegistry {
     }
 
     /// Number of registered probes (numeric only).
-
-    /// Number of registered probes (numeric only).
+    #[cfg(test)]
     #[must_use]
     pub fn len(&self) -> usize {
         self.probes.len()
     }
 
     /// Returns `true` if no probes are registered.
+    #[cfg(test)]
     #[must_use]
     pub fn is_empty(&self) -> bool {
         self.probes.is_empty()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn registry_has_all_mvp_numeric_probes() {
+        let reg = ProbeRegistry::with_defaults();
+        assert!(
+            reg.len() >= 20,
+            "expected at least 20 numeric MVP probes, got {}",
+            reg.len()
+        );
+    }
+
+    #[test]
+    fn each_probe_has_unique_name() {
+        let reg = ProbeRegistry::with_defaults();
+        let names: std::collections::BTreeSet<&str> = reg.probes.iter().map(|p| p.name()).collect();
+        assert_eq!(names.len(), reg.probes.len(), "probe names must be unique");
+    }
+
+    #[test]
+    fn collect_numeric_returns_results_on_linux() {
+        if !std::path::Path::new("/proc/meminfo").exists() {
+            return;
+        }
+        let reg = ProbeRegistry::with_defaults();
+        let samples = reg.collect_numeric();
+        assert!(
+            !samples.is_empty(),
+            "should have at least one numeric sample on Linux"
+        );
     }
 }

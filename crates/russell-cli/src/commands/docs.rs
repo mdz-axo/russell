@@ -17,11 +17,6 @@ use russell_core::paths::Paths;
 use std::process::Command;
 
 /// Run the documentation quality gate.
-///
-/// Delegates to `scripts/lint_frontmatter.py --severity alert`
-/// for frontmatter, metadata, diagram, and freshness checks.
-/// Future work: integrate link checking, metric integrity,
-/// and citation density as native Rust checks.
 pub fn run(_paths: &Paths, strict: bool) -> Result<()> {
     let project_root = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
 

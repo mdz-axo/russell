@@ -203,3 +203,157 @@ pub fn parse_df_output(content: &str) -> Option<(u64, u64)> {
     let used: u64 = parts.next()?.parse().ok()?;
     Some((total, used))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_meminfo_kib_extracts_value() {
+        let content =
+            "MemTotal:       94321 kB\nMemFree:         1234 kB\nMemAvailable:   56789 kB\n";
+        assert_eq!(parse_meminfo_kib(content, "MemAvailable"), Some(56789));
+        assert_eq!(parse_meminfo_kib(content, "MemTotal"), Some(94321));
+        assert_eq!(parse_meminfo_kib(content, "MemFree"), Some(1234));
+    }
+
+    #[test]
+    fn parse_meminfo_kib_returns_none_for_missing_key() {
+        let content = "MemTotal:       94321 kB\n";
+        assert_eq!(parse_meminfo_kib(content, "MemAvailable"), None);
+    }
+
+    #[test]
+    fn parse_meminfo_kib_handles_empty_input() {
+        assert_eq!(parse_meminfo_kib("", "MemAvailable"), None);
+    }
+
+    #[test]
+    fn kib_to_mib_correct() {
+        assert!((kib_to_mib(1024) - 1.0).abs() < f64::EPSILON);
+        assert!((kib_to_mib(2048) - 2.0).abs() < f64::EPSILON);
+        assert!((kib_to_mib(0) - 0.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn parse_loadavg_1m_extracts_first_field() {
+        assert_eq!(parse_loadavg_1m("0.52 0.34 0.28 1/234 5678"), Some(0.52));
+        assert_eq!(parse_loadavg_1m("1.00 0.50 0.25 2/100 999"), Some(1.0));
+    }
+
+    #[test]
+    fn parse_loadavg_1m_handles_empty() {
+        assert_eq!(parse_loadavg_1m(""), None);
+    }
+
+    #[test]
+    fn parse_loadavg_1m_handles_garbage() {
+        assert_eq!(parse_loadavg_1m("not_a_number rest"), None);
+    }
+
+    #[test]
+    fn parse_proc_stat_extracts_fields() {
+        // Real stat line format: pid (comm) state ppid pgrp session tty_nr tpgid
+        // flags minflt cminflt majflt cmajflt utime stime cutime cstime priority
+        // nice num_threads itrealvalue starttime vsize rss ...
+        let content = "1234 (my-process) S 1233 1234 1234 0 -1 4194304 123 \
+                       0 0 0 45 67 0 0 20 0 1 0 123456 12345678 3456 \
+                       18446744073709551615 1 1 0 0 0 0 0 0 0 0 0 0 \
+                       0 0 0 0 0 0 0 0 0 0 0 0 0";
+        let stat = parse_proc_stat(content).expect("should parse");
+        assert_eq!(stat.comm, "my-process");
+        assert_eq!(stat.state, 'S');
+        assert_eq!(stat.utime_ticks, 45);
+        assert_eq!(stat.stime_ticks, 67);
+        assert_eq!(stat.rss_pages, 3456);
+    }
+
+    #[test]
+    fn parse_proc_stat_zombie() {
+        let content = "9999 (zombie-proc) Z 1 1 1 0 -1 0 0 0 0 0 0 0 0 0 \
+                       0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 \
+                       0 0 0 0 0 0 0";
+        let stat = parse_proc_stat(content).expect("should parse");
+        assert_eq!(stat.comm, "zombie-proc");
+        assert_eq!(stat.state, 'Z');
+        assert_eq!(stat.rss_pages, 0);
+    }
+
+    #[test]
+    fn parse_proc_stat_stuck_d_state() {
+        let content = "5555 (stuck-io) D 1 1 1 0 -1 0 100 0 50 0 5000 3000 \
+                       0 0 0 0 1 0 555 10000000 2048 \
+                       0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0";
+        let stat = parse_proc_stat(content).expect("should parse");
+        assert_eq!(stat.state, 'D');
+    }
+
+    #[test]
+    fn parse_proc_stat_comm_with_spaces() {
+        // Comm may be truncated to 15 chars, test with paren-wrapped name
+        let content = "1 (systemd) S 0 1 1 0 -1 4194304 1234 0 0 0 \
+                       100 50 10 5 20 0 1 0 50000 25000000 1024 \
+                       0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0";
+        let stat = parse_proc_stat(content).expect("should parse");
+        assert_eq!(stat.comm, "systemd");
+    }
+
+    #[test]
+    fn parse_proc_stat_empty_input() {
+        assert_eq!(parse_proc_stat(""), None);
+    }
+
+    #[test]
+    fn cpu_ticks_sums_both() {
+        let s = ProcessStat {
+            comm: "test".into(),
+            state: 'R',
+            utime_ticks: 100,
+            stime_ticks: 50,
+            rss_pages: 0,
+        };
+        assert_eq!(cpu_ticks(&s), 150);
+    }
+
+    #[test]
+    fn parse_gpu_util_pct_parses_integer() {
+        assert_eq!(parse_gpu_util_pct("42"), Some(42.0));
+        assert_eq!(parse_gpu_util_pct("0"), Some(0.0));
+        assert_eq!(parse_gpu_util_pct("100\n"), Some(100.0));
+    }
+
+    #[test]
+    fn parse_gpu_util_pct_handles_bad_input() {
+        assert_eq!(parse_gpu_util_pct(""), None);
+        assert_eq!(parse_gpu_util_pct("abc"), None);
+        assert_eq!(parse_gpu_util_pct("-1"), None);
+    }
+
+    #[test]
+    fn parse_millidegrees_to_c_converts() {
+        assert_eq!(parse_millidegrees_to_c("49000"), Some(49.0));
+        assert_eq!(parse_millidegrees_to_c("0"), Some(0.0));
+        assert_eq!(parse_millidegrees_to_c("28000\n"), Some(28.0));
+    }
+
+    #[test]
+    fn parse_millidegrees_to_c_handles_bad_input() {
+        assert_eq!(parse_millidegrees_to_c(""), None);
+        assert_eq!(parse_millidegrees_to_c("abc"), None);
+    }
+
+    #[test]
+    fn parse_io_pressure_some_extracts_avg10() {
+        let content = "some avg10=0.00 avg60=0.00 avg300=0.14 total=38929564\n\
+                       full avg10=1.23 avg60=0.87 avg300=0.13 total=22896661\n";
+        assert_eq!(parse_io_pressure_some(content), Some(0.0));
+        assert_eq!(parse_io_pressure_full(content), Some(1.23));
+    }
+
+    #[test]
+    fn parse_io_pressure_handles_bad_input() {
+        assert_eq!(parse_io_pressure_some(""), None);
+        assert_eq!(parse_io_pressure_some("garbage"), None);
+        assert_eq!(parse_io_pressure_full("full avg10=abc"), None);
+    }
+}
