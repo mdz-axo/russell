@@ -154,11 +154,11 @@ impl TokenProvider for FileTokenProvider {
         // Check cache first.
         {
             let cached = self.cached.read().await;
-            if let Some(ref c) = *cached {
-                if !Self::needs_refresh(c) {
-                    debug!("using cached token (not near expiry)");
-                    return Ok(c.token.clone());
-                }
+            if let Some(ref c) = *cached
+                && !Self::needs_refresh(c)
+            {
+                debug!("using cached token (not near expiry)");
+                return Ok(c.token.clone());
             }
         }
 
@@ -241,10 +241,10 @@ impl TokenProvider for ChainedTokenProvider {
     }
 
     async fn is_valid(&self) -> bool {
-        if let Some(ref file) = self.file {
-            if file.is_valid().await {
-                return true;
-            }
+        if let Some(ref file) = self.file
+            && file.is_valid().await
+        {
+            return true;
         }
 
         if let Some(ref fallback) = self.fallback {

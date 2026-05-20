@@ -46,6 +46,7 @@ pub fn list(paths: &Paths) -> Result<()> {
     }
 
     for s in &skills {
+        println!("{} v{} — {:?}", s.id, s.version, s.kind);
     }
 
     Ok(())

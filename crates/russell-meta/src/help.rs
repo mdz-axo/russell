@@ -39,9 +39,6 @@ use crate::{fallback, mock, oai_client, prompt};
 /// Process-wide LLM rate limiter. Shared across `russell jack`
 /// and `russell chat` calls within the same process lifetime.
 /// Default: 3 requests/minute, burst of 3.
-/// and `russell chat` calls within the same process lifetime.
-/// Default: 3 requests/minute, burst of 3.
-/// Default: 3 requests/minute, burst of 3.
 static LLM_RATE_LIMITER: std::sync::LazyLock<RateLimiter> =
     std::sync::LazyLock::new(|| RateLimiter::new(RateLimitConfig::default()));
 

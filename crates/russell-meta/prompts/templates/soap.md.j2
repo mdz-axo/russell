@@ -1,9 +1,9 @@
 {# soap.md.j2 — Russell SOAP one-shot prompt (russell jack)
    Inference: temperature=0.2, constrained/decisive mode.
    Variables: subjective, profile_block, severity_block, samples_table,
-             freshness_block, actionable_skills, knowledge_skills,
-             kask_tools, events_table, reflex_section
-#}
+             freshness, events_table, reflex_section, actionable_skills,
+             knowledge_skills, kask_tools
+ #}
 [inference]
 temperature = 0.2
 max_tokens = 4096
@@ -26,7 +26,7 @@ max_tokens = 4096
 {{ samples_table }}
 
 ### Sentinel freshness
-{{ freshness_block }}
+{{ freshness }}
 {% if actionable_skills %}
 
 ### Available skills

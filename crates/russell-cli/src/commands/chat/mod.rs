@@ -245,8 +245,6 @@ async fn call_okapi_with_spinner(
     messages: &[serde_json::Value],
 ) -> std::result::Result<String, String> {
     use rand::seq::SliceRandom;
-    use russell_meta::client::{LlmClient, SoapPrompt};
-    use russell_meta::oai_client::OkapiClient;
     use tokio::sync::oneshot;
 
     let expression = THINKING_EXPRESSIONS

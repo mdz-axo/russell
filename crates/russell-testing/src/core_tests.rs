@@ -141,7 +141,8 @@ mod event {
 }
 
 mod time {
-    use russell_core::time::{approx_days_between, now_date_iso8601, now_rfc3339, now_unix, SystemClock, FixedClock, Clock};
+    use russell_core::time::{approx_days_between, now_date_iso8601, now_rfc3339, now_unix, SystemClock, FixedClock};
+    use russell_core::Clock;
 
     #[test]
     fn rfc3339_is_plausible() {
@@ -319,8 +320,8 @@ mod schedule {
 }
 
 mod journal {
-    use russell_core::journal::{JournalWriter, SeverityCounts};
-    use russell_core::event::{Event, Scope, Severity};
+    use russell_core::journal::JournalWriter;
+    use russell_core::event::{Event, Severity};
 
     fn tmp_path() -> (tempfile::TempDir, std::path::PathBuf) {
         let tmp = tempfile::tempdir().unwrap();
@@ -359,7 +360,7 @@ mod journal {
         for sev in [Severity::Info, Severity::Info, Severity::Warn, Severity::Crit] {
             w.append(&Event::new("x", sev)).unwrap();
         }
-        let c = w.reader().severity_counts(0, i64::MAX).unwrap();
+        let _c = w.reader().severity_counts(0, i64::MAX).unwrap();
     }
 }
 

@@ -13,6 +13,7 @@ use russell_core::time::{approx_days_between, now_date_iso8601};
 use russell_meta::client::LlmClient;
 use russell_meta::client::SoapPrompt;
 use russell_meta::oai_client::OkapiClient;
+use crate::commands::utils::{extract_yaml_field, extract_yaml_list, extract_manifest_block, call_llm};
 use russell_skills::Skill;
 use russell_skills::registry::{
     LifecycleStatus, RegistryCache, RegistryEntry, SafetyScan, SkillSource,
@@ -599,36 +600,6 @@ fn do_install(registry: &mut RegistryCache, skills_dir: &std::path::Path, name: 
     }
 }
 
-/// Extract a scalar YAML field from a manifest string.
-fn extract_yaml_field(manifest: &str, key: &str) -> Option<String> {
-    for line in manifest.lines() {
-        if let Some(rest) = line.trim().strip_prefix(&format!("{key}:")) {
-            return Some(rest.trim().to_string());
-        }
-    }
-    None
-}
-
-/// Extract a YAML list from a manifest string (simple line-based parser).
-fn extract_yaml_list(manifest: &str, key: &str) -> Vec<String> {
-    let mut items = Vec::new();
-    let mut in_section = false;
-    for line in manifest.lines() {
-        if line.trim_start().starts_with(&format!("{key}:")) {
-            in_section = true;
-            continue;
-        }
-        if in_section {
-            if let Some(item) = line.trim().strip_prefix("- ") {
-                items.push(item.trim().to_string());
-            } else if line.trim().starts_with(|c: char| c.is_alphabetic()) {
-                break; // Next top-level key
-            }
-        }
-    }
-    items
-}
-
 /// Fetch a skill manifest from a URL, safety-scan it, and register as discovered.
 async fn do_fetch(
     registry: &mut RegistryCache,
@@ -803,64 +774,16 @@ async fn adapt_via_llm(
          add timeout values, or refine symptom coverage. Output ONLY the complete YAML manifest \
          in a ```yaml code block. Do not explain the changes."
     );
-    let adapted = match llm_call(client_cfg, fallback_model, &prompt).await {
+    let adapted = match call_llm(client_cfg, fallback_model, "You are a YAML editor for Russell skill manifests. Output ONLY the YAML in a code block.", &prompt, Some(0.6)).await {
         Ok(resp) => resp,
         Err(_) => String::new(),
     };
     if adapted.is_empty() {
         return (String::new(), false);
     }
-    let yaml = extract_yaml_block(&adapted);
+    let yaml = extract_manifest_block(&adapted).unwrap_or_default();
     let is_empty = yaml.is_empty();
     (yaml, !is_empty)
-}
-
-/// Extract the first ```yaml...``` block from LLM output.
-fn extract_yaml_block(response: &str) -> String {
-    let start = response.find("```yaml");
-    let body_start = match start {
-        Some(s) => s + 7,
-        None => return String::new(),
-    };
-    let end = match response[body_start..].find("```") {
-        Some(e) => body_start + e,
-        None => return response[body_start..].to_string(),
-    };
-    response[body_start..end].trim().to_string()
-}
-
-/// Simple LLM call for adaptation. Returns response text or empty on failure.
-async fn llm_call(
-    cfg: &russell_meta::client::ClientConfig,
-    _fallback_model: &str,
-    prompt: &str,
-) -> Result<String> {
-    use russell_meta::client::SoapPrompt;
-    use russell_meta::oai_client::OkapiClient;
-
-    let mut chat_cfg = cfg.clone();
-    if chat_cfg.base_url.is_none() {
-        chat_cfg.base_url = Some(russell_meta::health::DEFAULT_BASE_URL.to_string());
-    }
-    if chat_cfg.api_key.is_none() {
-        chat_cfg.api_key = Some("okapi".into());
-    }
-
-    let base = chat_cfg.base_url.as_deref().unwrap_or(russell_meta::health::DEFAULT_BASE_URL);
-    if !russell_meta::health::ensure_ready(base).await {
-        return Err(anyhow::anyhow!("Okapi not reachable"));
-    }
-
-    let client = OkapiClient::new(&chat_cfg).await?;
-    let soap = SoapPrompt {
-        system: "You are a YAML editor for Russell skill manifests. Output ONLY the YAML in a code block.".into(),
-        subjective: String::new(),
-        objective: String::new(),
-        rendered: prompt.to_string(),
-        temperature: Some(0.6),
-        max_tokens: None,
-    };
-    Ok(client.chat(&soap).await?.content)
 }
 
 /// Open EDITOR for manifest, then safety-scan and update registry.

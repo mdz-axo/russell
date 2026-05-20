@@ -542,7 +542,7 @@ fn timeout_default_intervention() -> String {
     "120s".into()
 }
 
-fn bool_true() -> bool {
+const fn bool_true() -> bool {
     true
 }
 
@@ -550,7 +550,7 @@ fn max_auto_risk_default() -> RiskBand {
     RiskBand::Low
 }
 
-fn expected_exit_default() -> i32 {
+const fn expected_exit_default() -> i32 {
     0
 }
 
