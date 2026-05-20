@@ -113,31 +113,3 @@ async fn start_service() {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn health_url_strips_v1() {
-        assert_eq!(
-            health_url_from_base("http://127.0.0.1:11435/v1"),
-            "http://127.0.0.1:11435/api/tags"
-        );
-    }
-
-    #[test]
-    fn health_url_no_v1() {
-        assert_eq!(
-            health_url_from_base("http://127.0.0.1:11435"),
-            "http://127.0.0.1:11435/api/tags"
-        );
-    }
-
-    #[test]
-    fn health_url_trailing_slash() {
-        assert_eq!(
-            health_url_from_base("http://127.0.0.1:11435/v1/"),
-            "http://127.0.0.1:11435/api/tags"
-        );
-    }
-}

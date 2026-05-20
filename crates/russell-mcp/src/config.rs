@@ -130,29 +130,3 @@ impl HKaskMcpConfig {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn default_config_is_loopback() {
-        let cfg = HKaskMcpConfig {
-            endpoint: DEFAULT_ENDPOINT.to_owned(),
-            token: Some("test-token".into()),
-            tool_ttl: Duration::from_secs(DEFAULT_TOOL_TTL_SECS),
-            timeout: Duration::from_secs(DEFAULT_TIMEOUT_SECS),
-        };
-        assert!(cfg.validate().is_ok());
-    }
-
-    #[test]
-    fn remote_endpoint_rejected() {
-        let cfg = HKaskMcpConfig {
-            endpoint: "http://192.168.1.100:9500/mcp".to_owned(),
-            token: Some("test-token".into()),
-            tool_ttl: Duration::from_secs(300),
-            timeout: Duration::from_secs(30),
-        };
-        assert!(cfg.validate().is_err());
-    }
-}

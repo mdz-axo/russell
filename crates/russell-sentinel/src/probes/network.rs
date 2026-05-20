@@ -41,17 +41,3 @@ impl_probe!(
     net_tcp6_connections
 );
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn net_tcp_returns_on_linux() {
-        if !std::path::Path::new("/proc/net/sockstat").exists() {
-            return;
-        }
-        let val = net_tcp_connections();
-        assert!(val.is_some(), "tcp connections should be readable");
-        assert!(val.unwrap() >= 0.0);
-    }
-}

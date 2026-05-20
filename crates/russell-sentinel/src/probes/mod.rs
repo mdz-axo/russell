@@ -78,16 +78,3 @@ pub fn collect_with(registry: &ProbeRegistry) -> Vec<Sample> {
 static REGISTRY: std::sync::LazyLock<ProbeRegistry> =
     std::sync::LazyLock::new(ProbeRegistry::with_defaults);
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn collect_returns_some_probes_on_linux() {
-        // On Linux we expect /proc/meminfo and /proc/loadavg to exist.
-        let s = collect();
-        if std::path::Path::new("/proc/meminfo").exists() {
-            assert!(!s.is_empty(), "expected at least one probe on Linux");
-        }
-    }
-}

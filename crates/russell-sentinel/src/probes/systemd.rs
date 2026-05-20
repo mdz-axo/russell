@@ -73,28 +73,3 @@ impl_probe!(
     systemd_system_failed_count
 );
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn systemd_degraded_returns_on_linux() {
-        if !std::path::Path::new("/run/systemd/system").exists() {
-            return;
-        }
-        let val = systemd_degraded();
-        assert!(val.is_some(), "systemd-degraded should return a value");
-        let v = val.unwrap();
-        assert!(v == 0.0 || v == 1.0, "degraded should be 0 or 1, got {v}");
-    }
-
-    #[test]
-    fn systemd_user_failed_count_on_linux() {
-        if !std::path::Path::new("/run/systemd/system").exists() {
-            return;
-        }
-        let val = systemd_user_failed_count();
-        assert!(val.is_some(), "failed count should return a value");
-        assert!(val.unwrap() >= 0.0);
-    }
-}

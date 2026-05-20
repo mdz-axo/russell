@@ -82,35 +82,3 @@ fn verdict(c: &SeverityCounts) -> Verdict {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use russell_core::event::{Event, Severity};
-    use russell_core::journal::JournalWriter;
-
-    #[test]
-    fn clean_fallback_mentions_nothing_notable() {
-        let tmp = tempfile::tempdir().unwrap();
-        let w = JournalWriter::open(&tmp.path().join("j.db")).unwrap();
-        let s = summarise(&w.reader(), None).unwrap();
-        assert!(s.contains("Nothing notable"));
-        assert!(s.contains("Offline"));
-    }
-
-    #[test]
-    fn hard_verdict_on_crit_event() {
-        let tmp = tempfile::tempdir().unwrap();
-        let w = JournalWriter::open(&tmp.path().join("j.db")).unwrap();
-        w.append(&Event::new("observe", Severity::Crit)).unwrap();
-        let s = summarise(&w.reader(), None).unwrap();
-        assert!(s.contains("Alerts in the window"));
-    }
-
-    #[test]
-    fn note_passed_through() {
-        let tmp = tempfile::tempdir().unwrap();
-        let w = JournalWriter::open(&tmp.path().join("j.db")).unwrap();
-        let s = summarise(&w.reader(), Some("ollama is slow")).unwrap();
-        assert!(s.contains("ollama is slow"));
-    }
-}

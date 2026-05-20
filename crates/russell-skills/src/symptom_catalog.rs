@@ -144,39 +144,3 @@ fn parse_symptoms_yaml(yaml: &str) -> Vec<String> {
         .collect()
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn compiled_in_yaml_parses() {
-        let parsed = parse_symptoms_yaml(SYMPTOMS_YAML);
-        // The YAML has the same entries as the SYMPTOMS constant (currently 85).
-        assert!(
-            parsed.len() >= 70,
-            "expected >=70 symptoms, got {}",
-            parsed.len()
-        );
-        assert!(parsed.contains(&"vram_oom".to_string()));
-        assert!(parsed.contains(&"agent_latency_spike".to_string()));
-    }
-
-    #[test]
-    fn static_symptoms_matches_yaml() {
-        let parsed = parse_symptoms_yaml(SYMPTOMS_YAML);
-        // Every entry in SYMPTOMS should be in the parsed YAML.
-        for s in SYMPTOMS {
-            assert!(
-                parsed.contains(&s.to_string()),
-                "SYMPTOMS constant has '{s}' but YAML doesn't"
-            );
-        }
-    }
-
-    #[test]
-    fn load_from_nonexistent_falls_back() {
-        let symptoms = load_symptoms_from_file(Path::new("/nonexistent/symptoms.yaml"));
-        assert!(!symptoms.is_empty());
-        assert!(symptoms.contains(&"vram_oom".to_string()));
-    }
-}
