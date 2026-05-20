@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
-//! Configuration for the Kask MCP client.
+//! Configuration for the hKask MCP client.
 //!
 //! All values are read from environment variables (loaded via
 //! `russell-core::env` from `russell.env`). Existing env vars
@@ -9,7 +9,43 @@ use std::time::Duration;
 
 use crate::error::Result;
 
-/// Default Kask API endpoint (stack-api default bind).
+/// MCP Config trait — hexagonal port for MCP configuration.
+///
+/// This trait defines the interface for MCP configurations, allowing Russell
+/// to work with any MCP implementation without coupling to specific configs.
+pub trait McpConfig {
+    /// Get the endpoint URL.
+    fn endpoint(&self) -> &str;
+    
+    /// Get the bearer token (if configured).
+    fn token(&self) -> Option<&str>;
+    
+    /// Validate the configuration (e.g., loopback check).
+    fn validate(&self) -> Result<()>;
+    
+    /// Whether a token is configured (can authenticate).
+    fn has_token(&self) -> bool;
+}
+
+impl McpConfig for HKaskMcpConfig {
+    fn endpoint(&self) -> &str {
+        &self.endpoint
+    }
+    
+    fn token(&self) -> Option<&str> {
+        self.token.as_deref()
+    }
+    
+    fn validate(&self) -> Result<()> {
+        self.validate()
+    }
+    
+    fn has_token(&self) -> bool {
+        self.has_token()
+    }
+}
+
+/// Default hKask API endpoint (stack-api default bind).
 pub const DEFAULT_ENDPOINT: &str = "http://127.0.0.1:18100";
 
 /// Default tools/list cache TTL in seconds.
@@ -18,17 +54,17 @@ pub const DEFAULT_TOOL_TTL_SECS: u64 = 300;
 /// Default HTTP timeout for MCP requests.
 pub const DEFAULT_TIMEOUT_SECS: u64 = 30;
 
-/// Environment variable: Kask MCP endpoint URL.
-pub const ENV_KASK_MCP_ENDPOINT: &str = "KASK_MCP_ENDPOINT";
+/// Environment variable: hKask MCP endpoint URL.
+pub const ENV_HKASK_MCP_ENDPOINT: &str = "HKASK_MCP_ENDPOINT";
 
-/// Environment variable: Bearer token for Kask authentication.
-pub const ENV_KASK_MCP_TOKEN: &str = "KASK_MCP_TOKEN";
+/// Environment variable: Bearer token for hKask authentication.
+pub const ENV_HKASK_MCP_TOKEN: &str = "HKASK_MCP_TOKEN";
 
 /// Environment variable: Tool list cache TTL in seconds.
-pub const ENV_KASK_MCP_TOOL_TTL_SECS: &str = "KASK_MCP_TOOL_TTL_SECS";
+pub const ENV_HKASK_MCP_TOOL_TTL_SECS: &str = "HKASK_MCP_TOOL_TTL_SECS";
 
 /// Environment variable: HTTP timeout in seconds.
-pub const ENV_KASK_MCP_TIMEOUT_SECS: &str = "KASK_MCP_TIMEOUT_SECS";
+pub const ENV_HKASK_MCP_TIMEOUT_SECS: &str = "HKASK_MCP_TIMEOUT_SECS";
 
 /// Configuration for the hKask MCP client.
 ///
@@ -54,19 +90,19 @@ impl HKaskMcpConfig {
     /// in a degraded state (for health checks / reachability probes).
     pub fn from_env() -> Self {
         let endpoint =
-            std::env::var(ENV_KASK_MCP_ENDPOINT).unwrap_or_else(|_| DEFAULT_ENDPOINT.to_owned());
+            std::env::var(ENV_HKASK_MCP_ENDPOINT).unwrap_or_else(|_| DEFAULT_ENDPOINT.to_owned());
 
-        let token = std::env::var(ENV_KASK_MCP_TOKEN)
+        let token = std::env::var(ENV_HKASK_MCP_TOKEN)
             .ok()
             .filter(|s| !s.is_empty());
 
-        let tool_ttl = std::env::var(ENV_KASK_MCP_TOOL_TTL_SECS)
+        let tool_ttl = std::env::var(ENV_HKASK_MCP_TOOL_TTL_SECS)
             .ok()
             .and_then(|s| s.parse::<u64>().ok())
             .map(Duration::from_secs)
             .unwrap_or(Duration::from_secs(DEFAULT_TOOL_TTL_SECS));
 
-        let timeout = std::env::var(ENV_KASK_MCP_TIMEOUT_SECS)
+        let timeout = std::env::var(ENV_HKASK_MCP_TIMEOUT_SECS)
             .ok()
             .and_then(|s| s.parse::<u64>().ok())
             .map(Duration::from_secs)

@@ -18,6 +18,74 @@ use crate::config::HKaskMcpConfig;
 use crate::error::{McpError, Result};
 use crate::types::{McpToolDefinition, ToolCallResult};
 
+/// MCP Client trait — hexagonal port for MCP tool access.
+///
+/// This trait defines the interface for MCP clients, allowing Russell
+/// to work with any MCP implementation (hKask, future backends) without
+/// coupling to specific implementations.
+///
+/// # Safety Constraints
+///
+/// Implementations MUST:
+/// - Validate that endpoints are loopback addresses (ADR-0025 §4)
+/// - Authenticate via bearer token
+/// - Enforce capability scope (Schneier/Miller principle)
+#[async_trait::async_trait]
+pub trait McpClient: Send + Sync {
+    /// Connect to the MCP endpoint and perform health check.
+    async fn connect(&mut self) -> Result<()>;
+    
+    /// List available MCP tools.
+    async fn list_tools(&self) -> Result<Vec<McpToolDefinition>>;
+    
+    /// Call an MCP tool by name with optional arguments.
+    async fn call_tool(
+        &self,
+        name: &str,
+        arguments: Option<serde_json::Value>,
+    ) -> Result<ToolCallResult>;
+    
+    /// Server name from last successful connection.
+    fn server_name(&self) -> Option<&str>;
+    
+    /// Whether the client is initialized (completed health check).
+    fn is_initialized(&self) -> bool;
+    
+    /// The configured endpoint URL.
+    fn endpoint(&self) -> &str;
+}
+
+#[async_trait::async_trait]
+impl McpClient for HKaskMcpClient {
+    async fn connect(&mut self) -> Result<()> {
+        self.connect().await
+    }
+    
+    async fn list_tools(&self) -> Result<Vec<McpToolDefinition>> {
+        self.list_tools().await
+    }
+    
+    async fn call_tool(
+        &self,
+        name: &str,
+        arguments: Option<serde_json::Value>,
+    ) -> Result<ToolCallResult> {
+        self.call_tool(name, arguments).await
+    }
+    
+    fn server_name(&self) -> Option<&str> {
+        self.server_name()
+    }
+    
+    fn is_initialized(&self) -> bool {
+        self.is_initialized()
+    }
+    
+    fn endpoint(&self) -> &str {
+        self.endpoint()
+    }
+}
+
 /// Validate that a URL points to a loopback address.
 ///
 /// Russell MUST NOT connect to non-loopback MCP servers (ADR-0025 §4).

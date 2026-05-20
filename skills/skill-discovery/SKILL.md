@@ -1,21 +1,21 @@
 ---
-name: pragmatic-cybernetics
+name: skill-discovery
 version: 0.1.0
 author: Russell (Jack the Nurse)
 license: MIT OR Apache-2.0
-description: Russell skill: pragmatic-cybernetics
+description: Russell skill: skill-discovery
 symptoms: []
 tags:
   - russell-replicant
-  - pragmatic-cybernetics
+  - skill-discovery
 visibility: public
 replicant: russell
 artifact_type: semantic_memory
 ---
 
-# pragmatic-cybernetics Skill
+# skill-discovery Skill
 
-Placeholder hKask artifact for pragmatic-cybernetics.
+Placeholder hKask artifact for skill-discovery.
 
 ## hKask Replicant Metadata
 

@@ -1,21 +1,21 @@
 ---
-name: pragmatic-cybernetics
+name: journal-compactor
 version: 0.1.0
 author: Russell (Jack the Nurse)
 license: MIT OR Apache-2.0
-description: Russell skill: pragmatic-cybernetics
+description: Russell skill: journal-compactor
 symptoms: []
 tags:
   - russell-replicant
-  - pragmatic-cybernetics
+  - journal-compactor
 visibility: public
 replicant: russell
 artifact_type: semantic_memory
 ---
 
-# pragmatic-cybernetics Skill
+# journal-compactor Skill
 
-Placeholder hKask artifact for pragmatic-cybernetics.
+Placeholder hKask artifact for journal-compactor.
 
 ## hKask Replicant Metadata
 

@@ -1,24 +1,25 @@
 ---
-name: pragmatic-cybernetics
+name: ubuntu-jack
 version: 0.1.0
 author: Russell (Jack the Nurse)
 license: MIT OR Apache-2.0
-description: Russell skill: pragmatic-cybernetics
+description: Russell skill: ubuntu-jack
 symptoms: []
 tags:
   - russell-replicant
-  - pragmatic-cybernetics
+  - ubuntu-jack
 visibility: public
 replicant: russell
-artifact_type: semantic_memory
+artifact_type: skill
 ---
 
-# pragmatic-cybernetics Skill
+# ubuntu-jack Skill
 
-Placeholder hKask artifact for pragmatic-cybernetics.
+Placeholder hKask artifact for ubuntu-jack.
 
 ## hKask Replicant Metadata
 
 - **Replicant ID**: russell
 - **Visibility**: public
 - **Episodic Memory**: false
+

@@ -1,0 +1,18 @@
+{
+  "$schema": "https://raw.githubusercontent.com/hashgraph-online/registry-broker-skills/main/schemas/skill.schema.json",
+  "name": "skill-maintenance",
+  "version": "0.1.0",
+  "description": "Russell skill: skill-maintenance",
+  "author": "Russell (Jack the Nurse)",
+  "license": "MIT OR Apache-2.0",
+  "homepage": "https://github.com/mdz-axolotl/russell",
+  "tags": ["russell-replicant", "skill-maintenance"],
+  "languages": ["bash", "shell"],
+  "repo": "https://github.com/mdz-axolotl/russell",
+  "replicant": {
+    "id": "russell",
+    "visibility": "public",
+    "artifact_type": "semantic_memory",
+    "episodic_memory": false
+  }
+}

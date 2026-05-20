@@ -561,6 +561,7 @@ fn classify_threshold_f64(value: f64, warn: f64, alert: f64) -> Severity {
         Severity::Info
     }
 }
+}
 
 /// Gather the journal writer stall vital.
 fn gather_journal_stall(writer: &JournalWriter, now: i64) -> Result<(Option<i64>, Severity)> {

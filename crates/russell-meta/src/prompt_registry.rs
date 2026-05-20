@@ -417,22 +417,55 @@ pub struct KnowledgeSlot {
     pub token_estimate: usize,
 }
 
-/// Select knowledge slots that fit within the token budget, ordered
-/// by relevance (highest first).
-pub fn select_knowledge(slots: &mut [KnowledgeSlot], budget_tokens: usize) -> Vec<&KnowledgeSlot> {
-    slots.sort_by(|a, b| {
-        b.relevance
-            .partial_cmp(&a.relevance)
-            .unwrap_or(std::cmp::Ordering::Equal)
-    });
-    let mut remaining = budget_tokens;
-    let mut selected = Vec::new();
-    for slot in slots.iter() {
-        if slot.token_estimate > remaining {
-            continue;
+/// Select knowledge slots that fit within the token budget using
+/// 0/1 knapsack optimization. Maximizes total value (relevance × token_estimate)
+/// while respecting the budget constraint.
+///
+/// # Algorithm
+///
+/// Standard 0/1 knapsack DP. O(n × budget_tokens) time and space.
+/// For typical inputs (n ≤ 20 skills, budget ≤ 3000 tokens), this
+/// is negligible (~60k operations).
+///
+/// # Value calculation
+///
+/// `slot_value = relevance × token_estimate × 1_000_000` (scaled to u64)
+///
+/// This ensures high-relevance knowledge gets priority, but token-heavy
+/// knowledge is penalized proportionally.
+pub fn select_knowledge(slots: &[KnowledgeSlot], budget_tokens: usize) -> Vec<&KnowledgeSlot> {
+    let n = slots.len();
+    if n == 0 || budget_tokens == 0 {
+        return Vec::new();
+    }
+
+    let budget = budget_tokens.min(65535);
+    let weights: Vec<usize> = slots.iter().map(|s| s.token_estimate.min(budget + 1)).collect();
+    let values: Vec<u64> = slots
+        .iter()
+        .map(|s| (s.relevance * s.token_estimate as f64 * 1_000_000.0) as u64)
+        .collect();
+
+    let mut dp = vec![vec![0u64; budget + 1]; n + 1];
+    for i in 0..n {
+        let w = weights[i];
+        let v = values[i];
+        for cap in 0..=budget {
+            if w > cap {
+                dp[i + 1][cap] = dp[i][cap];
+            } else {
+                dp[i + 1][cap] = dp[i][cap - w].saturating_add(v).max(dp[i][cap]);
+            }
         }
-        remaining -= slot.token_estimate;
-        selected.push(slot);
+    }
+
+    let mut selected = Vec::new();
+    let mut cap = budget;
+    for i in (0..n).rev() {
+        if dp[i + 1][cap] != dp[i][cap] && weights[i] <= cap {
+            selected.push(&slots[i]);
+            cap = cap.saturating_sub(weights[i]);
+        }
     }
     selected
 }
@@ -687,17 +720,17 @@ mod tests {
     }
 
     #[test]
-    fn knowledge_selection_respects_budget() {
-        let mut slots = vec![
+    fn select_knowledge_knapsack_selects_optimal() {
+        let slots = vec![
             KnowledgeSlot {
                 skill_id: "a".to_string(),
-                content: "big".to_string(),
+                content: "high relevance".to_string(),
                 relevance: 0.9,
                 token_estimate: 500,
             },
             KnowledgeSlot {
                 skill_id: "b".to_string(),
-                content: "small".to_string(),
+                content: "medium".to_string(),
                 relevance: 0.8,
                 token_estimate: 200,
             },
@@ -708,11 +741,17 @@ mod tests {
                 token_estimate: 400,
             },
         ];
-        let selected = select_knowledge(&mut slots, 700);
-        // Budget 700: 'a' (500, 0.9) fits, 'b' (200, 0.8) fits, 'c' (400) doesn't
+        // Knapsack: maximize value = relevance × tokens
+        // a: 0.9 × 500 = 450
+        // b: 0.8 × 200 = 160
+        // c: 0.7 × 400 = 280
+        // Budget 700: a+b = 700 tokens, value = 610 (optimal)
+        // a+c = 900 tokens (exceeds budget!)
+        // b+c = 600 tokens, value = 440
+        let selected = select_knowledge(&slots, 700);
         assert_eq!(selected.len(), 2);
-        assert_eq!(selected[0].skill_id, "a");
-        assert_eq!(selected[1].skill_id, "b");
+        assert!(selected.iter().any(|s| s.skill_id == "a"));
+        assert!(selected.iter().any(|s| s.skill_id == "b"));
     }
 
     #[test]
