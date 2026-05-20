@@ -55,6 +55,11 @@ pub const MIGRATIONS: &[Migration] = &[
         slug: "add_outputs_column",
         sql: include_str!("migrations/0005_add_outputs_column.sql"),
     },
+    Migration {
+        version: 6,
+        slug: "hash_chain",
+        sql: include_str!("migrations/0006_hash_chain.sql"),
+    },
 ];
 
 /// Apply any migrations newer than the DB's current version.
@@ -137,10 +142,10 @@ mod tests {
     fn runs_once_then_noop() {
         let c = fresh();
         run(&c).unwrap();
-        assert_eq!(current_version(&c).unwrap(), 5);
+        assert_eq!(current_version(&c).unwrap(), MIGRATIONS.last().unwrap().version);
         // Second run must not re-apply.
         run(&c).unwrap();
-        assert_eq!(current_version(&c).unwrap(), 5);
+        assert_eq!(current_version(&c).unwrap(), MIGRATIONS.last().unwrap().version);
     }
 
     #[test]

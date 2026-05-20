@@ -217,6 +217,36 @@ impl Event {
         }
     }
 
+    /// Create an event using an explicit clock (T2 — capability injection).
+    ///
+    /// This is the deterministic version of [`Event::new`]. Use this
+    /// in tests or when threading a clock through the system.
+    #[must_use]
+    pub fn new_with_clock(
+        action: impl Into<String>,
+        severity: Severity,
+        clock: &dyn crate::time::Clock,
+    ) -> Self {
+        Self {
+            id: EventId::new(),
+            ts: clock.now_rfc3339(),
+            ts_unix: clock.now_unix(),
+            schema: EVENT_SCHEMA.to_string(),
+            run_id: None,
+            tier: None,
+            module: None,
+            severity,
+            scope: Scope::Host,
+            action: action.into(),
+            dry_run: false,
+            inputs: BTreeMap::new(),
+            outputs: BTreeMap::new(),
+            evidence_ref: None,
+            duration_ms: None,
+            summary: None,
+        }
+    }
+
     /// Returns `true` iff the record schema matches this build.
     #[must_use]
     pub fn schema_matches(&self) -> bool {

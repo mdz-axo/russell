@@ -85,6 +85,10 @@ pub struct JournalWriter {
     /// Atomically updated on every write (append / append_sample).
     /// Records the unix timestamp of the most recent write.
     last_write_unix_s: AtomicI64,
+    /// Last event hash for hash-chain continuity (T6).
+    /// Initialized from the latest event's hash column on open,
+    /// or from [`crate::hash_chain::genesis_hash`] if the DB is empty.
+    last_hash: std::cell::RefCell<String>,
 }
 
 /// Read-only journal handle. Constructs fresh connections as needed.
@@ -171,10 +175,21 @@ impl JournalWriter {
 
         info!(db = %path.display(), "journal opened");
 
+        // Initialize hash chain: read the most recent event's hash,
+        // or use the genesis hash if the DB is empty / pre-chain.
+        let last_hash = conn
+            .query_row(
+                "SELECT hash FROM events WHERE hash IS NOT NULL ORDER BY ts_unix DESC LIMIT 1",
+                [],
+                |r| r.get::<_, String>(0),
+            )
+            .unwrap_or_else(|_| crate::hash_chain::genesis_hash());
+
         Ok(Self {
             conn,
             path: path.to_path_buf(),
             last_write_unix_s: AtomicI64::new(crate::time::now_unix()),
+            last_hash: std::cell::RefCell::new(last_hash),
         })
     }
 
@@ -189,12 +204,16 @@ impl JournalWriter {
         let severity = event.severity.as_str();
         let scope = event.scope.as_str();
 
+        // T6: Compute hash chain link.
+        let prev_hash = self.last_hash.borrow().clone();
+        let hash = crate::hash_chain::compute_event_hash(&prev_hash, &payload);
+
         self.conn.execute(
             r"INSERT INTO events (
                 id, ts_unix, ts, schema, scope, tier, module, run_id,
                 severity, action, dry_run, summary, evidence_ref,
-                duration_ms, payload
-            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)",
+                duration_ms, payload, prev_hash, hash
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17)",
             params![
                 event.id.to_string(),
                 event.ts_unix,
@@ -211,9 +230,15 @@ impl JournalWriter {
                 event.evidence_ref,
                 event.duration_ms.map(|d| d as i64),
                 payload,
+                prev_hash,
+                hash,
             ],
         )?;
-        debug!(id = %event.id, action = %event.action, "event appended");
+
+        // Update chain state.
+        *self.last_hash.borrow_mut() = hash;
+
+        debug!(id = %event.id, action = %event.action, "event appended (hash-chained)");
         self.last_write_unix_s
             .store(crate::time::now_unix(), Ordering::Relaxed);
         Ok(())

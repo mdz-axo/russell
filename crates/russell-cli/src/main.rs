@@ -110,6 +110,10 @@ enum Command {
         #[arg(long)]
         strict: bool,
     },
+    /// Verify the journal's event integrity chain (T6). Walks
+    /// SHA-256 hash links and reports any tamper-evidence breaks.
+    #[command(name = "verify-journal")]
+    VerifyJournal,
 }
 
 #[derive(Subcommand, Debug)]
@@ -225,5 +229,6 @@ async fn main() -> Result<()> {
         }
         Command::Mcp => russell_mcp_server::serve_stdio(paths).await,
         Command::Docs { strict } => commands::docs::run(&paths, strict),
+        Command::VerifyJournal => commands::verify::run(&paths),
     }
 }

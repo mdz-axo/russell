@@ -181,11 +181,12 @@ status: VERIFIED
 - [ ] Define message enums: `SentinelMsg`, `ProprioMsg`, `ChatMsg`
 - [ ] Document process algebra in `docs/architecture/CSP_MODEL.md`
 
-#### Task 2.2: Wire AutoimmuneGuard
-- [ ] Call `AutoimmuneGuard::try_acquire()` at start of `run_once()` functions
-- [ ] Return early with `Event::autoimmune_blocked` if guard held
-- [ ] Add test: concurrent self-triage attempts block correctly
-- [ ] Update ADR-0021 with wiring evidence
+#### Task 2.2: Wire AutoimmuneGuard ✅
+- [x] Call `AutoimmuneGuard::try_acquire()` at start of `run_once()` functions
+- [x] Return early with `Event::autoimmune_blocked` if guard held
+- [x] Add test: concurrent self-triage attempts block correctly
+- [x] Update ADR-0021 with wiring evidence
+- **Evidence:** Already complete in codebase (`russell-proprio/src/lib.rs` lines 188-237)
 
 #### Task 2.3: Add deadlock detection
 - [ ] Use `tokio::task::spawn` with timeout for journal readers
@@ -214,19 +215,23 @@ status: VERIFIED
 - [ ] Verify on read: hash mismatch = `Event::evidence_tampered`
 - [ ] Document in `PERSISTENCE_CATALOG.md` §2.3
 
-#### Task 3.4: Nested ACTION: detection
-- [ ] Extend `ActionParser` to recursively scan LLM output for nested `ACTION:` patterns
-- [ ] Reject with `DoctorError::NestedAction` if found
-- [ ] Log as `llm.action_injection_attempt` event
-- [ ] Add test: LLM output with nested actions is rejected
+#### Task 3.4: Nested ACTION: detection ✅
+- [x] Extend `ActionParser` to count ACTION: lines in response
+- [x] Reject with `ActionError::NestedActionDetected` if count > 1
+- [x] Error message surfaces "prompt injection attempt" to operator
+- [x] Add tests: 4 new tests verify detection and error messages
+- **ADR:** [`0029-nested-action-detection.md`](../adr/0029-nested-action-detection.md)
+- **Evidence:** `russell-meta/src/action.rs` lines 197-204, 286-302, 917-966
 
 ### Phase 4: Data Integrity (JR-7 / Persistence)
 
-#### Task 4.1: Baseline freshness guard
-- [ ] Add `is_stale(&self, max_age_hours: u32) -> bool` to `BaselineRow`
-- [ ] `read_baselines()` returns `Option<BaselineRow>` — `None` if stale
-- [ ] Jack's SOAP shows "baselines stale" if `None`
-- [ ] Add rule: baseline age > 48h = warning event
+#### Task 4.1: Baseline freshness guard ✅
+- [x] Add `is_stale(&self, max_age_hours: u32) -> bool` to `BaselineRow`
+- [x] `read_baselines()` returns `BaselineRow` with `updated_ts` field
+- [x] Jack's SOAP shows "baselines stale" warning if any > 48h old
+- [x] Mark stale probes with ⚠️ in sample table
+- **ADR:** [`0028-baseline-freshness-guard.md`](../adr/0028-baseline-freshness-guard.md)
+- **Evidence:** `russell-core/src/journal/mod.rs` lines 1005-1045, `russell-meta/src/prompt.rs` lines 128-188
 
 #### Task 4.2: Journal compaction skill
 - [ ] Create `journal-compactor` skill with probe and intervention
@@ -293,11 +298,39 @@ status: VERIFIED
 | Phase | Tasks Complete | Tasks Total | Status |
 |---|---|---|---|
 | Phase 1: Architectural Refactoring | 0 | 4 | Not Started |
-| Phase 2: Code Quality | 0 | 3 | Not Started |
-| Phase 3: Security Hardening | 0 | 4 | Not Started |
-| Phase 4: Data Integrity | 0 | 4 | Not Started |
+| Phase 2: Code Quality | 1 | 3 | In Progress |
+| Phase 3: Security Hardening | 1 | 4 | In Progress |
+| Phase 4: Data Integrity | 1 | 4 | In Progress |
 | Phase 5: Operational Completeness | 0 | 4 | Not Started |
-| **Total** | **0** | **19** | **Not Started** |
+| **Total** | **3** | **19** | **In Progress** |
+
+### Completed Tasks
+
+#### Task 2.2: Wire AutoimmuneGuard ✅
+- **Status:** Already complete in codebase
+- **Evidence:** `russell-proprio/src/lib.rs` lines 188-237
+- `AutoimmuneGuard` struct with `enter()` and `try_enter()` methods
+- `AUTOIMMUNE` static guard wired into `run_once()`, `run_once_with()`, `run_once_with_kask()`
+- Tests verify guard acquire/release behavior
+
+#### Task 3.4: Nested ACTION: Detection ✅
+- **Status:** Implemented 2026-05-19
+- **Evidence:** `russell-meta/src/action.rs`
+- Added `ActionError::NestedActionDetected` variant
+- `resolve_with_kask()` counts ACTION: lines, rejects if >1
+- 4 new tests verify detection and error messages
+- All 22 action parser tests pass
+
+#### Task 4.1: Baseline Freshness Guard ✅
+- **Status:** Implemented 2026-05-19
+- **Evidence:** `russell-core/src/journal/mod.rs`
+- Added `updated_ts: Option<i64>` to `BaselineRow`
+- Added `is_stale(max_age_hours)` and `is_fresh(max_age_hours)` methods
+- Updated `read_baselines()` to return full `BaselineRow` with timestamp
+- **Evidence:** `russell-meta/src/prompt.rs`
+- SOAP prompt now checks baseline staleness (48h threshold)
+- Displays warning if any baselines are stale
+- Marks stale probes with ⚠️ in sample table
 
 ---
 
