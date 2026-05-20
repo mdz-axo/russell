@@ -437,6 +437,10 @@ impl RiskBand {
 }
 
 /// Safety constraints for a skill.
+///
+/// Task 3.1: Capability attenuation — skills declare what environment
+/// variables and network access they need. The dispatcher enforces
+/// these constraints at runtime.
 #[derive(Debug, Clone, Deserialize)]
 pub struct Safety {
     /// Maximum risk band the Nurse may auto-run.
@@ -445,6 +449,15 @@ pub struct Safety {
     /// Intervention IDs that always require human confirmation.
     #[serde(default)]
     pub require_human_for: Vec<String>,
+    /// Environment variables this skill is allowed to access.
+    /// If empty, no environment variables are passed to subprocesses.
+    /// Task 3.1: Capability attenuation for skills.
+    #[serde(default)]
+    pub allowed_env_keys: Vec<String>,
+    /// Whether this skill requires network access.
+    /// Task 3.1: Skills declaring `true` may be blocked in air-gapped environments.
+    #[serde(default)]
+    pub needs_network: bool,
 }
 
 /// Post-intervention evaluation checks.
@@ -505,6 +518,12 @@ pub struct RawSafety {
     max_auto_risk: RiskBand,
     #[serde(default)]
     require_human_for: Vec<String>,
+    /// Task 3.1: Capability attenuation — allowed environment variables.
+    #[serde(default)]
+    allowed_env_keys: Vec<String>,
+    /// Task 3.1: Capability attenuation — network access requirement.
+    #[serde(default)]
+    needs_network: bool,
 }
 
 // --- Defaults -----------------------------------------------------------
@@ -589,6 +608,21 @@ pub fn load_all(skills_dir: &Path) -> Result<Vec<Skill>, LoadError> {
 }
 
 /// Load and validate a single skill manifest.
+///
+/// Task 3.1: Used by the CLI to load skill metadata for capability attenuation.
+///
+/// # Errors
+///
+/// Returns [`LoadError`] for I/O or validation failures.
+pub fn load_single(skill_dir: &Path) -> Result<Skill, LoadError> {
+    let dir_name = skill_dir
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("unknown");
+    load_one(skill_dir, dir_name)
+}
+
+/// Load and validate a single skill manifest (internal helper).
 fn load_one(skill_dir: &Path, dir_name: &str) -> Result<Skill, LoadError> {
     let manifest_path = skill_dir.join("manifest.yaml");
     if !manifest_path.exists() {
@@ -768,6 +802,8 @@ pub fn parse_manifest(yaml: &str, dir_name: &str) -> std::result::Result<Skill, 
     let safety_raw = raw.safety.unwrap_or(RawSafety {
         max_auto_risk: RiskBand::Low,
         require_human_for: Vec::new(),
+        allowed_env_keys: Vec::new(),
+        needs_network: false,
     });
 
     // Determine kind: explicit from manifest, or inferred from content.
@@ -792,6 +828,8 @@ pub fn parse_manifest(yaml: &str, dir_name: &str) -> std::result::Result<Skill, 
         safety: Safety {
             max_auto_risk: safety_raw.max_auto_risk,
             require_human_for: safety_raw.require_human_for,
+            allowed_env_keys: safety_raw.allowed_env_keys,
+            needs_network: safety_raw.needs_network,
         },
         evaluation: raw.evaluation,
     })

@@ -21,6 +21,8 @@ serde_yaml.workspace = true
 tokio.workspace = true
 tracing.workspace = true
 zeroize.workspace = true
+sha2 = "0.10"
+hex = "0.4"
 
 [dev-dependencies]
 tempfile.workspace = true

@@ -1,16 +1,16 @@
 ---
 title: "Russell — Agent Orientation"
 audience: [agents, operators, developers, contributors, architects]
-last_updated: 2026-05-09
+last_updated: 2026-05-19
 togaf_phase: "Preliminary / Governance"
-version: "1.0.0"
+version: "1.1.0"
 status: "Active"
 ---
 
 <!-- TOGAF_DOMAIN: Governance -->
-<!-- VERSION: 1.0.0 -->
+<!-- VERSION: 1.1.0 -->
 <!-- STATUS: Active -->
-<!-- LAST_UPDATED: 2026-05-09 -->
+<!-- LAST_UPDATED: 2026-05-19 -->
 
 # AGENTS.md — contributing to Russell
 
@@ -208,7 +208,147 @@ Specifically:
 - **If you do not know** — say "I do not know", name what you
   do not know, and ask.
 
-## 11. What this file is not
+## 11. Constraint-Driven Design (shared with hKask)
+
+These constraints apply identically to both Russell and hKask —
+they are the operator's engineering standards.
+
+### Principles (P1–P7)
+
+| # | Principle |
+|---|-----------|
+| **P1** | No trait without two consumers |
+| **P2** | No generic without two instantiations |
+| **P3** | No module directory without encapsulation |
+| **P4** | No builder without fallibility or complexity |
+| **P5** | No feature flag without an activator |
+| **P6** | Delete stubs, don't publish them |
+| **P7** | Prefer deletion over deprecation |
+
+### Constraints (C1–C7)
+
+| # | Constraint |
+|---|------------|
+| **C1** | A type must be worn before it's tailored |
+| **C2** | Distinguish dead from unwired |
+| **C3** | Unwired code has a shelf life |
+| **C4** | Repetition is a missing primitive |
+| **C5** | Every error variant is a unique recovery path |
+| **C6** | A stub is a debt receipt |
+| **C7** | When implementations diverge, one must yield |
+
+When a JR principle and a P/C constraint conflict, JR wins
+(Russell-specific > shared engineering).
+
+## 12. Code Budget & Testing Policy
+
+**Line Budget:** ≤15,000 lines Rust production code.
+
+Russell is governed by JR-1 (*"Though she be but little, she is
+fierce"*). The budget creates natural pressure to delete before
+adding and to consolidate before spreading.
+
+### What Counts Toward Budget
+
+All code in `russell-*` crates counts toward the 15,000 line limit:
+- Production code in `src/` directories
+- Inline unit tests (`#[cfg(test)]` modules within source files)
+- Integration tests in `tests/` directories within functional crates
+
+### What Is Excluded From Budget
+
+- **Single test crate:** `russell-testing` — the only crate whose
+  code is excluded from the budget (created when pressure warrants).
+- **Embedded non-Rust content:** SQL migrations (`migrations/*.sql`),
+  prompt templates (`prompts/*.md`), skill manifests (`manifest.yaml`).
+  These are data, not logic.
+- **Generated code** (if any, e.g. from `build.rs`).
+- **Comments and blank lines** — use `tokei` which strips these.
+
+### Measurement
+
+```bash
+tokei crates/ --type Rust          # primary measure
+cargo run -- verify-journal        # ensure integrity (separate concern)
+```
+
+### Policy
+
+- Only ONE test crate is excluded (`russell-testing`)
+- Multiple test crates are not authorized — if more test space is
+  needed, use directories within `russell-testing`
+- When inline `#[cfg(test)]` code exceeds 30% of a crate's total,
+  extract test helpers/fixtures into `russell-testing`
+- Tests must have no dependencies on them from production code
+
+### Agent Guidance (approaching 15,000 lines)
+
+1. First priority: delete, consolidate, simplify production code
+2. Second priority: move inline unit tests to `russell-testing`
+3. Third: collapse duplicate methods (C7 — when implementations
+   diverge, one must yield)
+4. Never: create additional test crates
+
+### Budget vs. JR-1
+
+The budget is a *consequence* of JR-1, not a replacement. If the
+system is well-designed, 15,000 lines is generous for a single-host
+health harness. If you are bumping the ceiling, the design has
+drifted — consolidate rather than expand.
+
+## 13. Hallucinations (Do NOT Implement)
+
+These features have been explicitly rejected. If proposed again,
+cite this list:
+
+- Cross-machine sync (Russell is single-host by design)
+- Bot swarms / consensus mechanisms
+- LLM-composed shell commands (JR-3 forbids this permanently)
+- Reputation systems for skills
+- Fine-tuning integration (Okapi handles model management)
+- Separate feedback crate (proprioception handles all self-observation)
+- Plugin marketplace
+- Multi-operator mode (single-operator threat model is load-bearing)
+- Async streaming from LLM (the Nurse pipeline is request-response)
+- UCAN / capability tokens (OCAP is enforcement; IDRS is the contract)
+
+## 14. Essential Commands
+
+```bash
+cargo check                          # quick type check
+cargo test                           # full test suite
+cargo clippy -- -D warnings          # lint (treat warnings as errors)
+cargo fmt --check                    # format check (CI)
+cargo run -- sentinel-once           # fire one observe cycle
+cargo run -- verify-journal          # audit hash chain integrity
+cargo run -- jack                    # ask Jack for assessment
+cargo run -- chat                    # interactive REPL
+```
+
+## 15. Completion Standard
+
+Before claiming work is done:
+
+1. `cargo check` — no errors
+2. `cargo test` — all pass
+3. `cargo clippy -- -D warnings` — no warnings
+4. `cargo fmt --check` — formatted
+5. Report exact test count and pass/fail
+6. If verification fails, fix it or state the remaining blocker
+
+Never claim completion without running verification.
+
+## 16. Workspace Integrity
+
+Before editing any file:
+
+1. `git status --short` — confirm no uncommitted work you
+   didn't create
+2. Never overwrite another agent's uncommitted changes
+3. Add dependencies at `[workspace.dependencies]` level first
+4. New crates require a workspace member entry in root `Cargo.toml`
+
+## 17. What this file is not
 
 - Not a tutorial. New contributors read [`docs/README.md`](docs/README.md) §3.
 - Not a reference. Every link above is the reference for its

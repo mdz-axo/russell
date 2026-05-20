@@ -224,6 +224,9 @@ pub struct DispatchRequest<'a> {
 
 /// A subprocess dispatcher. Constructed with the skills base directory
 /// (working directory for spawned processes).
+///
+/// Task 3.1: Capability attenuation — skills can declare allowed environment
+/// variables via `allowed_env_keys` in their manifest.
 pub struct Dispatcher {
     /// Base skills directory (e.g. `~/.local/share/harness/skills/<id>/`).
     pub skill_dir: PathBuf,
@@ -244,6 +247,10 @@ pub struct Dispatcher {
     /// (if applicable). Used for interventions like `create-manifest` where
     /// the LLM produces content that must be piped to the CLI command.
     pub stdin_content: Option<String>,
+    /// Environment variables this skill is allowed to access.
+    /// Combined with ENV_ALLOWLIST at dispatch time.
+    /// Task 3.1: Capability attenuation.
+    pub allowed_env_keys: Vec<String>,
 }
 
 impl std::fmt::Debug for Dispatcher {
@@ -341,6 +348,7 @@ impl Dispatcher {
             max_auto_risk: RiskBand::Low,
             sudo_password: None,
             stdin_content: None,
+            allowed_env_keys: Vec::new(),
         }
     }
 
@@ -450,7 +458,12 @@ impl Dispatcher {
         // RUSSELL_* internals, .env contents) to skill subprocesses.
         // Only a minimal allowlist is propagated.
         child_cmd.env_clear();
-        for key in &Self::ENV_ALLOWLIST {
+        // Combine default allowlist with skill-specific allowed_env_keys.
+        let mut combined_allowlist: Vec<&str> = Self::ENV_ALLOWLIST.to_vec();
+        for key in &self.allowed_env_keys {
+            combined_allowlist.push(key.as_str());
+        }
+        for key in &combined_allowlist {
             if let Ok(val) = std::env::var(key) {
                 child_cmd.env(key, val);
             }
@@ -887,19 +900,64 @@ pub fn resolve_rollback_strategy(rollback: &crate::Rollback) -> RollbackStrategy
 }
 
 /// Write stdout, stderr, and event JSON to the evidence directory.
+///
+/// Task 3.3: Evidence bundle sealing — computes SHA-256 hashes of all
+/// evidence files and writes a manifest.json for tamper detection.
 fn write_evidence(dir: &Path, outcome: &RunOutcome, event: &Event) -> Result<()> {
+    use sha2::{Sha256, Digest};
+    
     std::fs::create_dir_all(dir).map_err(|e| russell_core::CoreError::io(dir, e))?;
 
+    // Write stdout and compute hash.
     std::fs::write(dir.join("stdout.txt"), &outcome.stdout)
         .map_err(|e| russell_core::CoreError::io(dir, e))?;
+    let mut hasher = Sha256::new();
+    hasher.update(&outcome.stdout);
+    let stdout_hash = hex::encode(hasher.finalize());
 
-    if !outcome.stderr.is_empty() {
+    // Write stderr and compute hash.
+    let stderr_hash = if !outcome.stderr.is_empty() {
         std::fs::write(dir.join("stderr.txt"), &outcome.stderr)
             .map_err(|e| russell_core::CoreError::io(dir, e))?;
+        let mut hasher = Sha256::new();
+        hasher.update(&outcome.stderr);
+        hex::encode(hasher.finalize())
+    } else {
+        String::new()
+    };
+
+    // Add hashes to event outputs for journal audit trail.
+    let mut event_with_hashes = event.clone();
+    event_with_hashes.outputs.insert("stdout_sha256".into(), stdout_hash.clone().into());
+    if !stderr_hash.is_empty() {
+        event_with_hashes.outputs.insert("stderr_sha256".into(), stderr_hash.clone().into());
     }
 
-    let event_json = serde_json::to_string_pretty(event)?;
+    // Write event JSON.
+    let event_json = serde_json::to_string_pretty(&event_with_hashes)?;
     std::fs::write(dir.join("event.json"), event_json)
+        .map_err(|e| russell_core::CoreError::io(dir, e))?;
+
+    // Write manifest.json with file hashes and timestamp (Task 3.3).
+    let manifest = serde_json::json!({
+        "version": "1.0",
+        "created_at": russell_core::time::now_rfc3339(),
+        "files": {
+            "stdout.txt": {
+                "sha256": stdout_hash,
+                "size_bytes": outcome.stdout.len()
+            },
+            "stderr.txt": {
+                "sha256": stderr_hash,
+                "size_bytes": outcome.stderr.len()
+            },
+            "event.json": {
+                "note": "Self-hash not included"
+            }
+        }
+    });
+    let manifest_json = serde_json::to_string_pretty(&manifest)?;
+    std::fs::write(dir.join("manifest.json"), manifest_json)
         .map_err(|e| russell_core::CoreError::io(dir, e))?;
 
     Ok(())
@@ -919,6 +977,7 @@ mod tests {
             max_auto_risk: RiskBand::Low,
             sudo_password: None,
             stdin_content: None,
+            allowed_env_keys: Vec::new(),
         };
         // Dry-run skips validation — any command shape accepted.
         let outcome = d.run(&["/bin/echo".into(), "hello".into()], None).await.unwrap();
@@ -970,6 +1029,7 @@ mod tests {
             max_auto_risk: RiskBand::Low,
             sudo_password: None,
             stdin_content: None,
+            allowed_env_keys: Vec::new(),
         };
         // Sleep longer than the timeout — uses allowed interpreter `sh`.
         let outcome = d
@@ -1048,6 +1108,7 @@ mod tests {
             max_auto_risk: RiskBand::Low,
             sudo_password: None,
             stdin_content: None,
+            allowed_env_keys: Vec::new(),
         };
         let outcome = d
             .run_and_journal(
@@ -1082,6 +1143,7 @@ mod tests {
             max_auto_risk: RiskBand::Low,
             sudo_password: None,
             stdin_content: None,
+            allowed_env_keys: Vec::new(),
         };
         assert!(d.check_risk(RiskBand::None, false).is_ok());
         assert!(d.check_risk(RiskBand::Low, false).is_ok());
@@ -1100,6 +1162,7 @@ mod tests {
             max_auto_risk: RiskBand::Low,
             sudo_password: None,
             stdin_content: None,
+            allowed_env_keys: Vec::new(),
         };
         // High risk in dry-run mode should still pass — no mutation occurs.
         assert!(d.check_risk(RiskBand::Critical, true).is_ok());
@@ -1115,6 +1178,7 @@ mod tests {
             max_auto_risk: RiskBand::Medium,
             sudo_password: None,
             stdin_content: None,
+            allowed_env_keys: Vec::new(),
         };
         assert!(d.check_risk(RiskBand::Medium, false).is_ok());
         assert!(d.check_risk(RiskBand::High, false).is_err());
@@ -1130,6 +1194,7 @@ mod tests {
             max_auto_risk: RiskBand::Low,
             sudo_password: None,
             stdin_content: None,
+            allowed_env_keys: Vec::new(),
         };
         let err = d.check_risk(RiskBand::High, false).unwrap_err();
         let msg = err.to_string();

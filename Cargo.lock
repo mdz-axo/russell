@@ -1745,10 +1745,12 @@ dependencies = [
 name = "russell-skills"
 version = "0.20.0"
 dependencies = [
+ "hex",
  "russell-core",
  "serde",
  "serde_json",
  "serde_yaml",
+ "sha2",
  "tempfile",
  "thiserror",
  "tokio",

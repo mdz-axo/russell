@@ -688,6 +688,8 @@ mod tests {
             safety: Safety {
                 max_auto_risk: RiskBand::Low,
                 require_human_for: vec![],
+                allowed_env_keys: vec![],
+                needs_network: false,
             },
             evaluation: None,
         }

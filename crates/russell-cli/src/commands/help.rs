@@ -161,11 +161,16 @@ async fn execute_probe_capture(
     let timeout = Duration::from_secs(30);
 
     let mut dispatcher = Dispatcher::new(&skill_dir);
+    // Task 3.1: Load skill to get allowed_env_keys for capability attenuation.
+    if let Ok(skill) = russell_skills::load_single(&skill_dir) {
+        dispatcher.allowed_env_keys = skill.safety.allowed_env_keys.clone();
+    }
     dispatcher.probe_timeout = timeout;
     dispatcher.dry_run = DryRun::Disabled;
     dispatcher.max_auto_risk = match action {
         ResolvedAction::Probe { max_auto_risk, .. } => *max_auto_risk,
-        _ => russell_skills::RiskBand::None,
+        ResolvedAction::Intervention { max_auto_risk, .. } => *max_auto_risk,
+        ResolvedAction::KaskTool { .. } => russell_skills::RiskBand::None,
     };
 
     let result = dispatcher
