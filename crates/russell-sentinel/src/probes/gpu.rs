@@ -18,7 +18,6 @@
 
 use super::connectors;
 use super::tools;
-use std::path::Path;
 
 /// Detect the discrete GPU card index dynamically.
 ///
