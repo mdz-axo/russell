@@ -58,13 +58,13 @@ fn detect_dgpu_card() -> u32 {
         let vram_total_path = device_path.join("mem_info_vram_total");
 
         // Read VRAM total to determine if this is a dGPU
-        if let Ok(content) = std::fs::read_to_string(&vram_total_path) {
-            if let Ok(vram_bytes) = content.trim().parse::<u64>() {
-                // dGPUs typically have more VRAM than iGPUs
-                if vram_bytes > best_vram {
-                    best_vram = vram_bytes;
-                    best_card = card_num;
-                }
+        if let Ok(content) = std::fs::read_to_string(&vram_total_path)
+            && let Ok(vram_bytes) = content.trim().parse::<u64>()
+        {
+            // dGPUs typically have more VRAM than iGPUs
+            if vram_bytes > best_vram {
+                best_vram = vram_bytes;
+                best_card = card_num;
             }
         }
     }
