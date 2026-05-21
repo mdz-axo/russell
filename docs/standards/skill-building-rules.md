@@ -71,6 +71,17 @@ Then create `scripts/list-skills.sh`:
 russell skill list
 ```
 
+**Note:** If `russell` is not in PATH (common during development), use the `RUSSELL_BIN` environment variable pattern:
+
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+RUSSELL_BIN="${RUSSELL_BIN:-/home/user/Clones/russell/target/debug/russell}"
+"$RUSSELL_BIN" skill list
+```
+
+This allows runtime override via `RUSSELL_BIN=/custom/path/russell`.
+
 ## 2. Skill Directory Structure
 
 ```
