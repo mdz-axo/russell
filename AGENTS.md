@@ -165,6 +165,68 @@ Before touching code, answer:
 
 If you cannot answer all six, stop and ask.
 
+## 7.5. Building Skills (Jack's Workflow)
+
+When Jack (the Nurse) needs to create, modify, or install a skill, follow these rules:
+
+### 1. Command Path Validation (CRITICAL)
+
+Every skill command MUST pass path validation. The dispatcher rejects invalid paths at load time.
+
+**Valid patterns:**
+- `["bash", "./scripts/foo.sh"]` — relative script (preferred)
+- `["/usr/bin/systemctl", "--user", "restart", "okapi"]` — absolute path
+- `["sh", "-c", "echo hi"]` — allowed interpreter
+
+**Rejected patterns:**
+- `["russell", "skill", "list"]` — bare command name ✗
+- `["python3", "script.py"]` — PATH lookup ✗
+- `["bash", "../escape.sh"]` — traversal attempt ✗
+
+**Allowed interpreters:** `sh`, `bash`, `dash`, `python3`, `python`, `perl`, `ruby`
+
+**Why:** JR-2 (explicit execution), security (no PATH hijacking), JR-7 (auditability).
+
+**Fix:** If you see `bare command name "russell" rejected`, wrap in a script:
+```yaml
+# Wrong:
+cmd: ["russell", "skill", "list"]
+
+# Right:
+cmd: ["bash", "./scripts/list-skills.sh"]
+```
+
+Then create `scripts/list-skills.sh`:
+```bash
+#!/usr/bin/env bash
+russell skill list
+```
+
+### 2. Skill Directory Structure
+
+```
+~/.local/share/harness/skills/<id>/
+  manifest.yaml              # Required
+  scripts/                   # Required: probe/intervention scripts
+    probe-foo.sh
+    intervention-bar.sh
+  KNOWLEDGE.md               # Optional: context for Jack
+```
+
+### 3. From Chat Workflow
+
+1. **Discover gap:** Jack notices a symptom with no installed skill.
+2. **Propose build:** "Want me to create a <symptom>-watcher skill?"
+3. **Build skeleton:** `ACTION: skill-manager/build <id>`
+4. **Add probe/intervention:** Edit manifest, create scripts.
+5. **Install:** `ACTION: skill-manager/install <id>`
+
+### 4. References
+
+- [`docs/standards/skill-building-rules.md`](docs/standards/skill-building-rules.md) — full rules
+- [`docs/templates/skill-manifest.yaml`](docs/templates/skill-manifest.yaml) — starter template
+- [`docs/architecture/skill-self-management-strategy.md`](docs/architecture/skill-self-management-strategy.md) — design
+
 ## 8. Inherited Rules
 
 The Peripheral / Disclosure Stack operating rules apply to

@@ -1,5 +1,6 @@
 # docs/templates/skill-manifest.yaml
 # Copy to skills/<id>/manifest.yaml and fill every field.
+# See docs/standards/skill-building-rules.md for command path rules.
 # See AGENTS.md §6 ("How to add a new skill") and
 # docs/standards/safety.md (IDRS contract) before editing.
 
@@ -26,18 +27,25 @@ applies_when:
 # --- probes (risk: none by definition) -------------------------------------
 # Probes are read-only. Anything that mutates MUST live under
 # `interventions`. The dispatcher enforces this at load time.
+#
+# CRITICAL: Command paths MUST be valid:
+#   ✓ ["bash", "./scripts/foo.sh"]      — relative script
+#   ✓ ["/usr/bin/systemctl", "..."]     — absolute path
+#   ✓ ["sh", "-c", "echo"]              — allowed interpreter
+#   ✗ ["russell", "skill", "list"]      — bare command (REJECTED)
+# See docs/standards/skill-building-rules.md §1.
 probes:
   - id: <probe_id>
-    cmd: ["argv", "as", "list"]     # no shell interpolation; use bash -c for pipes
-    risk: none
+    cmd: ["bash", "./scripts/<probe_id>.sh"]
     capture: stdout                 # one of: stdout, stderr, both, file:<path>
     timeout: 30s                    # coarse upper bound; dispatcher kills on expiry
 
 # --- interventions ---------------------------------------------------------
 # Every mutating step satisfies IDRS. See docs/standards/safety.md.
+# CRITICAL: Same command path rules as probes apply.
 interventions:
   - id: <intervention_id>
-    cmd: ["argv", "as", "list"]
+    cmd: ["bash", "./scripts/<intervention_id>.sh"]
     risk: low                       # none | low | medium | high | critical
     idempotent: true                # must be true; verifiable with --verify-idempotent
     # Exactly one of: rollback_id, rollback: none_needed, rollback: reboot
