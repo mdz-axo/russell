@@ -1,16 +1,16 @@
 ---
 title: "Skill Self-Management Strategy"
 audience: [architects, developers]
-last_updated: 2026-05-14
+last_updated: 2026-05-21
 togaf_phase: "H"
-version: "1.0.0"
+version: "1.1.0"
 status: "Active"
 ---
 
 <!-- TOGAF_DOMAIN: Application Architecture -->
-<!-- VERSION: 1.0.0 -->
+<!-- VERSION: 1.1.0 -->
 <!-- STATUS: Active -->
-<!-- LAST_UPDATED: 2026-05-14 -->
+<!-- LAST_UPDATED: 2026-05-21 -->
 
 # Skill Self-Management Strategy
 
@@ -19,25 +19,25 @@ status: "Active"
 
 ## 1. Current State
 
-### What works
+### What works (2026-05-21)
 
 | Capability | Surface | Automation |
 |---|---|---|
 | Run probes / interventions | `russell chat` — ACTION syntax | Jack proposes, probes auto-fire, interventions need consent |
-| List skills | `russell skill list` | CLI only |
+| List skills | `russell skill list` | CLI + `skill-manager/list-skills` probe |
 | Discover skills | `russell workshop` — `search --remote` | Operator-driven |
-| Install / prune / adapt | `russell workshop` — built-in commands | Operator-driven |
+| Install / prune / adapt | `russell workshop` + `skill-manager` interventions | Both operator-driven and Jack-driven |
+| Build skills | `russell skill build` + `skill-manager/build` | Both operator-driven and Jack-driven |
 | Knowledge skills | KNOWLEDGE.md files loaded into Jack's context | Passive — just text |
+| Command path validation | Dispatcher enforces `./scripts/` or absolute paths | Automatic at load time |
 
 ### What's missing (blocking self-management)
 
 | Gap | Impact |
 |---|---|
 | **No telemetry feedback** | `probe_runs` and `recent_probe_failures` fields exist in `RegistryEntry` but are **never updated**. The dispatch path writes journal events but does not touch the registry cache. Jack has no way to know which skills are used or failing. |
-| **No in-chat skill management** | Jack can execute skills via ACTION but cannot build, install, modify, prune, or retire them. The workshop REPL is the only management surface, and it's operator-driven. |
 | **No quality scoring** | `coverage_score` field exists but `compute_score()` is not implemented. The scoring rubric from `skill-maintenance/KNOWLEDGE.md` has no backing code. |
 | **Registry only written on workshop exit** | Chat sessions don't read or write the registry cache. When Jack runs a probe in chat, the counter doesn't increment. |
-| **Knowledge skills have no teeth** | `skill-maintenance`, `skill-workshop`, `skill-discovery` are KNOWLEDGE.md files only — they teach Jack about the lifecycle but give him no mechanisms to act. |
 
 ## 2. Design Principles
 
@@ -99,6 +99,8 @@ status: "Active"
 
 #### The `skill-manager` manifest
 
+**Implementation note (2026-05-21):** The `skill-manager` skill is installed and operational at `~/.local/share/harness/skills/skill-manager/`. All commands use wrapper scripts (`scripts/*.sh`) with the `RUSSELL_BIN` environment variable pattern to handle development builds not in PATH.
+
 ```yaml
 id: skill-manager
 version: 1.0.0
@@ -112,65 +114,83 @@ symptoms:
 
 probes:
   - id: list-skills
-    cmd: ["russell", "skill", "list"]
+    cmd: ["bash", "./scripts/list-skills.sh"]
     risk: none
     timeout: 10s
 
-  - id: check-coverage
-    cmd: ["russell", "skill", "check"]
+  - id: check
+    cmd: ["bash", "./scripts/check.sh"]
     risk: none
     timeout: 10s
 
-  - id: skill-stats
-    cmd: ["russell", "skill", "stats"]
+  - id: stats
+    cmd: ["bash", "./scripts/stats.sh"]
     risk: none
     timeout: 10s
 
 interventions:
-  - id: install-skill
-    cmd: ["russell", "skill", "install", "<name>"]
+  - id: install
+    cmd: ["bash", "./scripts/install.sh"]
     risk: low
     idempotent: true
     rollback: none_needed
 
-  - id: prune-skill
-    cmd: ["russell", "skill", "prune", "<name>"]
-    risk: low
-    idempotent: true
-    rollback_id: restore-skill
-
-  - id: restore-skill
-    cmd: ["russell", "skill", "restore", "<name>"]
+  - id: build
+    cmd: ["bash", "./scripts/build.sh"]
     risk: low
     idempotent: true
     rollback: none_needed
 
-  - id: delete-skill
-    cmd: ["russell", "skill", "retire", "<name>"]
+  - id: create-manifest
+    cmd: ["bash", "./scripts/put.sh"]
+    risk: low
+    idempotent: true
+    rollback: none_needed
+    timeout: 15s
+
+  - id: prune
+    cmd: ["bash", "./scripts/prune.sh"]
+    risk: low
+    idempotent: true
+    rollback_id: restore
+
+  - id: restore
+    cmd: ["bash", "./scripts/restore.sh"]
+    risk: low
+    idempotent: true
+    rollback: none_needed
+
+  - id: delete
+    cmd: ["bash", "./scripts/retire.sh"]
     risk: medium
     idempotent: true
-    rollback: none_needed    # Files removed; restore from source
+    rollback: none_needed
+```
 
-  - id: build-skill
-    cmd: ["russell", "skill", "build", "<name>"]
-    risk: low
-    idempotent: true
-    rollback_id: prune-skill
+**Script pattern:** Each wrapper uses `RUSSELL_BIN` env var (defaults to dev build path):
+
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+RUSSELL_BIN="${RUSSELL_BIN:-/home/user/Clones/russell/target/debug/russell}"
+"$RUSSELL_BIN" skill list
 ```
 
 #### New CLI verbs required
 
-To make the `skill-manager` probes and interventions work, add these CLI subcommands to `russell-cli`:
+**Status (2026-05-21):** All CLI verbs are implemented in `crates/russell-cli/src/commands/skill.rs`:
 
-| Verb | Added to | Purpose |
+| Verb | Status | Purpose |
 |---|---|---|
-| `russell skill stats` | `skill.rs` | Prints registry counters, last runs, health |
-| `russell skill check` | `skill.rs` | Prints staleness audit + coverage gaps |
-| `russell skill install <name>` | `skill.rs` | Installs or activates a skill (idempotent) |
-| `russell skill prune <name>` | `skill.rs` | Deprecates a skill |
-| `russell skill restore <name>` | `skill.rs` | Restores from deprecated → active |
-| `russell skill retire <name>` | `skill.rs` | Removes from disk + marks retired |
-| `russell skill build <name>` | `skill.rs` | Creates manifest skeleton on disk |
+| `russell skill list` | ✓ Implemented | Lists loaded skills |
+| `russell skill stats` | ✓ Implemented | Prints registry counters, last runs, health |
+| `russell skill check` | ✓ Implemented | Prints staleness audit + coverage gaps |
+| `russell skill install <name>` | ✓ Implemented | Installs or activates a skill (idempotent) |
+| `russell skill prune <name>` | ✓ Implemented | Deprecates a skill |
+| `russell skill restore <name>` | ✓ Implemented | Restores from deprecated → active |
+| `russell skill retire <name>` | ✓ Implemented | Removes from disk + marks retired |
+| `russell skill build <name>` | ✓ Implemented | Creates manifest skeleton on disk |
+| `russell skill put <manifest>` | ✓ Implemented | Creates/updates skill manifest from YAML |
 
 These verbs wrap the existing workshop code in `workshop.rs` (`do_install`, `do_prune`, `do_restore`, `do_build`, `print_check`) — no new logic, just a non-interactive CLI surface.
 
@@ -219,7 +239,7 @@ Jack: I'll adapt it now to add the probe...
 
 ## 4. Implementation Plan
 
-### Phase A: Telemetry (2-3 hours)
+### Phase A: Telemetry (2-3 hours) — DEFERRED
 
 1. Extend `RegistryEntry` with new metric fields.
 2. Add `record_probe_run()` / `record_intervention_run()` to `RegistryCache`.
@@ -227,28 +247,36 @@ Jack: I'll adapt it now to add the probe...
 4. Save registry on chat exit and periodic flush.
 5. Add `russell skill stats` CLI verb.
 
-### Phase B: CLI verbs for management (1-2 hours)
+### Phase B: CLI verbs for management (1-2 hours) — ✓ COMPLETE (2026-05-21)
 
-1. Add `skill install`, `skill prune`, `skill restore`, `skill retire`, `skill build`, `skill check` subcommands.
-2. Each wraps existing workshop.rs functions in a non-interactive shell.
+1. ✓ Add `skill install`, `skill prune`, `skill restore`, `skill retire`, `skill build`, `skill check` subcommands.
+2. ✓ Each wraps existing workshop.rs functions in a non-interactive shell.
+3. ✓ Added `skill put` for manifest creation/update.
 
-### Phase C: skill-manager skill (1 hour)
+### Phase C: skill-manager skill (1 hour) — ✓ COMPLETE (2026-05-21)
 
-1. Create `skills/skill-manager/` with manifest.yaml and scripts.
-2. Add to bundled skill set.
-3. `install.sh` copies it to `~/.local/share/harness/skills/`.
+1. ✓ Created `skills/skill-manager/` with manifest.yaml and scripts.
+2. ✓ Added to bundled skill set.
+3. ✓ All commands use wrapper scripts with `RUSSELL_BIN` pattern for dev builds.
 
-### Phase D: Quality scoring (1 hour)
+**Command path validation fix (2026-05-21):** The dispatcher enforces that all skill commands use either:
+- Relative paths: `["bash", "./scripts/foo.sh"]`
+- Absolute paths: `["/usr/bin/systemctl", "..."]`
+- Allowed interpreters: `sh`, `bash`, `dash`, `python3`, `python`, `perl`, `ruby`
+
+Bare command names like `["russell", "skill", "list"]` are rejected. The `skill-manager` skill was updated to use wrapper scripts.
+
+### Phase D: Quality scoring (1 hour) — DEFERRED
 
 1. Implement `compute_score()`.
 2. Wire into registry sync and `skill check`.
 3. Display scores in Jack's skill performance table.
 
-### Phase E: Integration testing (1 hour)
+### Phase E: Integration testing (1 hour) — PARTIAL
 
-1. End-to-end scenario: Jack builds a new skill, installs it, runs probes, sees telemetry, prunes it.
-2. Verify registry counters increment correctly.
-3. Verify audit trail (journal events for every registry mutation).
+1. ✓ End-to-end skill creation works (`journal-viewer` skill built and installed).
+2. ✓ `skill-manager` probes functional (`list-skills`, `check`, `stats`).
+3. ◐ Registry counters not yet wired (Phase A dependency).
 
 ## 5. Registry Mutation Audit Trail
 
@@ -270,6 +298,37 @@ The registry cache (`local-cache.yaml`) is always rebuildable from:
 2. The journal events (`~/.local/state/harness/journal.db`)
 
 This satisfies JR-7: persistence is auditable.
+
+## 5.5. Command Path Validation (Lessons Learned)
+
+**Issue (2026-05-21):** The original `skill-manager` manifest used bare command names:
+
+```yaml
+# REJECTED by dispatcher:
+cmd: ["russell", "skill", "list"]
+```
+
+The dispatcher (`crates/russell-skills/src/dispatch.rs:validate_command_path`) enforces:
+- ✓ Relative paths: `["bash", "./scripts/foo.sh"]`
+- ✓ Absolute paths: `["/usr/bin/systemctl", "..."]`
+- ✓ Allowed interpreters: `sh`, `bash`, `dash`, `python3`, `python`, `perl`, `ruby`
+- ✗ Bare names: `["russell", "skill", "list"]` — PATH lookup rejected
+
+**Resolution:** All `skill-manager` commands now use wrapper scripts in `scripts/` directory with the `RUSSELL_BIN` environment variable pattern:
+
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+RUSSELL_BIN="${RUSSELL_BIN:-/home/user/Clones/russell/target/debug/russell}"
+"$RUSSELL_BIN" skill list
+```
+
+This pattern:
+1. Satisfies dispatcher validation (uses `bash` interpreter + relative script path)
+2. Handles development builds not in PATH
+3. Allows runtime override via `RUSSELL_BIN=/custom/path/russell`
+
+**Documentation:** See [`docs/standards/skill-building-rules.md`](docs/standards/skill-building-rules.md) for full skill-building guidance.
 
 ## 6. What This Does NOT Do (Out of Scope)
 
