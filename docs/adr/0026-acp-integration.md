@@ -270,9 +270,9 @@ crates/
 ## References
 
 - [ADR-0025: MCP Client Trusted Relationship](0025-hkask-mcp-client-trusted-relationship.md)
-- [hKask hLexicon](../../hKask/docs/architecture/hKask-hLexicon.md)
-- [hKask ACP Server](../../hKask/stack/crates/stack-acp-server/)
-- [hKask Macaroon Config](../../hKask/config/macaroon.example.yaml)
+- hKask hLexicon — separate repository
+- hKask ACP Server — separate repository
+- hKask Macaroon Config — separate repository
 - [ACP Specification](https://agentclientprotocol.com)
 - [A2A Protocol](https://a2a-protocol.org)
 - [Speech Act Theory](https://en.wikipedia.org/wiki/Speech_act)

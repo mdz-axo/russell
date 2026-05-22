@@ -234,5 +234,5 @@ cargo run --manifest-path crates/russell-skills/Cargo.toml -- test
 
 - [ADR-0026](../adr/0026-acp-integration.md) — Architecture decisions
 - [ACP Specification](https://agentclientprotocol.com)
-- [hKask hLexicon](../../hKask/docs/architecture/hKask-hLexicon.md)
-- [Macaroon Example Config](../../hKask/config/macaroon.example.yaml)
+- hKask hLexicon — separate repository
+- Macaroon Example Config — separate repository

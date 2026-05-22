@@ -40,7 +40,7 @@ model. That model also:
 - delegates lifecycle (kill, restart) to the frontend,
 - logs naturally to stdout/stderr + journald.
 
-See [ADR-0001](0001-scope-and-charter.md): Russell is a
+See [ADR-0001](../0001-scope-and-charter.md): Russell is a
 single-host, single-operator tool.
 
 ## Decision
@@ -179,6 +179,6 @@ Rejected: Windows is out of charter per ADR-0001.
 ## References
 
 - MCP specification: https://modelcontextprotocol.io
-- [ADR-0001](0001-scope-and-charter.md) — single-host scope.
+- [ADR-0001](../0001-scope-and-charter.md) — single-host scope.
 - [ADR-0025](../0025-hkask-mcp-client-trusted-relationship.md) —
   Russell as MCP *client* to Kask (orthogonal to this ADR).

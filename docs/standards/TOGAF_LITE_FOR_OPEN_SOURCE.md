@@ -400,19 +400,19 @@ docs/
 
 | Section | Contents | Audience |
 |---------|----------|----------|
-| [`architecture/`](architecture/) | System architecture documents | All |
-| [`architecture/adr/`](architecture/adr/) | Architecture Decision Records | Engineers |
-| [`operations/`](operations/) | Deployment and usage guides | Operators |
-| [`standards/`](standards/) | Project standards and policies | Contributors |
-| [`plans/`](plans/) | Active implementation plans | Engineers |
+| `architecture/` | System architecture documents | All |
+| `architecture/adr/` | Architecture Decision Records | Engineers |
+| `operations/` | Deployment and usage guides | Operators |
+| `standards/` | Project standards and policies | Contributors |
+| `plans/` | Active implementation plans | Engineers |
 
 ## Key Entry Points
 
 | I am… | Start here |
 |-------|-----------|
-| **New to the project?** | [Architecture Vision](architecture/VISION.md) |
-| **Deploying?** | [Installation Guide](operations/INSTALLATION.md) |
-| **Contributing code?** | [Application Architecture](architecture/APPLICATION.md) |
+| **New to the project?** | `architecture/VISION.md` |
+| **Deploying?** | `operations/INSTALLATION.md` |
+| **Contributing code?** | `architecture/APPLICATION.md` |
 
 ## TOGAF Alignment Note
 
@@ -551,11 +551,11 @@ The project demonstrates TOGAF-Lite at the "Standard" tier (30–75 docs per §8
 
 [^iso42010]: ISO/IEC/IEEE. (2011). *Systems and Software Engineering — Architecture Description*. ISO/IEC/IEEE 42010:2011. The architecture description standard that informs TOGAF-Lite's viewpoint and correspondence conventions.
 
-[^peripheral_docs]: Peripheral Project. (2026). "Peripheral Documentation Portal." [`docs/README.md`](../README.md) v2.0.0. The documentation portal demonstrating TOGAF-Lite in practice. ~35 active files, 17 crates in 1 workspace, verified 2026-04-15.
+[^peripheral_docs]: Peripheral Project. (2026). "Peripheral Documentation Portal." `docs/README.md` v2.0.0. The documentation portal demonstrating TOGAF-Lite in practice. ~35 active files, 17 crates in 1 workspace, verified 2026-04-15.
 
-[^peripheral_docarch]: Peripheral Project. (2026). "Peripheral Architecture Documentation." [`docs/architecture/README.md`](README.md) v2.0.0. The architecture directory index listing all architecture documents with TOGAF phase mappings.
+[^peripheral_docarch]: Peripheral Project. (2026). "Peripheral Architecture Documentation." `docs/architecture/README.md` v2.0.0. The architecture directory index listing all architecture documents with TOGAF phase mappings.
 
-[^peripheral_docstandards]: Peripheral Project. (2026). "Peripheral Documentation Standards." [`docs/standards/DOCUMENTATION_STANDARDS.md`](standards/DOCUMENTATION_STANDARDS.md) v1.0.0. The standards document governing metadata headers, lifecycle, citation requirements, and diagram conventions.
+[^peripheral_docstandards]: Peripheral Project. (2026). "Peripheral Documentation Standards." `docs/standards/DOCUMENTATION_STANDARDS.md` v1.0.0. The standards document governing metadata headers, lifecycle, citation requirements, and diagram conventions.
 
 [^gentle-docs]: Gentle, A. (2012). *Conversation and Community: The Social Web for Documentation*. XML Press. Articulates the principle that documentation is an ongoing dialogue with the community, not a static deliverable.
 
@@ -567,6 +567,6 @@ The project demonstrates TOGAF-Lite at the "Standard" tier (30–75 docs per §8
 
 ---
 
-*This pattern specification is maintained as part of the Kask documentation corpus. It is designed to be self-contained and reusable by other open-source projects. Pattern updated 2026-05-12: corrected counts after consolidation (38 stack + 20 arsenal = 58 workspace packages, 75 active docs). See [`docs/README.md`](README.md) for the Kask-specific TOGAF-Lite mapping.*
+*This pattern specification is maintained as part of the Kask documentation corpus. It is designed to be self-contained and reusable by other open-source projects. Pattern updated 2026-05-12: corrected counts after consolidation (38 stack + 20 arsenal = 58 workspace packages, 75 active docs). See Kask's `docs/README.md` for the Kask-specific TOGAF-Lite mapping.*
 
-[^kask_docs]: Kask Project. (2026). "Kask Documentation Portal." [`docs/README.md`](README.md) v5.4.0. The documentation portal demonstrating TOGAF-Lite at Standard tier. 67 active files and 64 Cargo workspace packages in 2 workspaces, verified 2026-05-08.
+[^kask_docs]: Kask Project. (2026). "Kask Documentation Portal." `docs/README.md` v5.4.0. The documentation portal demonstrating TOGAF-Lite at Standard tier. 67 active files and 64 Cargo workspace packages in 2 workspaces, verified 2026-05-08.

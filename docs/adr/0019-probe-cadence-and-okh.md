@@ -32,9 +32,8 @@ memory/load probes:
    timeout per provider × 8 providers = 40s worst case). Cannot
    run every 5 minutes without dominating the Sentinel cycle.
 
-Simultaneously, the Kask platform's `audit-crate.md` methodology
-(updated to three layers) identifies that **every tool/connector
-boundary is a sensor placement point**. Russell already has
+Simultaneously, the Kask platform's three-layer audit methodology
+identifies that **every tool/connector boundary is a sensor placement point**. Russell already has
 proprioception (ADR-0015), but it operates at the macro level
 ("did Sentinel run on time?"). The OKH discipline adds micro-level
 instrumentation: how long did each probe take? Did the apt
@@ -231,9 +230,8 @@ marginal effort. Rejected: do it once, do it right.
 
 ## References
 
-- [`docs/specifications/DISK_PKG_HYGIENE_SPEC.md`](../specifications/DISK_PKG_HYGIENE_SPEC.md) — parent spec
-- [`docs/specifications/disk-pkg-hygiene/06-open-questions.md`](../specifications/disk-pkg-hygiene/06-open-questions.md) — Question 1
-- [`docs/specifications/audit-crate.md`](../specifications/audit-crate.md) — three-layer audit methodology
+- [`DISK_PKG_HYGIENE_SPEC.md`](../specifications/DISK_PKG_HYGIENE_SPEC.md) — parent spec
+- [`06-open-questions.md`](../specifications/disk-pkg-hygiene/06-open-questions.md) — Question 1
 - [ADR-0015](0015-proprioception-self-health.md) — proprioception
 - [ADR-0013](0013-rust-workspace-layout.md) — crate topology
 - Stafford Beer, *Brain of the Firm* — System 3* (self-observation)

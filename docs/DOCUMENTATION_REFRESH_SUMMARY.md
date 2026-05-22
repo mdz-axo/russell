@@ -107,52 +107,36 @@ Minimal README files in subdirectories absorbed into main portal:
 
 ---
 
-## Broken Links (49 remaining)
+## Broken Links (resolved)
 
-### Categories
+**Final count:** 0 broken internal links (verified 2026-05-22)
 
-1. **External URLs (not broken, false positives):** 15
-   - `https://agentclientprotocol.com`
-   - `https://github.com/macaroon-v2/spec`
-   - `https://www.opengroup.org/togaf`
-   - Various Wikipedia, docs.rs URLs
+### Fixed Categories
 
-2. **hKask references (external repo):** 6
-   - `../../hKask/docs/architecture/hKask-hLexicon.md`
-   - `../../hKask/stack/crates/stack-acp-server/`
-   - `../../hKask/config/macaroon.example.yaml`
+1. **Incorrect paths (18 links)** — ✅ FIXED
+   - ADRs with `docs/adr/docs/architecture/` typos
+   - Code references corrected to relative paths
+   - Non-existent file references removed
 
-3. **Archived content (intentionally broken):** 10
-   - Links to `plans/*.md` (phase logs)
-   - Links to `proposals/*.md` (superseded)
-   - Links to deleted README files
+2. **hKask references (6 links)** — ✅ FIXED
+   - Converted to plain text (separate repository)
 
-4. **Incorrect paths (to fix):** 18
-   - `docs/adr/docs/architecture/...` (double `docs/`)
-   - `crates/russell-*/src/*.rs` (code references)
-   - `audit-crate.md` (non-existent file)
+3. **Archived content (10 links)** — ✅ FIXED
+   - Links to `plans/*.md` removed
+   - Links to `proposals/*.md` removed
+   - Links to deleted README files fixed
 
----
+4. **Directory links (4 links)** — ✅ FIXED
+   - Directory links converted to specific file links
+   - `adr/` → `adr/0001-scope-and-charter.md`
+   - `disk-pkg-hygiene/` → `disk-pkg-hygiene/00-semantic-decomposition.md`
 
-## Next Steps
+5. **Deferred ADR README references (6 links)** — ✅ FIXED
+   - Removed references to deleted `deferred/README.md`
+   - Fixed cross-ADR references (`0003` → `0001`)
 
-### Priority 1: Fix Incorrect Paths (18 links)
-- ADRs with `docs/adr/docs/architecture/` typos
-- Code references that should be relative to repo root
-- Non-existent file references
-
-### Priority 2: Update hKask References (6 links)
-- Replace with external URLs or remove if not essential
-- These reference a separate repository
-
-### Priority 3: Diagram Verification
-- `CAPABILITY_GRAPH.md` and `CODE_ANCHOR_GRAPH.md` archived pending verification
-- Remaining diagrams need `DIAGRAM_ALIGNMENT` metadata verification
-
-### Priority 4: Ongoing Maintenance
-- Run `.github/scripts/check_links.sh` before commits
-- Archive phase logs quarterly
-- Update `CONSOLIDATED-STATUS.md` at end of each session
+6. **External URLs** — ✅ SKIPPED
+   - Link checker correctly ignores `http://` and `https://` URLs
 
 ---
 
@@ -162,7 +146,7 @@ Minimal README files in subdirectories absorbed into main portal:
 |----------|--------|
 | TOGAF-Lite lifecycle | ✅ 35 files archived per policy |
 | Single source of truth | ✅ `CONSOLIDATED-STATUS.md` updated |
-| Link integrity | ⚠️ 49 broken links identified (18 actionable) |
+| Link integrity | ✅ 0 broken internal links (verified 2026-05-22) |
 | Metadata headers | ✅ All retained docs have frontmatter |
 | Authority hierarchy | ✅ `docs/README.md` updated as portal |
 
@@ -182,4 +166,5 @@ git show <sha>:docs/<path>
 ---
 
 **Refresh completed:** 2026-05-22  
+**Link integrity verified:** 2026-05-22 (0 broken)  
 **Next scheduled review:** 2026-08-22 (90-day freshness gate)

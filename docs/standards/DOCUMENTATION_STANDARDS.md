@@ -34,7 +34,7 @@ When claims conflict, precedence is:
 4. [`docs/specifications/MVP_SPEC.md`](../specifications/MVP_SPEC.md)
    — the pinned MVP boundary.
 5. [`docs/architecture/PRINCIPLES_CATALOG.md`](../architecture/PRINCIPLES_CATALOG.md).
-6. The relevant ADR under [`docs/adr/`](../adr/).
+6. The relevant ADR under [`docs/adr/`](../adr/0001-scope-and-charter.md).
 
 ## 2. Critical Set Policy
 
@@ -120,7 +120,7 @@ portal or is archived. There are no orphans.
 ### 5.2 When a decision is deferred
 
 ADRs whose subject is explicitly outside the MVP go under
-[`docs/adr/deferred/`](../adr/deferred/). They retain their
+[`docs/adr/deferred/`](../adr/deferred/0003-mcp-transport.md). They retain their
 `Status: Accepted` line and remain load-bearing for their
 future phase. Being deferred is not a demotion; it is a
 sequencing fact.
@@ -270,7 +270,7 @@ serve multiple tiers serves none effectively.
 ## 16. TOGAF Integration
 
 Russell uses a minimal TOGAF mapping; the full matrix lives at
-[`docs/architecture/TOGAF_TRACEABILITY_MATRIX.md`](../architecture/TOGAF_TRACEABILITY_MATRIX.md).
+`../architecture/TOGAF_TRACEABILITY_MATRIX.md` (archived).
 
 Every document carries one `togaf_phase` tag. Valid values:
 

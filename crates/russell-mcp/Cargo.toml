@@ -13,8 +13,10 @@ path = "src/lib.rs"
 
 [features]
 default = ["client"]
-client = ["reqwest", "urlencoding", "async-trait", "chrono"]
-server = ["russell-core", "russell-meta", "russell-sentinel", "russell-skills", "rmcp", "tokio/io-util", "tokio/io-std", "anyhow"]
+client = ["reqwest", "urlencoding", "async-trait", "chrono", "russell-meta", "russell-skills"]
+# Deprecated: Use russell-acp-server for hKask integration.
+# MCP server for IDE frontends is superseded by ACP protocol.
+server = ["russell-core", "russell-sentinel", "rmcp", "tokio/io-util", "tokio/io-std", "anyhow"]
 
 [dependencies]
 thiserror.workspace = true
@@ -28,12 +30,12 @@ reqwest = { workspace = true, optional = true }
 urlencoding = { version = "2.1", optional = true }
 async-trait = { version = "0.1", optional = true }
 chrono = { version = "0.4", features = ["serde"], optional = true }
-
-# Server dependencies (optional)
-russell-core = { workspace = true, optional = true }
 russell-meta = { workspace = true, optional = true }
-russell-sentinel = { workspace = true, optional = true }
 russell-skills = { workspace = true, optional = true }
+
+# Server dependencies (optional, deprecated)
+russell-core = { workspace = true, optional = true }
+russell-sentinel = { workspace = true, optional = true }
 rmcp = { version = "1.7", features = ["server", "transport-io", "macros"], optional = true }
 anyhow = { workspace = true, optional = true }
 

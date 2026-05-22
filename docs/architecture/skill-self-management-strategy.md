@@ -328,7 +328,7 @@ This pattern:
 2. Handles development builds not in PATH
 3. Allows runtime override via `RUSSELL_BIN=/custom/path/russell`
 
-**Documentation:** See [`docs/standards/skill-building-rules.md`](docs/standards/skill-building-rules.md) for full skill-building guidance.
+**Documentation:** See [`../standards/skill-building-rules.md`](../standards/skill-building-rules.md) for full skill-building guidance.
 
 ## 6. What This Does NOT Do (Out of Scope)
 

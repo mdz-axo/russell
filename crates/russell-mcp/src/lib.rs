@@ -1,17 +1,17 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
-//! `russell-mcp` — MCP client for hKask and MCP server for IDE frontends.
+//! `russell-mcp` — MCP client for hKask tool access.
 //!
-//! **TOGAF Phase:** Phase C (Application Architecture) — exposes Russell's
-//! telemetry as MCP tools (`russell_jack`, `russell_sentinel`, `russell_proprio`)
-//! for agentic consumption via hKask's MCP infrastructure.
+//! **Status:** Tertiary interface — ACP is primary for hKask integration.
+//!
+//! **TOGAF Phase:** Phase C (Application Architecture)
 //!
 //! Per [ADR-0025](../../docs/adr/0025-hkask-mcp-client-trusted-relationship.md),
 //! Russell gains an MCP client that connects **exclusively** to the local
-//! hKask installation's MCP endpoint. No general remote MCP servers. No
-//! remote skill registries. hKask is the sole trust boundary.
+//! hKask installation's MCP endpoint. No general remote MCP servers.
 //!
-//! This crate also provides an MCP server for IDE frontends (Zed, Claude Desktop,
-//! Cline/Roo) via stdio transport (ADR-0003).
+//! **Note:** The MCP server feature for IDE frontends is deprecated.
+//! Use the ACP server (`russell-acp-server`) for hKask integration.
+//! The MCP client remains available for Russell to access hKask's 193 MCP tools.
 //!
 //! # Architecture
 //!
@@ -23,8 +23,8 @@
 //!
 //! # Feature flags
 //!
-//! - `client` (default) — Include MCP client for hKask integration.
-//! - `server` — Include MCP server for IDE frontends.
+//! - `client` (default) — MCP client for hKask tool access.
+//! - `server` (deprecated) — MCP server for IDE frontends. Use ACP instead.
 //!
 //! # Safety constraints
 //!
@@ -51,4 +51,5 @@ pub mod registry;
 pub mod types;
 
 #[cfg(feature = "server")]
+#[deprecated(note = "MCP server is deprecated. Use russell-acp-server for hKask integration.")]
 pub mod server;

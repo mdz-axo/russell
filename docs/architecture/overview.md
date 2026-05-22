@@ -8,9 +8,9 @@ status: "Active"
 ---
 
 <!-- TOGAF_DOMAIN: Architecture Vision -->
-<!-- VERSION: 1.1.0 -->
+<!-- VERSION: 1.2.0 -->
 <!-- STATUS: Active -->
-<!-- LAST_UPDATED: 2026-05-06 -->
+<!-- LAST_UPDATED: 2026-05-22 -->
 
 <!--
 audience: contributors orienting themselves before editing code
@@ -32,7 +32,7 @@ design document wins. When both are silent, file an ADR.
 flowchart TB
   subgraph POLICY [Policy — the human operator]
     USER[Operator]
-    CONFIRM[russell confirm / confirm_proposal]
+    HKASK[hKask Platform]
   end
 
   subgraph INTEL [Intelligence]
@@ -42,7 +42,7 @@ flowchart TB
 
   subgraph CONTROL [Control]
     META[Metacognitive layer]
-    PROPRIO[Meta-Doctor / self-triage]
+    PROPRIO[Proprioception]
   end
 
   subgraph COORD [Coordination]
@@ -51,8 +51,7 @@ flowchart TB
 
   subgraph OPS [Operations]
     SENTINEL[Sentinel]
-    META[Meta-Sentinel]
-    TIERS[Tier I / II / III modules]
+    ACP[ACP Server]
     SKILLS[Skill dispatcher]
   end
 
@@ -65,33 +64,28 @@ flowchart TB
 
   subgraph SURFACE [Surfaces]
     CLI[russell CLI]
-    MCP[MCP stdio server]
-    NOTIFY[notify-send]
-    DIGEST[HTML digest]
   end
 
-  USER --> CLI & CONFIRM
-  MCP <--> AGENTS((Agent frontends))
-  CLI & MCP --> META & TIERS & SKILLS
-  CLOCK --> TIERS & SENTINEL & META
+  USER --> CLI
+  HKASK <-->|ACP stdio| ACP
+  CLI & ACP --> META & SKILLS
+  CLOCK --> SENTINEL
   SENTINEL --> JOURNAL
   META --> JOURNAL
-  TIERS --> META
   META --> SKILLS --> JOURNAL & EVIDENCE
   META --> LLM
   PROPRIO --> META
   BOOT --> PROFILE
-  PROFILE --> META & TIERS & SENTINEL
+  PROFILE --> META & SENTINEL
   RULES --> SENTINEL
-  JOURNAL --> DIGEST
-  META --> NOTIFY
+  JOURNAL --> CLI
 ```
 
 <!-- DIAGRAM_ALIGNMENT
 id: DIAG-OVERVIEW-001
 type: flowchart
-verified_date: 2026-05-13
-verified_against: AGENTS.md §5 (VSM layers); ADR-0004, ADR-0006, ADR-0008, ADR-0013, ADR-0015
+verified_date: 2026-05-22
+verified_against: AGENTS.md §5 (VSM layers); ADR-0026 (ACP integration)
 reference_sources: PRINCIPLES_CATALOG.md JR-1 through JR-7; cybernetic-health-harness.md
 status: VERIFIED
 -->
@@ -105,7 +99,7 @@ a corresponding ADR and a corresponding area of the code:
 | Policy | [ADR-0005](../adr/deferred/0005-privileged-operations.md), [safety.md](../standards/safety.md) | `russell-cli` confirm flow, kill switches |
 | Intelligence | [ADR-0008](../adr/0008-llm-triage-never-emits-shell.md) | `russell-meta::openrouter`, `russell-core::profile` |
 | Control | [ADR-0007](../adr/deferred/0007-yaml-manifest-subprocess-skill-model.md), [ADR-0015](../adr/0015-proprioception-self-health.md) | `russell-meta`, `russell-proprio` (MVP self-vital) |
-| Coordination | [ADR-0009](../adr/deferred/0009-tokio-runtime.md) + systemd timers | Unit files under `packaging/systemd/`; timers are OS-level |
+| Coordination | [ADR-0009](../adr/deferred/0009-tokio-runtime-lifted.md) + systemd timers | Unit files under `packaging/systemd/`; timers are OS-level |
 | Operations | [ADR-0004](../adr/0004-sqlite-journal.md), [ADR-0006](../adr/0006-profile-abstraction.md) | `russell-sentinel`, `russell-skills` |
 
 ## 2. Crate topology
@@ -307,9 +301,6 @@ not import hKask; hKask does not import Russell. Communication in
 both directions is via HTTP REST to `stack-api` (Russell → hKask)
 and via the SQLite journal read by `arsenal-mcp-russell`
 (hKask → Russell).
-
-See [`../proposals/russell-hkask-integration.md`](../proposals/russell-hkask-integration.md)
-for the full design.
 
 ## 9. What this document is not
 

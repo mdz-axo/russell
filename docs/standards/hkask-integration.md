@@ -224,9 +224,9 @@ hKask skills inherit this contract via Russell's dispatcher.
 ## References
 
 - [HCS-26 Standard](https://github.com/hiero-ledger/hiero-consensus-specifications/blob/main/docs/standards/hcs-26.md)
-- [OpenClaw Skill Manifest Reference](https://openclawai.me/blog/s skill-manifest-reference)
-- [SchemaStore #5405](https://github.com/SchemaStore/s schemastore/issues/5405)
-- [AGENTS.md](AGENTS.md) — Russell binding orientation
+- [OpenClaw Skill Manifest Reference](https://openclawai.me/blog/skill-manifest-reference)
+- [SchemaStore #5405](https://github.com/SchemaStore/schemastore/issues/5405)
+- [AGENTS.md](../../AGENTS.md) — Russell binding orientation
 
 ---
 

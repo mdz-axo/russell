@@ -163,7 +163,7 @@ configurable without code changes.
 ## References
 
 - [`MVP_SPEC.md §2.1`](../specifications/MVP_SPEC.md) — current `jack` spec
-- [`JR-2`](docs/architecture/PRINCIPLES_CATALOG.md) — Observe > Recommend > Act
-- [`russell-meta/src/fallback.rs`](crates/russell-meta/src/fallback.rs) — existing `verdict()` + `summarise()`
-- [`russell-meta/src/help.rs`](crates/russell-meta/src/help.rs) — current `run_help_with_config`
+- [`JR-2`](../architecture/PRINCIPLES_CATALOG.md) — Observe > Recommend > Act
+- [`russell-meta/src/fallback.rs`](../../crates/russell-meta/src/fallback.rs) — existing `verdict()` + `summarise()`
+- [`russell-meta/src/help.rs`](../../crates/russell-meta/src/help.rs) — current `run_help_with_config`
 - OpenClaw architecture (external) — inspiration for deterministic pre-flight pattern

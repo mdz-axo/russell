@@ -87,7 +87,7 @@ are separate crates. Cross-crate dependencies are a DAG rooted at
   runtime.
 - Blocking work (subprocess spawn, SQLite writes) goes through
   `tokio::task::spawn_blocking` or a dedicated blocking
-  threadpool. See [ADR-0009](../adr/deferred/0009-tokio-runtime.md).
+  threadpool. See [ADR-0009](../adr/deferred/0009-tokio-runtime-lifted.md).
 
 ## 6. Logging
 

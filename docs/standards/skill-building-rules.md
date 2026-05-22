@@ -201,7 +201,7 @@ russell skill prune "$SKILL_ID"
 mkdir -p ~/.local/share/harness/skills/<id>/scripts
 
 # Copy template
-cp docs/templates/skill-manifest.yaml \
+cp ../templates/skill-manifest.yaml \
    ~/.local/share/harness/skills/<id>/manifest.yaml
 
 # Edit manifest (fill all required fields)
@@ -240,7 +240,7 @@ russell journal tail
 
 ## 8. References
 
-- [`docs/standards/safety.md`](docs/standards/safety.md) — IDRS contract
-- [`docs/templates/skill-manifest.yaml`](docs/templates/skill-manifest.yaml) — starter template
-- [`docs/architecture/skill-self-management-strategy.md`](docs/architecture/skill-self-management-strategy.md) — self-management design
-- [`AGENTS.md`](AGENTS.md) — contributor orientation
+- [`safety.md`](safety.md) — IDRS contract
+- [`../templates/skill-manifest.yaml`](../templates/skill-manifest.yaml) — starter template
+- [`../architecture/skill-self-management-strategy.md`](../architecture/skill-self-management-strategy.md) — self-management design
+- [`AGENTS.md`](../../AGENTS.md) — contributor orientation

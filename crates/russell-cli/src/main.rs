@@ -2,10 +2,17 @@
 //! `russell` — command-line entry point.
 //!
 //! **TOGAF Phase:** Phase D (Technology Architecture) — the operator's
-//! primary interface. Ships the six read-only verbs plus the Nurse's
-//! `help` cry-for-help channel and interactive `chat` REPL.
+//! secondary interface. Primary interface is ACP server for hKask.
 //!
-//! Phase 1 (`cybernetic-health-harness.md` §20,
+//! This CLI provides local operator access to Russell's capabilities:
+//! - Sentinel probe execution
+//! - Journal queries
+//! - Interactive chat with Jack
+//! - Skill management
+//! - MCP client for hKask tool access (optional)
+//!
+//! **Note:** For hKask integration, use `russell-acp-server` (ACP protocol).
+//! The MCP server (`russell mcp`) is deprecated.
 
 #![deny(unsafe_code)]
 #![deny(rust_2018_idioms)]
@@ -91,14 +98,16 @@ enum Command {
     Workshop,
     /// Run Russell's self-observation cycle. Computes five self-vitals and appends samples to the journal.
     Proprio,
-    /// List available MCP tools from the local Kask installation.
+    /// List available MCP tools from the local hKask installation.
+    /// Deprecated: Use ACP for hKask integration.
+    #[deprecated(note = "Use ACP server for hKask integration")]
     McpTools {
         /// Just ping the endpoint (don't list tools).
         #[arg(long)]
         ping: bool,
     },
-    /// Start the MCP server (stdio transport). Used by IDE frontends
-    /// (Zed, Claude Desktop, Cline/Roo) to query Russell's telemetry.
+    /// Start the MCP server (stdio transport). Deprecated — use russell-acp-server.
+    #[deprecated(note = "MCP server is deprecated. Use russell-acp-server instead.")]
     Mcp,
     /// Check documentation quality — run linter, link check, freshness
     /// audit, metric-integrity verification, and diagram-alignment
@@ -236,6 +245,7 @@ async fn main() -> Result<()> {
         Command::Chat => commands::chat::run(&paths).await,
         Command::Workshop => commands::workshop::run(&paths).await,
         Command::Proprio => commands::proprio::run(&paths).await,
+        #[allow(deprecated)]
         Command::McpTools { ping } => {
             if ping {
                 commands::mcp_tools::ping().await
@@ -243,7 +253,17 @@ async fn main() -> Result<()> {
                 commands::mcp_tools::run().await
             }
         }
-        Command::Mcp => russell_mcp::server::serve_stdio(paths).await,
+        #[allow(deprecated)]
+        Command::Mcp => {
+            #[cfg(feature = "mcp-server")]
+            {
+                russell_mcp::server::serve_stdio(paths).await
+            }
+            #[cfg(not(feature = "mcp-server"))]
+            {
+                anyhow::bail!("MCP server is deprecated. Use russell-acp-server for hKask integration. Rebuild with --features mcp-server to enable.")
+            }
+        }
         Command::Docs { strict } => commands::docs::run(&paths, strict),
         Command::VerifyJournal => commands::verify::run(&paths),
         Command::Confirm {

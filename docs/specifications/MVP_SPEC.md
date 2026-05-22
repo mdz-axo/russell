@@ -10,9 +10,9 @@ status: "Active"
 # MVP Russell — the Minimal Viable Terrier
 
 <!-- TOGAF_DOMAIN: Requirements Management -->
-<!-- VERSION: 1.1.0 -->
+<!-- VERSION: 1.2.0 -->
 <!-- STATUS: Active -->
-<!-- LAST_UPDATED: 2026-05-11 -->
+<!-- LAST_UPDATED: 2026-05-22 -->
 
 This is the **pinned boundary** of MVP Russell. Anything outside
 this boundary requires an ADR or a spec update to this document.
@@ -23,27 +23,35 @@ The principle that pins it is JR-1 (see
 
 ## 1. The One-Paragraph Russell
 
-MVP Russell is a single Rust binary, `russell`, run by one user
-under user-scoped systemd on Ubuntu 25.10. He **observes** the
-host every five minutes via a broad probe set covering
-CPU, memory, processes, GPU, disks, and systemd, **remembers**
-what he saw in a SQLite journal, **reports** through CLI verbs,
-**watches himself** through five self-vitals (proprioception),
-and when asked he **cries for help** to a local LLM
-(Okapi by default). He **proposes**
-interventions via loaded skills, and with the operator's
-explicit consent, he **executes** them through the IDRS-gated
-skill dispatcher. He is small and he is fierce.
+MVP Russell is a cybernetic health harness for a single Linux AI/ML workstation, operating as an **ACP (Agent Client Protocol) agent** integrated with hKask. He **observes** the host every five minutes via a broad probe set covering CPU, memory, processes, GPU, disks, and systemd, **remembers** what he saw in a SQLite journal, **reports** through ACP sessions with Jack (the nurse persona) and CLI verbs, **watches himself** through five self-vitals (proprioception), and when asked he **cries for help** to a local LLM (Okapi by default). He **proposes** interventions via loaded skills, and with the operator's explicit consent, he **executes** them through the IDRS-gated skill dispatcher. He is small and he is fierce.
+
+**Primary interface:** ACP server for hKask integration  
+**Secondary interface:** CLI for local operator actions  
+**Deployment:** Hybrid (ACP server + systemd sentinel timer)
 
 ## 2. The Verbs
 
-The MVP CLI exposes these verbs:
+The MVP exposes capabilities through two interfaces:
+
+### 2.1 ACP Methods (Primary — hKask Integration)
+
+| Method | Risk | Role | Reach |
+|---|---|---|---|
+| `acp/session.create` | none | Create multi-turn session with Jack | stdio |
+| `acp/session.message` | none | Send message, receive Jack response | stdio |
+| `acp/session.close` | none | Close session | stdio |
+| `acp/capabilities` | none | List public skills and probes | stdio |
+| `acp/skill/info` | none | Get skill metadata | stdio |
+| `acp/probe/run` | none | Run read-only probe | stdio + process |
+| `acp/skill/run` | varies | Run skill (probes auto, interventions require consent) | stdio + process |
+
+### 2.2 CLI Verbs (Secondary — Local Operator)
 
 | Verb | Risk | Role | Reach |
 |---|---|---|---|
 | `russell status` | none | Read-only summary of paths, kill-switch, journal, profile | local fs |
 | `russell list` | none | Most-recent journal events | local sqlite |
-| `russell profile [--init]` | none | Show / initialise `profile.json` | local fs |
+| `russell profile [--init]` | none | Show / initialize `profile.json` | local fs |
 | `russell digest [--since-hours N]` | none | Markdown summary of recent activity | local sqlite |
 | `russell sentinel-once` | none | Fire the Sentinel once, append samples, evaluate rules | local fs |
 | `russell jack [--note "..."]` | none | Compose SOAP-shaped prompt and consult the LLM; print response | network *(opt-in)* |

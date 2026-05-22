@@ -12,13 +12,19 @@ authors.workspace = true
 name = "russell"
 path = "src/main.rs"
 
+[features]
+default = []
+# Deprecated: MCP server for IDE frontends. Use russell-acp-server instead.
+mcp-server = ["russell-mcp/server"]
+
 [dependencies]
 russell-core.workspace = true
 russell-sentinel.workspace = true
 russell-skills.workspace = true
 russell-meta.workspace = true
 russell-proprio.workspace = true
-russell-mcp = { workspace = true, features = ["server"] }
+# MCP client for hKask tool access (client feature only, server is deprecated)
+russell-mcp = { workspace = true, features = ["client"] }
 anyhow.workspace = true
 clap.workspace = true
 tokio.workspace = true

@@ -210,4 +210,4 @@ becomes appropriate.
 - [`ADR-0015`](0015-proprioception-self-health.md) — full proprioception spec
 - [`ADR-0020`](0020-threshold-gated-llm-escalation.md) — threshold-gated LLM (related pattern)
 - [`../archive/proprioception.md`](../archive/proprioception.md) §4 — reflex arc table
-- [`russell-proprio/src/lib.rs`](crates/russell-proprio/src/lib.rs) — current implementation
+- [`russell-proprio/src/lib.rs`](../../crates/russell-proprio/src/lib.rs) — current implementation

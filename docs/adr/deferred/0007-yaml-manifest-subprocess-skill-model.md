@@ -15,7 +15,7 @@ status: "Deprecated"
 > **Deferred.** This ADR's subject is outside the MVP boundary per
 > [`../../specifications/MVP_SPEC.md`](../../specifications/MVP_SPEC.md) §5.
 > It remains **Accepted** — when its phase opens, it ships this way.
-> See [`README.md`](README.md) for the deferral register.
+
 
 <!--
 audience: skill authors and dispatcher implementers

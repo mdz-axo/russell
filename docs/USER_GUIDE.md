@@ -1,8 +1,8 @@
 ---
 title: "Russell User Guide"
 audience: [operators]
-last_updated: 2026-05-20
-version: "1.0.0"
+last_updated: 2026-05-22
+version: "1.1.0"
 status: "Active"
 ---
 
@@ -16,14 +16,62 @@ This guide helps you operate Russell on your Linux workstation. Russell is a cyb
 
 ### 1.1 Installation
 
+**Option A: Automated install (recommended)**
+
 ```bash
 cd ~/Clones/russell
-./packaging/bin/install.sh --release
+./docs/deployment/install.sh
+./docs/deployment/macaroon-setup.sh
+source ~/.bashrc
 ```
 
-See [`operations/INSTALL.md`](operations/INSTALL.md) for full installation instructions.
+**Option B: Manual install**
 
-### 1.5 Essential Commands
+```bash
+cargo install --path crates/russell-cli --root ~/.cargo
+cargo install --path crates/russell-acp-server --root ~/.cargo
+
+# Copy systemd units
+cp docs/deployment/*.service ~/.config/systemd/user/
+cp docs/deployment/*.timer ~/.config/systemd/user/
+systemctl --user daemon-reload
+```
+
+See [`deployment/INSTALL.md`](deployment/INSTALL.md) for full installation instructions.
+
+### 1.2 Enable Services
+
+```bash
+# Sentinel timer (5-min cadence)
+systemctl --user enable --now russell-sentinel.timer
+
+# ACP server (hKask integration)
+systemctl --user enable --now russell-acp-server.service
+```
+
+### 1.3 Verify Installation
+
+```bash
+# Check services
+systemctl --user status russell-acp-server.service
+systemctl --user list-timers | grep russell
+
+# Run integration tests
+./docs/deployment/test-acp-integration.sh
+```
+
+### 1.4 Essential Commands
+
+**ACP Methods (Primary — hKask Integration)**
+
+| Method | Purpose |
+|---|---|
+| `acp/capabilities` | List public skills and probes |
+| `acp/session.create` | Create multi-turn session with Jack |
+| `acp/session.message` | Send message, receive Jack response |
+| `acp/probe/run` | Run read-only probe |
+
+**CLI Verbs (Secondary — Local Operator)**
 
 | Command | Purpose |
 |---|---|
@@ -35,7 +83,34 @@ See [`operations/INSTALL.md`](operations/INSTALL.md) for full installation instr
 | `russell skill list` | List installed skills |
 | `russell skill run <id>` | Run a skill probe/intervention |
 
-### 1.3 First Week with Russell
+### 1.5 hKask Integration
+
+Russell operates as an ACP agent in hKask. To enable integration:
+
+1. **Configure macaroon auth:**
+   ```bash
+   ./docs/deployment/macaroon-setup.sh
+   ```
+
+2. **Add Russell to hKask config** (`~/.config/hkask/agents/russell.yaml`):
+   ```yaml
+   agent:
+     russell:
+       type: acp
+       transport:
+         protocol: stdio
+         command: ["russell-acp-server"]
+       auth:
+         type: macaroon
+         root_key_file: ~/.config/hkask/macaroon-root.key
+   ```
+
+3. **Verify connection:**
+   ```bash
+   ./docs/deployment/test-acp-integration.sh
+   ```
+
+See [`deployment/acp-integration.md`](deployment/acp-integration.md) for full integration guide.
 
 **Day 1:** Russell establishes baselines. Expect limited insights — he needs 30 days of data for full EWMA baselines.
 
@@ -69,7 +144,7 @@ Jack always responds — LLM is optional.
 
 ## 3. Configuration
 
-### 3.1 Environment Variables
+### 1.6 First Week with Russell
 
 Edit `~/.config/harness/russell.env`:
 

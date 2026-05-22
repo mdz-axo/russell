@@ -74,4 +74,3 @@ russell confirm <event-id> --deny     # Deny a reflex intervention
 
 - [`AGENTS.md`](../../AGENTS.md) §5 — vocabulary (Andon cord definition)
 - [`ADR-0021`](0021-proprioception-phase2-reflex-arcs.md) — reflex arc foundation
-- [`ADVERSARIAL-REVIEW-ACTION-PLAN.md`](../plans/ADVERSARIAL-REVIEW-ACTION-PLAN.md) — Task O1

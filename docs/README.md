@@ -9,7 +9,7 @@
 
 ## What Russell Is
 
-Russell is a **cybernetic health harness** for a single Linux AI/ML workstation, operating as an **ACP (Agent Client Protocol) agent** integrated with [hKask](../hKask/README.md).
+Russell is a **cybernetic health harness** for a single Linux AI/ML workstation, operating as an **ACP (Agent Client Protocol) agent** integrated with hKask (separate repository).
 
 **Documentation Corpus:** 79 active files (2026-05-22 refresh)
 
@@ -131,7 +131,7 @@ systemctl --user list-timers | grep russell
 | [overview.md](architecture/overview.md) | Architecture overview | C — Application |
 | [ecosystem-integration.md](architecture/ecosystem-integration.md) | hKask integration | C — Application |
 | [skill-self-management-strategy.md](architecture/skill-self-management-strategy.md) | Skill lifecycle design | C — Application |
-| [ADR Index](adr/) | Architecture decisions | H — Change |
+| [ADR Index](adr/0001-scope-and-charter.md) | Architecture decisions | H — Change |
 
 ### Specifications
 
@@ -139,7 +139,7 @@ systemctl --user list-timers | grep russell
 |----------|---------|-------------|
 | [MVP_SPEC.md](specifications/MVP_SPEC.md) | MVP boundary | Requirements |
 | [PERSISTENCE_CATALOG.md](specifications/PERSISTENCE_CATALOG.md) | Data stores | C — Data |
-| [disk-pkg-hygiene/](specifications/disk-pkg-hygiene/) | Disk/package hygiene | C — Application |
+| [disk-pkg-hygiene](specifications/disk-pkg-hygiene/00-semantic-decomposition.md) | Disk/package hygiene | C — Application |
 
 ### Standards
 
