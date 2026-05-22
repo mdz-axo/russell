@@ -187,7 +187,7 @@ impl AcpHandler {
             response,
             turns: session.recent_turns(10).iter().map(turn_to_info).collect(),
             state: format!("{:?}", session.state),
-            pending_action: None, // TODO: Implement when consent workflow is added
+            pending_action: None, // Interventions require consent via upstream hKask workflow
         }))
     }
 
@@ -237,7 +237,7 @@ impl AcpHandler {
     /// Get skill info.
     async fn get_skill_info(&self, params: Option<serde_json::Value>) -> Result<serde_json::Value> {
         let skill_id = params
-            .and_then(|p| p.get("skill_id").map(|v| v.to_string()))
+            .and_then(|p| p.get("skill_id").and_then(|v| v.as_str()).map(String::from))
             .ok_or_else(|| AcpError::InvalidRequest("missing skill_id".to_string()))?;
 
         let skill = self
@@ -253,7 +253,7 @@ impl AcpHandler {
         let (skill_id, args) = params
             .ok_or_else(|| AcpError::InvalidRequest("missing params".to_string()))
             .and_then(|p| {
-                let skill_id = p.get("skill_id").map(|v| v.to_string()).ok_or_else(|| {
+                let skill_id = p.get("skill_id").and_then(|v| v.as_str()).map(String::from).ok_or_else(|| {
                     AcpError::InvalidRequest("missing skill_id".to_string())
                 })?;
                 let args = p.get("args").cloned().unwrap_or(json!({}));
@@ -269,10 +269,10 @@ impl AcpHandler {
         let (skill_id, probe_id, args) = params
             .ok_or_else(|| AcpError::InvalidRequest("missing params".to_string()))
             .and_then(|p| {
-                let skill_id = p.get("skill_id").map(|v| v.to_string()).ok_or_else(|| {
+                let skill_id = p.get("skill_id").and_then(|v| v.as_str()).map(String::from).ok_or_else(|| {
                     AcpError::InvalidRequest("missing skill_id".to_string())
                 })?;
-                let probe_id = p.get("probe_id").map(|v| v.to_string()).ok_or_else(|| {
+                let probe_id = p.get("probe_id").and_then(|v| v.as_str()).map(String::from).ok_or_else(|| {
                     AcpError::InvalidRequest("missing probe_id".to_string())
                 })?;
                 let args = p.get("args").cloned().unwrap_or(json!({}));

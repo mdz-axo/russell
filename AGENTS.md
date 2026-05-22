@@ -8,9 +8,9 @@ status: "Active"
 ---
 
 <!-- TOGAF_DOMAIN: Governance -->
-<!-- VERSION: 1.1.0 -->
+<!-- VERSION: 1.2.0 -->
 <!-- STATUS: Active -->
-<!-- LAST_UPDATED: 2026-05-19 -->
+<!-- LAST_UPDATED: 2026-05-22 -->
 
 # AGENTS.md — contributing to Russell
 
@@ -28,7 +28,7 @@ Russell is a single-host, single-operator harness that:
 
 - **observes** the host on a 5-minute cadence (Sentinel),
 - **remembers** what he saw in a SQLite journal,
-- **reports** through a read-only CLI,
+- **reports** through ACP (Agent Client Protocol) to hKask,
 - **watches himself** (proprioception — "did I run on time?"),
 - and when asked, **cries for help** via a local LLM
   (Okapi by default; OpenRouter opt-in).
@@ -36,6 +36,10 @@ Russell is a single-host, single-operator harness that:
 He does *not* mutate host state (outside his own skill sandbox)
 or act on LLM output as shell commands. Those lanes are
 guarded by IDRS and JR-3.
+
+**Primary interface:** ACP server for hKask integration  
+**Secondary interface:** CLI for local operator actions  
+**Deployment:** Hybrid (ACP server + systemd sentinel timer)
 
 ## 2. Authority Hierarchy
 
@@ -383,8 +387,33 @@ cargo clippy -- -D warnings          # lint (treat warnings as errors)
 cargo fmt --check                    # format check (CI)
 cargo run -- sentinel-once           # fire one observe cycle
 cargo run -- verify-journal          # audit hash chain integrity
-cargo run -- jack                    # ask Jack for assessment
-cargo run -- chat                    # interactive REPL
+cargo run -- skill list              # list installed skills
+cargo run -- chat                    # interactive REPL with Jack
+```
+
+### ACP Server
+
+```bash
+# Test ACP capabilities
+echo '{"jsonrpc":"2.0","id":1,"method":"acp/capabilities","params":{}}' | \
+  russell-acp-server
+
+# Run integration tests
+./docs/deployment/test-acp-integration.sh
+```
+
+### Deployment
+
+```bash
+# Install
+./docs/deployment/install.sh
+
+# Configure macaroon
+./docs/deployment/macaroon-setup.sh
+
+# Enable services
+systemctl --user enable --now russell-sentinel.timer
+systemctl --user enable --now russell-acp-server.service
 ```
 
 ## 15. Completion Standard

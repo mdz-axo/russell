@@ -21,7 +21,7 @@ cd ~/Clones/russell
 ./packaging/bin/install.sh --release
 ```
 
-See [`docs/operations/INSTALL.md`](docs/operations/INSTALL.md) for full installation instructions.
+See [`operations/INSTALL.md`](operations/INSTALL.md) for full installation instructions.
 
 ### 1.5 Essential Commands
 
@@ -301,11 +301,11 @@ russell skill run --dry-run <id>
 
 | Resource | Contents |
 |---|---|
-| [`AGENTS.md`](AGENTS.md) | Binding rules, authority hierarchy |
-| [`docs/README.md`](docs/README.md) | Documentation portal |
-| [`docs/operations/INSTALL.md`](docs/operations/INSTALL.md) | Installation guide |
-| [`docs/reference/cli.md`](docs/reference/cli.md) | Command reference |
-| [`docs/standards/safety.md`](docs/standards/safety.md) | IDRS contract, risk bands |
+| [`../AGENTS.md`](../AGENTS.md) | Binding rules, authority hierarchy |
+| [`README.md`](README.md) | Documentation portal |
+| [`operations/INSTALL.md`](operations/INSTALL.md) | Installation guide |
+| [`reference/cli.md`](reference/cli.md) | Command reference |
+| [`standards/safety.md`](standards/safety.md) | IDRS contract, risk bands |
 
 ## 10. Next Steps
 

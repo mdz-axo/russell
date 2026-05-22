@@ -1109,18 +1109,26 @@ async fn do_build(
     let manifest_path = skill_dir.join("manifest.yaml");
     let today = now_date_iso8601();
     let manifest_content = format!(
-        r#"# {name} — TODO: describe what this skill does.
-id: {name}
-version: 0.1.0
-authored: {today}
-min_harness_version: 0.1.0
-symptoms: []
-applies_when:
-  - os_family: linux
-probes: []
-interventions: []
-safety:
-  max_auto_risk: none
+        r#"# {name}
+
+**Version:** 0.1.0  
+**Status:** Draft
+
+## Purpose
+
+TODO: Describe what symptom this skill addresses.
+
+## Probes
+
+TODO: List read-only probes.
+
+## Interventions
+
+TODO: List mutating interventions (with IDRS rollback).
+
+## Knowledge
+
+TODO: Add KNOWLEDGE.md if this skill requires contextual knowledge injection.
 "#
     );
 

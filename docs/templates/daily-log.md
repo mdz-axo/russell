@@ -77,6 +77,6 @@ The `c=N` on `[O]` entries is Russell's self-assessed confidence:
 
 ## See Also
 
-- [ADR-0022](../../adr/0022-markdown-memory-layer.md) — design decision
-- [`PERSISTENCE_CATALOG.md`](../../specifications/PERSISTENCE_CATALOG.md) §2.9 — persistence registration
+- [ADR-0022](../adr/0022-markdown-memory-layer.md) — design decision
+- [`PERSISTENCE_CATALOG.md`](../specifications/PERSISTENCE_CATALOG.md) §2.9 — persistence registration
 - [`review-entry.md`](review-entry.md) — REVIEW.md entry template

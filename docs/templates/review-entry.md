@@ -115,6 +115,6 @@ as a durable fact for future sessions.")
 
 ## See Also
 
-- [ADR-0022](../../adr/0022-markdown-memory-layer.md) — design decision
-- [`PERSISTENCE_CATALOG.md`](../../specifications/PERSISTENCE_CATALOG.md) §2.9 — persistence registration
+- [ADR-0022](../adr/0022-markdown-memory-layer.md) — design decision
+- [`PERSISTENCE_CATALOG.md`](../specifications/PERSISTENCE_CATALOG.md) §2.9 — persistence registration
 - [`daily-log.md`](daily-log.md) — daily log template (where candidate observations originate)

@@ -1,219 +1,298 @@
+# Russell — Cybernetic Health Harness for hKask
+
+**Version:** 1.0.0  
+**Status:** Active — Documentation Refresh Complete  
+**Last Updated:** 2026-05-22  
+**TOGAF Phase:** G — Governance
+
 ---
-title: "Russell Documentation Portal"
-audience: [operators, developers, contributors, architects, agents]
-last_updated: 2026-05-14
-togaf_phase: "C"
-version: "1.2.0"
-status: "Active"
+
+## What Russell Is
+
+Russell is a **cybernetic health harness** for a single Linux AI/ML workstation, operating as an **ACP (Agent Client Protocol) agent** integrated with [hKask](../hKask/README.md).
+
+**Documentation Corpus:** 79 active files (2026-05-22 refresh)
+
+### Architecture Overview
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                         hKask Platform                          │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────────┐ │
+│  │ MCP Servers │  │   Agents    │  │  Bitemporal Store       │ │
+│  │ (193 tools) │  │ (Ensemble)  │  │  (PostgreSQL/Redis)     │ │
+│  └──────┬──────┘  └──────┬──────┘  └───────────┬─────────────┘ │
+│         │                │                      │                │
+│         └────────────────┼──────────────────────┘                │
+│                          │ ACP (JSON-RPC)                        │
+└──────────────────────────┼───────────────────────────────────────┘
+                           │ stdio
+┌──────────────────────────┼───────────────────────────────────────┐
+│                    Russell ACP Server                            │
+│  ┌────────────────────────┼────────────────────────────────┐    │
+│  │  Jack Persona (LLLM)  │  Public Skills (8)             │    │
+│  │  - Okapi backend      │  - journal-viewer              │    │
+│  │  - SOAP prompts       │  - web-search                  │    │
+│  │  - Nurse voice        │  - scenario-tester             │    │
+│  │                       │  - package-checker             │    │
+│  │  Session Manager      │  - ubuntu-jack                 │    │
+│  │  - Multi-turn state   │  - journal-compactor           │    │
+│  │  - Turn records       │  - pragmatic-*                 │    │
+│  │                       │                                 │    │
+│  │  Security Boundary    │  Private Skills (6)            │    │
+│  │  - Macaroon auth      │  - okapi-watcher               │    │
+│  │  - Rate limiter       │  - sysadmin                    │    │
+│  │  - Visibility filter  │  - skill-*                     │    │
+│  └────────────────────────┼────────────────────────────────┘    │
+│                           │                                     │
+│  ┌────────────────────────┴─────────────────────────────────┐   │
+│  │              SQLite Journal (Local)                       │   │
+│  │  - Host telemetry (5-min cadence)                         │   │
+│  │  - Evidence bundles (IDRS)                                │   │
+│  │  - Proprioception vitals (private)                        │   │
+│  └───────────────────────────────────────────────────────────┘   │
+└───────────────────────────────────────────────────────────────────┘
+                           │
+┌──────────────────────────┼───────────────────────────────────────┐
+│              Russell Sentinel (systemd timer)                    │
+│  - 5-minute probe cadence                                        │
+│  - 23 host samples per cycle                                     │
+│  - Threshold evaluation (RuleSet)                                │
+│  - Journal writes (harness.event.v1)                             │
+└───────────────────────────────────────────────────────────────────┘
+```
+
+### Key Design Decisions
+
+| Decision | Rationale |
+|----------|-----------|
+| **ACP primary interface** | hKask integration, bidirectional capability access |
+| **Hybrid deployment** | ACP server (on-demand) + Sentinel timer (5-min) |
+| **Visibility boundary** | 8 public skills (read-only) / 6 private (mutations) |
+| **Independent journal** | Russell operates during hKask outages |
+| **Proprioception private** | 5 self-vitals never exposed (security) |
+| **Macaroon OCAP** | Fine-grained capability attenuation |
+
 ---
 
-# Russell Documentation Portal
+## Quick Start
 
-<!-- TOGAF_DOMAIN: Cross-cutting — Documentation Governance -->
-<!-- VERSION: 1.2.0 -->
-<!-- STATUS: Active -->
-<!-- LAST_UPDATED: 2026-05-14 -->
+### Prerequisites
 
-<!-- TOGAF_DOMAIN: Cross-cutting — Documentation Governance -->
-<!-- VERSION: 1.0.0 -->
-<!-- STATUS: Active -->
-<!-- LAST_UPDATED: 2026-05-15 -->
+- Rust toolchain (`cargo --version`)
+- Okapi running (`systemctl --user status okapi`)
+- hKask configured (optional, for ACP integration)
 
-This is the **single navigation entrypoint** for Russell's active
-documentation corpus. Russell is small; the corpus should be too.
-If you cannot find what you need from this page, it probably does
-not belong in the corpus (yet).
+### Install
 
-## 1. Quick Navigation
+```bash
+# Install binaries
+./docs/deployment/install.sh
 
-| Section | Contents | TOGAF Phase | Audience |
-|---|---|---|---|
-| [`architecture/`](architecture/) | System architecture & principles | A / Preliminary | All |
-| [`architecture/adr/`](adr/) | Architecture Decision Records (19 active, 7 deferred) | H | Developers |
-| [`specifications/`](specifications/) | MVP boundary, persistence catalog, integration refs | Requirements | All |
-| [`standards/`](standards/) | Documentation, coding, commits, safety, ADR, writing excellence | Preliminary | Contributors |
-| [`operations/`](operations/) | Reuse manifest, operator runbooks | D / G | Developers, Operators |
-| [`status/`](status/) | Current consolidated state | G | All |
-| [`templates/`](templates/) | Copy-when-authoring scaffolds | — | Contributors |
-| [`archive/`](archive/) | Superseded content, with provenance | Repository | Reference |
+# Configure macaroon auth
+./docs/deployment/macaroon-setup.sh
+source ~/.bashrc
 
-## 2. Critical Set (Authoritative Documents)
+# Enable services
+systemctl --user enable --now russell-sentinel.timer
+systemctl --user enable --now russell-acp-server.service
+```
 
-Only these documents are **authoritative**. Supplementary documents
-may exist but must not contradict these.
+### Verify
 
-### 2.1 Root level
+```bash
+# Check services
+systemctl --user status russell-acp-server.service
+systemctl --user list-timers | grep russell
 
-- [`../AGENTS.md`](../AGENTS.md) — binding vocabulary, authority
-  hierarchy, what Russell is.
-- [`../README.md`](../README.md) — one-liner + reading order.
-- [`../CONTRIBUTING.md`](../CONTRIBUTING.md) — dev environment,
-  tests, local build.
-- [`../MACHINE_PROFILE.md`](../MACHINE_PROFILE.md) — the patient's
-  chart.
-- [`../cybernetic-health-harness.md`](../cybernetic-health-harness.md)
-  — the design document (aspirational target).
+# Run tests
+./docs/deployment/test-acp-integration.sh
+```
 
-### 2.2 Architecture
+---
 
-- [`architecture/PRINCIPLES_CATALOG.md`](architecture/PRINCIPLES_CATALOG.md)
-  — JR-1 through JR-7.
-- [`architecture/overview.md`](architecture/overview.md) —
-  current crate topology + VSM mapping.
-- [`architecture/TOGAF_TRACEABILITY_MATRIX.md`](architecture/TOGAF_TRACEABILITY_MATRIX.md)
-  — ADM phase coverage.
-- [`architecture/CAPABILITY_GRAPH.md`](architecture/CAPABILITY_GRAPH.md)
-  — cross-repository capability, port, adapter, and contract mapping.
-- [`architecture/CODE_ANCHOR_GRAPH.md`](architecture/CODE_ANCHOR_GRAPH.md)
-  — public type registry with crate dependency graph.
+## Documentation
 
-### 2.3 Specifications
+### Core Documents
 
-- [`specifications/MVP_SPEC.md`](specifications/MVP_SPEC.md) —
-  the pinned MVP boundary. **Read before adding a feature.**
-- [`specifications/PERSISTENCE_CATALOG.md`](specifications/PERSISTENCE_CATALOG.md)
-  — every byte Russell writes, named.
-- [`specifications/DISK_PKG_HYGIENE_SPEC.md`](specifications/DISK_PKG_HYGIENE_SPEC.md)
-  — disk and package hygiene specification.
-- [`../docs/OKAPI_REFERENCE.md`](../docs/OKAPI_REFERENCE.md)
-  — Okapi inference engine integration reference.
+| Document | Purpose | TOGAF Phase |
+|----------|---------|-------------|
+| [AGENTS.md](../AGENTS.md) | Contributor orientation | Preliminary |
+| [cybernetic-health-harness.md](../cybernetic-health-harness.md) | Canonical design | A — Vision |
+| [MACHINE_PROFILE.md](../MACHINE_PROFILE.md) | Observed machine | G — Governance |
+| [CONSOLIDATED-STATUS.md](status/CONSOLIDATED-STATUS.md) | Single source of truth | G — Governance |
 
-### 2.4 Standards
+### Architecture
 
-- [`standards/DOCUMENTATION_STANDARDS.md`](standards/DOCUMENTATION_STANDARDS.md)
-  — this file's rules-of-the-road.
-- [`standards/WRITING_EXCELLENCE.md`](standards/WRITING_EXCELLENCE.md)
-  — voice, style, and discipline protocol.
-- [`standards/TOGAF_LITE_FOR_OPEN_SOURCE.md`](standards/TOGAF_LITE_FOR_OPEN_SOURCE.md)
-  — the documentation architecture pattern.
-- [`standards/VALIDATION_RUBRIC.md`](standards/VALIDATION_RUBRIC.md)
-  — documentation excellence validation checks.
-- [`standards/coding-rust.md`](standards/coding-rust.md) — Rust
-  conventions.
-- [`standards/commits.md`](standards/commits.md) —
-  Conventional Commits dialect.
-- [`standards/adr.md`](standards/adr.md) — how to author an ADR.
-- [`standards/safety.md`](standards/safety.md) — IDRS contract,
-  risk bands, kill switches.
+| Document | Purpose | TOGAF Phase |
+|----------|---------|-------------|
+| [PRINCIPLES_CATALOG.md](architecture/PRINCIPLES_CATALOG.md) | JR-1 through JR-7 | Preliminary |
+| [THE_JACK.md](architecture/THE_JACK.md) | Nurse persona spec | A — Vision |
+| [overview.md](architecture/overview.md) | Architecture overview | C — Application |
+| [ecosystem-integration.md](architecture/ecosystem-integration.md) | hKask integration | C — Application |
+| [skill-self-management-strategy.md](architecture/skill-self-management-strategy.md) | Skill lifecycle design | C — Application |
+| [ADR Index](adr/) | Architecture decisions | H — Change |
 
-### 2.5 Operations
+### Specifications
 
-- [`operations/INSTALL.md`](operations/INSTALL.md) — operator runbook.
-- [`operations/REUSE_MANIFEST.md`](operations/REUSE_MANIFEST.md)
-  — copy-with-provenance register.
+| Document | Purpose | TOGAF Phase |
+|----------|---------|-------------|
+| [MVP_SPEC.md](specifications/MVP_SPEC.md) | MVP boundary | Requirements |
+| [PERSISTENCE_CATALOG.md](specifications/PERSISTENCE_CATALOG.md) | Data stores | C — Data |
+| [disk-pkg-hygiene/](specifications/disk-pkg-hygiene/) | Disk/package hygiene | C — Application |
 
-### 2.6 Status
+### Standards
 
-- [`status/CONSOLIDATED-STATUS.md`](status/CONSOLIDATED-STATUS.md)
-  — current state.
+| Document | Purpose | TOGAF Phase |
+|----------|---------|-------------|
+| [DOCUMENTATION_STANDARDS.md](standards/DOCUMENTATION_STANDARDS.md) | Documentation governance | Preliminary |
+| [TOGAF_LITE_FOR_OPEN_SOURCE.md](standards/TOGAF_LITE_FOR_OPEN_SOURCE.md) | TOGAF-Lite pattern | Preliminary |
+| [WRITING_EXCELLENCE.md](standards/WRITING_EXCELLENCE.md) | Writing rubric | Preliminary |
+| [VALIDATION_RUBRIC.md](standards/VALIDATION_RUBRIC.md) | Validation standard | Preliminary |
+| [agent-operating-rules.md](standards/agent-operating-rules.md) | Agent rules | Preliminary |
+| [coding-rust.md](standards/coding-rust.md) | Rust coding standard | Preliminary |
+| [commits.md](standards/commits.md) | Commit standard | Preliminary |
+| [hkask-integration.md](standards/hkask-integration.md) | hKask integration | Preliminary |
+| [safety.md](standards/safety.md) | IDRS contract | Preliminary |
+| [skill-building-rules.md](standards/skill-building-rules.md) | Skill development | Preliminary |
 
-### 2.7 ADRs (active)
+### Deployment & Operations
 
-- [`adr/0001-scope-and-charter.md`](adr/0001-scope-and-charter.md)
-- [`adr/0002-licensing.md`](adr/0002-licensing.md)
-- [`adr/0004-sqlite-journal.md`](adr/0004-sqlite-journal.md)
-- [`adr/0006-profile-abstraction.md`](adr/0006-profile-abstraction.md)
-- [`adr/0008-llm-triage-never-emits-shell.md`](adr/0008-llm-triage-never-emits-shell.md)
-- [`adr/0011-testing-strategy.md`](adr/0011-testing-strategy.md)
-- [`adr/0013-rust-workspace-layout.md`](adr/0013-rust-workspace-layout.md)
-- [`adr/0015-proprioception-self-health.md`](adr/0015-proprioception-self-health.md)
-- [`adr/0016-doctor-and-llm-router.md`](adr/0016-doctor-and-llm-router.md)
-- [`adr/0017-reuse-over-dependency.md`](adr/0017-reuse-over-dependency.md)
-- [`adr/0018-close-phase-1c.md`](adr/0018-close-phase-1c.md)
-- [`adr/0019-probe-cadence-and-okh.md`](adr/0019-probe-cadence-and-okh.md)
-- [`adr/0020-threshold-gated-llm-escalation.md`](adr/0020-threshold-gated-llm-escalation.md)
-- [`adr/0021-proprioception-phase2-reflex-arcs.md`](adr/0021-proprioception-phase2-reflex-arcs.md)
-- [`adr/0022-markdown-memory-layer.md`](adr/0022-markdown-memory-layer.md)
-- [`adr/0023-lift-adr-0007-phase3-skills.md`](adr/0023-lift-adr-0007-phase3-skills.md)
-- [`adr/0024-skill-registry-workshop-lifecycle.md`](adr/0024-skill-registry-workshop-lifecycle.md)
-- [`adr/0025-hkask-mcp-client-trusted-relationship.md`](adr/0025-hkask-mcp-client-trusted-relationship.md)
-- [`adr/0026-metacognitive-layer.md`](adr/0026-metacognitive-layer.md)
+| Document | Purpose | TOGAF Phase |
+|----------|---------|-------------|
+| [QUICKSTART.md](deployment/QUICKSTART.md) | 5-minute setup | G — Governance |
+| [INSTALL.md](deployment/INSTALL.md) | Full installation guide | G — Governance |
+| [acp-integration.md](deployment/acp-integration.md) | hKask integration | G — Governance |
+| [REUSE_MANIFEST.md](operations/REUSE_MANIFEST.md) | Reuse manifest | D — Technology |
 
-### 2.8 ADRs (deferred — not MVP-load-bearing but retained)
+### Reference
 
-The following ADRs are **Accepted** but their subjects are
-explicitly outside the MVP boundary (see
-[`specifications/MVP_SPEC.md`](specifications/MVP_SPEC.md) §5).
-They live under [`adr/deferred/`](adr/deferred/):
+| Document | Purpose | TOGAF Phase |
+|----------|---------|-------------|
+| [cli.md](reference/cli.md) | CLI reference | G — Governance |
 
-- 0003 MCP transport
-- 0005 Privileged operations (PolKit)
-- 0007 YAML skill manifests + subprocess dispatch (lifted by ADR-0023)
-- 0009 Tokio runtime
-- 0010 Observability stack
-- 0012 Config formats
-- 0014 Skill manifest licensing
+### Templates
 
-## 3. Reading Paths by Audience
+| Document | Purpose | TOGAF Phase |
+|----------|---------|-------------|
+| [adr-template.md](templates/adr-template.md) | ADR template | H — Change |
+| [daily-log.md](templates/daily-log.md) | Daily log template | G — Governance |
+| [review-entry.md](templates/review-entry.md) | Review template | G — Governance |
+| [soap-bundle.md](templates/soap-bundle.md) | SOAP template | G — Governance |
 
-### Operators (running Russell on a workstation)
+---
 
-1. [`../README.md`](../README.md) — what Russell is.
-2. [`specifications/MVP_SPEC.md`](specifications/MVP_SPEC.md)
-   §1–2 — the six verbs.
-3. [`specifications/PERSISTENCE_CATALOG.md`](specifications/PERSISTENCE_CATALOG.md)
-   §2 — where your data lives.
-4. [`standards/safety.md`](standards/safety.md) — what Russell
-   will and will not do.
+## Crate Structure
 
-### New contributors
+| Crate | Purpose | TOGAF Phase |
+|-------|---------|-------------|
+| `russell-acp-server` | ACP session interface | D — Technology |
+| `russell-cli` | Local CLI (secondary) | D — Technology |
+| `russell-core` | Base types, journal, rules | C — Application |
+| `russell-mcp` | hKask MCP client | C — Application |
+| `russell-meta` | Jack persona, LLM client | C — Application |
+| `russell-proprio` | Proprioception (5 vitals) | C — Application |
+| `russell-sentinel` | Host probe collection | C — Application |
+| `russell-skills` | Skill manifest loader | C — Application |
+| `russell-testing` | Test fixtures | G — Governance |
 
-1. [`../AGENTS.md`](../AGENTS.md) — vocabulary and posture.
-2. [`../CONTRIBUTING.md`](../CONTRIBUTING.md) — environment.
-3. [`architecture/PRINCIPLES_CATALOG.md`](architecture/PRINCIPLES_CATALOG.md)
-   — the principles.
-4. [`standards/DOCUMENTATION_STANDARDS.md`](standards/DOCUMENTATION_STANDARDS.md)
-   — how docs work.
-5. [`standards/coding-rust.md`](standards/coding-rust.md) —
-   how code works.
-6. [`status/CONSOLIDATED-STATUS.md`](status/CONSOLIDATED-STATUS.md)
-   — where to pick up.
+---
 
-### AI agents (acting on Russell's behalf or extending it)
+## Security Model
 
-1. [`../AGENTS.md`](../AGENTS.md) — the binding vocabulary (read first).
-2. [`architecture/PRINCIPLES_CATALOG.md`](architecture/PRINCIPLES_CATALOG.md)
-   — JR-1 is non-negotiable.
-3. [`specifications/MVP_SPEC.md`](specifications/MVP_SPEC.md)
-   — the pinned boundary.
-4. [`standards/safety.md`](standards/safety.md) — the IDRS
-   contract.
+### Boundaries
 
-### Architects
+| Boundary | Enforcement |
+|----------|-------------|
+| Public/Private skills | `visibility` field filter at dispatch |
+| Proprioception | Never added to ACP capability registry |
+| Interventions | Require upstream consent (hKask or CLI) |
+| Macaroon auth | OCAP validation with caveats |
+| Rate limiting | 100 calls/min/token |
 
-1. [`architecture/PRINCIPLES_CATALOG.md`](architecture/PRINCIPLES_CATALOG.md)
-2. [`architecture/TOGAF_TRACEABILITY_MATRIX.md`](architecture/TOGAF_TRACEABILITY_MATRIX.md)
-3. [`architecture/overview.md`](architecture/overview.md)
-4. ADRs in the active set (§2.7 above).
+### JR Principles
 
-## 4. Current Counts
+| Principle | Implementation |
+|-----------|----------------|
+| **JR-1** (Austere) | Minimal crate changes, delete before add |
+| **JR-2** (Observe > Act) | Public skills read-only |
+| **JR-3** (No LLM shell) | LLM ranks IDs, doesn't emit commands |
+| **JR-4** (Nurse present) | Jack persona via ACP sessions |
+| **JR-5** (Proprioception) | 5 vitals retained, never exposed |
+| **JR-6** (Reuse) | Independent SQLite journal |
+| **JR-7** (Auditable) | ACP calls logged to journal |
 
-| Bucket | Count |
-|---|---|---|
-| Active authoritative docs | 92 |
-| Active ADRs | 19 |
-| Deferred ADRs | 7 |
-| Archived docs | 8 |
-| Templates | 5 |
+---
 
-_Verify with `find docs -type f -name '*.md' -not -path 'docs/archive/*' | wc -l`; current as of `last_updated`._
+## Development
 
-## 5. Governance
+### Build
 
-This portal is the authoritative entry point for the corpus.
-Adding a new authoritative document requires adding it to §2
-(Critical Set) in the same changeset. Adding a non-authoritative
-document requires stating so explicitly in its frontmatter and
-linking from the relevant authoritative doc.
+```bash
+cargo check                    # Type check
+cargo test                     # Run tests
+cargo clippy -- -D warnings    # Lint
+cargo fmt --check              # Format check
+```
 
-See [`standards/DOCUMENTATION_STANDARDS.md`](standards/DOCUMENTATION_STANDARDS.md)
-for the full procedure.
+### Key Commands
 
-## 6. Conventions
+```bash
+cargo run -- sentinel-once     # Fire one observe cycle
+cargo run -- verify-journal    # Audit hash chain
+cargo run -- skill list        # List skills
+cargo run -- chat              # Interactive REPL with Jack
+```
 
-- **Voice.** Per [`standards/DOCUMENTATION_STANDARDS.md`](standards/DOCUMENTATION_STANDARDS.md)
-  §7, pick the register that matches reader-task.
-- **Frontmatter.** YAML + HTML metadata block on every authoritative
-  document.
-- **Diagrams.** Mermaid only, with `DIAGRAM_ALIGNMENT` block.
-- **Links.** Relative inside the repo, absolute outside.
+### Adding Skills
+
+See [Skill Building Rules](standards/skill-building-rules.md) for:
+- Manifest structure
+- Path validation rules
+- IDRS contract requirements
+
+---
+
+## Status
+
+| Component | Status | TOGAF Phase |
+|-----------|--------|-------------|
+| ACP Server | ✅ Deployed | G — Governance |
+| Sentinel | ✅ 5-min cadence | G — Governance |
+| Skills | ✅ 12 loaded | G — Governance |
+| hKask Integration | ✅ Config ready | G — Governance |
+| Tests | ✅ 218 passing | G — Governance |
+| Documentation | ✅ 79 active files | G — Governance |
+
+**Last Deployment:** 2026-05-22  
+**Documentation Refresh:** 2026-05-22 (35 files archived, 79 retained)  
+**Next Review:** After bidirectional ACP testing
+
+---
+
+## Archive
+
+Superseded documents are archived per lifecycle policy. Git history is the canonical archive of record.
+
+- **Archive location:** [`docs/archive/2026-05-22-documentation-refresh/`](archive/2026-05-22-documentation-refresh/README.md)
+- **Archived:** 35 files (phase logs, analysis, superseded proposals)
+- **Retained:** 79 files (active specifications, standards, architecture)
+
+To recover an archived document:
+
+```bash
+# Find deletion commit
+git log --diff-filter=D -- docs/<path>
+
+# Restore from history
+git checkout <sha> -- docs/<path>
+```
+
+---
+
+## References
+
+- [ACP Specification](https://agentclientprotocol.com)
+- [Macaroons](https://github.com/macaroon-v2/spec)
+- [TOGAF Standard](https://www.opengroup.org/togaf)
+- [Rust Programming Language](https://www.rust-lang.org)
