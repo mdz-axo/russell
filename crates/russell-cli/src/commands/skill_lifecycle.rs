@@ -377,16 +377,13 @@ applies_when:
 
 probes:
   - id: health
-    cmd: ["echo", "health check"]
+    cmd: ["bash", "./scripts/health.sh"]
     timeout: 30s
 
 interventions: []
 
 safety:
-  risk_band: none
-  idempotent: true
-  dry_run_support: true
-  rollback_support: none_needed
+  max_auto_risk: low
 "#
     );
 

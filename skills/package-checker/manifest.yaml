@@ -1,0 +1,60 @@
+# Skill manifest for package-checker
+# Enables Jack to check package versions and update packages via apt.
+# Addresses the capability gap identified in user sovereignty analysis.
+
+id: package-checker
+version: 0.1.0
+authored: 2026-05-22
+min_harness_version: 0.20.0
+
+kind: actionable
+
+symptoms:
+  - package_out_of_date
+  - system_maintenance
+
+applies_when:
+  - os_family: linux
+
+probes:
+  - id: match-package
+    cmd: ["bash", "./scripts/match-package.sh"]
+    timeout: 5s
+  - id: check-version
+    cmd: ["bash", "./scripts/check-version.sh"]
+    timeout: 5s
+  - id: list-installed
+    cmd: ["bash", "./scripts/list-installed.sh"]
+    timeout: 10s
+  - id: check-updates
+    cmd: ["bash", "./scripts/check-updates.sh"]
+    timeout: 30s
+
+interventions:
+  - id: update-package
+    cmd: ["bash", "./scripts/update-package.sh"]
+    risk: low
+    idempotent: true
+    rollback: none_needed
+    needs_sudo: true
+  - id: update-all
+    cmd: ["bash", "./scripts/update-all.sh"]
+    risk: medium
+    idempotent: true
+    rollback: none_needed
+    needs_sudo: true
+
+safety:
+  max_auto_risk: low
+  require_human_for:
+    - update-all
+
+evaluation:
+  after_intervention:
+    - id: verify-update
+      cmd: ["bash", "./scripts/verify-update.sh"]
+      timeout: 5s
+      expect_exit: 0
+
+references:
+  - docs/reviews/jack-sovereignty-analysis.md

@@ -1,94 +1,87 @@
-# SPDX-License-Identifier: MIT
-# skill-manager — enables Jack to build, install, modify, prune, and
-# measure skills autonomously from within `russell chat`.
-#
-# This is a bundled meta-skill: its probes and interventions wrap
-# `russell skill` CLI subcommands, giving Jack hands-on management
-# of the skill lifecycle without operator workshop interaction.
-#
-# This skill pairs with:
-#   - skill-workshop (for composition guidance)
-#   - skill-maintenance (for staleness/coverage auditing)
-#   - skill-discovery (for web-based searching)
-#   - web-search (for the MCP bridge)
-#
-# Install: shipped with Russell; copied by install.sh.
+# Skill manifest for skill-manager
+# Enables Jack to build, install, prune, retire, and restore skills autonomously.
+# See ADR-0024 and docs/architecture/skill-self-management-strategy.md.
 
 id: skill-manager
-version: 1.0.0
-authored: 2026-05-14
-min_harness_version: 0.1.0
+version: 0.1.0
+authored: 2026-05-22
+min_harness_version: 0.20.0
+
+kind: actionable
 
 symptoms:
-  - skill_not_in_catalog
-  - skill_version_stale
-  - skill_install_failed
-  - skill_manifest_invalid
-  - skill_probe_script_missing
-  - skill_coverage_gap
+  - capability_gap
+  - skill_stale
+  - skill_missing
 
 applies_when:
   - os_family: linux
 
 probes:
   - id: list-skills
-    cmd: ["russell", "skill", "list"]
-    risk: none
-    timeout: 10s
-
+    cmd: ["bash", "./scripts/list-skills.sh"]
+    timeout: 5s
   - id: stats
-    cmd: ["russell", "skill", "stats"]
-    risk: none
-    timeout: 10s
-
+    cmd: ["bash", "./scripts/skill-stats.sh"]
+    timeout: 5s
   - id: check
-    cmd: ["russell", "skill", "check"]
-    risk: none
+    cmd: ["bash", "./scripts/skill-check.sh"]
     timeout: 10s
+  - id: registry-status
+    cmd: ["bash", "./scripts/registry-status.sh"]
+    timeout: 5s
 
 interventions:
-  - id: install
-    cmd: ["russell", "skill", "install"]
-    risk: low
-    idempotent: true
-    rollback: none_needed
-
   - id: build
-    cmd: ["russell", "skill", "build"]
+    cmd: ["bash", "./scripts/build-skill.sh"]
     risk: low
     idempotent: true
     rollback: none_needed
-
-  - id: create-manifest
-    cmd: ["russell", "skill", "put"]
+    needs_sudo: false
+  - id: install
+    cmd: ["bash", "./scripts/install-skill.sh"]
     risk: low
     idempotent: true
     rollback: none_needed
-    timeout: 15s
-
+    needs_sudo: false
   - id: prune
-    cmd: ["russell", "skill", "prune"]
+    cmd: ["bash", "./scripts/prune-skill.sh"]
     risk: low
     idempotent: true
-    rollback_id: restore
-
+    rollback: restore
+    needs_sudo: false
   - id: restore
-    cmd: ["russell", "skill", "restore"]
+    cmd: ["bash", "./scripts/restore-skill.sh"]
     risk: low
     idempotent: true
-    rollback: none_needed
-
-  - id: delete
-    cmd: ["russell", "skill", "retire"]
+    rollback: prune
+    needs_sudo: false
+  - id: retire
+    cmd: ["bash", "./scripts/retire-skill.sh"]
     risk: medium
     idempotent: true
-    rollback: none_needed
+    rollback: restore-from-archive
+    needs_sudo: false
+  - id: restore-from-archive
+    cmd: ["bash", "./scripts/restore-from-archive.sh"]
+    risk: medium
+    idempotent: true
+    rollback: retire
+    needs_sudo: false
 
 safety:
   max_auto_risk: low
+  require_human_for:
+    - retire
+    - restore-from-archive
+
+evaluation:
+  after_intervention:
+    - id: verify-skill-exists
+      cmd: ["bash", "./scripts/verify-skill.sh"]
+      timeout: 5s
+      expect_exit: 0
 
 references:
+  - docs/adr/0024-skill-self-management.md
   - docs/architecture/skill-self-management-strategy.md
-  - docs/adr/0024-skill-registry-workshop-lifecycle.md
-  - skills/skill-workshop/KNOWLEDGE.md
-  - skills/skill-maintenance/KNOWLEDGE.md

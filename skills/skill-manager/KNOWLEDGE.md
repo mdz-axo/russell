@@ -1,162 +1,88 @@
-# Skill Manager — Usage Guide for Jack
+# skill-manager KNOWLEDGE.md
+# Context for Jack when managing skills autonomously.
 
-## What this skill is
+## Purpose
 
-The skill-manager gives you (Jack) hands-on management of the Russell
-skill lifecycle from within `russell chat`. Before this skill existed,
-you could only run probes and interventions — not install, modify, or
-retire them. Now you can.
+This skill enables Jack (the Nurse) to manage the skill lifecycle autonomously from within `russell chat`. Instead of requiring manual CLI commands, Jack can:
 
-## Probes (auto-execute, read-only)
+1. **Build** new skill skeletons when users describe capability gaps
+2. **Install** skills that have been created on disk
+3. **Prune** skills that haven't been evaluated in 30+ days
+4. **Restore** deprecated skills to active status
+4. **Retire** skills (archive and remove from disk)
+5. **Restore from archive** retired skills
 
-### `list-skills`
-Lists all loaded skills with their probes and interventions.
-```
-ACTION: skill-manager/list-skills
-```
+## Workflow Patterns
 
-### `stats`
-Shows performance telemetry: probe runs, failures, last run time,
-average duration, intervention counts.
-```
-ACTION: skill-manager/stats
-```
-
-### `check`
-Audits all skills for staleness, coverage gaps, and quality scores.
-```
-ACTION: skill-manager/check
-```
-
-## Interventions (require operator consent)
-
-### `install <name>`
-Installs or activates a skill. If the skill directory already exists
-on disk but isn't active, this moves it to `installed` → `active`.
-If it's discovered (from a remote search), it needs to be fetched first.
-```
-ACTION: skill-manager/install
-Arguments <skill-name>
-```
-
-### `build <name>`
-Creates a minimal skill skeleton on disk. Writes a bare manifest.yaml
-with empty probes/interventions — a starting point for further editing.
-After building, use `create-manifest` to write the full manifest, or
-install it as-is and `adapt` it in the workshop.
-```
-ACTION: skill-manager/build
-Arguments <skill-name>
-```
-
-### `create-manifest <name>`
-Writes a full skill manifest from content Jack provides. Include the
-manifest YAML in a `---manifest` block after the ACTION line:
-```
-ACTION: skill-manager/create-manifest
----manifest
-id: my-skill
-version: 0.1.0
-authored: 2026-05-15
-symptoms: [gpu_temp_high, gpu_freq_throttle]
-probes:
-  - id: check-gpu
-    cmd: ["nvidia-smi", "--query-gpu=temperature.gpu", "--format=csv,noheader"]
-    risk: none
-    timeout: 10s
-interventions: []
----
-```
-The YAML's `id` field must match the CLI argument. The content is
-safety-scanned before writing. The skill is registered as Active
-immediately — no separate `install` step needed.
-
-### `prune <name>`
-Deprecates a skill (moves from active/stale → deprecated). Files
-stay on disk. Can be undone with `restore`.
-```
-ACTION: skill-manager/prune
-Arguments <skill-name>
-```
-
-### `restore <name>`
-Restores a deprecated skill back to active.
-```
-ACTION: skill-manager/restore
-Arguments <skill-name>
-```
-### `build <name>`
-Creates a minimal skill skeleton on disk. Writes a bare manifest.yaml
-with empty probes/interventions — a starting point for further editing.
-After building, use `create-manifest` to write the full manifest, or
-install it as-is and `adapt` it in the workshop.
-```
-ACTION: skill-manager/build
-Arguments <skill-name>
-```
-
-## When to use each verb
-
-| Situation | Verb | Risk |
-|---|---|---|
-| Just installed a new skill to disk | `install <name>` | low |
-| A skill has been stale/warning for 30+ days | `prune <name>` | low |
-| Operator asked you to un-prune something | `restore <name>` | low |
-| Skill is obsolete, superseded, or broken | `delete <name>` | medium |
-| Want to see what's installed and their health | `list-skills` / `stats` / `check` | none |
-
-## Guardrails
-
-- **Never prune bundled skills** (okapi-watcher, web-search, skill-discovery,
-  skill-workshop, skill-maintenance, skill-manager, scenario-tester,
-  pragmatic-cybernetics, pragmatic-semantics, ubuntu-jack).
-  These ship with Russell and are maintained by the Russell team.
-- **Check stats before pruning.** If `stats` shows recent failures,
-  investigate rather than prune. The skill might need fixing, not
-  removing.
-- **Ask before deleting.** `delete` is irreversible. Always confirm
-  with the operator before proposing this action.
-- **Use create-manifest to write complete skills.** You can now write full
-  skill manifests directly from chat — no workshop needed. Include the
-  YAML in a `---manifest` block after the ACTION line.
-
-## Example workflow
+### Pattern 1: Capability Gap → Build → Install
 
 ```
-operator → I want a skill to monitor swap pressure
-
-Jack → Let me check what's already installed first.
-       ACTION: skill-manager/list-skills
-
-[probe result shows no swap-watcher]
-
-Jack → No skill covers swap_pressure. The workshop can build one.
-     Start 'russell workshop' and use 'build swap-watcher' to create it.
-     Then I can install it from here with 'install swap-watcher'.
-
-operator → switches to workshop, builds swap-watcher, returns to chat
-
-Jack → ACTION: skill-manager/install
-       Arguments swap-watcher
-
-[intervention result: swap-watcher installed and active]
-
-Jack → swap-watcher is now loaded. Want me to run a health check?
+User: "I need to check if Ollama is outdated"
+Jack: "I'll build a package-checker skill for that. Want me to install it too?"
+ACTION: skill-manager/build package-checker
+[After build completes]
+ACTION: skill-manager/install package-checker
+[After install completes]
+ACTION: package-checker/check-version ollama
 ```
 
-## Registry Telemetry
+### Pattern 2: Stale Skill → Prune
 
-The skill-manager's `stats` probe shows live usage data that the
-registry tracks automatically. Every time a probe or intervention
-runs in `russell chat`, the registry updates:
+```
+Jack: "The gpu-doctor skill hasn't been evaluated in 45 days. Want me to prune it?"
+ACTION: skill-manager/prune gpu-doctor
+```
 
-| Field | What it means |
-|---|---|
-| `probe_runs` | Total probe executions |
-| `recent_probe_failures` | Recent failures (counter) |
-| `last_probe_run_at` | ISO 8601 timestamp of most recent run |
-| `avg_probe_duration_ms` | EWMA of run duration |
-| `intervention_runs` | Total intervention executions |
-| `coverage_score` | Quality score 0.0–1.0 |
+### Pattern 3: Retire → Restore from Archive
 
-Use `stats` to see the numbers. Use `check` for the audit summary.
+```
+Jack: "The old-logger skill is retired but archived. Want me to restore it?"
+ACTION: skill-manager/restore-from-archive old-logger
+```
+
+## Safety Rules
+
+1. **Build is low-risk** — Creates a skeleton manifest and directory, no execution.
+2. **Install is low-risk** — Updates registry cache, skill runs on next load.
+3. **Prune is low-risk** — Marks as deprecated, files remain on disk.
+4. **Retire is medium-risk** — Removes files, requires archive first.
+5. **Restore from archive is medium-risk** — Restores archived files, reversible.
+
+## Script Arguments
+
+All scripts accept the skill name as the first argument:
+
+```bash
+./scripts/build-skill.sh package-checker
+./scripts/install-skill.sh package-checker
+./scripts/prune-skill.sh package-checker
+```
+
+## Error Handling
+
+Scripts exit with:
+- `0` — Success
+- `1` — Skill not found (for install/prune/restore)
+- `2` — Already in target state (e.g., installing already-installed skill)
+- `3` — Invalid skill name or path
+
+## Registry Integration
+
+All interventions update `~/.local/share/harness/registry/local-cache.yaml` and journal the transition via `RegistryCache::journal_transition`.
+
+## Evaluation
+
+After any intervention, the `verify-skill-exists` check runs to confirm the skill directory and manifest exist (for build/install) or are removed (for retire).
+
+## Telemetry
+
+The skill registry tracks:
+- `probe_runs` — Count of probe executions
+- `intervention_runs` — Count of intervention executions
+- `recent_probe_failures` — Failed probes in last 10 runs
+- `recent_intervention_failures` — Failed interventions in last 10 runs
+- `avg_probe_duration_ms` — Average probe execution time
+- `last_probe_run_at` — ISO timestamp of last probe run
+- `coverage_score` — How many symptoms this skill covers
+
+Jack uses this telemetry to recommend skill pruning, restoration, or creation.
