@@ -1,0 +1,55 @@
+# SPDX-License-Identifier: MIT OR Apache-2.0
+[package]
+name = "russell-acp-server"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+description = "ACP (Agent Client Protocol) server for Russell — session-oriented interface exposing public skills and host probes to hKask agents"
+
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+name = "russell-acp-server"
+path = "src/main.rs"
+
+[features]
+default = []
+stdio = ["tokio/net", "tokio/io-util", "tokio/io-std"]
+
+[dependencies]
+# Russell workspace crates
+russell-skills = { workspace = true }
+russell-meta = { workspace = true }
+russell-core = { workspace = true }
+
+# Async runtime
+tokio = { workspace = true, features = ["sync", "time", "macros", "io-util", "io-std"] }
+
+# Serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+# Error handling
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+
+# Logging
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+
+# Time
+chrono = { workspace = true }
+
+# UUID
+uuid = { workspace = true, features = ["v4", "serde"] }
+
+# Rate limiting
+governor = { version = "0.7", default-features = false, features = ["std", "dashmap"] }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["test-util"] }
+tempfile = { workspace = true }

@@ -12,6 +12,7 @@ members = [
     "crates/russell-mcp",
     "crates/russell-cli",
     "crates/russell-testing",
+    "crates/russell-acp-server",
 ]
 
 [workspace.package]
@@ -41,7 +42,9 @@ tokio = { version = "1", features = ["rt-multi-thread", "macros", "process", "si
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
 ulid = { version = "1", features = ["serde"] }
+uuid = { version = "1", features = ["v4", "serde"] }
 time = { version = "0.3", features = ["serde", "serde-human-readable", "macros"] }
+chrono = { version = "0.4", features = ["serde"] }
 clap = { version = "4", features = ["derive"] }
 toml = "0.8"
 serde_yaml = "0.9"

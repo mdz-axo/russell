@@ -1,0 +1,30 @@
+# SPDX-License-Identifier: MIT OR Apache-2.0
+[Unit]
+Description=Russell ACP Server — hKask integration
+Documentation=file:///home/mdz-axolotl/Clones/russell/docs/README.md
+After=network.target okapi.service
+Wants=okapi.service
+ConditionPathExists=%h/.local/share/harness/skills
+
+[Service]
+Type=simple
+ExecStart=%h/.cargo/bin/russell-acp-server
+Environment=RUSSELL_DOCTOR_BACKEND=okapi
+Environment=RUSSELL_DOCTOR_MODEL=qwen3.5:cloud
+Environment=RUSSELL_ACP_MACAROON_KEY=
+# Restart on failure (graceful degradation)
+Restart=on-failure
+RestartSec=10
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=read-only
+PrivateTmp=true
+ReadWritePaths=%h/.local/state/harness %h/.local/share/harness
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=russell-acp
+
+[Install]
+WantedBy=multi-user.target

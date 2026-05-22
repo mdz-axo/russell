@@ -1,0 +1,23 @@
+# SPDX-License-Identifier: MIT OR Apache-2.0
+[Unit]
+Description=Russell Sentinel — Host probe collection
+Documentation=file:///home/mdz-axolotl/Clones/russell/docs/README.md
+After=network.target
+
+[Service]
+Type=oneshot
+ExecStart=%h/.cargo/bin/russell sentinel-once
+Environment=RUSSELL_DOCTOR_BACKEND=okapi
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=read-only
+PrivateTmp=true
+ReadWritePaths=%h/.local/state/harness
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=russell-sentinel
+
+[Install]
+WantedBy=multi-user.target

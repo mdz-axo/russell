@@ -1,0 +1,16 @@
+# SPDX-License-Identifier: MIT OR Apache-2.0
+[Unit]
+Description=Russell Sentinel — 5-minute host probe cadence
+Documentation=file:///home/mdz-axolotl/Clones/russell/docs/README.md
+After=network.target
+
+[Timer]
+# 5-minute cadence per JR-5 (proprioception)
+OnCalendar=*:0/5
+AccuracySec=1min
+Persistent=true
+# Randomize to avoid thundering herd
+RandomizedDelaySec=30
+
+[Install]
+WantedBy=timers.target

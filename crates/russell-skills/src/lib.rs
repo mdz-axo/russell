@@ -176,6 +176,33 @@ impl Default for SkillKind {
     }
 }
 
+/// Visibility annotation for ACP exposure (ADR-0026).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Visibility {
+    /// Exposed via ACP to hKask agents.
+    Public,
+    /// Russell-only (never exposed).
+    Private,
+}
+
+impl Default for Visibility {
+    fn default() -> Self {
+        // Default to private for security — skills must explicitly declare public
+        Self::Private
+    }
+}
+
+/// hLexicon categorization (ADR-0026).
+#[derive(Debug, Clone, Deserialize)]
+pub struct Lexicon {
+    /// Primary domain (WordAct, FlowDef, KnowAct).
+    pub primary: String,
+    /// Specific terms (3-7 from hLexicon).
+    #[serde(default)]
+    pub terms: Vec<String>,
+}
+
 /// A single skill, fully loaded and validated.
 #[derive(Debug, Clone)]
 pub struct Skill {
@@ -201,6 +228,10 @@ pub struct Skill {
     pub safety: Safety,
     /// Post-intervention evaluation checks.
     pub evaluation: Option<Evaluation>,
+    /// Visibility for ACP exposure (ADR-0026).
+    pub visibility: Visibility,
+    /// hLexicon categorization (ADR-0026).
+    pub lexicon: Option<Lexicon>,
 }
 
 impl Skill {
@@ -511,6 +542,12 @@ pub struct RawManifest {
     pub safety: Option<RawSafety>,
     #[serde(default)]
     pub evaluation: Option<Evaluation>,
+    /// Visibility for ACP exposure (ADR-0026).
+    #[serde(default)]
+    pub visibility: Option<Visibility>,
+    /// hLexicon categorization (ADR-0026).
+    #[serde(default)]
+    pub lexicon: Option<Lexicon>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -817,6 +854,8 @@ pub fn parse_manifest(yaml: &str, dir_name: &str) -> std::result::Result<Skill, 
             needs_network: safety_raw.needs_network,
         },
         evaluation: raw.evaluation,
+        visibility: raw.visibility.unwrap_or_default(),
+        lexicon: raw.lexicon,
     })
 }
 
