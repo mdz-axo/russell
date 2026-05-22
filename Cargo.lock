@@ -1765,6 +1765,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "russell-agent"
+version = "0.20.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "russell-acp-server",
+ "russell-core",
+ "russell-meta",
+ "russell-sentinel",
+ "russell-skills",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+ "tempfile",
+ "thiserror",
+ "tokio",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
 name = "russell-cli"
 version = "0.20.0"
 dependencies = [

@@ -2,17 +2,18 @@
 # See docs/adr/0013-rust-workspace-layout.md
 
 [workspace]
-resolver = "3"
+resolver = "2"
 members = [
     "crates/russell-core",
     "crates/russell-sentinel",
-    "crates/russell-skills",
-    "crates/russell-meta",
     "crates/russell-proprio",
+    "crates/russell-meta",
+    "crates/russell-skills",
     "crates/russell-mcp",
     "crates/russell-cli",
     "crates/russell-testing",
     "crates/russell-acp-server",
+    "crates/russell-agent",
 ]
 
 [workspace.package]
@@ -31,6 +32,10 @@ russell-skills   = { path = "crates/russell-skills" }
 russell-meta     = { path = "crates/russell-meta" }
 russell-proprio  = { path = "crates/russell-proprio" }
 russell-mcp      = { path = "crates/russell-mcp" }
+russell-cli      = { path = "crates/russell-cli" }
+russell-testing  = { path = "crates/russell-testing" }
+russell-acp-server = { path = "crates/russell-acp-server" }
+russell-agent    = { path = "crates/russell-agent" }
 
 # Third-party (see ADRs 0004, 0009, 0010, 0012)
 thiserror = "2"

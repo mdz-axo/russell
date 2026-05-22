@@ -1,0 +1,54 @@
+# SPDX-License-Identifier: MIT OR Apache-2.0
+[package]
+name = "russell-agent"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+description = "Russell agent pod — sovereign agent entity with lifecycle, persona, and CNS integration"
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+# Russell workspace crates
+russell-core = { workspace = true }
+russell-meta = { workspace = true }
+russell-skills = { workspace = true }
+russell-sentinel = { workspace = true }
+russell-acp-server = { workspace = true }
+
+# Async runtime
+tokio = { workspace = true, features = ["sync", "time", "macros", "rt-multi-thread"] }
+
+# Serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde_yaml = { workspace = true }
+
+# Error handling
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+
+# Logging
+tracing = { workspace = true }
+
+# Time
+chrono = { workspace = true }
+
+# UUID
+uuid = { workspace = true, features = ["v4", "serde"] }
+
+# hKask integration (optional — graceful degradation if unavailable)
+# hkask-types = { version = "0.21", optional = true }
+# hkask-cns = { version = "0.21", optional = true }
+
+[features]
+default = []
+# cns = ["hkask-types", "hkask-cns"]  # Enable CNS span emission (deferred until hKask crates available)
+
+[dev-dependencies]
+tempfile.workspace = true
+tokio = { workspace = true, features = ["test-util"] }
