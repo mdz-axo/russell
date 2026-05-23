@@ -82,8 +82,11 @@ if [ "$ACTION" = "uninstall" ]; then
     rm -f "${SYSTEMD_USER_DIR}/russell-digest.timer"
     rm -f "${SYSTEMD_USER_DIR}/russell-failure@.service"
 
-    echo "==> Removing binary…"
+    echo "==> Removing binaries…"
     rm -f "${BIN_DIR}/${BINARY_NAME}"
+    rm -f "${BIN_DIR}/russell-acp-server"
+    rm -f "${HOME}/.cargo/bin/${BINARY_NAME}"
+    rm -f "${HOME}/.cargo/bin/russell-acp-server"
 
     echo "==> Russell state and data preserved at:"
     echo "    ${STATE_DIR}"
@@ -147,9 +150,19 @@ mkdir -p "${SHARE_DIR}/rules.d"
 mkdir -p "$CONFIG_DIR"
 mkdir -p "$SYSTEMD_USER_DIR"
 
-echo "==> Installing binary…"
+echo "==> Installing binaries…"
 cp "$BINARY_SRC" "${BIN_DIR}/${BINARY_NAME}"
 chmod +x "${BIN_DIR}/${BINARY_NAME}"
+
+# Also install russell-acp-server for hKask integration
+ACP_SERVER_SRC="${REPO_ROOT}/target/release/russell-acp-server"
+if [ -f "$ACP_SERVER_SRC" ]; then
+    cp "$ACP_SERVER_SRC" "${BIN_DIR}/russell-acp-server"
+    chmod +x "${BIN_DIR}/russell-acp-server"
+    echo "  → russell-acp-server installed"
+else
+    echo "  → Warning: russell-acp-server not built, skipping"
+fi
 
 # Remove any stale cargo-installed copy to prevent PATH shadowing.
 # The canonical install location is ~/.local/bin (this script).
@@ -157,6 +170,13 @@ CARGO_BIN="${HOME}/.cargo/bin/${BINARY_NAME}"
 if [ -f "$CARGO_BIN" ] && [ "$CARGO_BIN" != "${BIN_DIR}/${BINARY_NAME}" ]; then
     echo "  → Removing stale ${CARGO_BIN} (canonical is ${BIN_DIR}/${BINARY_NAME})"
     rm -f "$CARGO_BIN"
+fi
+
+# Also remove stale ACP server from cargo bin
+ACP_CARGO_BIN="${HOME}/.cargo/bin/russell-acp-server"
+if [ -f "$ACP_CARGO_BIN" ]; then
+    echo "  → Removing stale ${ACP_CARGO_BIN} (canonical is ${BIN_DIR}/russell-acp-server)"
+    rm -f "$ACP_CARGO_BIN"
 fi
 
 echo "==> Installing systemd units…"
@@ -167,6 +187,11 @@ cp "${REPO_ROOT}/packaging/systemd/russell-okapi.timer" "$SYSTEMD_USER_DIR"
 cp "${REPO_ROOT}/packaging/systemd/russell-digest.service" "$SYSTEMD_USER_DIR"
 cp "${REPO_ROOT}/packaging/systemd/russell-digest.timer" "$SYSTEMD_USER_DIR"
 cp "${REPO_ROOT}/packaging/systemd/russell-failure@.service" "$SYSTEMD_USER_DIR"
+# ACP server unit for hKask integration
+if [ -f "${REPO_ROOT}/docs/deployment/russell-acp-server.service" ]; then
+    cp "${REPO_ROOT}/docs/deployment/russell-acp-server.service" "$SYSTEMD_USER_DIR"
+    echo "  → russell-acp-server.service installed"
+fi
 
 echo "==> Installing default rules…"
 # Ship default rules only if the target doesn't already have rules

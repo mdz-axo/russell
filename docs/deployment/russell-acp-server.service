@@ -8,7 +8,7 @@ ConditionPathExists=%h/.local/share/harness/skills
 
 [Service]
 Type=simple
-ExecStart=%h/.cargo/bin/russell-acp-server
+ExecStart=%h/.local/bin/russell-acp-server
 Environment=RUSSELL_DOCTOR_BACKEND=okapi
 Environment=RUSSELL_DOCTOR_MODEL=qwen3.5:cloud
 Environment=RUSSELL_ACP_MACAROON_KEY=
