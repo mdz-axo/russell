@@ -1,624 +1,245 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
-//! `run_help` orchestrator — the Nurse pipeline.
+//! `run_help` — Nurse pipeline via hKask.
 //!
-//! Implements the three-stage Nurse flow from
-//! [`docs/architecture/CAPABILITY_GRAPH.md`](../../../docs/architecture/CAPABILITY_GRAPH.md) §1.2:
-//!
-//! 1. **Compose** — builds a SOAP bundle (Subjective, Objective,
-//!    Assessment, Plan) from journal state, machine profile,
-//!    loaded skills, and Kask tools. Augments with operator
-//!    PERSONA.md / USER.md files per
-//!    [ADR-0022](../../../docs/adr/0022-markdown-memory-layer.md).
-//! 2. **Dispatch** — threshold-gated LLM call per
-//!    [ADR-0020](../../../docs/adr/0020-threshold-gated-llm-escalation.md).
-//!    Falls back to rule-based offline summariser on failure.
-//! 3. **Persist** — writes request/response/transcript to evidence
-//!    bundle, appends `harness.event.v1` to journal, records
-//!    help session row, and generates daily memory note.
-//!
-//! The Nurse never emits shell (JR-3, ADR-0008). Action IDs are
-//! selected from loaded manifests and rejected by a poka-yoke
-//! dispatcher if unknown.
+//! Russell collects telemetry and sends it to hKask for LLM inference.
+//! hKask handles prompt composition, LLM calls, and returns the response.
 
 use std::path::PathBuf;
+use std::time::Duration;
 
-use serde::Serialize;
-use serde_json::json;
+use serde::{Deserialize, Serialize};
 use tracing::{info, warn};
 use ulid::Ulid;
+use time::OffsetDateTime;
 
-use russell_core::event::{Event, Severity};
 use russell_core::journal::{HelpSessionInput, HelpSessionStatus, JournalWriter};
 use russell_core::paths::Paths;
 
-use crate::client::{Backend, ClientConfig, LlmClient, SoapPrompt};
 use crate::error::{DoctorError, Result};
-use crate::rate_limit::{RateLimitConfig, RateLimiter};
-use crate::sanitizer::PromptSanitizer;
-use crate::{fallback, mock, oai_client, prompt};
-
-/// Process-wide LLM rate limiter. Shared across `russell jack`
-/// and `russell chat` calls within the same process lifetime.
-/// Default: 3 requests/minute, burst of 3.
-static LLM_RATE_LIMITER: std::sync::LazyLock<RateLimiter> =
-    std::sync::LazyLock::new(|| RateLimiter::new(RateLimitConfig::default()));
-
-/// Why the LLM was not called.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
-pub enum SkipReason {
-    /// Network/key unavailable; offline fallback engaged.
-    OfflineFallback,
-    /// Severity below threshold; rule-based summary returned.
-    ThresholdSkip,
-}
 
 /// Outcome from a `run_help` call.
 #[derive(Debug, Clone, Serialize)]
 pub struct HelpOutcome {
-    /// Session ID (ULID).
     pub session_id: String,
-    /// Backend used — may be `offline` if fallback kicked in.
     pub backend: &'static str,
-    /// Path to the evidence bundle on disk.
     pub evidence_dir: PathBuf,
-    /// The response text Jack printed.
     pub response: String,
-    /// Why the LLM was skipped; `None` if the LLM was called.
     pub skip_reason: Option<SkipReason>,
 }
 
-/// Run the Nurse flow end to end: compose SOAP, call LLM (or fall
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+pub enum SkipReason {
+    OfflineFallback,
+    ThresholdSkip,
+}
+
+#[derive(Serialize)]
+struct HKaskInferRequest {
+    subjective: Option<String>,
+    objective: ObjectiveData,
+    assessment: String,
+    plan: String,
+}
+
+#[derive(Serialize)]
+struct ObjectiveData {
+    samples: Vec<SampleRecord>,
+    severity_counts: SeverityCounts,
+    recent_events: Vec<EventRecord>,
+}
+
+#[derive(Serialize)]
+struct SampleRecord {
+    probe: String,
+    value: f64,
+    ts: String,
+}
+
+#[derive(Serialize)]
+struct SeverityCounts {
+    crit: u64,
+    alert: u64,
+    warn: u64,
+    info: u64,
+}
+
+#[derive(Serialize)]
+struct EventRecord {
+    probe: String,
+    severity: String,
+    message: String,
+    ts: String,
+}
+
+#[derive(Deserialize, Serialize)]
+struct HKaskInferResponse {
+    response: String,
+    model: String,
+    latency_ms: u64,
+}
+
+const HKASK_ENDPOINT: &str = "http://127.0.0.1:8080/api/llm/infer";
+
 pub async fn run_help(
     paths: &Paths,
     writer: &JournalWriter,
     note: Option<&str>,
-    hkask_tool_names: &[(String, Option<String>)],
+    _hkask_tool_names: &[(String, Option<String>)],
 ) -> Result<HelpOutcome> {
-    let cfg = ClientConfig::from_env();
-    run_help_with_config(paths, writer, note, cfg, hkask_tool_names).await
+    run_help_with_endpoint(paths, writer, note, HKASK_ENDPOINT).await
 }
 
-/// Dispatch result from calling the LLM backend.
-struct DispatchResult {
-    backend_label: &'static str,
-    response: Option<String>,
-    model: Option<String>,
-    latency_ms: Option<i64>,
-    error_kind: Option<String>,
-    skip_reason: Option<SkipReason>,
-}
-
-// ---------------------------------------------------------------------------
-// Stage 1: SOAP composition + augmentation
-// ---------------------------------------------------------------------------
-
-/// Compose the SOAP prompt from journal state, profile, skills, and
-/// operator identity files. Also writes the raw SOAP to the evidence
-/// directory.
-/// operator identity files. Also writes the raw SOAP to the evidence
-/// directory.
-/// directory.
-fn compose_and_augment_soap(
+pub async fn run_help_with_endpoint(
     paths: &Paths,
     writer: &JournalWriter,
     note: Option<&str>,
-    evidence_dir: &std::path::Path,
-    hkask_tool_names: &[(String, Option<String>)],
-) -> Result<SoapPrompt> {
-    // Sanitize operator note input (defense against prompt injection).
-    let sanitized_note = note.map(|n| {
-        let sanitizer = PromptSanitizer::strict();
-        let result = sanitizer.sanitize_input(n);
-        if result.was_filtered {
-            tracing::warn!(
-                reason = %result.filter_reason.unwrap_or_default(),
-                "operator note was sanitized"
-            );
-        }
-        result.text
-    });
-
-    let profile_path = paths.profile();
-    let profile = if profile_path.exists() {
-        russell_core::Profile::load(&profile_path).ok()
-    } else {
-        None
-    };
-
-    let loaded_skills = russell_skills::load_all(&paths.skills()).unwrap_or_default();
-    tracing::debug!(
-        count = loaded_skills.len(),
-        hkask_tools = hkask_tool_names.len(),
-        "loaded skills and hkask tools for help session"
-    );
-
-    let soap = prompt::compose_with_hkask(
-        &writer.reader(),
-        profile.as_ref(),
-        sanitized_note.as_deref(),
-        &loaded_skills,
-        &paths.skills(),
-        hkask_tool_names,
-    )?;
-
-    // ADR-0022: augment the system prompt with operator identity files.
-    let soap = augment_system_prompt(paths, soap);
-
-    let soap_path = evidence_dir.join("soap.md");
-    std::fs::write(&soap_path, &soap.rendered).map_err(|e| DoctorError::io(&soap_path, e))?;
-
-    Ok(soap)
-}
-
-// ---------------------------------------------------------------------------
-// Stage 2: Threshold gate + backend dispatch
-// ---------------------------------------------------------------------------
-
-/// Check the escalation threshold and dispatch to the LLM backend.
-/// Falls back to the offline summariser if the threshold is not met
-/// or the backend call fails.
-/// Falls back to the offline summariser if the threshold is not met
-/// or the backend call fails.
-/// or the backend call fails.
-async fn dispatch_backend(
-    writer: &JournalWriter,
-    cfg: &ClientConfig,
-    soap: &SoapPrompt,
-    escalate: bool,
-) -> Result<DispatchResult> {
-    // Threshold gate.
-    if !escalate {
-        let text = fallback::summarise(&writer.reader(), None)?;
-        return Ok(DispatchResult {
-            backend_label: "offline",
-            response: Some(text),
-            model: None,
-            latency_ms: None,
-            error_kind: None,
-            skip_reason: Some(SkipReason::ThresholdSkip),
-        });
-    }
-
-    // Attempt the configured backend. Any failure → fall back to offline.
-    let (backend_label, maybe_response, error_kind, skip_reason) = match cfg.backend {
-        Backend::Okapi => {
-            let mut okapi_cfg = cfg.clone();
-            if okapi_cfg.base_url.is_none() {
-                okapi_cfg.base_url = Some("http://127.0.0.1:11435/v1".into());
-            }
-            if okapi_cfg.api_key.is_none() {
-                okapi_cfg.api_key = Some("okapi".into());
-            }
-            let base = okapi_cfg
-                .base_url
-                .as_deref()
-                .unwrap_or(crate::health::DEFAULT_BASE_URL);
-            crate::health::ensure_ready(base).await;
-
-            // Rate-limit gate (T14): prevent resource exhaustion.
-            if let Err(e) = LLM_RATE_LIMITER.try_acquire() {
-                warn!(error = %e, "LLM rate-limited — falling back to offline");
-                (
-                    "okapi",
-                    None,
-                    Some(error_kind_of(&e)),
-                    Some(SkipReason::OfflineFallback),
-                )
-            } else {
-                let client = oai_client::OkapiClient::new(&okapi_cfg).await?;
-                match client.chat(soap).await {
-                    Ok(resp) => ("okapi", Some(resp), None, None),
-                    Err(e) => {
-                        warn!(error = %e, "okapi call failed — falling back");
-                        (
-                            "okapi",
-                            None,
-                            Some(error_kind_of(&e)),
-                            Some(SkipReason::OfflineFallback),
-                        )
-                    }
-                }
-            }
-        }
-        Backend::Mock => {
-            let client = mock::MockClient::jack_default();
-            match client.chat(soap).await {
-                Ok(resp) => ("mock", Some(resp), None, None),
-                Err(e) => (
-                    "mock",
-                    None,
-                    Some(error_kind_of(&e)),
-                    Some(SkipReason::OfflineFallback),
-                ),
-            }
-        }
-        Backend::Offline => ("offline", None, None, Some(SkipReason::OfflineFallback)),
-    };
-
-    let (response_text, latency_ms, model) = match maybe_response {
-        Some(resp) => (
-            resp.content.clone(),
-            Some(resp.latency_ms as i64),
-            resp.model,
-        ),
-        None => {
-            let text = fallback::summarise(&writer.reader(), None)?;
-            (text, None, None)
-        }
-    };
-
-    Ok(DispatchResult {
-        backend_label,
-        response: Some(response_text),
-        model,
-        latency_ms,
-        error_kind,
-        skip_reason,
-    })
-}
-
-// ---------------------------------------------------------------------------
-// Stage 3: Evidence persistence + journaling
-// ---------------------------------------------------------------------------
-
-/// Write evidence artefacts, journal the event, and insert the
-/// help-session row. Returns the final `HelpOutcome`.
-/// help-session row. Returns the final `HelpOutcome`.
-#[allow(clippy::too_many_arguments)]
-fn persist_session(
-    paths: &Paths,
-    writer: &JournalWriter,
-    session_id: &str,
-    ts_unix: i64,
-    ts: &str,
-    evidence_dir: &std::path::Path,
-    soap: &SoapPrompt,
-    dispatch: &DispatchResult,
-    cfg: &ClientConfig,
-    note: Option<&str>,
-) -> Result<HelpOutcome> {
-    let mut response_text = dispatch.response.as_deref().unwrap_or("").to_string();
-    let backend_used = dispatch.backend_label;
-    let skip_reason = dispatch.skip_reason;
-    let status: HelpSessionStatus = if let Some(sr) = skip_reason {
-        match sr {
-            SkipReason::OfflineFallback => HelpSessionStatus::Fallback,
-            SkipReason::ThresholdSkip => HelpSessionStatus::ThresholdSkip,
-        }
-    } else {
-        HelpSessionStatus::Ok
-    };
-    let status_str = status.as_str();
-
-    // Sanitize LLM output (defense against secret exfiltration, ACTION injection).
-    // Only sanitize if LLM was actually called (not offline fallback).
-    if skip_reason.is_none() {
-        let sanitizer = PromptSanitizer::strict();
-        let mut valid_skill_ids = std::collections::HashSet::new();
-        let mut valid_action_ids = std::collections::HashSet::new();
-
-        // Collect valid skill and action IDs from loaded skills.
-        for skill in russell_skills::load_all(&paths.skills()).unwrap_or_default() {
-            valid_skill_ids.insert(skill.id.clone());
-            for step in skill.steps() {
-                valid_action_ids.insert(step.id.clone());
-            }
-        }
-
-        let sanitized =
-            sanitizer.sanitize_output(&response_text, &valid_skill_ids, &valid_action_ids);
-        if sanitized.was_filtered {
-            tracing::warn!(
-                reason = %sanitized.filter_reason.unwrap_or_default(),
-                "LLM response was sanitized"
-            );
-        }
-        response_text = sanitized.text;
-    }
-
-    // Evidence files.
-    let request_path = evidence_dir.join("request.json");
-    let request_rec = json!({
-        "backend": backend_used,
-        "model": &cfg.model,
-        "base_url": &cfg.base_url,
-        "note": note,
-        "soap_chars": soap.rendered.len(),
-    });
-    std::fs::write(&request_path, serde_json::to_vec_pretty(&request_rec)?)
-        .map_err(|e| DoctorError::io(&request_path, e))?;
-
-    let response_path = evidence_dir.join("response.json");
-    let response_rec = json!({
-        "status": status_str,
-        "error_kind": dispatch.error_kind,
-        "latency_ms": dispatch.latency_ms,
-        "model": dispatch.model,
-        "content_chars": response_text.len(),
-    });
-    std::fs::write(&response_path, serde_json::to_vec_pretty(&response_rec)?)
-        .map_err(|e| DoctorError::io(&response_path, e))?;
-
-    let transcript_path = evidence_dir.join("transcript.jsonl");
-    let line = json!({
-        "schema": "harness.llm-transcript.v1",
-        "ts": ts,
-        "backend": backend_used,
-        "model": &cfg.model,
-        "fell_back": skip_reason.is_some(),
-        "skip_reason": skip_reason.map(|s| match s {
-            SkipReason::OfflineFallback => "offline_fallback",
-            SkipReason::ThresholdSkip => "threshold_skip",
-        }),
-        "prompt_chars": soap.rendered.len(),
-        "response_chars": response_text.len(),
-        "response": response_text,
-    });
-    std::fs::write(&transcript_path, format!("{line}\n"))
-        .map_err(|e| DoctorError::io(&transcript_path, e))?;
-
-    // Event journal entry.
-    let evidence_ref_str = evidence_dir.to_string_lossy().into_owned();
-    let mut ev = Event::new("help", Severity::Info);
-    ev.id = russell_core::event::EventId(Ulid::from_string(session_id).unwrap_or_default());
-    ev.run_id = Some(session_id.to_string());
-    ev.tier = Some("doctor".into());
-    ev.module = Some("doctor/help".into());
-    ev.summary = Some(format!(
-        "backend={} status={} chars={}",
-        backend_used,
-        status_str,
-        response_text.len()
-    ));
-    ev.evidence_ref = Some(evidence_ref_str.clone());
-    ev.duration_ms = dispatch.latency_ms.map(|v| v as u64);
-    if let Some(ref k) = dispatch.error_kind {
-        ev.outputs
-            .insert("error_kind".into(), serde_json::Value::from(k.as_str()));
-    }
-    if let Some(sr) = skip_reason {
-        ev.outputs.insert(
-            "skip_reason".into(),
-            serde_json::Value::from(match sr {
-                SkipReason::OfflineFallback => "offline_fallback",
-                SkipReason::ThresholdSkip => "threshold_skip",
-            }),
-        );
-    }
-    writer.append(&ev)?;
-
-    // Help-session row.
-    let input = HelpSessionInput {
-        id: session_id,
-        ts_unix,
-        ts,
-        backend: backend_used,
-        model: dispatch.model.as_deref(),
-        note,
-        prompt_chars: soap.rendered.len() as i64,
-        response_chars: response_text.len() as i64,
-        latency_ms: dispatch.latency_ms,
-        status,
-        error_kind: dispatch.error_kind.as_deref(),
-        evidence_ref: &evidence_ref_str,
-    };
-    writer.append_help_session(&input)?;
-
-    // ADR-0022: append a session note to today's daily log if it exists.
-    append_session_note(paths, session_id, note, status_str);
-
-    Ok(HelpOutcome {
-        session_id: session_id.to_string(),
-        backend: backend_used,
-        evidence_dir: evidence_dir.to_path_buf(),
-        response: response_text.to_string(),
-        skip_reason,
-    })
-}
-
-/// Same as [`run_help`] but with an explicit [`ClientConfig`]. Useful in
-/// tests where mutating process env racily is undesirable.
-pub async fn run_help_with_config(
-    paths: &Paths,
-    writer: &JournalWriter,
-    note: Option<&str>,
-    cfg: ClientConfig,
-    hkask_tool_names: &[(String, Option<String>)],
+    endpoint: &str,
 ) -> Result<HelpOutcome> {
     let session_id = Ulid::new().to_string();
-    let ts_unix = russell_core::time::now_unix();
-    let ts = russell_core::time::now_rfc3339();
-
     let evidence_dir = paths.evidence().join("help").join(&session_id);
     std::fs::create_dir_all(&evidence_dir).map_err(|e| DoctorError::io(&evidence_dir, e))?;
 
-    info!(backend = %cfg.backend.label(), model = %cfg.model, session = %session_id, "russell help starting");
+    let objective = gather_objective(writer).await;
 
-    // Stage 1: compose + augment SOAP.
-    let soap = compose_and_augment_soap(paths, writer, note, &evidence_dir, hkask_tool_names)?;
+    if let Some(reason) = check_threshold(&objective.severity_counts) {
+        let response = fallback_summary(&objective);
+        let ts = OffsetDateTime::now_utc();
+        let input = HelpSessionInput {
+            id: &session_id,
+            ts_unix: ts.unix_timestamp(),
+            ts: &ts.to_string(),
+            backend: "offline",
+            model: None,
+            note,
+            prompt_chars: 0,
+            response_chars: response.len() as i64,
+            latency_ms: None,
+            evidence_ref: &evidence_dir.to_string_lossy(),
+            status: HelpSessionStatus::ThresholdSkip,
+            error_kind: None,
+        };
+        writer.append_help_session(&input)?;
+        return Ok(HelpOutcome {
+            session_id,
+            backend: "offline",
+            evidence_dir,
+            response,
+            skip_reason: Some(reason),
+        });
+    }
 
-    // Stage 2: threshold gate + backend dispatch.
-    let counts = {
-        let now = russell_core::time::now_unix();
-        let window_start = now - 24 * 3600;
-        writer
-            .reader()
-            .severity_counts(window_start, i64::MAX)
-            .unwrap_or_default()
+    let request = HKaskInferRequest {
+        subjective: note.map(String::from),
+        objective,
+        assessment: String::new(),
+        plan: String::new(),
     };
-    let escalate = cfg.escalate_min.satisfied_by(&counts);
-    tracing::debug!(escalate = escalate, alert = %counts.alert, crit = %counts.crit, "threshold gate");
 
-    let dispatch = dispatch_backend(writer, &cfg, &soap, escalate).await?;
+    let response = match call_hkask(endpoint, &request).await {
+        Ok(r) => r,
+        Err(e) => {
+            warn!(error = %e, "hKask unreachable; using offline fallback");
+            let response = fallback_summary(&gather_objective(writer).await);
+            let ts = OffsetDateTime::now_utc();
+            let input = HelpSessionInput {
+                id: &session_id,
+                ts_unix: ts.unix_timestamp(),
+                ts: &ts.to_string(),
+                backend: "offline",
+                model: None,
+                note,
+                prompt_chars: 0,
+                response_chars: response.len() as i64,
+                latency_ms: None,
+                evidence_ref: &evidence_dir.to_string_lossy(),
+            status: HelpSessionStatus::Fallback,
+                error_kind: None,
+            };
+            writer.append_help_session(&input)?;
+            return Ok(HelpOutcome {
+                session_id,
+                backend: "offline",
+                evidence_dir,
+                response,
+                skip_reason: Some(SkipReason::OfflineFallback),
+            });
+        }
+    };
 
-    // Stage 3: persist evidence + journal.
-    persist_session(
-        paths,
-        writer,
-        &session_id,
-        ts_unix,
-        &ts,
-        &evidence_dir,
-        &soap,
-        &dispatch,
-        &cfg,
+    let ts = OffsetDateTime::now_utc();
+    let input = HelpSessionInput {
+        id: &session_id,
+        ts_unix: ts.unix_timestamp(),
+        ts: &ts.to_string(),
+        backend: "hkask",
+        model: Some(&response.model),
         note,
-    )
-}
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-/// ADR-0022: augment the compiled-in Jack persona with operator identity files.
-fn augment_system_prompt(
-    paths: &Paths,
-    soap: crate::client::SoapPrompt,
-) -> crate::client::SoapPrompt {
-    let mut soap = soap;
-    let mut extras = String::new();
-
-    if let Ok(persona) = std::fs::read_to_string(paths.persona_md())
-        && !persona.trim().is_empty()
-    {
-        tracing::debug!("loaded PERSONA.md for session context");
-        extras.push_str("\n\n---\n\n");
-        extras.push_str(&persona);
-    }
-    if let Ok(user) = std::fs::read_to_string(paths.user_md())
-        && !user.trim().is_empty()
-    {
-        tracing::debug!("loaded USER.md for session context");
-        extras.push_str("\n\n---\n\n");
-        extras.push_str(&user);
-    }
-
-    if !extras.is_empty() {
-        soap.system.push_str(&extras);
-    }
-    soap
-}
-
-/// ADR-0022: append a one-line session note to the current day's daily log.
-/// Non-fatal — failures are logged but never returned as errors.
-/// Non-fatal — failures are logged but never returned as errors.
-fn append_session_note(paths: &Paths, session_id: &str, note: Option<&str>, status: &str) {
-    let now = russell_core::time::now_unix();
-    let today = match time::OffsetDateTime::from_unix_timestamp(now) {
-        Ok(dt) => dt,
-        Err(_) => return,
+        prompt_chars: 0,
+        response_chars: response.response.len() as i64,
+        latency_ms: Some(response.latency_ms as i64),
+        evidence_ref: &evidence_dir.to_string_lossy(),
+            status: HelpSessionStatus::Ok,
+        error_kind: None,
     };
-    let (year, month, day) = (today.year(), u8::from(today.month()), today.day());
-    let filename = format!("{year:04}-{month:02}-{day:02}.md");
-    let path = paths.memory_daily_dir().join(&filename);
+    writer.append_help_session(&input)?;
 
-    // Only append if the file already exists (lazy creation by digest).
-    if !path.exists() {
-        return;
-    }
+    let evidence_path = evidence_dir.join("response.json");
+    std::fs::write(&evidence_path, serde_json::to_string_pretty(&response)?)?;
 
-    let summary = match note {
-        Some(n) if !n.trim().is_empty() => format!("{n} [{status}]"),
-        _ => format!("(no note) [{status}]"),
-    };
-    let line = format!("- [{session_id}] — {summary}\n");
+    info!(session_id, model = %response.model, "help session complete");
 
-    if let Err(e) = std::fs::OpenOptions::new()
-        .append(true)
-        .open(&path)
-        .and_then(|mut f| std::io::Write::write_all(&mut f, line.as_bytes()))
-    {
-        tracing::warn!(error = %e, path = %path.display(), "failed to append session note to daily log");
-    } else {
-        tracing::debug!(session = %session_id, "appended session note to daily log");
+    Ok(HelpOutcome {
+        session_id,
+        backend: "hkask",
+        evidence_dir,
+        response: response.response,
+        skip_reason: None,
+    })
+}
+
+async fn gather_objective(writer: &JournalWriter) -> ObjectiveData {
+    let samples = writer.get_recent_samples(50).unwrap_or_default();
+    let severity_counts = writer.get_severity_counts().unwrap_or_default();
+    let events = writer.get_recent_events(20).unwrap_or_default();
+
+    ObjectiveData {
+        samples: samples.into_iter().map(|s| SampleRecord { probe: s.probe, value: s.value, ts: s.ts }).collect(),
+        severity_counts: SeverityCounts { crit: severity_counts.crit, alert: severity_counts.alert, warn: severity_counts.warn, info: severity_counts.info },
+        recent_events: events.into_iter().map(|e| EventRecord { probe: e.probe, severity: format!("{:?}", e.severity), message: e.message, ts: e.ts }).collect(),
     }
 }
 
-/// Short tag for the `error_kind` column.
-fn error_kind_of(e: &DoctorError) -> String {
-    match e {
-        DoctorError::Io { .. } => "io".into(),
-        DoctorError::Json(_) => "json".into(),
-        DoctorError::Core(_) => "core".into(),
-        DoctorError::Http {
-            is_timeout: true, ..
-        } => "http_timeout".into(),
-        DoctorError::Http {
-            is_connect: true, ..
-        } => "http_connect".into(),
-        DoctorError::Http {
-            status: Some(s), ..
-        } => format!("http_{s}"),
-        DoctorError::Http { .. } => "http".into(),
-        DoctorError::Authentication(_) => "auth".into(),
-        DoctorError::ModelNotFound(_) => "model_not_found".into(),
-        DoctorError::RateLimited { .. } => "rate_limited".into(),
-        DoctorError::Config(_) => "config".into(),
-        DoctorError::BadResponse(_) => "bad_response".into(),
-        DoctorError::Fmt(_) => "fmt".into(),
-        DoctorError::Prompt(_) => "prompt".into(),
-        DoctorError::Skill(_) => "skill".into(),
-        DoctorError::RiskGate(_) => "risk_gate".into(),
-        DoctorError::Other(_) => "other".into(),
-    }
+fn check_threshold(counts: &SeverityCounts) -> Option<SkipReason> {
+    if counts.crit > 0 || counts.alert > 0 { None } else { Some(SkipReason::ThresholdSkip) }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::client::EscalateMin;
+fn fallback_summary(objective: &ObjectiveData) -> String {
+    let mut lines = Vec::new();
+    lines.push("## Russell Health Summary (Offline)".to_string());
+    lines.push(String::new());
+    lines.push(format!("Severity: {} crit, {} alert, {} warn, {} info",
+        objective.severity_counts.crit, objective.severity_counts.alert,
+        objective.severity_counts.warn, objective.severity_counts.info));
+    lines.push(String::new());
+    lines.push("Recent probes:".to_string());
+    for sample in objective.samples.iter().take(10) {
+        lines.push(format!("  - {}: {:.2}", sample.probe, sample.value));
+    }
+    lines.join("\n")
+}
 
-    #[tokio::test]
-    async fn offline_path_produces_fallback_outcome() {
-        let tmp = tempfile::tempdir().unwrap();
-        let paths = Paths::rooted(tmp.path());
-        paths.ensure_dirs().unwrap();
-        let writer = JournalWriter::open(&paths.journal()).unwrap();
+async fn call_hkask(endpoint: &str, request: &HKaskInferRequest) -> Result<HKaskInferResponse> {
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(30))
+        .build()
+        .map_err(|e| DoctorError::Config(format!("HTTP client: {e}")))?;
 
-        let cfg = ClientConfig {
-            backend: Backend::Offline,
-            model: "test".into(),
-            base_url: None,
-            api_key: None,
-            timeout: std::time::Duration::from_secs(5),
-            escalate_min: EscalateMin::Alert,
-        };
-        let out = run_help_with_config(&paths, &writer, Some("unit test"), cfg, &[])
-            .await
-            .unwrap();
+    let response = client.post(endpoint).json(request).send().await
+        .map_err(|e| DoctorError::Config(format!("hKask request: {e}")))?;
 
-        assert!(out.skip_reason.is_some());
-        assert_eq!(out.backend, "offline");
-        assert!(out.response.contains("Offline"));
-        assert!(out.evidence_dir.join("soap.md").exists());
-        assert!(out.evidence_dir.join("transcript.jsonl").exists());
-
-        // Verify the help_sessions row landed.
-        let reader = russell_core::journal::JournalReader::new(paths.journal());
-        assert!(reader.recent(1).unwrap().iter().any(|r| r.action == "help"));
+    if !response.status().is_success() {
+        return Err(DoctorError::Config(format!("hKask returned {}", response.status())));
     }
 
-    #[tokio::test]
-    async fn mock_path_produces_ok_outcome() {
-        let tmp = tempfile::tempdir().unwrap();
-        let paths = Paths::rooted(tmp.path());
-        paths.ensure_dirs().unwrap();
-        let writer = JournalWriter::open(&paths.journal()).unwrap();
-
-        let cfg = ClientConfig {
-            backend: Backend::Mock,
-            model: "test".into(),
-            base_url: None,
-            api_key: None,
-            timeout: std::time::Duration::from_secs(5),
-            escalate_min: EscalateMin::Always,
-        };
-        let out = run_help_with_config(&paths, &writer, None, cfg, &[])
-            .await
-            .unwrap();
-
-        assert!(out.skip_reason.is_none());
-        assert_eq!(out.backend, "mock");
-        assert!(out.response.contains("Mock Jack"));
-    }
+    response.json().await.map_err(|e| DoctorError::Config(format!("hKask response: {e}")))
 }

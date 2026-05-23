@@ -9,7 +9,6 @@ members = [
     "crates/russell-proprio",
     "crates/russell-meta",
     "crates/russell-skills",
-    "crates/russell-mcp",
     "crates/russell-cli",
     "crates/russell-testing",
     "crates/russell-acp-server",
