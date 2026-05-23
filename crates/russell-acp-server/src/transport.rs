@@ -8,6 +8,8 @@ use crate::error::Result;
 use crate::handler::AcpHandler;
 use crate::types::{JsonRpcRequest, JsonRpcResponse};
 
+const GC_INTERVAL_REQUESTS: u64 = 100;
+
 /// ACP server — stdio JSON-RPC transport.
 pub struct AcpServer {
     /// Handler.
@@ -28,12 +30,24 @@ impl AcpServer {
         let mut reader = BufReader::new(stdin);
         let mut stdout = tokio::io::stdout();
         let mut line = String::new();
+        let mut request_count: u64 = 0;
+
+        let shutdown = tokio::signal::ctrl_c();
+        tokio::pin!(shutdown);
 
         loop {
             line.clear();
-            let bytes_read = match reader.read_line(&mut line).await {
+
+            let read_result = tokio::select! {
+                result = reader.read_line(&mut line) => result,
+                _ = &mut shutdown => {
+                    info!("ACP server: received shutdown signal");
+                    break;
+                }
+            };
+
+            let bytes_read = match read_result {
                 Ok(0) => {
-                    // EOF — client disconnected.
                     info!("ACP server: client disconnected (EOF)");
                     break;
                 }
@@ -51,7 +65,6 @@ impl AcpServer {
 
             debug!(bytes = %bytes_read, "Read ACP request");
 
-            // Parse JSON-RPC request.
             let request: JsonRpcRequest = match serde_json::from_str(line) {
                 Ok(req) => req,
                 Err(e) => {
@@ -69,9 +82,16 @@ impl AcpServer {
                 }
             };
 
-            // Handle request.
             let response = self.handler.handle(request).await;
             send_response(&mut stdout, &response).await?;
+
+            request_count += 1;
+            if request_count % GC_INTERVAL_REQUESTS == 0 {
+                let cleaned = self.handler.sessions_mut().cleanup_old_sessions();
+                if cleaned > 0 {
+                    debug!(cleaned, "GC: removed old sessions");
+                }
+            }
         }
 
         info!("ACP server stopped");

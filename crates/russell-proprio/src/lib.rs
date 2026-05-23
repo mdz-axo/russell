@@ -297,6 +297,12 @@ pub struct ProprioResult {
     /// detected. `None` if verification could not run.
     /// detected. `None` if verification could not run.
     pub journal_chain_intact: Option<bool>,
+
+    // -- Evidence bundle integrity (Task 13) --
+    /// Whether the most recent evidence bundles pass hash verification.
+    /// `true` if all checked bundles are intact. `false` if any bundle
+    /// has a hash mismatch. `None` if no bundles exist to check.
+    pub evidence_integrity_ok: Option<bool>,
 }
 
 /// Input from the async HKask MCP health probe, passed into the proprio cycle
@@ -503,6 +509,7 @@ fn run_once_inner(
         remote_discovery_latency_s: remote_latency_s,
         remote_discovery_latency_severity: remote_latency_severity,
         journal_chain_intact,
+        evidence_integrity_ok: None,
     })
 }
 

@@ -27,8 +27,7 @@
 use std::path::{Path, PathBuf};
 
 use landlock::{
-    Access, AccessFs, PathBeneath, PathFd, Ruleset, RulesetAttr,
-    RulesetCreatedAttr, ABI,
+    ABI, Access, AccessFs, PathBeneath, PathFd, Ruleset, RulesetAttr, RulesetCreatedAttr,
 };
 use tracing::debug;
 
@@ -102,7 +101,7 @@ impl SandboxConfig {
 pub fn apply_sandbox(config: &SandboxConfig) -> Result<(), SandboxError> {
     // Check if Landlock is available
     let abi = ABI::V4; // Use latest stable ABI
-    
+
     // Build ruleset with allowed paths
     let mut ruleset_created = Ruleset::default()
         .handle_access(AccessFs::from_all(abi))
@@ -216,9 +215,7 @@ mod tests {
 
     #[test]
     fn sandbox_config_builder_methods() {
-        let config = SandboxConfig::default()
-            .with_network(true)
-            .with_tmp(false);
+        let config = SandboxConfig::default().with_network(true).with_tmp(false);
         assert!(config.allow_network);
         assert!(!config.allow_tmp);
     }

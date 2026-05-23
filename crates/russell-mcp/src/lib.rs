@@ -50,6 +50,6 @@ pub mod registry;
 #[cfg(feature = "client")]
 pub mod types;
 
-#[cfg(feature = "server")]
-#[deprecated(note = "MCP server is deprecated. Use russell-acp-server for hKask integration.")]
-pub mod server;
+// Note: The MCP server feature is deprecated.
+// Use russell-acp-server for hKask integration instead.
+// The server module has been removed.

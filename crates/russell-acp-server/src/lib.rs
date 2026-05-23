@@ -44,7 +44,7 @@
 //!
 //!     // Initialize components.
 //!     let dispatch = AcpDispatch::new(skills, skills_dir);
-//!     let auth = MacaroonAuth::new(None);
+//!     let auth = MacaroonAuth::new(None, true);
 //!     let rate_limiter = RateLimiter::default();
 //!     let handler = AcpHandler::new(persona, dispatch, auth, rate_limiter);
 //!     let server = AcpServer::new(handler);

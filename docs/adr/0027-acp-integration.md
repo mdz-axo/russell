@@ -271,6 +271,8 @@ crates/
 
 - [ADR-0025: MCP Client Trusted Relationship](0025-hkask-mcp-client-trusted-relationship.md)
 - hKask hLexicon — separate repository
+- hKask hLexicon Governance — `hKask/registry/registries/hlexicon-governance.yaml` (term allocation model)
+- hKask Terminology Change — `hKask/docs/plans/LEXICON_TERMINOLOGY_CHANGE.md` ("budget" → "allocation" for vocabulary)
 - hKask ACP Server — separate repository
 - hKask Macaroon Config — separate repository
 - [ACP Specification](https://agentclientprotocol.com)

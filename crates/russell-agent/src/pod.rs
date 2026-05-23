@@ -254,11 +254,13 @@ impl RussellPod {
 
         // Create a capability token (stub - in production would receive from hKask)
         let token = russell_acp_server::CapabilityToken {
+            token_id: format!("russell-pod-{}", self.id),
             token: "russell-pod-token".to_string(),
             capabilities: vec!["acp:session".to_string()],
             attenuations: Vec::new(),
             expires_at: None,
             issuer: "russell-pod".to_string(),
+            nonce: format!("nonce-{}", self.id),
         };
         self.capability_tokens.push(token);
         tracing::info!(pod_id = %self.id, "Capability token received");
@@ -732,7 +734,7 @@ responsibilities:
         let handler = russell_acp_server::AcpHandler::new(
             russell_acp_server::JackPersonaProjection::default(),
             russell_acp_server::AcpDispatch::default(),
-            russell_acp_server::MacaroonAuth::new(None),
+            russell_acp_server::MacaroonAuth::new(None, true),
             russell_acp_server::RateLimiter::default(),
         );
         let acp_server = russell_acp_server::AcpServer::new(handler);

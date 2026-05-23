@@ -1,16 +1,16 @@
 ---
 title: "Ecosystem Integration — hKask & Okapi Reference Model"
 audience: [architects, developers]
-last_updated: 2026-05-20
+last_updated: 2026-05-23
 togaf_phase: "C"
-version: "1.1.0"
+version: "1.2.0"
 status: "Active"
 ---
 
 <!-- TOGAF_DOMAIN: Application Architecture -->
-<!-- VERSION: 1.1.0 -->
+<!-- VERSION: 1.2.0 -->
 <!-- STATUS: Active -->
-<!-- LAST_UPDATED: 2026-05-20 -->
+<!-- LAST_UPDATED: 2026-05-23 -->
 
 # Ecosystem Integration — hKask & Okapi Reference Model
 
@@ -20,7 +20,7 @@ status: "Active"
 >
 > **Architecture:** Russell → hKask → Okapi (Russell accesses Okapi through hKask as an ACP agent)
 >
-> Version: 1.1.0 | 2026-05-20
+> Version: 1.2.0 | 2026-05-23
 
 ---
 
@@ -143,6 +143,18 @@ stack-control-plane
   ├── Diff: skill version mismatch across hosts → flag for reconciliation
   └── Action: propose skill export from canonical host → import to drifters
 ```
+
+### 1.1 hLexicon Terminology & Governance
+
+Russell skills declare hLexicon terms (WordAct/FlowDef/KnowAct) in their `hlexicon.yaml` manifests. These terms are **allocated** (not budgeted) by hKask's governance model:
+
+- **Allocation:** 75 terms allocated across 3 domains (currently 80, with 5 git evolution terms exceeding allocation)
+- **Governance:** `hKask/registry/registries/hlexicon-governance.yaml` defines the `term_allocation` section
+- **Expansion:** When hKask extends hLexicon (e.g., spec-curation terms), Russell skills may adopt new terms without code changes
+
+**Key distinction:** Vocabulary terms are allocated, not consumed. A term like `curate` is not depleted by use — it is deliberately placed and reused infinitely. This differs from consumable resources like `reflex_budget` or `token_budget`, which are depleted by use.
+
+**Reference:** hKask `docs/architecture/hKask-hLexicon.md` and `docs/plans/LEXICON_TERMINOLOGY_CHANGE.md`
 
 ---
 

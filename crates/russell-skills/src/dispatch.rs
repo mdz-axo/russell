@@ -35,6 +35,7 @@ use tracing::{debug, warn};
 use zeroize::Zeroize;
 
 use crate::RiskBand;
+use crate::sandbox::{SandboxConfig, apply_sandbox};
 
 /// Errors that can occur during risk checking.
 #[derive(Debug, Clone, thiserror::Error)]
@@ -238,10 +239,11 @@ pub struct Dispatcher {
     /// Environment variables this skill is allowed to access.
     /// Combined with ENV_ALLOWLIST at dispatch time.
     /// Task 3.1: Capability attenuation.
-    /// Combined with ENV_ALLOWLIST at dispatch time.
-    /// Task 3.1: Capability attenuation.
-    /// Task 3.1: Capability attenuation.
     pub allowed_env_keys: Vec<String>,
+    /// Sandbox configuration for subprocess confinement.
+    /// If `None`, no sandbox is applied (default for backward compatibility).
+    /// Set to `Some(SandboxConfig::for_skill(&skill_dir))` for production use.
+    pub sandbox: Option<SandboxConfig>,
 }
 
 impl std::fmt::Debug for Dispatcher {
@@ -325,8 +327,9 @@ impl Dispatcher {
     /// Create a new dispatcher for a given skill.
     #[must_use]
     pub fn new(skill_dir: impl Into<PathBuf>) -> Self {
+        let skill_dir = skill_dir.into();
         Self {
-            skill_dir: skill_dir.into(),
+            skill_dir: skill_dir.clone(),
             dry_run: DryRun::Disabled,
             probe_timeout: Duration::from_secs(30),
             intervention_timeout: Duration::from_secs(120),
@@ -334,6 +337,7 @@ impl Dispatcher {
             sudo_password: None,
             stdin_content: None,
             allowed_env_keys: Vec::new(),
+            sandbox: Some(SandboxConfig::for_skill(&skill_dir)),
         }
     }
 
@@ -437,6 +441,14 @@ impl Dispatcher {
         // Force a restrictive PATH — no user bin dirs unless the
         // operator explicitly overrides via manifest `env:` (future).
         child_cmd.env("PATH", "/usr/local/bin:/usr/bin:/bin");
+
+        // Apply Landlock sandbox if configured (Task 8).
+        // Must be applied BEFORE spawning the subprocess so it inherits restrictions.
+        if let Some(ref sandbox_config) = self.sandbox
+            && let Err(e) = apply_sandbox(sandbox_config)
+        {
+            warn!(error = %e, "failed to apply Landlock sandbox — proceeding without sandbox");
+        }
 
         let mut child = child_cmd
             .spawn()
@@ -908,6 +920,52 @@ fn write_evidence(dir: &Path, outcome: &RunOutcome, event: &Event) -> Result<()>
     Ok(())
 }
 
+/// Verify an evidence bundle's integrity by re-hashing files and comparing
+/// against the manifest.json seals.
+///
+/// Returns `Ok(true)` if all hashes match, `Ok(false)` if any mismatch,
+/// `Err` if files are missing or unreadable.
+pub fn verify_evidence_bundle(dir: &Path) -> Result<bool> {
+    use sha2::{Digest, Sha256};
+
+    let manifest_path = dir.join("manifest.json");
+    let manifest_bytes =
+        std::fs::read_to_string(&manifest_path).map_err(|e| russell_core::CoreError::io(dir, e))?;
+    let manifest: serde_json::Value = serde_json::from_str(&manifest_bytes)?;
+
+    let files = manifest
+        .get("files")
+        .and_then(|f| f.as_object())
+        .ok_or_else(|| russell_core::CoreError::Invariant("manifest missing 'files'".into()))?;
+
+    for (filename, metadata) in files {
+        let expected_hash = match metadata.get("sha256").and_then(|h| h.as_str()) {
+            Some(h) if !h.is_empty() => h,
+            _ => continue, // Skip entries without hashes (e.g., event.json self-hash note)
+        };
+
+        let file_path = dir.join(filename);
+        let contents =
+            std::fs::read(&file_path).map_err(|e| russell_core::CoreError::io(&file_path, e))?;
+
+        let mut hasher = Sha256::new();
+        hasher.update(&contents);
+        let actual_hash = hex::encode(hasher.finalize());
+
+        if actual_hash != expected_hash {
+            tracing::warn!(
+                file = %filename,
+                expected = %expected_hash,
+                actual = %actual_hash,
+                "evidence bundle hash mismatch"
+            );
+            return Ok(false);
+        }
+    }
+
+    Ok(true)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -923,6 +981,7 @@ mod tests {
             sudo_password: None,
             stdin_content: None,
             allowed_env_keys: Vec::new(),
+            sandbox: None,
         };
         // Dry-run skips validation — any command shape accepted.
         let outcome = d
@@ -987,6 +1046,7 @@ mod tests {
             sudo_password: None,
             stdin_content: None,
             allowed_env_keys: Vec::new(),
+            sandbox: None,
         };
         // Sleep longer than the timeout — uses allowed interpreter `sh`.
         let outcome = d
@@ -1066,6 +1126,7 @@ mod tests {
             sudo_password: None,
             stdin_content: None,
             allowed_env_keys: Vec::new(),
+            sandbox: None,
         };
         let outcome = d
             .run_and_journal(
@@ -1101,6 +1162,7 @@ mod tests {
             sudo_password: None,
             stdin_content: None,
             allowed_env_keys: Vec::new(),
+            sandbox: None,
         };
         assert!(d.check_risk(RiskBand::None, false).is_ok());
         assert!(d.check_risk(RiskBand::Low, false).is_ok());
@@ -1120,6 +1182,7 @@ mod tests {
             sudo_password: None,
             stdin_content: None,
             allowed_env_keys: Vec::new(),
+            sandbox: None,
         };
         // High risk in dry-run mode should still pass — no mutation occurs.
         assert!(d.check_risk(RiskBand::Critical, true).is_ok());
@@ -1136,6 +1199,7 @@ mod tests {
             sudo_password: None,
             stdin_content: None,
             allowed_env_keys: Vec::new(),
+            sandbox: None,
         };
         assert!(d.check_risk(RiskBand::Medium, false).is_ok());
         assert!(d.check_risk(RiskBand::High, false).is_err());
@@ -1152,6 +1216,7 @@ mod tests {
             sudo_password: None,
             stdin_content: None,
             allowed_env_keys: Vec::new(),
+            sandbox: None,
         };
         let err = d.check_risk(RiskBand::High, false).unwrap_err();
         let msg = err.to_string();
@@ -1316,4 +1381,138 @@ mod tests {
             RollbackStrategy::Reboot
         ));
     }
+
+    #[test]
+    fn verify_evidence_bundle_detects_intact_bundle() {
+        use sha2::{Digest, Sha256};
+        let dir = tempfile::tempdir().unwrap();
+        let bundle = dir.path().join("bundle");
+        std::fs::create_dir_all(&bundle).unwrap();
+
+        let stdout = b"hello world\n";
+        std::fs::write(bundle.join("stdout.txt"), stdout).unwrap();
+        let mut hasher = Sha256::new();
+        hasher.update(stdout);
+        let stdout_hash = hex::encode(hasher.finalize());
+
+        let manifest = serde_json::json!({
+            "version": "1.0",
+            "created_at": "2026-05-23T00:00:00Z",
+            "files": {
+                "stdout.txt": {
+                    "sha256": stdout_hash,
+                    "size_bytes": stdout.len()
+                }
+            }
+        });
+        std::fs::write(
+            bundle.join("manifest.json"),
+            serde_json::to_string_pretty(&manifest).unwrap(),
+        )
+        .unwrap();
+
+        assert!(verify_evidence_bundle(&bundle).unwrap());
+    }
+
+    #[test]
+    fn verify_evidence_bundle_detects_tampered_file() {
+        use sha2::{Digest, Sha256};
+        let dir = tempfile::tempdir().unwrap();
+        let bundle = dir.path().join("bundle");
+        std::fs::create_dir_all(&bundle).unwrap();
+
+        let stdout = b"original content\n";
+        std::fs::write(bundle.join("stdout.txt"), stdout).unwrap();
+        let mut hasher = Sha256::new();
+        hasher.update(stdout);
+        let stdout_hash = hex::encode(hasher.finalize());
+
+        let manifest = serde_json::json!({
+            "version": "1.0",
+            "created_at": "2026-05-23T00:00:00Z",
+            "files": {
+                "stdout.txt": {
+                    "sha256": stdout_hash,
+                    "size_bytes": stdout.len()
+                }
+            }
+        });
+        std::fs::write(
+            bundle.join("manifest.json"),
+            serde_json::to_string_pretty(&manifest).unwrap(),
+        )
+        .unwrap();
+
+        // Tamper with the file after writing the manifest
+        std::fs::write(bundle.join("stdout.txt"), b"tampered content\n").unwrap();
+
+        assert!(!verify_evidence_bundle(&bundle).unwrap());
+    }
+}
+
+#[test]
+fn verify_evidence_bundle_detects_intact_bundle() {
+    use sha2::{Digest, Sha256};
+    let dir = tempfile::tempdir().unwrap();
+    let bundle = dir.path().join("bundle");
+    std::fs::create_dir_all(&bundle).unwrap();
+
+    let stdout = b"hello world\n";
+    std::fs::write(bundle.join("stdout.txt"), stdout).unwrap();
+    let mut hasher = Sha256::new();
+    hasher.update(stdout);
+    let stdout_hash = hex::encode(hasher.finalize());
+
+    let manifest = serde_json::json!({
+        "version": "1.0",
+        "created_at": "2026-05-23T00:00:00Z",
+        "files": {
+            "stdout.txt": {
+                "sha256": stdout_hash,
+                "size_bytes": stdout.len()
+            }
+        }
+    });
+    std::fs::write(
+        bundle.join("manifest.json"),
+        serde_json::to_string_pretty(&manifest).unwrap(),
+    )
+    .unwrap();
+
+    assert!(verify_evidence_bundle(&bundle).unwrap());
+}
+
+#[test]
+fn verify_evidence_bundle_detects_tampered_file() {
+    use sha2::{Digest, Sha256};
+    let dir = tempfile::tempdir().unwrap();
+    let bundle = dir.path().join("bundle");
+    std::fs::create_dir_all(&bundle).unwrap();
+
+    let stdout = b"original content\n";
+    std::fs::write(bundle.join("stdout.txt"), stdout).unwrap();
+    let mut hasher = Sha256::new();
+    hasher.update(stdout);
+    let stdout_hash = hex::encode(hasher.finalize());
+
+    let manifest = serde_json::json!({
+        "version": "1.0",
+        "created_at": "2026-05-23T00:00:00Z",
+        "files": {
+            "stdout.txt": {
+                "sha256": stdout_hash,
+                "size_bytes": stdout.len()
+            }
+        }
+    });
+    std::fs::write(
+        bundle.join("manifest.json"),
+        serde_json::to_string_pretty(&manifest).unwrap(),
+    )
+    .unwrap();
+
+    // Tamper with the file after writing the manifest
+    std::fs::write(bundle.join("stdout.txt"), b"tampered content\n").unwrap();
+
+    assert!(!verify_evidence_bundle(&bundle).unwrap());
 }

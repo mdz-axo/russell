@@ -186,6 +186,7 @@ mod tests {
             remote_discovery_latency_s: None,
             remote_discovery_latency_severity: Severity::Info,
             journal_chain_intact: None,
+            evidence_integrity_ok: None,
         }
     }
 

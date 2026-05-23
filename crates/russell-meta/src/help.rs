@@ -44,6 +44,9 @@ pub enum SkipReason {
 
 #[derive(Serialize)]
 struct HKaskInferRequest {
+    /// Capability token (base64-encoded hKask CapabilityToken JSON).
+    /// Required by hKask's `/api/llm/infer` endpoint for OCAP verification.
+    capability_token: String,
     subjective: Option<String>,
     objective: ObjectiveData,
     assessment: String,
@@ -97,11 +100,6 @@ pub async fn run_help(
 /// Gathers objective telemetry, checks the threshold gate, calls hKask
 /// for LLM inference, and journals the help session. Falls back to an
 /// offline summary if hKask is unreachable or the threshold gate skips.
-/// Run the Nurse pipeline with a configurable hKask endpoint.
-///
-/// Gathers objective telemetry, checks the threshold gate, calls hKask
-/// for LLM inference, and journals the help session. Falls back to an
-/// offline summary if hKask is unreachable or the threshold gate skips.
 pub async fn run_help_with_endpoint(
     paths: &Paths,
     writer: &JournalWriter,
@@ -113,6 +111,9 @@ pub async fn run_help_with_endpoint(
     std::fs::create_dir_all(&evidence_dir).map_err(|e| DoctorError::io(&evidence_dir, e))?;
 
     let objective = gather_objective(writer).await;
+
+    // Verify recent evidence bundles (Task 13).
+    verify_recent_evidence(&paths.evidence(), writer);
 
     if let Some(reason) = check_threshold(&objective.severity_counts) {
         let response = fallback_summary(&objective);
@@ -141,7 +142,9 @@ pub async fn run_help_with_endpoint(
         });
     }
 
+    let capability_token = load_capability_token().unwrap_or_default();
     let request = HKaskInferRequest {
+        capability_token,
         subjective: note.map(String::from),
         objective,
         assessment: String::new(),
@@ -277,6 +280,70 @@ fn fallback_summary(objective: &ObjectiveData) -> String {
     lines.join("\n")
 }
 
+/// Verify the 5 most recent evidence bundles by re-hashing files
+/// and comparing against their manifest.json seals.
+///
+/// Logs a warning for each bundle that fails verification.
+/// Failures are non-fatal — they don't block the Nurse pipeline.
+fn verify_recent_evidence(evidence_base: &std::path::Path, _writer: &JournalWriter) {
+    let skills_dir = evidence_base.join("skills");
+    if !skills_dir.is_dir() {
+        return;
+    }
+
+    let mut checked = 0u32;
+    if let Ok(entries) = std::fs::read_dir(&skills_dir) {
+        for entry in entries.flatten() {
+            if checked >= 5 {
+                break;
+            }
+            let skill_dir = entry.path();
+            if !skill_dir.is_dir() {
+                continue;
+            }
+            if let Ok(steps) = std::fs::read_dir(&skill_dir) {
+                for step in steps.flatten() {
+                    if checked >= 5 {
+                        break;
+                    }
+                    let step_dir = step.path();
+                    if !step_dir.is_dir() {
+                        continue;
+                    }
+                    if let Ok(bundles) = std::fs::read_dir(&step_dir) {
+                        for bundle in bundles.flatten() {
+                            if checked >= 5 {
+                                break;
+                            }
+                            let bundle_dir = bundle.path();
+                            if !bundle_dir.join("manifest.json").exists() {
+                                continue;
+                            }
+                            checked += 1;
+                            match russell_skills::dispatch::verify_evidence_bundle(&bundle_dir) {
+                                Ok(true) => {}
+                                Ok(false) => {
+                                    warn!(
+                                        dir = %bundle_dir.display(),
+                                        "evidence bundle integrity check FAILED"
+                                    );
+                                }
+                                Err(e) => {
+                                    warn!(
+                                        dir = %bundle_dir.display(),
+                                        error = %e,
+                                        "evidence bundle integrity check error"
+                                    );
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 async fn call_hkask(endpoint: &str, request: &HKaskInferRequest) -> Result<HKaskInferResponse> {
     let client = reqwest::Client::builder()
         .timeout(Duration::from_secs(30))
@@ -345,12 +412,105 @@ fn load_service_token() -> Option<String> {
 fn generate_service_token() -> String {
     use sha2::{Digest, Sha256};
     let mut hasher = Sha256::new();
-    hasher.update(std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_nanos()
-        .to_le_bytes());
+    hasher.update(
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_nanos()
+            .to_le_bytes(),
+    );
     hasher.update(std::process::id().to_le_bytes());
     hasher.update(b"russell-service-principal");
     hex::encode(hasher.finalize())
+}
+
+/// Load or generate a hKask-format capability token for SOAP inference.
+///
+/// The token is stored at `~/.local/state/harness/russell.capability_token`
+/// as base64-encoded JSON matching hKask's `CapabilityToken` schema.
+///
+/// Returns `None` if the token cannot be loaded or generated.
+fn load_capability_token() -> Option<String> {
+    use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
+    use hmac::{Hmac, Mac};
+    use serde_json::json;
+    use sha2::{Digest, Sha256};
+
+    type HmacSha256 = Hmac<Sha256>;
+
+    let token_path = russell_core::paths::Paths::from_env()
+        .ok()?
+        .state
+        .join("russell.capability_token");
+
+    // Try to load existing token
+    if let Ok(token) = std::fs::read_to_string(&token_path) {
+        let trimmed = token.trim();
+        if !trimmed.is_empty() {
+            return Some(trimmed.to_owned());
+        }
+    }
+
+    // Generate new token matching hKask's CapabilityToken schema
+    let secret = std::env::var("HKASK_CAPABILITY_KEY").ok()?;
+    let russell_webid = "russell-agent";
+    let hkask_webid = "hkask-inference";
+
+    // Compute token ID: SHA-256(resource || resource_id || action || from || to)
+    let mut id_hasher = Sha256::new();
+    id_hasher.update(b"Tool");
+    id_hasher.update(b"inference");
+    id_hasher.update(b"Execute");
+    id_hasher.update(russell_webid.as_bytes());
+    id_hasher.update(hkask_webid.as_bytes());
+    let token_id = hex::encode(id_hasher.finalize());
+
+    // Compute signature: HMAC-SHA256(secret, id || resource || resource_id || action || from || to)
+    let mut mac =
+        HmacSha256::new_from_slice(secret.as_bytes()).expect("HMAC can take key of any size");
+    mac.update(token_id.as_bytes());
+    mac.update(b"Tool");
+    mac.update(b"inference");
+    mac.update(b"Execute");
+    mac.update(russell_webid.as_bytes());
+    mac.update(hkask_webid.as_bytes());
+    let signature = hex::encode(mac.finalize().into_bytes());
+
+    let token_json = json!({
+        "id": token_id,
+        "resource": "Tool",
+        "resource_id": "inference",
+        "action": "Execute",
+        "delegated_from": russell_webid,
+        "delegated_to": hkask_webid,
+        "signature": signature,
+        "expires_at": null,
+        "attenuation_level": 0,
+        "max_attenuation": 7,
+        "context_nonce": format!("root-{}", russell_webid)
+    });
+
+    let token_b64 = BASE64.encode(serde_json::to_string(&token_json).ok()?.as_bytes());
+
+    // Persist token
+    if let Some(parent) = token_path.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        let _ = std::fs::OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .mode(0o600)
+            .open(&token_path)
+            .and_then(|mut f| std::io::Write::write_all(&mut f, token_b64.as_bytes()));
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = std::fs::write(&token_path, &token_b64);
+    }
+
+    Some(token_b64)
 }

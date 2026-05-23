@@ -130,20 +130,16 @@ impl MacaroonAuth {
     /// Validate a capability token.
     pub fn validate(&self, token: &CapabilityToken) -> Result<()> {
         // If no root key configured, check if dev mode is allowed.
-        if self.root_key.is_none() {
-            if !self.dev_mode_allowed {
-                return Err(AcpError::Internal(
-                    "authentication required: root key not configured".into(),
-                ));
-            }
-            // Dev mode: skip signature validation but still check expiration and replay
+        if self.root_key.is_none() && !self.dev_mode_allowed {
+            return Err(AcpError::Internal(
+                "authentication required: root key not configured".into(),
+            ));
         }
 
-        // Check expiration.
-        if let Some(expires) = token.expires_at {
-            if Utc::now() > expires {
-                return Err(AcpError::TokenExpired(expires.to_rfc3339()));
-            }
+        if let Some(expires) = token.expires_at
+            && Utc::now() > expires
+        {
+            return Err(AcpError::TokenExpired(expires.to_rfc3339()));
         }
 
         // Check revocation.
@@ -159,7 +155,9 @@ impl MacaroonAuth {
             let mut nonces = self.used_nonces.lock().unwrap();
             let nonce_key = format!("{}:{}", token.token_id, token.nonce);
             if !nonces.insert(nonce_key) {
-                return Err(AcpError::InvalidToken("replay detected: nonce already used".into()));
+                return Err(AcpError::InvalidToken(
+                    "replay detected: nonce already used".into(),
+                ));
             }
         }
 
@@ -210,6 +208,66 @@ impl MacaroonAuth {
     pub fn revoke_token(&self, token_id: &str) {
         let mut revoked = self.revoked_tokens.lock().unwrap();
         revoked.insert(token_id.to_string());
+    }
+
+    /// Decode a wire token (base64-encoded) into a CapabilityToken.
+    ///
+    /// In dev mode, the token is base64(identifier) where identifier contains
+    /// the token fields. In production mode, the token is the HMAC signature;
+    /// the caller must provide the full token via a separate channel.
+    pub fn decode_wire_token(&self, wire_token: &str) -> Result<CapabilityToken> {
+        use base64::{Engine as _, engine::general_purpose::STANDARD};
+
+        let decoded = STANDARD
+            .decode(wire_token)
+            .map_err(|e| AcpError::InvalidToken(format!("invalid base64 token: {e}")))?;
+
+        let identifier = String::from_utf8(decoded)
+            .map_err(|e| AcpError::InvalidToken(format!("token is not valid UTF-8: {e}")))?;
+
+        if !identifier.starts_with("id:") {
+            return Err(AcpError::InvalidToken(
+                "token does not contain a valid identifier".into(),
+            ));
+        }
+
+        let mut token_id = String::new();
+        let mut capabilities = Vec::new();
+        let mut issuer = String::new();
+        let mut nonce = String::new();
+        let mut expires_at = None;
+
+        for part in identifier.split('|') {
+            if let Some(val) = part.strip_prefix("id:") {
+                token_id = val.to_string();
+            } else if let Some(val) = part.strip_prefix("capabilities:") {
+                capabilities = val.split(',').filter(|s| !s.is_empty()).map(String::from).collect();
+            } else if let Some(val) = part.strip_prefix("issuer:") {
+                issuer = val.to_string();
+            } else if let Some(val) = part.strip_prefix("nonce:") {
+                nonce = val.to_string();
+            } else if let Some(val) = part.strip_prefix("expires:") {
+                if val != "never" {
+                    expires_at = DateTime::parse_from_rfc3339(val)
+                        .ok()
+                        .map(|dt| dt.with_timezone(&Utc));
+                }
+            }
+        }
+
+        if token_id.is_empty() {
+            return Err(AcpError::InvalidToken("token missing id field".into()));
+        }
+
+        Ok(CapabilityToken {
+            token_id,
+            token: wire_token.to_string(),
+            capabilities,
+            attenuations: Vec::new(),
+            expires_at,
+            issuer,
+            nonce,
+        })
     }
 
     /// Check if a token has been revoked.
@@ -309,11 +367,7 @@ mod tests {
     fn no_root_key_skips_validation_in_dev_mode() {
         let auth = MacaroonAuth::new(None, true);
         let token = auth
-            .create_token(
-                vec!["acp:session".to_string()],
-                Vec::new(),
-                None,
-            )
+            .create_token(vec!["acp:session".to_string()], Vec::new(), None)
             .unwrap();
         assert!(auth.validate(&token).is_ok());
     }
@@ -321,11 +375,7 @@ mod tests {
     #[test]
     fn no_root_key_fails_in_production_mode() {
         let auth = MacaroonAuth::new(None, false);
-        let result = auth.create_token(
-            vec!["acp:session".to_string()],
-            Vec::new(),
-            None,
-        );
+        let result = auth.create_token(vec!["acp:session".to_string()], Vec::new(), None);
         assert!(result.is_err());
     }
 
@@ -481,7 +531,7 @@ mod tests {
 
         // Token should now be rejected
         assert!(auth.is_revoked(&token.token_id));
-        
+
         // Create a new token with same ID to test revocation check
         let mut revoked_token = auth
             .create_token(
@@ -491,7 +541,7 @@ mod tests {
             )
             .unwrap();
         revoked_token.token_id = token.token_id.clone();
-        
+
         assert!(matches!(
             auth.validate(&revoked_token),
             Err(AcpError::InvalidToken(_))

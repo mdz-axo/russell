@@ -71,7 +71,9 @@ pub trait JournalWritePort: Send {
 /// - [`EventQueryPort`] — meta/ACP needs (severity counts, recent events, baselines)
 /// - [`SelfTelemetryPort`] — proprio needs (self-vitals, reflex events)
 /// - [`EventDetailPort`] — detailed event access by ID
-pub trait JournalReadPort: Send + Sync + HostTelemetryPort + EventQueryPort + SelfTelemetryPort + EventDetailPort {
+pub trait JournalReadPort:
+    Send + Sync + HostTelemetryPort + EventQueryPort + SelfTelemetryPort + EventDetailPort
+{
     /// Retrieve the N most recent events.
     fn recent(&self, limit: usize) -> Result<Vec<EventRow>>;
 
@@ -136,12 +138,24 @@ pub trait EventQueryPort: Send + Sync {
 /// Provides access to self-observation data needed for:
 /// - Cadence monitoring (last_host_sample_ts)
 /// - Reflex event tracking (count_reflex_events)
+/// - Help session error rate (help_error_rate_pct)
+/// - LLM latency monitoring (llm_latency_p95_ms)
+/// - Journal chain integrity (check_chain_integrity)
 pub trait SelfTelemetryPort: Send + Sync {
     /// Get last host sample timestamp.
     fn last_host_sample_ts(&self) -> Result<Option<i64>>;
 
     /// Count reflex events for a probe in a time window.
     fn count_reflex_events(&self, probe: &str, since: i64, until: i64) -> Result<usize>;
+
+    /// Get help session error rate as percentage (0.0-100.0).
+    fn help_error_rate_pct(&self) -> Result<Option<f64>>;
+
+    /// Get LLM p95 latency in milliseconds.
+    fn llm_latency_p95_ms(&self) -> Result<Option<f64>>;
+
+    /// Check journal hash chain integrity (last 10 events).
+    fn check_chain_integrity(&self) -> Option<bool>;
 }
 
 /// Event detail port — detailed event access by ID.
@@ -248,6 +262,18 @@ impl SelfTelemetryPort for super::JournalReader {
     fn count_reflex_events(&self, probe: &str, since: i64, until: i64) -> Result<usize> {
         Ok(super::JournalReader::count_reflex_events(self, probe, since, until)? as usize)
     }
+
+    fn help_error_rate_pct(&self) -> Result<Option<f64>> {
+        super::JournalReader::help_error_rate_pct(self)
+    }
+
+    fn llm_latency_p95_ms(&self) -> Result<Option<f64>> {
+        super::JournalReader::llm_latency_p95_ms(self)
+    }
+
+    fn check_chain_integrity(&self) -> Option<bool> {
+        super::JournalReader::check_chain_integrity(self)
+    }
 }
 
 impl EventDetailPort for super::JournalReader {
@@ -322,8 +348,8 @@ impl EventQueryPort for InMemoryJournal {
             .map(|e| EventRow {
                 id: String::new(),
                 ts: String::new(),
-                scope: e.scope.clone(),
-                severity: e.severity.clone(),
+                scope: e.scope,
+                severity: e.severity,
                 tier: e.tier.clone(),
                 module: e.module.clone(),
                 action: String::new(),
@@ -367,11 +393,28 @@ impl SelfTelemetryPort for InMemoryJournal {
         // In-memory journal doesn't track reflex events
         Ok(0)
     }
+
+    fn help_error_rate_pct(&self) -> Result<Option<f64>> {
+        // In-memory journal doesn't track help sessions
+        Ok(None)
+    }
+
+    fn llm_latency_p95_ms(&self) -> Result<Option<f64>> {
+        // In-memory journal doesn't track help sessions
+        Ok(None)
+    }
+
+    fn check_chain_integrity(&self) -> Option<bool> {
+        // In-memory journal doesn't have a hash chain
+        Some(true)
+    }
 }
 
 impl EventDetailPort for InMemoryJournal {
     fn get_event(&self, _id: i64) -> Result<Event> {
         // In-memory journal doesn't support ID-based lookup
-        Err(crate::error::CoreError::Invariant("event not found in InMemoryJournal".into()))
+        Err(crate::error::CoreError::Invariant(
+            "event not found in InMemoryJournal".into(),
+        ))
     }
 }

@@ -53,13 +53,15 @@ async fn main() -> anyhow::Result<()> {
     // Initialize auth (no root key = dev mode, skip validation).
     let macaroon_root_key = std::env::var("RUSSELL_ACP_MACAROON_KEY").ok();
     let dev_mode_allowed = std::env::var("RUSSELL_ACP_DEV_MODE").is_ok();
+    let require_auth = std::env::var("RUSSELL_ACP_REQUIRE_AUTH").is_ok();
     let auth = MacaroonAuth::new(macaroon_root_key, dev_mode_allowed);
 
     // Initialize rate limiter.
     let rate_limiter = RateLimiter::default();
 
     // Create handler and server.
-    let handler = AcpHandler::new(persona, dispatch, auth, rate_limiter);
+    let handler = AcpHandler::new(persona, dispatch, auth, rate_limiter)
+        .with_require_auth(require_auth);
     let server = AcpServer::new(handler);
 
     // Serve over stdio.

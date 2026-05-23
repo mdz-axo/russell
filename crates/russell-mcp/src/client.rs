@@ -140,10 +140,11 @@ pub fn validate_endpoint(url: &str) -> Result<()> {
     }
 
     // Resolve hostname — reject if ANY address is non-loopback.
-    let addrs = std::net::ToSocketAddrs::to_socket_addrs(&format!("{host}:0"))
-        .map_err(|_| McpError::NonLoopbackRefused {
+    let addrs = std::net::ToSocketAddrs::to_socket_addrs(&format!("{host}:0")).map_err(|_| {
+        McpError::NonLoopbackRefused {
             url: url.to_owned(),
-        })?;
+        }
+    })?;
 
     let mut found_any = false;
     for addr in addrs {
@@ -537,7 +538,10 @@ mod tests {
 
     #[test]
     fn unresolvable_hostname_rejected() {
-        assert!(validate_endpoint("http://this-host-does-not-exist-russell-test.invalid:18100").is_err());
+        assert!(
+            validate_endpoint("http://this-host-does-not-exist-russell-test.invalid:18100")
+                .is_err()
+        );
     }
 
     #[test]

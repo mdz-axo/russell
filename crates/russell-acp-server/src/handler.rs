@@ -26,6 +26,8 @@ pub struct AcpHandler {
     auth: MacaroonAuth,
     /// Rate limiter.
     rate_limiter: RateLimiter,
+    /// Whether authentication is required for all requests.
+    require_auth: bool,
 }
 
 impl AcpHandler {
@@ -42,12 +44,35 @@ impl AcpHandler {
             dispatch,
             auth,
             rate_limiter,
+            require_auth: false,
         }
+    }
+
+    /// Set whether authentication is required for all requests.
+    pub fn with_require_auth(mut self, require: bool) -> Self {
+        self.require_auth = require;
+        self
+    }
+
+    /// Access the session manager (for GC from transport layer).
+    pub fn sessions_mut(&mut self) -> &mut SessionManager {
+        &mut self.sessions
     }
 
     /// Handle a JSON-RPC request.
     pub async fn handle(&mut self, request: JsonRpcRequest) -> JsonRpcResponse {
         debug!(method = %request.method, "Handling ACP request");
+
+        if self.require_auth && request.auth.is_none() {
+            return JsonRpcResponse {
+                jsonrpc: "2.0".to_string(),
+                id: request.id,
+                result: None,
+                error: Some(JsonRpcError::from(AcpError::AuthFailed(
+                    "authentication required".to_string(),
+                ))),
+            };
+        }
 
         // Check rate limit (if auth provided).
         if let Some(ref auth) = request.auth {
@@ -61,24 +86,29 @@ impl AcpHandler {
             }
         }
 
-        // Validate auth (if configured).
-        if let Some(ref auth_info) = request.auth {
-            if let Err(e) = self.validate_auth(auth_info) {
-                return JsonRpcResponse {
-                    jsonrpc: "2.0".to_string(),
-                    id: request.id,
-                    result: None,
-                    error: Some(JsonRpcError::from(e)),
-                };
+        // Validate auth (if provided).
+        let validated_token = if let Some(ref auth_info) = request.auth {
+            match self.validate_auth(auth_info) {
+                Ok(token) => Some(token),
+                Err(e) => {
+                    return JsonRpcResponse {
+                        jsonrpc: "2.0".to_string(),
+                        id: request.id,
+                        result: None,
+                        error: Some(JsonRpcError::from(e)),
+                    };
+                }
             }
-        }
+        } else {
+            None
+        };
 
         // Dispatch to method handler.
         let result = match request.method.as_str() {
-            "acp/session.create" => self.create_session(request.params).await,
-            "acp/session.message" => self.session_message(request.params).await,
-            "acp/session.close" => self.close_session(request.params).await,
-            "acp/session.status" => self.session_status(request.params).await,
+            "acp/session.create" => self.create_session(request.params, validated_token.as_ref()).await,
+            "acp/session.message" => self.session_message(request.params, validated_token.as_ref()).await,
+            "acp/session.close" => self.close_session(request.params, validated_token.as_ref()).await,
+            "acp/session.status" => self.session_status(request.params, validated_token.as_ref()).await,
             "acp/capabilities" => self.get_capabilities(request.params).await,
             "acp/skill/info" => self.get_skill_info(request.params).await,
             "acp/skill/run" => self.run_skill(request.params).await,
@@ -108,8 +138,8 @@ impl AcpHandler {
         }
     }
 
-    /// Validate authentication info.
-    fn validate_auth(&self, auth_info: &AuthInfo) -> Result<()> {
+    /// Validate authentication info and return the validated token.
+    fn validate_auth(&self, auth_info: &AuthInfo) -> Result<CapabilityToken> {
         if auth_info.auth_type != "macaroon" {
             return Err(AcpError::AuthFailed(format!(
                 "unknown auth type: {}",
@@ -117,23 +147,16 @@ impl AcpHandler {
             )));
         }
 
-        let token = CapabilityToken {
-            token_id: "unknown".to_string(),
-            token: auth_info.token.clone(),
-            capabilities: vec!["acp:session".to_string()],
-            attenuations: Vec::new(),
-            expires_at: None,
-            issuer: "unknown".to_string(),
-            nonce: "unknown".to_string(),
-        };
-
-        self.auth.validate(&token)
+        let token = self.auth.decode_wire_token(&auth_info.token)?;
+        self.auth.validate(&token)?;
+        Ok(token)
     }
 
     /// Create a new session.
     async fn create_session(
         &mut self,
         params: Option<serde_json::Value>,
+        token: Option<&CapabilityToken>,
     ) -> Result<serde_json::Value> {
         let req: CreateSessionRequest = params
             .map(serde_json::from_value)
@@ -144,7 +167,8 @@ impl AcpHandler {
             })
             .map_err(|e| AcpError::InvalidRequest(format!("invalid params: {}", e)))?;
 
-        let session_id = self.sessions.create_session(&req.persona);
+        let token_id = token.map(|t| t.token_id.clone());
+        let session_id = self.sessions.create_session_with_token(&req.persona, token_id);
         info!(session_id = %session_id, "Created ACP session");
 
         Ok(json!(CreateSessionResponse {
@@ -158,6 +182,7 @@ impl AcpHandler {
     async fn session_message(
         &mut self,
         params: Option<serde_json::Value>,
+        token: Option<&CapabilityToken>,
     ) -> Result<serde_json::Value> {
         let req: SessionMessageRequest = params
             .ok_or_else(|| AcpError::InvalidRequest("missing params".to_string()))
@@ -167,6 +192,13 @@ impl AcpHandler {
             })?;
 
         let session_id = req.session_id.clone();
+
+        if !self.sessions.verify_session_ownership(&session_id, token.map(|t| t.token_id.as_str())) {
+            return Err(AcpError::CapabilityNotGranted(format!(
+                "session '{session_id}' not owned by this token"
+            )));
+        }
+
         let session = self
             .sessions
             .get_session_mut(&session_id)
@@ -208,11 +240,17 @@ impl AcpHandler {
     async fn close_session(
         &mut self,
         params: Option<serde_json::Value>,
+        token: Option<&CapabilityToken>,
     ) -> Result<serde_json::Value> {
         let session_id = params
-            .and_then(|p| p.get("session_id").map(|v| v.as_str().map(String::from)))
-            .flatten()
+            .and_then(|p| p.get("session_id").and_then(|v| v.as_str()).map(String::from))
             .ok_or_else(|| AcpError::InvalidRequest("missing session_id".to_string()))?;
+
+        if !self.sessions.verify_session_ownership(&session_id, token.map(|t| t.token_id.as_str())) {
+            return Err(AcpError::CapabilityNotGranted(format!(
+                "session '{session_id}' not owned by this token"
+            )));
+        }
 
         if !self.sessions.close_session(&session_id) {
             return Err(AcpError::SessionNotFound(session_id.clone()));
@@ -226,10 +264,17 @@ impl AcpHandler {
     async fn session_status(
         &mut self,
         params: Option<serde_json::Value>,
+        token: Option<&CapabilityToken>,
     ) -> Result<serde_json::Value> {
         let session_id = params
-            .and_then(|p| p.get("session_id").map(|v| v.to_string()))
+            .and_then(|p| p.get("session_id").and_then(|v| v.as_str()).map(String::from))
             .ok_or_else(|| AcpError::InvalidRequest("missing session_id".to_string()))?;
+
+        if !self.sessions.verify_session_ownership(&session_id, token.map(|t| t.token_id.as_str())) {
+            return Err(AcpError::CapabilityNotGranted(format!(
+                "session '{session_id}' not owned by this token"
+            )));
+        }
 
         let session = self
             .sessions

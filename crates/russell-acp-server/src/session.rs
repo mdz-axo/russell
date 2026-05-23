@@ -20,6 +20,9 @@ pub struct Session {
     pub last_activity: DateTime<Utc>,
     /// Session state.
     pub state: SessionState,
+    /// Token ID that created this session (for ownership binding).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub token_id: Option<String>,
 }
 
 impl Session {
@@ -33,7 +36,15 @@ impl Session {
             created: now,
             last_activity: now,
             state: SessionState::Active,
+            token_id: None,
         }
+    }
+
+    /// Create a new session bound to a specific token.
+    pub fn new_with_token(persona: impl Into<String>, token_id: Option<String>) -> Self {
+        let mut session = Self::new(persona);
+        session.token_id = token_id;
+        session
     }
 
     /// Add a turn to the session.
@@ -165,6 +176,32 @@ impl SessionManager {
         let id = session.id.clone();
         self.sessions.insert(id.clone(), session);
         id
+    }
+
+    /// Create a new session bound to a specific token.
+    pub fn create_session_with_token(
+        &mut self,
+        persona: impl Into<String>,
+        token_id: Option<String>,
+    ) -> String {
+        let session = Session::new_with_token(persona, token_id);
+        let id = session.id.clone();
+        self.sessions.insert(id.clone(), session);
+        id
+    }
+
+    /// Verify that a token owns a session.
+    /// Returns true if the session has no token binding (unauthenticated mode)
+    /// or if the token_id matches.
+    pub fn verify_session_ownership(&self, id: &str, token_id: Option<&str>) -> bool {
+        match self.sessions.get(id) {
+            Some(session) => match (&session.token_id, token_id) {
+                (None, _) => true,
+                (Some(_), None) => false,
+                (Some(bound), Some(requesting)) => bound == requesting,
+            },
+            None => false,
+        }
     }
 
     /// Get a session by ID.

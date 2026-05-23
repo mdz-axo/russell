@@ -390,8 +390,8 @@ mod tests {
         // Test round filter
         let mut ctx = TemplateContext::default();
         ctx.params
-            .insert("num".to_string(), serde_json::json!(3.14159));
+            .insert("num".to_string(), serde_json::json!(1.23456));
         let result = engine.render("{{ params.num | round(2) }}", &ctx).unwrap();
-        assert!(result.contains("3.14"));
+        assert!(result.contains("1.23"));
     }
 }

@@ -135,11 +135,13 @@ mod tests {
         let key = EncryptionKey::generate();
 
         let token = CapabilityToken {
+            token_id: "test-token-id".to_string(),
             token: "macaroon-signature".to_string(),
             capabilities: vec!["acp:session".to_string()],
             attenuations: Vec::new(),
             expires_at: Some(Utc::now() + Duration::hours(1)),
             issuer: "test".to_string(),
+            nonce: "test-nonce".to_string(),
         };
 
         let encrypted = encrypt_token(&token, &key).unwrap();
