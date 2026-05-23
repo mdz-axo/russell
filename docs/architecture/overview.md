@@ -97,7 +97,7 @@ a corresponding ADR and a corresponding area of the code:
 | VSM layer | Locked decision | Code home |
 |---|---|---|
 | Policy | [ADR-0005](../adr/deferred/0005-privileged-operations.md), [safety.md](../standards/safety.md) | `russell-cli` confirm flow, kill switches |
-| Intelligence | [ADR-0008](../adr/0008-llm-triage-never-emits-shell.md) | `russell-meta::openrouter`, `russell-core::profile` |
+| Intelligence | [ADR-0008](../adr/0008-llm-triage-never-emits-shell.md) | `russell-meta::help`, `russell-core::profile` |
 | Control | [ADR-0007](../adr/deferred/0007-yaml-manifest-subprocess-skill-model.md), [ADR-0015](../adr/0015-proprioception-self-health.md) | `russell-meta`, `russell-proprio` (MVP self-vital) |
 | Coordination | [ADR-0009](../adr/deferred/0009-tokio-runtime-lifted.md) + systemd timers | Unit files under `packaging/systemd/`; timers are OS-level |
 | Operations | [ADR-0004](../adr/0004-sqlite-journal.md), [ADR-0006](../adr/0006-profile-abstraction.md) | `russell-sentinel`, `russell-skills` |
@@ -113,13 +113,21 @@ flowchart LR
   MCP[russell-mcp]
   PROPRIO[russell-proprio]
   CLI[russell-cli]
+  ACP[russell-acp-server]
+  AGENT[russell-agent]
+  REFLEX[russell-reflex]
+  TESTING[russell-testing]
 
   SENTINEL --> CORE
   SKILLS --> CORE
   META --> CORE & SKILLS
   PROPRIO --> CORE
+  REFLEX --> CORE & PROPRIO
   MCP --> CORE & SENTINEL & META & SKILLS & PROPRIO
-  CLI --> CORE & SENTINEL & META & SKILLS & PROPRIO & MCP
+  ACP --> CORE & SKILLS & META
+  AGENT --> CORE & SENTINEL & PROPRIO & REFLEX & META
+  CLI --> CORE & SENTINEL & META & SKILLS & PROPRIO & MCP & REFLEX
+  TESTING --> CORE
 ```
 
 <!-- DIAGRAM_ALIGNMENT
@@ -144,7 +152,7 @@ derived.
 
 - Path: `~/.local/state/harness/profile.json`.
 - Author: the Bootstrap.
-- Readers: every tier, the Doctor, the Sentinel, the MCP server.
+- Readers: every tier, the Nurse, the Sentinel, the MCP server.
 - Schema: [ADR-0006](../adr/0006-profile-abstraction.md).
 - Invariant: mutations happen only through the Bootstrap state
   machine. Everywhere else the profile is read-only.
@@ -192,9 +200,9 @@ agents and humans never diverge in capability. The MCP surface
 is catalogued in
 [`../archive/mcp-surface.md`](../archive/mcp-surface.md).
 
-### 4.3 The Doctor
+### 4.3 The Nurse (Metacognitive Layer)
 
-The Doctor is a **supervisor**, not an LLM wrapper. Its loop:
+The Nurse is a **supervisor**, not an LLM wrapper. Its loop:
 
 1. Receive a symptom (Sentinel crit event, CLI, tier
    escalation, proprioception).
@@ -235,7 +243,7 @@ Russell is deliberately cautious for the first 30 days after
 bootstrap. Effective `max_auto_risk` is clamped to `low` for any
 skill with `risk: high` interventions, regardless of manifest
 settings. Rationale: baselines need data to be meaningful;
-without them the Doctor lacks the evidence to justify an
+without them the Nurse lacks the evidence to justify an
 aggressive intervention.
 
 ## 7. Where to put a new feature

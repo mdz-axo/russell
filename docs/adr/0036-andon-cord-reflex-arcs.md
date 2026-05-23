@@ -1,6 +1,6 @@
 # ADR-0036: Andon Cord for Reflex Arcs
 
-- **Status:** Accepted
+- **Status:** Deferred (implementation removed; consent absorbed into ACP session interface)
 - **Date:** 2026-05-19
 - **Deciders:** Project founders
 - **Tags:** `reflex-arcs`, `andon-cord`, `operator-consent`, `JR-2`
@@ -25,8 +25,8 @@ russell confirm <event-id> --deny     # Deny a reflex intervention
 
 ### Implementation
 
-- **Location:** `crates/russell-cli/src/commands/confirm.rs`
-- **Journal API:** Added `get_event(id: i64)` to `JournalReadPort` trait
+- **Location:** Deferred. The `confirm.rs` CLI module was removed during the 2026-05-23 adversarial review. Consent functionality is planned to be absorbed into the ACP session interface (`russell-acp-server`), where hKask agents can surface `PendingAction` and receive consent responses.
+- **Journal API:** `get_event(id: i64)` available on `JournalReadPort` trait
 - **Persistence:** Approval/denial recorded as `reflex_confirmed`/`reflex_denied` events
 
 ### Security Model

@@ -203,7 +203,6 @@ ADR-0007 deferral lifted per ADR-0023.
 - [x] IDRS journaling: `run_and_journal` with evidence bundles per run
 - [x] Risk-band enforcement: `max_auto_risk` cap, `check_risk()` gate
 - [x] Rollback execution: `run_intervention_with_rollback()` chains reverse interventions
-- [x] `russell chat` — interactive readline REPL with Jack's chat persona
 - [x] Persona shift: Jack is a nurse, not a doctor
 
 ### Phase 4 — MCP surface, real skills, operational depth (CURRENT)
@@ -239,7 +238,7 @@ build→install→test→sentinel flow.
   `JournalReader::list_reflex_events()` and `count_reflex_events()` for cooldown
   enforcement.
 - [x] **IDRS rollback & evaluation wired**: `run_intervention_with_rollback()`
-  used in chat.rs consent path; `eval_checks` resolved from skill manifests and
+  used in ACP session consent path; `eval_checks` resolved from skill manifests and
   passed through `ResolvedAction::Intervention`. Rollback strategies
   (RollbackId, NoneNeeded, Reboot) propagated from manifest to dispatcher.
 - [x] **HKaskTool IDRS parity**: evidence bundles for HKask MCP tool calls

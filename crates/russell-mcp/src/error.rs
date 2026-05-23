@@ -40,7 +40,7 @@ pub enum McpError {
     InvalidResponse(String),
 
     /// Authentication failed (401 from server).
-    #[error("authentication failed — check KASK_MCP_TOKEN")]
+    #[error("authentication failed — check HKASK_MCP_TOKEN")]
     Unauthenticated,
 
     /// Authorization denied (403 from server).

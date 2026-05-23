@@ -67,20 +67,17 @@ done
 if [ "$ACTION" = "uninstall" ]; then
     echo "==> Stopping and disabling Russell timers…"
     systemctl --user stop russell-sentinel.timer 2>/dev/null || true
-    systemctl --user stop russell-okapi.timer 2>/dev/null || true
     systemctl --user stop russell-digest.timer 2>/dev/null || true
     systemctl --user disable russell-sentinel.timer 2>/dev/null || true
-    systemctl --user disable russell-okapi.timer 2>/dev/null || true
     systemctl --user disable russell-digest.timer 2>/dev/null || true
 
     echo "==> Removing systemd units…"
     rm -f "${SYSTEMD_USER_DIR}/russell-sentinel.service"
     rm -f "${SYSTEMD_USER_DIR}/russell-sentinel.timer"
-    rm -f "${SYSTEMD_USER_DIR}/russell-okapi.service"
-    rm -f "${SYSTEMD_USER_DIR}/russell-okapi.timer"
     rm -f "${SYSTEMD_USER_DIR}/russell-digest.service"
     rm -f "${SYSTEMD_USER_DIR}/russell-digest.timer"
     rm -f "${SYSTEMD_USER_DIR}/russell-failure@.service"
+    rm -f "${SYSTEMD_USER_DIR}/russell-acp-server.service"
 
     echo "==> Removing binaries…"
     rm -f "${BIN_DIR}/${BINARY_NAME}"
@@ -133,8 +130,8 @@ if [ "$ACTION" = "check" ]; then
     echo ""
     echo "Would enable timers:"
     echo "  russell-sentinel.timer"
-    echo "  russell-okapi.timer"
     echo "  russell-digest.timer"
+    echo "  russell-acp-server.service"
     exit 0
 fi
 
@@ -182,8 +179,6 @@ fi
 echo "==> Installing systemd units…"
 cp "${REPO_ROOT}/packaging/systemd/russell-sentinel.service" "$SYSTEMD_USER_DIR"
 cp "${REPO_ROOT}/packaging/systemd/russell-sentinel.timer" "$SYSTEMD_USER_DIR"
-cp "${REPO_ROOT}/packaging/systemd/russell-okapi.service" "$SYSTEMD_USER_DIR"
-cp "${REPO_ROOT}/packaging/systemd/russell-okapi.timer" "$SYSTEMD_USER_DIR"
 cp "${REPO_ROOT}/packaging/systemd/russell-digest.service" "$SYSTEMD_USER_DIR"
 cp "${REPO_ROOT}/packaging/systemd/russell-digest.timer" "$SYSTEMD_USER_DIR"
 cp "${REPO_ROOT}/packaging/systemd/russell-failure@.service" "$SYSTEMD_USER_DIR"
@@ -248,7 +243,7 @@ if [ ! -f "${CONFIG_DIR}/russell.env" ]; then
 # Override the LLM backend endpoint
 # OLLAMA_HOST=127.0.0.1:11435
 
-# Override the LLM model for `russell jack` / `russell chat`
+# Override the LLM model for `russell jack`
 # HARVESTER_MODEL=deepseek-v4-pro
 ENV_EOF
     echo "  → ${CONFIG_DIR}/russell.env created (edit to configure)"
@@ -259,14 +254,10 @@ systemctl --user daemon-reload
 
 # Enable the timers (they start on next boot or immediately if activated).
 systemctl --user enable russell-sentinel.timer
-systemctl --user enable russell-okapi.timer
 systemctl --user enable russell-digest.timer
 
 # Start them now.
 systemctl --user start russell-sentinel.timer
-systemctl --user start russell-okapi.timer 2>/dev/null || {
-    echo "  → Note: russell-okapi.timer failed to start — is Okapi running?"
-}
 systemctl --user start russell-digest.timer 2>/dev/null || true
 
 echo ""
@@ -282,11 +273,9 @@ echo "  Env:       ${CONFIG_DIR}/russell.env"
 echo ""
 echo "  Try:  russell status"
 echo "        russell jack"
-echo "        russell chat"
 echo ""
 echo "  Timers:"
 echo "    russell-sentinel.timer  — every 5 min"
-echo "    russell-okapi.timer     — every 5 min (offset)"
 echo "    russell-digest.timer    — weekly"
 echo ""
 echo "  Check:  systemctl --user list-timers russell-*"

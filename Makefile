@@ -38,7 +38,3 @@ sentinel:
 # Run jack with an optional note
 jack:
 	cargo run -- jack $(if $(note),--note "$(note)",)
-
-# Run chat
-chat:
-	cargo run -- chat

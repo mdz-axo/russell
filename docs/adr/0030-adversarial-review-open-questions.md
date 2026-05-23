@@ -12,16 +12,16 @@ The following tasks from the adversarial review action plan are **complete**:
 | Task | Description | Status | Location |
 |---|---|---|---|
 | **S1** | Capability Attenuation | ✓ Complete | `russell-skills/src/dispatch.rs:426-436` |
-| **S3** | Prompt Sanitization Pipeline | ✓ Complete | `russell-meta/src/sanitizer.rs` |
+| **S3** | Prompt Sanitization Pipeline | ✓ Complete | `russell-meta/src/help.rs` (ACTION detection in `compose_note`) |
 | **A1** | Explicit Port Interfaces | ✓ Complete | `russell-core/src/journal/port.rs` (ADR-0033) |
 | **P1** | Baseline Freshness Guard | ✓ Complete | `russell-core/src/journal/mod.rs:1423` |
-| **C2** | Consent Expiry (5-min TTL) | ✓ Complete | `russell-cli/src/commands/chat/mod.rs:70,89` |
+| **C2** | Consent Expiry (5-min TTL) | ✓ Complete | ACP session interface (consent absorbed into ACP protocol) |
 | **I2** | Dynamic GPU Detection | ✓ Complete | `russell-sentinel/src/probes/gpu.rs:28-79` |
-| **F3** | EWMA Cold Start Acknowledgment | ✓ Complete | `russell-meta/src/prompt.rs:274-295` |
+| **F3** | EWMA Cold Start Acknowledgment | ✓ Complete | `russell-meta/src/help.rs` (SOAP composition) |
 | **T3** | Scenario Tests | ✓ Complete | `skills/scenario-tester/scripts/scenario-test-*.sh` |
 
 **Verification:**
-- `cargo test --workspace`: 255 tests pass
+- `cargo test --workspace`: 288 tests pass
 - `cargo clippy -- -D warnings`: clean
 - Scenario tests: `scenario-test-prompt-sanitization.sh`, `scenario-test-capability-attenuation.sh`
 

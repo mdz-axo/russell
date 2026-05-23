@@ -79,7 +79,6 @@ systemctl --user list-timers | grep russell
 | `russell list --limit 20` | Last 20 journal events |
 | `russell digest --since-hours 168` | Weekly health report (7 days) |
 | `russell jack --note "…"` | Ask Jack about a specific concern |
-| `russell chat` | Interactive REPL with Jack |
 | `russell skill list` | List installed skills |
 | `russell skill run <id>` | Run a skill probe/intervention |
 

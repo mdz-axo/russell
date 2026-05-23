@@ -43,23 +43,22 @@ Consolidate both crates into a single `russell-mcp` crate with feature flags:
    - `client` (default) — MCP client for Kask integration (reqwest, auth, registry)
    - `server` — MCP server for IDE frontends (rmcp, tools)
 
-3. **Directory structure**:
+3. **Directory structure** (actual implementation):
    ```
    crates/russell-mcp/
    ├── src/
-   │   ├── client/       # Kask MCP client (gated by `client` feature)
-   │   │   ├── auth.rs
-   │   │   ├── client.rs
-   │   │   ├── config.rs
-   │   │   ├── error.rs
-   │   │   ├── health.rs
-   │   │   ├── registry.rs
-   │   │   └── types.rs
-   │   └── server/       # IDE MCP server (gated by `server` feature)
-   │       ├── mod.rs
-   │       └── tools.rs
+   │   ├── auth.rs        # Token provider chain
+   │   ├── client.rs      # HKask MCP client
+   │   ├── config.rs      # Configuration
+   │   ├── error.rs       # Error types
+   │   ├── health.rs      # Health check
+   │   ├── lib.rs         # Crate root
+   │   ├── registry.rs    # MCP server registry
+   │   └── types.rs       # Shared types
    └── Cargo.toml
    ```
+
+   **Note:** The `server/` subdirectory described in the original proposal was not implemented. The MCP server functionality lives in `russell-acp-server` (separate crate) per ADR-0027, which provides the ACP session interface for hKask integration.
 
 4. **Conditional compilation** — Modules gated by `#[cfg(feature = "...")]` in `lib.rs`.
 

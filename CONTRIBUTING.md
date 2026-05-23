@@ -92,43 +92,23 @@ SQLite migrations live under
    snapshots `PRAGMA table_info(...)` per table.
 4. Never edit a merged migration.
 
-## 8. Running the MCP server locally
+## 8. Running the ACP server locally
 
 ```bash
-cargo run -p russell-cli -- mcp
+cargo run -p russell-acp-server
 ```
 
-stdio is the only v1 transport (ADR-0003).
+stdio is the only v1 transport (ADR-0003). See
+[`AGENTS.md`](AGENTS.md) §8 for ACP server commands.
 
-### 8.1 Claude Desktop
+### 8.1 hKask Integration
 
-`~/.config/Claude/claude_desktop_config.json`:
+Configure hKask to connect via ACP. See
+[`docs/deployment/acp-integration.md`](docs/deployment/acp-integration.md).
 
-```jsonc
-{
-  "mcpServers": {
-    "russell": {
-      "command": "/home/<you>/Clones/russell/target/debug/russell",
-      "args": ["mcp"],
-      "env": { "RUST_LOG": "russell=debug,info" }
-    }
-  }
-}
-```
+### 8.2 Ad-hoc
 
-### 8.2 Roo / Cline in VSCodium
-
-Point the extension's MCP settings at the same command/args.
-
-### 8.3 Zed
-
-`~/.config/zed/settings.json` → `context_servers` with the same
-command/args.
-
-### 8.4 Ad-hoc
-
-`npx @modelcontextprotocol/inspector` or the built-in
-`russell mcp-probe`. Logs reach journald via `tracing-journald`; tail:
+Logs reach journald via `tracing-subscriber`; tail:
 
 ```bash
 journalctl --user -t russell -f
@@ -137,11 +117,13 @@ journalctl --user -t russell -f
 ## 9. Running tiers and modules ad-hoc
 
 ```bash
-cargo run -p russell-cli -- daily
-cargo run -p russell-cli -- weekly
-cargo run -p russell-cli -- doctor <symptom>
-cargo run -p russell-cli -- run --module <id> --dry-run
-cargo run -p russell-cli -- run --module <id> --verify-idempotent
+cargo run -p russell-cli -- sentinel-once
+cargo run -p russell-cli -- status
+cargo run -p russell-cli -- jack --note "something seems off"
+cargo run -p russell-cli -- skill list
+cargo run -p russell-cli -- skill run <id>
+cargo run -p russell-cli -- proprio
+cargo run -p russell-cli -- self-triage
 ```
 
 All honor `RUSSELL_DRY_RUN=1` globally.

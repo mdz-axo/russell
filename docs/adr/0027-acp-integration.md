@@ -1,7 +1,7 @@
 # ADR-0027: hKask ACP Integration
 
 **Date:** 2026-05-22  
-**Status:** Proposed  
+**Status:** Implemented  
 **Author:** Russell Team  
 **Deciders:** Operator  
 **Technical Story:** [GitHub Issue #XXX](https://github.com/russell/russell/issues/XXX)

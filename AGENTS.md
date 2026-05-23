@@ -124,7 +124,7 @@ These are explicitly rejected features. If observed during testing, they are bug
 russell sentinel-once           # fire one observe cycle
 russell verify-journal           # audit hash chain integrity
 russell skill list               # list installed skills
-russell chat                     # interactive REPL with Jack
+russell self-triage              # Russell diagnoses own health
 russell digest --format daily-log # generate daily memory export
 ```
 

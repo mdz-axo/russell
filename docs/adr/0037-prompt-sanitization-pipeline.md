@@ -1,18 +1,18 @@
 ---
-title: "ADR-0030 — Prompt Sanitization Pipeline"
+title: "ADR-0037 — Prompt Sanitization Pipeline"
 audience: [developers, architects, security reviewers]
-last_updated: 2026-05-19
+last_updated: 2026-05-23
 togaf_phase: "G"
 version: "1.0.0"
 status: "Active"
 ---
 
-# ADR-0030 — Prompt Sanitization Pipeline
+# ADR-0037 — Prompt Sanitization Pipeline
 
 <!-- TOGAF_DOMAIN: Governance — Security -->
 <!-- VERSION: 1.0.0 -->
 <!-- STATUS: Active -->
-<!-- LAST_UPDATED: 2026-05-19 -->
+<!-- LAST_UPDATED: 2026-05-23 -->
 
 ## Context
 
@@ -106,7 +106,7 @@ Implement runtime prompt sanitization:
 
 ## Implementation
 
-**Location:** `crates/russell-meta/src/sanitizer.rs` (451 lines)
+**Location:** `crates/russell-meta/src/help.rs` (sanitization logic in `compose_note` and ACTION detection)
 
 **Key types:**
 - `PromptSanitizer` — main sanitization engine with configurable strictness

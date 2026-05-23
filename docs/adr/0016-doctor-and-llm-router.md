@@ -4,7 +4,7 @@ audience: [developers, architects, agents]
 last_updated: 2026-05-09
 togaf_phase: "H"
 version: "2.0.0"
-status: "Active"
+status: "Superseded (naming)"
 ---
 
 <!-- TOGAF_DOMAIN: Change Management -->

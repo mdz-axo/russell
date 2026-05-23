@@ -224,7 +224,7 @@ scanner (see [`../adr/0024-skill-registry-workshop-lifecycle.md`](../adr/0024-sk
 ### 9.1 Prompt Sanitization Pipeline
 
 All LLM input/output is sanitized to prevent injection and
-exfiltration. See [ADR-0030](../adr/0030-prompt-sanitization-pipeline.md).
+exfiltration. See [ADR-0037](../adr/0037-prompt-sanitization-pipeline.md).
 
 **Input sanitization** (operator notes, skill knowledge):
 - Redacts `RUSSELL_*` environment variable references

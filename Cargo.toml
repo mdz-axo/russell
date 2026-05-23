@@ -14,7 +14,6 @@ members = [
     "crates/russell-acp-server",
     "crates/russell-agent",
     "crates/russell-mcp",
-    "crates/russell-reflex",
 ]
 
 [workspace.package]
