@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 //! Agent persona — YAML-parsed identity and charter.
 
-use std::path::Path;
 use serde::{Deserialize, Serialize};
+use std::path::Path;
 
 /// Agent type enumeration.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -27,12 +27,12 @@ impl AgentCapabilities {
     pub fn new() -> Self {
         Self { items: Vec::new() }
     }
-    
+
     /// Get capabilities as slice.
     pub fn as_slice(&self) -> &[String] {
         &self.items
     }
-    
+
     /// Check if capability is granted.
     pub fn has(&self, capability: &str) -> bool {
         self.items.iter().any(|c| c == capability)
@@ -128,59 +128,67 @@ impl AgentPersona {
     /// Load agent persona from template crate path.
     pub fn load(template_crate_path: &Path) -> Result<Self, PersonaError> {
         let persona_path = template_crate_path.join("agent_persona.yaml");
-        
+
         if !persona_path.exists() {
             return Err(PersonaError::NotFound(persona_path));
         }
-        
-        let content = std::fs::read_to_string(&persona_path)
-            .map_err(|e| PersonaError::IoError(e))?;
-        
-        let persona: AgentPersona = serde_yaml::from_str(&content)
-            .map_err(|e| PersonaError::ParseError(e))?;
-        
+
+        let content =
+            std::fs::read_to_string(&persona_path).map_err(|e| PersonaError::IoError(e))?;
+
+        let persona: AgentPersona =
+            serde_yaml::from_str(&content).map_err(|e| PersonaError::ParseError(e))?;
+
         // Validate required fields
         persona.validate()?;
-        
+
         Ok(persona)
     }
-    
+
     /// Validate the persona (required fields, consistency).
     pub fn validate(&self) -> Result<(), PersonaError> {
         if self.agent.name.is_empty() {
-            return Err(PersonaError::Validation("agent.name is required".to_string()));
+            return Err(PersonaError::Validation(
+                "agent.name is required".to_string(),
+            ));
         }
-        
+
         if self.charter.description.is_empty() {
-            return Err(PersonaError::Validation("charter.description is required".to_string()));
+            return Err(PersonaError::Validation(
+                "charter.description is required".to_string(),
+            ));
         }
-        
+
         if self.capabilities.items.is_empty() {
-            return Err(PersonaError::Validation("capabilities must have at least one item".to_string()));
+            return Err(PersonaError::Validation(
+                "capabilities must have at least one item".to_string(),
+            ));
         }
-        
+
         if self.responsibilities.items.is_empty() {
-            return Err(PersonaError::Validation("responsibilities must have at least one item".to_string()));
+            return Err(PersonaError::Validation(
+                "responsibilities must have at least one item".to_string(),
+            ));
         }
-        
+
         Ok(())
     }
-    
+
     /// Get the agent name.
     pub fn name(&self) -> &str {
         &self.agent.name
     }
-    
+
     /// Get the agent type.
     pub fn agent_type(&self) -> AgentType {
         self.agent.agent_type
     }
-    
+
     /// Get the agent version.
     pub fn version(&self) -> &str {
         &self.agent.version
     }
-    
+
     /// Get the WebID (if set).
     pub fn webid(&self) -> Option<&str> {
         self.agent.webid.as_deref()
@@ -214,15 +222,15 @@ pub enum PersonaError {
     /// Persona file not found
     #[error("persona file not found: {0}")]
     NotFound(std::path::PathBuf),
-    
+
     /// IO error reading persona
     #[error("IO error: {0}")]
     IoError(std::io::Error),
-    
+
     /// YAML parse error
     #[error("YAML parse error: {0}")]
     ParseError(serde_yaml::Error),
-    
+
     /// Validation error
     #[error("validation error: {0}")]
     Validation(String),

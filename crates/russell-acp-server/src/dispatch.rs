@@ -9,9 +9,9 @@ use crate::types::{
     InterventionInfo, LexiconCategorization, LexiconDomain, ProbeInfo, RiskLevel, SafetyInfo,
     SkillInfo, Visibility,
 };
-use russell_skills::{Skill, Visibility as SkillVisibility};
-use russell_skills::dispatch::{Dispatcher, StepType};
 use russell_core::journal::JournalWriter;
+use russell_skills::dispatch::{Dispatcher, StepType};
+use russell_skills::{Skill, Visibility as SkillVisibility};
 
 /// ACP dispatch — wraps russell-skills with visibility filtering.
 pub struct AcpDispatch {
@@ -53,11 +53,7 @@ impl AcpDispatch {
     }
 
     /// Dispatch a skill by ID (enforces visibility).
-    pub async fn dispatch_skill(
-        &self,
-        skill_id: &str,
-        args: &serde_json::Value,
-    ) -> Result<String> {
+    pub async fn dispatch_skill(&self, skill_id: &str, args: &serde_json::Value) -> Result<String> {
         let skill = self
             .skills
             .iter()
@@ -70,10 +66,7 @@ impl AcpDispatch {
         }
 
         // Extract probe_id or intervention_id from args.
-        let step_id = args
-            .get("step_id")
-            .and_then(|v| v.as_str())
-            .unwrap_or("");
+        let step_id = args.get("step_id").and_then(|v| v.as_str()).unwrap_or("");
 
         if step_id.is_empty() {
             return Err(AcpError::InvalidRequest("step_id required".to_string()));
@@ -109,7 +102,9 @@ impl AcpDispatch {
                 )
                 .await
         } else {
-            dispatcher.run(&step.cmd, Some(Duration::from_secs(30))).await
+            dispatcher
+                .run(&step.cmd, Some(Duration::from_secs(30)))
+                .await
         }
         .map_err(|e| AcpError::DispatchError(format!("probe execution failed: {}", e)))?;
 
@@ -223,18 +218,22 @@ fn skill_to_info(skill: &Skill) -> SkillInfo {
         version: skill.version.clone(),
         description: format!("Skill: {}", skill.id),
         visibility: Visibility::Public,
-        lexicon: skill.lexicon.as_ref().map(|l| LexiconCategorization {
-            primary: match l.primary.as_str() {
-                "WordAct" => LexiconDomain::WordAct,
-                "FlowDef" => LexiconDomain::FlowDef,
-                "KnowAct" => LexiconDomain::KnowAct,
-                _ => LexiconDomain::KnowAct,
-            },
-            terms: l.terms.clone(),
-        }).unwrap_or_else(|| LexiconCategorization {
-            primary: LexiconDomain::KnowAct,
-            terms: Vec::new(),
-        }),
+        lexicon: skill
+            .lexicon
+            .as_ref()
+            .map(|l| LexiconCategorization {
+                primary: match l.primary.as_str() {
+                    "WordAct" => LexiconDomain::WordAct,
+                    "FlowDef" => LexiconDomain::FlowDef,
+                    "KnowAct" => LexiconDomain::KnowAct,
+                    _ => LexiconDomain::KnowAct,
+                },
+                terms: l.terms.clone(),
+            })
+            .unwrap_or_else(|| LexiconCategorization {
+                primary: LexiconDomain::KnowAct,
+                terms: Vec::new(),
+            }),
         symptoms: skill.symptoms.clone(),
         probes: skill
             .probes

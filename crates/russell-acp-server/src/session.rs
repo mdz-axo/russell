@@ -59,7 +59,10 @@ impl Session {
 
     /// Whether the session is active.
     pub fn is_active(&self) -> bool {
-        matches!(self.state, SessionState::Active | SessionState::InputRequired)
+        matches!(
+            self.state,
+            SessionState::Active | SessionState::InputRequired
+        )
     }
 }
 

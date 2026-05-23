@@ -65,4 +65,3 @@ pub enum AcpError {
 
 /// Result type alias.
 pub type Result<T> = std::result::Result<T, AcpError>;
-

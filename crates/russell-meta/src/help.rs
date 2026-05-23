@@ -8,9 +8,9 @@ use std::path::PathBuf;
 use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
+use time::OffsetDateTime;
 use tracing::{info, warn};
 use ulid::Ulid;
-use time::OffsetDateTime;
 
 use russell_core::journal::{HelpSessionInput, HelpSessionStatus, JournalWriter};
 use russell_core::paths::Paths;
@@ -195,9 +195,15 @@ async fn gather_objective(writer: &JournalWriter) -> ObjectiveData {
     let now = OffsetDateTime::now_utc().unix_timestamp();
     let since = now - 86400; // Last 24 hours
 
-    let severity_counts = reader.severity_counts(since, now)
-        .unwrap_or_else(|_| russell_core::journal::SeverityCounts { crit: 0, alert: 0, warn: 0, info: 0 });
-    
+    let severity_counts = reader.severity_counts(since, now).unwrap_or_else(|_| {
+        russell_core::journal::SeverityCounts {
+            crit: 0,
+            alert: 0,
+            warn: 0,
+            info: 0,
+        }
+    });
+
     let events = reader.recent(20).unwrap_or_default();
 
     ObjectiveData {
@@ -207,30 +213,44 @@ async fn gather_objective(writer: &JournalWriter) -> ObjectiveData {
             warn: severity_counts.warn as u64,
             info: severity_counts.info as u64,
         },
-        recent_events: events.into_iter().map(|e| EventRecord {
-            probe: format!("{:?}", e.scope),
-            severity: format!("{:?}", e.severity),
-            message: e.summary.unwrap_or_default(),
-            ts: e.ts,
-        }).collect(),
+        recent_events: events
+            .into_iter()
+            .map(|e| EventRecord {
+                probe: format!("{:?}", e.scope),
+                severity: format!("{:?}", e.severity),
+                message: e.summary.unwrap_or_default(),
+                ts: e.ts,
+            })
+            .collect(),
     }
 }
 
 fn check_threshold(counts: &SeverityCounts) -> Option<SkipReason> {
-    if counts.crit > 0 || counts.alert > 0 { None } else { Some(SkipReason::ThresholdSkip) }
+    if counts.crit > 0 || counts.alert > 0 {
+        None
+    } else {
+        Some(SkipReason::ThresholdSkip)
+    }
 }
 
 fn fallback_summary(objective: &ObjectiveData) -> String {
     let mut lines = Vec::new();
     lines.push("## Russell Health Summary (Offline)".to_string());
     lines.push(String::new());
-    lines.push(format!("Severity: {} crit, {} alert, {} warn, {} info",
-        objective.severity_counts.crit, objective.severity_counts.alert,
-        objective.severity_counts.warn, objective.severity_counts.info));
+    lines.push(format!(
+        "Severity: {} crit, {} alert, {} warn, {} info",
+        objective.severity_counts.crit,
+        objective.severity_counts.alert,
+        objective.severity_counts.warn,
+        objective.severity_counts.info
+    ));
     lines.push(String::new());
     lines.push("Recent events:".to_string());
     for event in objective.recent_events.iter().take(10) {
-        lines.push(format!("  - [{}] {}: {}", event.severity, event.probe, event.message));
+        lines.push(format!(
+            "  - [{}] {}: {}",
+            event.severity, event.probe, event.message
+        ));
     }
     lines.join("\n")
 }
@@ -241,12 +261,22 @@ async fn call_hkask(endpoint: &str, request: &HKaskInferRequest) -> Result<HKask
         .build()
         .map_err(|e| DoctorError::Config(format!("HTTP client: {e}")))?;
 
-    let response = client.post(endpoint).json(request).send().await
+    let response = client
+        .post(endpoint)
+        .json(request)
+        .send()
+        .await
         .map_err(|e| DoctorError::Config(format!("hKask request: {e}")))?;
 
     if !response.status().is_success() {
-        return Err(DoctorError::Config(format!("hKask returned {}", response.status())));
+        return Err(DoctorError::Config(format!(
+            "hKask returned {}",
+            response.status()
+        )));
     }
 
-    response.json().await.map_err(|e| DoctorError::Config(format!("hKask response: {e}")))
+    response
+        .json()
+        .await
+        .map_err(|e| DoctorError::Config(format!("hKask response: {e}")))
 }

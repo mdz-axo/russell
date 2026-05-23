@@ -10,6 +10,7 @@ pub mod pod;
 pub mod profile;
 pub mod proprio;
 pub mod sentinel_once;
+pub mod self_triage;
 pub mod skill;
 pub mod skill_lifecycle;
 pub mod status;

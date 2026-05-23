@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 //! Pod lifecycle state machine.
 
-use serde::{Deserialize, Serialize};
 use crate::persona::PersonaError;
+use serde::{Deserialize, Serialize};
 
 /// Pod lifecycle states.
 ///
@@ -58,19 +58,19 @@ pub enum LifecycleError {
         /// Target state
         to: PodLifecycleState,
     },
-    
+
     /// ACP registration failed
     #[error("ACP registration failed: {0}")]
     AcpRegistrationError(String),
-    
+
     /// Persona error
     #[error("persona error: {0}")]
     PersonaError(#[from] PersonaError),
-    
+
     /// Sentinel error
     #[error("sentinel error: {0}")]
     SentinelError(String),
-    
+
     /// ACP server error
     #[error("ACP server error: {0}")]
     AcpServerError(String),
@@ -108,14 +108,17 @@ pub type LifecycleResult<T> = Result<T, LifecycleError>;
 /// // Invalid transition
 /// assert!(validate_transition(&PodLifecycleState::Populated, &PodLifecycleState::Activated).is_err());
 /// ```
-pub fn validate_transition(from: &PodLifecycleState, to: &PodLifecycleState) -> LifecycleResult<()> {
+pub fn validate_transition(
+    from: &PodLifecycleState,
+    to: &PodLifecycleState,
+) -> LifecycleResult<()> {
     let valid = match (from, to) {
         (PodLifecycleState::Populated, PodLifecycleState::Registered) => true,
         (PodLifecycleState::Registered, PodLifecycleState::Activated) => true,
         (PodLifecycleState::Activated, PodLifecycleState::Deactivated) => true,
         _ => false,
     };
-    
+
     if !valid {
         Err(LifecycleError::InvalidStateTransition {
             from: *from,
@@ -129,47 +132,137 @@ pub fn validate_transition(from: &PodLifecycleState, to: &PodLifecycleState) -> 
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_valid_transitions() {
         // Populated → Registered
-        assert!(validate_transition(&PodLifecycleState::Populated, &PodLifecycleState::Registered).is_ok());
-        
+        assert!(
+            validate_transition(
+                &PodLifecycleState::Populated,
+                &PodLifecycleState::Registered
+            )
+            .is_ok()
+        );
+
         // Registered → Activated
-        assert!(validate_transition(&PodLifecycleState::Registered, &PodLifecycleState::Activated).is_ok());
-        
+        assert!(
+            validate_transition(
+                &PodLifecycleState::Registered,
+                &PodLifecycleState::Activated
+            )
+            .is_ok()
+        );
+
         // Activated → Deactivated
-        assert!(validate_transition(&PodLifecycleState::Activated, &PodLifecycleState::Deactivated).is_ok());
+        assert!(
+            validate_transition(
+                &PodLifecycleState::Activated,
+                &PodLifecycleState::Deactivated
+            )
+            .is_ok()
+        );
     }
-    
+
     #[test]
     fn test_invalid_transitions() {
         // Cannot skip states
-        assert!(validate_transition(&PodLifecycleState::Populated, &PodLifecycleState::Activated).is_err());
-        assert!(validate_transition(&PodLifecycleState::Populated, &PodLifecycleState::Deactivated).is_err());
-        assert!(validate_transition(&PodLifecycleState::Registered, &PodLifecycleState::Deactivated).is_err());
-        
+        assert!(
+            validate_transition(&PodLifecycleState::Populated, &PodLifecycleState::Activated)
+                .is_err()
+        );
+        assert!(
+            validate_transition(
+                &PodLifecycleState::Populated,
+                &PodLifecycleState::Deactivated
+            )
+            .is_err()
+        );
+        assert!(
+            validate_transition(
+                &PodLifecycleState::Registered,
+                &PodLifecycleState::Deactivated
+            )
+            .is_err()
+        );
+
         // Cannot go backwards
-        assert!(validate_transition(&PodLifecycleState::Registered, &PodLifecycleState::Populated).is_err());
-        assert!(validate_transition(&PodLifecycleState::Activated, &PodLifecycleState::Registered).is_err());
-        assert!(validate_transition(&PodLifecycleState::Activated, &PodLifecycleState::Populated).is_err());
-        assert!(validate_transition(&PodLifecycleState::Deactivated, &PodLifecycleState::Activated).is_err());
-        
+        assert!(
+            validate_transition(
+                &PodLifecycleState::Registered,
+                &PodLifecycleState::Populated
+            )
+            .is_err()
+        );
+        assert!(
+            validate_transition(
+                &PodLifecycleState::Activated,
+                &PodLifecycleState::Registered
+            )
+            .is_err()
+        );
+        assert!(
+            validate_transition(&PodLifecycleState::Activated, &PodLifecycleState::Populated)
+                .is_err()
+        );
+        assert!(
+            validate_transition(
+                &PodLifecycleState::Deactivated,
+                &PodLifecycleState::Activated
+            )
+            .is_err()
+        );
+
         // Deactivated is terminal
-        assert!(validate_transition(&PodLifecycleState::Deactivated, &PodLifecycleState::Populated).is_err());
-        assert!(validate_transition(&PodLifecycleState::Deactivated, &PodLifecycleState::Registered).is_err());
-        assert!(validate_transition(&PodLifecycleState::Deactivated, &PodLifecycleState::Activated).is_err());
+        assert!(
+            validate_transition(
+                &PodLifecycleState::Deactivated,
+                &PodLifecycleState::Populated
+            )
+            .is_err()
+        );
+        assert!(
+            validate_transition(
+                &PodLifecycleState::Deactivated,
+                &PodLifecycleState::Registered
+            )
+            .is_err()
+        );
+        assert!(
+            validate_transition(
+                &PodLifecycleState::Deactivated,
+                &PodLifecycleState::Activated
+            )
+            .is_err()
+        );
     }
-    
+
     #[test]
     fn test_same_state_transition() {
         // Transitioning to same state is invalid
-        assert!(validate_transition(&PodLifecycleState::Populated, &PodLifecycleState::Populated).is_err());
-        assert!(validate_transition(&PodLifecycleState::Registered, &PodLifecycleState::Registered).is_err());
-        assert!(validate_transition(&PodLifecycleState::Activated, &PodLifecycleState::Activated).is_err());
-        assert!(validate_transition(&PodLifecycleState::Deactivated, &PodLifecycleState::Deactivated).is_err());
+        assert!(
+            validate_transition(&PodLifecycleState::Populated, &PodLifecycleState::Populated)
+                .is_err()
+        );
+        assert!(
+            validate_transition(
+                &PodLifecycleState::Registered,
+                &PodLifecycleState::Registered
+            )
+            .is_err()
+        );
+        assert!(
+            validate_transition(&PodLifecycleState::Activated, &PodLifecycleState::Activated)
+                .is_err()
+        );
+        assert!(
+            validate_transition(
+                &PodLifecycleState::Deactivated,
+                &PodLifecycleState::Deactivated
+            )
+            .is_err()
+        );
     }
-    
+
     #[test]
     fn test_state_display() {
         assert_eq!(PodLifecycleState::Populated.to_string(), "populated");

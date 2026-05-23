@@ -20,8 +20,7 @@ async fn main() -> anyhow::Result<()> {
     let persona = JackPersonaProjection::new()?;
 
     // Load skills from Russell's skill registry.
-    let skills_dir = PathBuf::from(std::env::var("HOME")?)
-        .join(".local/share/harness/skills");
+    let skills_dir = PathBuf::from(std::env::var("HOME")?).join(".local/share/harness/skills");
 
     let skills = if skills_dir.exists() {
         russell_skills::load_all(&skills_dir)?
@@ -33,9 +32,9 @@ async fn main() -> anyhow::Result<()> {
     tracing::info!("Loaded {} skills", skills.len());
 
     // Initialize journal writer.
-    let journal_path = PathBuf::from(std::env::var("HOME")?)
-        .join(".local/state/harness/journal.db");
-    
+    let journal_path =
+        PathBuf::from(std::env::var("HOME")?).join(".local/state/harness/journal.db");
+
     let journal = if journal_path.exists() {
         Some(JournalWriter::open(&journal_path)?)
     } else {

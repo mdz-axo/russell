@@ -94,15 +94,15 @@
 #![deny(rust_2018_idioms)]
 #![warn(missing_docs)]
 
-pub mod pod;
-pub mod persona;
-pub mod lifecycle;
-pub mod cns;
 pub mod artifacts;
+pub mod cns;
+pub mod lifecycle;
+pub mod persona;
+pub mod pod;
 
 // Re-export main types for convenience.
-pub use pod::{RussellPod, PodID};
-pub use lifecycle::{PodLifecycleState, LifecycleError, LifecycleResult};
-pub use persona::{AgentPersona, AgentType, AgentCharter, AgentCapabilities};
-pub use cns::{CnsEmitter, CnsSpan};
 pub use artifacts::{ArtifactStore, ArtifactType, ArtifactVisibility};
+pub use cns::{CnsEmitter, CnsSpan};
+pub use lifecycle::{LifecycleError, LifecycleResult, PodLifecycleState};
+pub use persona::{AgentCapabilities, AgentCharter, AgentPersona, AgentType};
+pub use pod::{PodID, RussellPod};

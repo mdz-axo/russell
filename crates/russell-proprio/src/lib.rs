@@ -41,6 +41,13 @@ use russell_core::journal::{JournalReader, JournalWriter};
 use tracing::{debug, warn};
 
 // ---------------------------------------------------------------------------
+// Reflex Arcs
+// ---------------------------------------------------------------------------
+
+pub mod reflex;
+pub use reflex::{ReflexAction, ReflexArc, RiskLevel};
+
+// ---------------------------------------------------------------------------
 // TimerSource — abstraction over systemd timer queries
 // ---------------------------------------------------------------------------
 

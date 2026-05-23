@@ -81,7 +81,10 @@ mod tests {
         let mut limiter = RateLimiter::new(2, 60);
         assert!(limiter.check("token1").is_ok());
         assert!(limiter.check("token1").is_ok());
-        assert!(matches!(limiter.check("token1"), Err(AcpError::RateLimitExceeded(2))));
+        assert!(matches!(
+            limiter.check("token1"),
+            Err(AcpError::RateLimitExceeded(2))
+        ));
     }
 
     #[test]

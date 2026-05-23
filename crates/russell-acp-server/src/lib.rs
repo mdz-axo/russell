@@ -78,15 +78,15 @@ pub mod transport;
 pub mod types;
 
 // Re-export main types for convenience.
-pub use auth::{MacaroonAuth, CapabilityToken};
+pub use auth::{CapabilityToken, MacaroonAuth};
 pub use dispatch::AcpDispatch;
 pub use error::{AcpError, Result};
 pub use handler::AcpHandler;
 pub use persona::JackPersonaProjection;
 pub use rate_limit::RateLimiter;
-pub use session::{Session, SessionManager, SessionState, Turn, TurnRole, ToolCallRecord};
+pub use session::{Session, SessionManager, SessionState, ToolCallRecord, Turn, TurnRole};
 pub use transport::AcpServer;
 pub use types::{
-    SkillInfo, ProbeInfo, InterventionInfo, SafetyInfo,
-    LexiconCategorization, LexiconDomain, Visibility, RiskLevel,
+    InterventionInfo, LexiconCategorization, LexiconDomain, ProbeInfo, RiskLevel, SafetyInfo,
+    SkillInfo, Visibility,
 };

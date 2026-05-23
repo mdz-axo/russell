@@ -50,9 +50,10 @@ impl MacaroonAuth {
 
     /// Check if a token has a skill attenuation.
     pub fn has_skill(&self, token: &CapabilityToken, skill_id: &str) -> bool {
-        token.attenuations.iter().any(|a| {
-            a.kind == AttenuationKind::SkillRestriction && a.value == skill_id
-        })
+        token
+            .attenuations
+            .iter()
+            .any(|a| a.kind == AttenuationKind::SkillRestriction && a.value == skill_id)
     }
 }
 
@@ -127,7 +128,10 @@ mod tests {
             expires_at: Some(Utc::now() - chrono::Duration::hours(1)),
             issuer: "test".to_string(),
         };
-        assert!(matches!(auth.validate(&token), Err(AcpError::TokenExpired(_))));
+        assert!(matches!(
+            auth.validate(&token),
+            Err(AcpError::TokenExpired(_))
+        ));
     }
 
     #[test]

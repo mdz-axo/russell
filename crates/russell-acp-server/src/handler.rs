@@ -5,6 +5,7 @@ use chrono::Utc;
 use serde_json::json;
 use tracing::{debug, info, warn};
 
+use crate::CapabilityToken;
 use crate::auth::MacaroonAuth;
 use crate::dispatch::AcpDispatch;
 use crate::error::{AcpError, Result};
@@ -12,7 +13,6 @@ use crate::persona::JackPersonaProjection;
 use crate::rate_limit::RateLimiter;
 use crate::session::{SessionManager, Turn, TurnRole};
 use crate::types::*;
-use crate::CapabilityToken;
 
 /// ACP handler — processes JSON-RPC requests.
 pub struct AcpHandler {
@@ -129,10 +129,17 @@ impl AcpHandler {
     }
 
     /// Create a new session.
-    async fn create_session(&mut self, params: Option<serde_json::Value>) -> Result<serde_json::Value> {
+    async fn create_session(
+        &mut self,
+        params: Option<serde_json::Value>,
+    ) -> Result<serde_json::Value> {
         let req: CreateSessionRequest = params
             .map(serde_json::from_value)
-            .unwrap_or_else(|| Ok(CreateSessionRequest { persona: "jack".to_string() }))
+            .unwrap_or_else(|| {
+                Ok(CreateSessionRequest {
+                    persona: "jack".to_string(),
+                })
+            })
             .map_err(|e| AcpError::InvalidRequest(format!("invalid params: {}", e)))?;
 
         let session_id = self.sessions.create_session(&req.persona);
@@ -146,10 +153,16 @@ impl AcpHandler {
     }
 
     /// Send a message in a session.
-    async fn session_message(&mut self, params: Option<serde_json::Value>) -> Result<serde_json::Value> {
+    async fn session_message(
+        &mut self,
+        params: Option<serde_json::Value>,
+    ) -> Result<serde_json::Value> {
         let req: SessionMessageRequest = params
             .ok_or_else(|| AcpError::InvalidRequest("missing params".to_string()))
-            .and_then(|p| serde_json::from_value(p).map_err(|e| AcpError::InvalidRequest(format!("invalid params: {}", e))))?;
+            .and_then(|p| {
+                serde_json::from_value(p)
+                    .map_err(|e| AcpError::InvalidRequest(format!("invalid params: {}", e)))
+            })?;
 
         let session_id = req.session_id.clone();
         let session = self
@@ -190,7 +203,10 @@ impl AcpHandler {
     }
 
     /// Close a session.
-    async fn close_session(&mut self, params: Option<serde_json::Value>) -> Result<serde_json::Value> {
+    async fn close_session(
+        &mut self,
+        params: Option<serde_json::Value>,
+    ) -> Result<serde_json::Value> {
         let session_id = params
             .and_then(|p| p.get("session_id").map(|v| v.as_str().map(String::from)))
             .flatten()
@@ -205,7 +221,10 @@ impl AcpHandler {
     }
 
     /// Get session status.
-    async fn session_status(&mut self, params: Option<serde_json::Value>) -> Result<serde_json::Value> {
+    async fn session_status(
+        &mut self,
+        params: Option<serde_json::Value>,
+    ) -> Result<serde_json::Value> {
         let session_id = params
             .and_then(|p| p.get("session_id").map(|v| v.to_string()))
             .ok_or_else(|| AcpError::InvalidRequest("missing session_id".to_string()))?;
@@ -225,7 +244,10 @@ impl AcpHandler {
     }
 
     /// Get capabilities (public skills + probes).
-    async fn get_capabilities(&self, _params: Option<serde_json::Value>) -> Result<serde_json::Value> {
+    async fn get_capabilities(
+        &self,
+        _params: Option<serde_json::Value>,
+    ) -> Result<serde_json::Value> {
         let skills = self.dispatch.load_public_skills();
         let probes = self.dispatch.list_probes();
 
@@ -251,9 +273,11 @@ impl AcpHandler {
         let (skill_id, args) = params
             .ok_or_else(|| AcpError::InvalidRequest("missing params".to_string()))
             .and_then(|p| {
-                let skill_id = p.get("skill_id").and_then(|v| v.as_str()).map(String::from).ok_or_else(|| {
-                    AcpError::InvalidRequest("missing skill_id".to_string())
-                })?;
+                let skill_id = p
+                    .get("skill_id")
+                    .and_then(|v| v.as_str())
+                    .map(String::from)
+                    .ok_or_else(|| AcpError::InvalidRequest("missing skill_id".to_string()))?;
                 let args = p.get("args").cloned().unwrap_or(json!({}));
                 Ok((skill_id, args))
             })?;
@@ -267,12 +291,16 @@ impl AcpHandler {
         let (skill_id, probe_id, args) = params
             .ok_or_else(|| AcpError::InvalidRequest("missing params".to_string()))
             .and_then(|p| {
-                let skill_id = p.get("skill_id").and_then(|v| v.as_str()).map(String::from).ok_or_else(|| {
-                    AcpError::InvalidRequest("missing skill_id".to_string())
-                })?;
-                let probe_id = p.get("probe_id").and_then(|v| v.as_str()).map(String::from).ok_or_else(|| {
-                    AcpError::InvalidRequest("missing probe_id".to_string())
-                })?;
+                let skill_id = p
+                    .get("skill_id")
+                    .and_then(|v| v.as_str())
+                    .map(String::from)
+                    .ok_or_else(|| AcpError::InvalidRequest("missing skill_id".to_string()))?;
+                let probe_id = p
+                    .get("probe_id")
+                    .and_then(|v| v.as_str())
+                    .map(String::from)
+                    .ok_or_else(|| AcpError::InvalidRequest("missing probe_id".to_string()))?;
                 let args = p.get("args").cloned().unwrap_or(json!({}));
                 Ok((skill_id, probe_id, args))
             })?;

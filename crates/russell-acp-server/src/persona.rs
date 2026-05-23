@@ -17,7 +17,7 @@ impl JackPersonaProjection {
     /// Create a new Jack persona projection.
     pub fn new() -> Result<Self> {
         let jack_prompt = JACK_PERSONA;
-        
+
         let system_prompt = format!(
             "You are Jack, Russell's nurse persona.\n\n\
              {}\n\n\
