@@ -112,12 +112,12 @@ pub fn validate_transition(
     from: &PodLifecycleState,
     to: &PodLifecycleState,
 ) -> LifecycleResult<()> {
-    let valid = match (from, to) {
-        (PodLifecycleState::Populated, PodLifecycleState::Registered) => true,
-        (PodLifecycleState::Registered, PodLifecycleState::Activated) => true,
-        (PodLifecycleState::Activated, PodLifecycleState::Deactivated) => true,
-        _ => false,
-    };
+    let valid = matches!(
+        (from, to),
+        (PodLifecycleState::Populated, PodLifecycleState::Registered)
+            | (PodLifecycleState::Registered, PodLifecycleState::Activated)
+            | (PodLifecycleState::Activated, PodLifecycleState::Deactivated)
+    );
 
     if !valid {
         Err(LifecycleError::InvalidStateTransition {

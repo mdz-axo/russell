@@ -133,11 +133,10 @@ impl AgentPersona {
             return Err(PersonaError::NotFound(persona_path));
         }
 
-        let content =
-            std::fs::read_to_string(&persona_path).map_err(|e| PersonaError::IoError(e))?;
+        let content = std::fs::read_to_string(&persona_path).map_err(PersonaError::IoError)?;
 
         let persona: AgentPersona =
-            serde_yaml::from_str(&content).map_err(|e| PersonaError::ParseError(e))?;
+            serde_yaml::from_str(&content).map_err(PersonaError::ParseError)?;
 
         // Validate required fields
         persona.validate()?;

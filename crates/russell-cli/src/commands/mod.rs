@@ -1,13 +1,11 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 //! Subcommand handlers. One module per verb.
 
-pub mod confirm;
 pub mod digest;
 pub mod docs;
 pub mod help;
 pub mod list;
 pub mod pod;
-pub mod profile;
 pub mod proprio;
 pub mod self_triage;
 pub mod sentinel_once;

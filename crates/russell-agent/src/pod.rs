@@ -413,11 +413,13 @@ impl RussellPod {
                     }
 
                     // 4. Compute baselines periodically (daily)
-                    if cycle_count % BASELINE_REFRESH_INTERVAL == 0 {
+                    if cycle_count.is_multiple_of(BASELINE_REFRESH_INTERVAL) {
                         tracing::info!(pod_id = %pod_id, "Computing EWMA baselines (30-day window)");
                         if let Some(ref reader) = journal_reader {
                             match reader.compute_baselines(30) {
-                                Ok(baselines) => {
+                                Ok(baselines) =>
+                                {
+                                    #[allow(clippy::collapsible_if)]
                                     if let Some(ref writer) = journal_writer {
                                         if let Ok(writer_guard) = writer.lock() {
                                             for baseline in &baselines {
@@ -447,6 +449,7 @@ impl RussellPod {
                     }
 
                     // 5. Run proprioception — Russell watches Russell (JR-5)
+                    #[allow(clippy::collapsible_if)]
                     if let (Some(writer), Some(reader)) = (&journal_writer, &journal_reader) {
                         if let Ok(writer_guard) = writer.lock() {
                             match russell_proprio::run_once(&writer_guard, reader) {
@@ -585,6 +588,7 @@ impl RussellPod {
                     } else {
                         // No journal reader — use simple threshold check
                         for sample in &samples {
+                            #[allow(clippy::collapsible_if)]
                             if let Some(value) = sample.value_num {
                                 if value > 90.0 {
                                     breaches += 1;

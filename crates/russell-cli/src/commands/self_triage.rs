@@ -13,12 +13,12 @@
 //! per Bruce Schneier's security principles.
 
 use anyhow::{Context, Result};
-use russell_core::journal::{JournalReader, JournalWriter};
+use russell_core::journal::JournalWriter;
 use russell_core::paths::Paths;
 use russell_meta::run_help_with_endpoint;
 use russell_proprio::ProprioReflex;
 use russell_proprio::run_once as run_proprio;
-use std::sync::{Arc, Mutex};
+use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
 /// Rate limiter state for self-triage (60 requests/hour).
@@ -68,19 +68,20 @@ static RATE_LIMITER: std::sync::LazyLock<Mutex<RateLimitState>> =
 /// Run self-triage — proprioception + LLM interpretation.
 pub async fn run(paths: &Paths) -> Result<()> {
     // Check rate limit first (DoS prevention)
-    let mut limiter = RATE_LIMITER.lock().unwrap();
-    if !limiter.check() {
-        let rejected = limiter.rejected_count();
-        drop(limiter);
+    {
+        let mut limiter = RATE_LIMITER.lock().unwrap();
+        if !limiter.check() {
+            let rejected = limiter.rejected_count();
+            drop(limiter);
 
-        eprintln!("⚠ Rate limit exceeded (60 requests/hour)");
-        eprintln!("  This is request #{} over the limit.", rejected);
-        eprintln!("  Please wait before running self-triage again.");
-        eprintln!();
-        eprintln!("  If you need immediate assistance, run: russell proprio");
-        return Ok(());
+            eprintln!("⚠ Rate limit exceeded (60 requests/hour)");
+            eprintln!("  This is request #{} over the limit.", rejected);
+            eprintln!("  Please wait before running self-triage again.");
+            eprintln!();
+            eprintln!("  If you need immediate assistance, run: russell proprio");
+            return Ok(());
+        }
     }
-    drop(limiter);
 
     println!("Russell Self-Triage");
     println!("===================\n");

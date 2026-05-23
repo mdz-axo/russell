@@ -39,7 +39,7 @@ pub fn status(paths: &Paths) -> Result<()> {
 }
 
 /// Activate Russell pod.
-pub async fn activate(paths: &Paths) -> Result<()> {
+pub async fn activate(_paths: &Paths) -> Result<()> {
     println!("Activating Russell agent pod...");
 
     // In production, this would:
@@ -61,7 +61,7 @@ pub async fn activate(paths: &Paths) -> Result<()> {
 }
 
 /// Deactivate Russell pod.
-pub async fn deactivate(paths: &Paths) -> Result<()> {
+pub async fn deactivate(_paths: &Paths) -> Result<()> {
     println!("Deactivating Russell agent pod...");
 
     // In production, this would:
@@ -104,23 +104,6 @@ pub fn persona_show(paths: &Paths) -> Result<()> {
     Ok(())
 }
 
-/// Update agent persona (hot reload).
-pub fn persona_update(paths: &Paths, persona_file: &str) -> Result<()> {
-    let content = std::fs::read_to_string(persona_file)?;
-
-    // Validate YAML
-    let _persona: serde_yaml::Value = serde_yaml::from_str(&content)?;
-
-    let target_path = paths.config.join("skills/russell-agent/agent_persona.yaml");
-    std::fs::create_dir_all(target_path.parent().unwrap())?;
-    std::fs::write(&target_path, &content)?;
-
-    println!("Persona updated: {}", target_path.display());
-    println!("Restart Russell to apply changes.");
-
-    Ok(())
-}
-
 /// List memory artifacts.
 pub fn artifacts_list(paths: &Paths, artifact_type: &str) -> Result<()> {
     let artifacts_dir = paths.state.join("artifacts");
@@ -141,7 +124,7 @@ pub fn artifacts_list(paths: &Paths, artifact_type: &str) -> Result<()> {
             let dir = artifacts_dir.join("evidence");
             list_dir(&dir, "Evidence Bundles")?;
         }
-        "all" | _ => {
+        _ => {
             let semantic = artifacts_dir.join("semantic");
             let episodic = artifacts_dir.join("episodic");
             let evidence = artifacts_dir.join("evidence");
