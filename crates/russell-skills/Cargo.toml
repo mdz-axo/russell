@@ -24,6 +24,7 @@ zeroize.workspace = true
 sha2 = "0.10"
 hex = "0.4"
 minijinja.workspace = true
+landlock = "0.4"
 
 [dev-dependencies]
 tempfile.workspace = true

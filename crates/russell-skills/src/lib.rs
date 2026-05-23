@@ -31,6 +31,9 @@ mod symptom_catalog;
 /// Subprocess dispatcher for probe and intervention execution.
 pub mod dispatch;
 
+/// Landlock-based sandbox for skill subprocess confinement.
+pub mod sandbox;
+
 /// Skill registry — cache, lifecycle, lookup, safety scanner.
 pub mod registry;
 

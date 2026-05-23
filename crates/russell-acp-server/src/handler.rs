@@ -118,11 +118,13 @@ impl AcpHandler {
         }
 
         let token = CapabilityToken {
+            token_id: "unknown".to_string(),
             token: auth_info.token.clone(),
             capabilities: vec!["acp:session".to_string()],
             attenuations: Vec::new(),
             expires_at: None,
             issuer: "unknown".to_string(),
+            nonce: "unknown".to_string(),
         };
 
         self.auth.validate(&token)

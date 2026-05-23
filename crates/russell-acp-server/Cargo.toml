@@ -55,6 +55,8 @@ macaroon = "0.3"
 base64 = "0.22"
 hmac = "0.12"
 sha2 = "0.10"
+rand = "0.8"
+hex = "0.4"
 
 # Token encryption at rest (Bruce Schneier: secrets must be encrypted)
 age = { version = "0.11", features = ["armor"] }

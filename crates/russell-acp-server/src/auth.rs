@@ -11,9 +11,6 @@
 use std::collections::HashSet;
 use std::sync::Mutex;
 
-use std::collections::HashSet;
-use std::sync::Mutex;
-
 use chrono::{DateTime, Utc};
 use hmac::{Hmac, Mac as MacTrait};
 use serde::{Deserialize, Serialize};
@@ -36,195 +33,11 @@ pub struct MacaroonAuth {
     dev_mode_allowed: bool,
 }
 
-impl MacaroonAuth {
-    /// Create a new macaroon authenticator.
-    ///
-    /// If `root_key` is None and `dev_mode_allowed` is false, authentication
-    /// will fail rather than being skipped (production safety).
-    pub fn new(root_key: Option<String>, dev_mode_allowed: bool) -> Self {
-        Self {
-            root_key: root_key.map(|k| k.into_bytes()),
-            used_nonces: Mutex::new(HashSet::new()),
-            revoked_tokens: Mutex::new(HashSet::new()),
-            dev_mode_allowed,
-        }
-    }
-
-    /// Create a new macaroon token with given capabilities.
-    pub fn create_token(
-        &self,
-        capabilities: Vec<String>,
-        attenuations: Vec<Attenuation>,
-        expires_in: Option<chrono::Duration>,
-    ) -> Result<CapabilityToken> {
-        let expires_at = expires_in.map(|d| Utc::now() + d);
-        let issuer = "russell-acp".to_string();
-        let token_id = generate_token_id();
-        let nonce = generate_nonce();
-
-        // Build macaroon identifier
-        let identifier = format!(
-            "id:{}|capabilities:{}|issuer:{}|nonce:{}|expires:{}",
-            token_id,
-            capabilities.join(","),
-            issuer,
-            nonce,
-            expires_at
-                .map(|e| e.to_rfc3339())
-                .unwrap_or_else(|| "never".to_string())
-        );
-
-        // Generate macaroon signature
-        let signature = if let Some(ref root_key) = self.root_key {
-            let mut mac = HmacSha256::new_from_slice(root_key)
-                .map_err(|_| AcpError::Internal("invalid root key length".into()))?;
-            mac.update(identifier.as_bytes());
-            for attenuation in &attenuations {
-                mac.update(attenuation.kind.as_str().as_bytes());
-                mac.update(attenuation.value.as_bytes());
-            }
-            let result = mac.finalize();
-            base64::encode(result.into_bytes())
-        } else {
-            // Dev mode: no signature (only if explicitly allowed)
-            if !self.dev_mode_allowed {
-                return Err(AcpError::Internal(
-                    "root key required in production mode".into(),
-                ));
-            }
-            base64::encode(&identifier.as_bytes())
-        };
-
-        Ok(CapabilityToken {
-            token_id,
-            token: signature,
-            capabilities,
-            attenuations,
-            expires_at,
-            issuer,
-            nonce,
-        })
-    }
-
-    /// Validate a capability token.
-    pub fn validate(&self, token: &CapabilityToken) -> Result<()> {
-        // If no root key configured, check if dev mode is allowed.
-        if self.root_key.is_none() {
-            if !self.dev_mode_allowed {
-                return Err(AcpError::Internal(
-                    "authentication required: root key not configured".into(),
-                ));
-            }
-            // Dev mode: skip signature validation but still check expiration and replay
-        }
-
-        // Check expiration.
-        if let Some(expires) = token.expires_at {
-            if Utc::now() > expires {
-                return Err(AcpError::TokenExpired(expires.to_rfc3339()));
-            }
-        }
-
-        // Check revocation.
-        {
-            let revoked = self.revoked_tokens.lock().unwrap();
-            if revoked.contains(&token.token_id) {
-                return Err(AcpError::InvalidToken("token has been revoked".into()));
-            }
-        }
-
-        // Check replay (nonce must not have been used before).
-        {
-            let mut nonces = self.used_nonces.lock().unwrap();
-            let nonce_key = format!("{}:{}", token.token_id, token.nonce);
-            if !nonces.insert(nonce_key) {
-                return Err(AcpError::InvalidToken("replay detected: nonce already used".into()));
-            }
-        }
-
-        // Verify macaroon signature (skip in dev mode).
-        if self.root_key.is_none() {
-            return Ok(());
-        }
-
-        let root_key = self
-            .root_key
-            .as_ref()
-            .ok_or_else(|| AcpError::Internal("root key not configured".into()))?;
-
-        // Rebuild the signed message
-        let identifier = format!(
-            "id:{}|capabilities:{}|issuer:{}|nonce:{}|expires:{}",
-            token.token_id,
-            token.capabilities.join(","),
-            token.issuer,
-            token.nonce,
-            token
-                .expires_at
-                .map(|e| e.to_rfc3339())
-                .unwrap_or_else(|| "never".to_string())
-        );
-
-        let expected_signature = {
-            let mut mac = HmacSha256::new_from_slice(root_key)
-                .map_err(|_| AcpError::Internal("invalid root key length".into()))?;
-            mac.update(identifier.as_bytes());
-            for attenuation in &token.attenuations {
-                mac.update(attenuation.kind.as_str().as_bytes());
-                mac.update(attenuation.value.as_bytes());
-            }
-            let result = mac.finalize();
-            base64::encode(result.into_bytes())
-        };
-
-        // Constant-time comparison to prevent timing attacks
-        if !constant_time_eq(token.token.as_bytes(), expected_signature.as_bytes()) {
-            return Err(AcpError::InvalidToken("macaroon signature mismatch".into()));
-        }
-
-        Ok(())
-    }
-
-    /// Revoke a token by its ID.
-    pub fn revoke_token(&self, token_id: &str) {
-        let mut revoked = self.revoked_tokens.lock().unwrap();
-        revoked.insert(token_id.to_string());
-    }
-
-    /// Check if a token has been revoked.
-    pub fn is_revoked(&self, token_id: &str) -> bool {
-        let revoked = self.revoked_tokens.lock().unwrap();
-        revoked.contains(token_id)
-    }
-
-    /// Check if a token has a specific capability.
-    pub fn has_capability(&self, token: &CapabilityToken, capability: &str) -> bool {
-        token.capabilities.iter().any(|c| c == capability)
-    }
-
-    /// Check if a token has a skill attenuation.
-    pub fn has_skill(&self, token: &CapabilityToken, skill_id: &str) -> bool {
-        token
-            .attenuations
-            .iter()
-            .any(|a| a.kind == AttenuationKind::SkillRestriction && a.value == skill_id)
-    }
-
-    /// Get the rate limit from token attenuations (calls per minute).
-    pub fn get_rate_limit(&self, token: &CapabilityToken) -> Option<u32> {
-        token
-            .attenuations
-            .iter()
-            .find(|a| a.kind == AttenuationKind::RateLimit)
-            .and_then(|a| a.value.parse().ok())
-    }
-}
-
 /// Generate a unique token ID.
 fn generate_token_id() -> String {
     use rand::Rng;
     let mut rng = rand::thread_rng();
-    let bytes: [u8; 16] = rng.gen();
+    let bytes: [u8; 16] = rng.r#gen();
     hex::encode(bytes)
 }
 
@@ -232,207 +45,7 @@ fn generate_token_id() -> String {
 fn generate_nonce() -> String {
     use rand::Rng;
     let mut rng = rand::thread_rng();
-    let bytes: [u8; 16] = rng.gen();
-    hex::encode(bytes)
-}
-
-impl MacaroonAuth {
-    /// Create a new macaroon authenticator.
-    ///
-    /// If `root_key` is None and `dev_mode_allowed` is false, authentication
-    /// will fail rather than being skipped (production safety).
-    pub fn new(root_key: Option<String>, dev_mode_allowed: bool) -> Self {
-        Self {
-            root_key: root_key.map(|k| k.into_bytes()),
-            used_nonces: Mutex::new(HashSet::new()),
-            revoked_tokens: Mutex::new(HashSet::new()),
-            dev_mode_allowed,
-        }
-    }
-
-    /// Create a new macaroon token with given capabilities.
-    pub fn create_token(
-        &self,
-        capabilities: Vec<String>,
-        attenuations: Vec<Attenuation>,
-        expires_in: Option<chrono::Duration>,
-    ) -> Result<CapabilityToken> {
-        let expires_at = expires_in.map(|d| Utc::now() + d);
-        let issuer = "russell-acp".to_string();
-        let token_id = generate_token_id();
-        let nonce = generate_nonce();
-
-        // Build macaroon identifier
-        let identifier = format!(
-            "id:{}|capabilities:{}|issuer:{}|nonce:{}|expires:{}",
-            token_id,
-            capabilities.join(","),
-            issuer,
-            nonce,
-            expires_at
-                .map(|e| e.to_rfc3339())
-                .unwrap_or_else(|| "never".to_string())
-        );
-
-        // Generate macaroon signature
-        let signature = if let Some(ref root_key) = self.root_key {
-            let mut mac = HmacSha256::new_from_slice(root_key)
-                .map_err(|_| AcpError::Internal("invalid root key length".into()))?;
-            mac.update(identifier.as_bytes());
-            for attenuation in &attenuations {
-                mac.update(attenuation.kind.as_str().as_bytes());
-                mac.update(attenuation.value.as_bytes());
-            }
-            let result = mac.finalize();
-            base64::encode(result.into_bytes())
-        } else {
-            // Dev mode: no signature (only if explicitly allowed)
-            if !self.dev_mode_allowed {
-                return Err(AcpError::Internal(
-                    "root key required in production mode".into(),
-                ));
-            }
-            base64::encode(&identifier.as_bytes())
-        };
-
-        Ok(CapabilityToken {
-            token_id,
-            token: signature,
-            capabilities,
-            attenuations,
-            expires_at,
-            issuer,
-            nonce,
-        })
-    }
-
-    /// Validate a capability token.
-    pub fn validate(&self, token: &CapabilityToken) -> Result<()> {
-        // If no root key configured, check if dev mode is allowed.
-        if self.root_key.is_none() {
-            if !self.dev_mode_allowed {
-                return Err(AcpError::Internal(
-                    "authentication required: root key not configured".into(),
-                ));
-            }
-            // Dev mode: skip signature validation but still check expiration and replay
-        }
-
-        // Check expiration.
-        if let Some(expires) = token.expires_at {
-            if Utc::now() > expires {
-                return Err(AcpError::TokenExpired(expires.to_rfc3339()));
-            }
-        }
-
-        // Check revocation.
-        {
-            let revoked = self.revoked_tokens.lock().unwrap();
-            if revoked.contains(&token.token_id) {
-                return Err(AcpError::InvalidToken("token has been revoked".into()));
-            }
-        }
-
-        // Check replay (nonce must not have been used before).
-        {
-            let mut nonces = self.used_nonces.lock().unwrap();
-            let nonce_key = format!("{}:{}", token.token_id, token.nonce);
-            if !nonces.insert(nonce_key) {
-                return Err(AcpError::InvalidToken("replay detected: nonce already used".into()));
-            }
-        }
-
-        // Verify macaroon signature (skip in dev mode).
-        if self.root_key.is_none() {
-            return Ok(());
-        }
-
-        let root_key = self
-            .root_key
-            .as_ref()
-            .ok_or_else(|| AcpError::Internal("root key not configured".into()))?;
-
-        // Rebuild the signed message
-        let identifier = format!(
-            "id:{}|capabilities:{}|issuer:{}|nonce:{}|expires:{}",
-            token.token_id,
-            token.capabilities.join(","),
-            token.issuer,
-            token.nonce,
-            token
-                .expires_at
-                .map(|e| e.to_rfc3339())
-                .unwrap_or_else(|| "never".to_string())
-        );
-
-        let expected_signature = {
-            let mut mac = HmacSha256::new_from_slice(root_key)
-                .map_err(|_| AcpError::Internal("invalid root key length".into()))?;
-            mac.update(identifier.as_bytes());
-            for attenuation in &token.attenuations {
-                mac.update(attenuation.kind.as_str().as_bytes());
-                mac.update(attenuation.value.as_bytes());
-            }
-            let result = mac.finalize();
-            base64::encode(result.into_bytes())
-        };
-
-        // Constant-time comparison to prevent timing attacks
-        if !constant_time_eq(token.token.as_bytes(), expected_signature.as_bytes()) {
-            return Err(AcpError::InvalidToken("macaroon signature mismatch".into()));
-        }
-
-        Ok(())
-    }
-
-    /// Revoke a token by its ID.
-    pub fn revoke_token(&self, token_id: &str) {
-        let mut revoked = self.revoked_tokens.lock().unwrap();
-        revoked.insert(token_id.to_string());
-    }
-
-    /// Check if a token has been revoked.
-    pub fn is_revoked(&self, token_id: &str) -> bool {
-        let revoked = self.revoked_tokens.lock().unwrap();
-        revoked.contains(token_id)
-    }
-
-    /// Check if a token has a specific capability.
-    pub fn has_capability(&self, token: &CapabilityToken, capability: &str) -> bool {
-        token.capabilities.iter().any(|c| c == capability)
-    }
-
-    /// Check if a token has a skill attenuation.
-    pub fn has_skill(&self, token: &CapabilityToken, skill_id: &str) -> bool {
-        token
-            .attenuations
-            .iter()
-            .any(|a| a.kind == AttenuationKind::SkillRestriction && a.value == skill_id)
-    }
-
-    /// Get the rate limit from token attenuations (calls per minute).
-    pub fn get_rate_limit(&self, token: &CapabilityToken) -> Option<u32> {
-        token
-            .attenuations
-            .iter()
-            .find(|a| a.kind == AttenuationKind::RateLimit)
-            .and_then(|a| a.value.parse().ok())
-    }
-}
-
-/// Generate a unique token ID.
-fn generate_token_id() -> String {
-    use rand::Rng;
-    let mut rng = rand::thread_rng();
-    let bytes: [u8; 16] = rng.gen();
-    hex::encode(bytes)
-}
-
-/// Generate a nonce for replay protection.
-fn generate_nonce() -> String {
-    use rand::Rng;
-    let mut rng = rand::thread_rng();
-    let bytes: [u8; 16] = rng.gen();
+    let bytes: [u8; 16] = rng.r#gen();
     hex::encode(bytes)
 }
 
@@ -442,6 +55,190 @@ fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
         return false;
     }
     a.iter().zip(b.iter()).fold(0, |acc, (x, y)| acc | (x ^ y)) == 0
+}
+
+impl MacaroonAuth {
+    /// Create a new macaroon authenticator.
+    ///
+    /// If `root_key` is None and `dev_mode_allowed` is false, authentication
+    /// will fail rather than being skipped (production safety).
+    pub fn new(root_key: Option<String>, dev_mode_allowed: bool) -> Self {
+        Self {
+            root_key: root_key.map(|k| k.into_bytes()),
+            used_nonces: Mutex::new(HashSet::new()),
+            revoked_tokens: Mutex::new(HashSet::new()),
+            dev_mode_allowed,
+        }
+    }
+
+    /// Create a new macaroon token with given capabilities.
+    pub fn create_token(
+        &self,
+        capabilities: Vec<String>,
+        attenuations: Vec<Attenuation>,
+        expires_in: Option<chrono::Duration>,
+    ) -> Result<CapabilityToken> {
+        let expires_at = expires_in.map(|d| Utc::now() + d);
+        let issuer = "russell-acp".to_string();
+        let token_id = generate_token_id();
+        let nonce = generate_nonce();
+
+        // Build macaroon identifier
+        let identifier = format!(
+            "id:{}|capabilities:{}|issuer:{}|nonce:{}|expires:{}",
+            token_id,
+            capabilities.join(","),
+            issuer,
+            nonce,
+            expires_at
+                .map(|e| e.to_rfc3339())
+                .unwrap_or_else(|| "never".to_string())
+        );
+
+        // Generate macaroon signature
+        let signature = if let Some(ref root_key) = self.root_key {
+            let mut mac = HmacSha256::new_from_slice(root_key)
+                .map_err(|_| AcpError::Internal("invalid root key length".into()))?;
+            mac.update(identifier.as_bytes());
+            for attenuation in &attenuations {
+                mac.update(attenuation.kind.as_str().as_bytes());
+                mac.update(attenuation.value.as_bytes());
+            }
+            let result = mac.finalize();
+            base64::encode(result.into_bytes())
+        } else {
+            // Dev mode: no signature (only if explicitly allowed)
+            if !self.dev_mode_allowed {
+                return Err(AcpError::Internal(
+                    "root key required in production mode".into(),
+                ));
+            }
+            base64::encode(&identifier.as_bytes())
+        };
+
+        Ok(CapabilityToken {
+            token_id,
+            token: signature,
+            capabilities,
+            attenuations,
+            expires_at,
+            issuer,
+            nonce,
+        })
+    }
+
+    /// Validate a capability token.
+    pub fn validate(&self, token: &CapabilityToken) -> Result<()> {
+        // If no root key configured, check if dev mode is allowed.
+        if self.root_key.is_none() {
+            if !self.dev_mode_allowed {
+                return Err(AcpError::Internal(
+                    "authentication required: root key not configured".into(),
+                ));
+            }
+            // Dev mode: skip signature validation but still check expiration and replay
+        }
+
+        // Check expiration.
+        if let Some(expires) = token.expires_at {
+            if Utc::now() > expires {
+                return Err(AcpError::TokenExpired(expires.to_rfc3339()));
+            }
+        }
+
+        // Check revocation.
+        {
+            let revoked = self.revoked_tokens.lock().unwrap();
+            if revoked.contains(&token.token_id) {
+                return Err(AcpError::InvalidToken("token has been revoked".into()));
+            }
+        }
+
+        // Check replay (nonce must not have been used before).
+        {
+            let mut nonces = self.used_nonces.lock().unwrap();
+            let nonce_key = format!("{}:{}", token.token_id, token.nonce);
+            if !nonces.insert(nonce_key) {
+                return Err(AcpError::InvalidToken("replay detected: nonce already used".into()));
+            }
+        }
+
+        // Verify macaroon signature (skip in dev mode).
+        if self.root_key.is_none() {
+            return Ok(());
+        }
+
+        let root_key = self
+            .root_key
+            .as_ref()
+            .ok_or_else(|| AcpError::Internal("root key not configured".into()))?;
+
+        // Rebuild the signed message
+        let identifier = format!(
+            "id:{}|capabilities:{}|issuer:{}|nonce:{}|expires:{}",
+            token.token_id,
+            token.capabilities.join(","),
+            token.issuer,
+            token.nonce,
+            token
+                .expires_at
+                .map(|e| e.to_rfc3339())
+                .unwrap_or_else(|| "never".to_string())
+        );
+
+        let expected_signature = {
+            let mut mac = HmacSha256::new_from_slice(root_key)
+                .map_err(|_| AcpError::Internal("invalid root key length".into()))?;
+            mac.update(identifier.as_bytes());
+            for attenuation in &token.attenuations {
+                mac.update(attenuation.kind.as_str().as_bytes());
+                mac.update(attenuation.value.as_bytes());
+            }
+            let result = mac.finalize();
+            base64::encode(result.into_bytes())
+        };
+
+        // Constant-time comparison to prevent timing attacks
+        if !constant_time_eq(token.token.as_bytes(), expected_signature.as_bytes()) {
+            return Err(AcpError::InvalidToken("macaroon signature mismatch".into()));
+        }
+
+        Ok(())
+    }
+
+    /// Revoke a token by its ID.
+    pub fn revoke_token(&self, token_id: &str) {
+        let mut revoked = self.revoked_tokens.lock().unwrap();
+        revoked.insert(token_id.to_string());
+    }
+
+    /// Check if a token has been revoked.
+    pub fn is_revoked(&self, token_id: &str) -> bool {
+        let revoked = self.revoked_tokens.lock().unwrap();
+        revoked.contains(token_id)
+    }
+
+    /// Check if a token has a specific capability.
+    pub fn has_capability(&self, token: &CapabilityToken, capability: &str) -> bool {
+        token.capabilities.iter().any(|c| c == capability)
+    }
+
+    /// Check if a token has a skill attenuation.
+    pub fn has_skill(&self, token: &CapabilityToken, skill_id: &str) -> bool {
+        token
+            .attenuations
+            .iter()
+            .any(|a| a.kind == AttenuationKind::SkillRestriction && a.value == skill_id)
+    }
+
+    /// Get the rate limit from token attenuations (calls per minute).
+    pub fn get_rate_limit(&self, token: &CapabilityToken) -> Option<u32> {
+        token
+            .attenuations
+            .iter()
+            .find(|a| a.kind == AttenuationKind::RateLimit)
+            .and_then(|a| a.value.parse().ok())
+    }
 }
 
 /// Capability token (OCAP).
@@ -500,7 +297,7 @@ impl AttenuationKind {
 
 impl Default for MacaroonAuth {
     fn default() -> Self {
-        Self::new(None)
+        Self::new(None, true) // Dev mode allowed by default for backward compatibility
     }
 }
 
@@ -509,28 +306,40 @@ mod tests {
     use super::*;
 
     #[test]
-    fn no_root_key_skips_validation() {
-        let auth = MacaroonAuth::new(None);
-        let token = CapabilityToken {
-            token: "test".to_string(),
-            capabilities: vec!["acp:session".to_string()],
-            attenuations: Vec::new(),
-            expires_at: None,
-            issuer: "test".to_string(),
-        };
+    fn no_root_key_skips_validation_in_dev_mode() {
+        let auth = MacaroonAuth::new(None, true);
+        let token = auth
+            .create_token(
+                vec!["acp:session".to_string()],
+                Vec::new(),
+                None,
+            )
+            .unwrap();
         assert!(auth.validate(&token).is_ok());
     }
 
     #[test]
+    fn no_root_key_fails_in_production_mode() {
+        let auth = MacaroonAuth::new(None, false);
+        let result = auth.create_token(
+            vec!["acp:session".to_string()],
+            Vec::new(),
+            None,
+        );
+        assert!(result.is_err());
+    }
+
+    #[test]
     fn expired_token_rejected() {
-        let auth = MacaroonAuth::new(Some("root".to_string()));
-        let token = CapabilityToken {
-            token: "test".to_string(),
-            capabilities: vec![],
-            attenuations: Vec::new(),
-            expires_at: Some(Utc::now() - chrono::Duration::hours(1)),
-            issuer: "test".to_string(),
-        };
+        let auth = MacaroonAuth::new(Some("root".to_string()), false);
+        let mut token = auth
+            .create_token(
+                vec![],
+                Vec::new(),
+                Some(chrono::Duration::hours(-1)), // Already expired
+            )
+            .unwrap();
+        token.expires_at = Some(Utc::now() - chrono::Duration::hours(1));
         assert!(matches!(
             auth.validate(&token),
             Err(AcpError::TokenExpired(_))
@@ -539,21 +348,21 @@ mod tests {
 
     #[test]
     fn capability_check() {
-        let auth = MacaroonAuth::new(None);
-        let token = CapabilityToken {
-            token: "test".to_string(),
-            capabilities: vec!["acp:session".to_string(), "skill:web-search".to_string()],
-            attenuations: Vec::new(),
-            expires_at: None,
-            issuer: "test".to_string(),
-        };
+        let auth = MacaroonAuth::new(None, true);
+        let token = auth
+            .create_token(
+                vec!["acp:session".to_string(), "skill:web-search".to_string()],
+                Vec::new(),
+                None,
+            )
+            .unwrap();
         assert!(auth.has_capability(&token, "acp:session"));
         assert!(!auth.has_capability(&token, "skill:sysadmin"));
     }
 
     #[test]
     fn create_and_validate_token() {
-        let auth = MacaroonAuth::new(Some("test-root-key".to_string()));
+        let auth = MacaroonAuth::new(Some("test-root-key".to_string()), false);
 
         let token = auth
             .create_token(
@@ -579,7 +388,7 @@ mod tests {
 
     #[test]
     fn tampered_token_rejected() {
-        let auth = MacaroonAuth::new(Some("test-root-key".to_string()));
+        let auth = MacaroonAuth::new(Some("test-root-key".to_string()), false);
 
         let token = auth
             .create_token(
@@ -602,7 +411,7 @@ mod tests {
 
     #[test]
     fn rate_limit_attenuation() {
-        let auth = MacaroonAuth::new(Some("root".to_string()));
+        let auth = MacaroonAuth::new(Some("root".to_string()), false);
 
         let token = auth
             .create_token(
@@ -630,5 +439,62 @@ mod tests {
         assert!(constant_time_eq(b"hello", b"hello"));
         assert!(!constant_time_eq(b"hello", b"world"));
         assert!(!constant_time_eq(b"short", b"longer"));
+    }
+
+    #[test]
+    fn replay_protection() {
+        let auth = MacaroonAuth::new(Some("root".to_string()), false);
+        let token = auth
+            .create_token(
+                vec!["acp:session".to_string()],
+                vec![],
+                Some(chrono::Duration::hours(1)),
+            )
+            .unwrap();
+
+        // First validation should succeed
+        assert!(auth.validate(&token).is_ok());
+
+        // Second validation with same token should fail (replay)
+        assert!(matches!(
+            auth.validate(&token),
+            Err(AcpError::InvalidToken(_))
+        ));
+    }
+
+    #[test]
+    fn token_revocation() {
+        let auth = MacaroonAuth::new(Some("root".to_string()), false);
+        let token = auth
+            .create_token(
+                vec!["acp:session".to_string()],
+                vec![],
+                Some(chrono::Duration::hours(1)),
+            )
+            .unwrap();
+
+        // Token should validate initially
+        assert!(auth.validate(&token).is_ok());
+
+        // Revoke the token
+        auth.revoke_token(&token.token_id);
+
+        // Token should now be rejected
+        assert!(auth.is_revoked(&token.token_id));
+        
+        // Create a new token with same ID to test revocation check
+        let mut revoked_token = auth
+            .create_token(
+                vec!["acp:session".to_string()],
+                vec![],
+                Some(chrono::Duration::hours(1)),
+            )
+            .unwrap();
+        revoked_token.token_id = token.token_id.clone();
+        
+        assert!(matches!(
+            auth.validate(&revoked_token),
+            Err(AcpError::InvalidToken(_))
+        ));
     }
 }
