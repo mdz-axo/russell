@@ -69,6 +69,7 @@
 
 pub mod auth;
 pub mod dispatch;
+pub mod encryption;
 pub mod error;
 pub mod handler;
 pub mod persona;
@@ -80,6 +81,7 @@ pub mod types;
 // Re-export main types for convenience.
 pub use auth::{CapabilityToken, MacaroonAuth};
 pub use dispatch::AcpDispatch;
+pub use encryption::{encrypt_token, decrypt_token, EncryptionKey};
 pub use error::{AcpError, Result};
 pub use handler::AcpHandler;
 pub use persona::JackPersonaProjection;

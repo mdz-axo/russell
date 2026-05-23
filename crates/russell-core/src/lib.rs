@@ -5,6 +5,7 @@
 #![deny(rust_2018_idioms)]
 #![warn(missing_docs)]
 
+pub mod channel;
 pub mod env;
 pub mod error;
 pub mod event;
@@ -18,6 +19,7 @@ pub mod schedule;
 pub mod telemetry;
 pub mod time;
 
+pub use channel::{spawn_journal_writer, JournalCommand, JournalHandle, JournalWriterTask};
 pub use error::{CoreError, Result};
 pub use event::{Event, EventId, Severity};
 pub use journal::port::{InMemoryJournal, JournalReadPort, JournalWritePort};

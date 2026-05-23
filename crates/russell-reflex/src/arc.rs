@@ -1,43 +1,22 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
-//! Reflex arcs — automatic responses to proprioception breaches.
-//!
-//! Phase 2A: Detection-only. Reflex arcs recommend actions but do not execute.
-//! Phase 3+: Corrective arcs will execute automatic remediation.
-//!
-//! See [ADR-0021](../../../docs/adr/0021-proprioception-phase2-reflex-arcs.md).
+//! Reflex arc engine — maps breaches to recommended actions.
 
-use crate::ProprioResult;
-use russell_core::Result;
-use russell_core::event::{Event, Scope, Severity as EventSeverity};
-use russell_core::journal::JournalWriter;
+use crate::action::{
+    ReflexAction, ACTION_DISABLE_LLM_HELP, ACTION_FLUSH_JOURNAL, ACTION_LLM_FALLBACK,
+    ACTION_RESTART_SENTINEL, ACTION_RESTART_TIMER,
+};
+use crate::risk::RiskLevel;
+use russell_proprio::ProprioResult;
 
-/// Reflex arc action recommendation.
-#[derive(Debug, Clone)]
-pub struct ReflexAction {
-    /// Action ID (e.g., "restart-sentinel")
-    pub action_id: &'static str,
-    /// Human-readable description
-    pub description: &'static str,
-    /// Risk level for execution
-    pub risk: RiskLevel,
-    /// Trigger condition that fired this action
-    pub trigger: &'static str,
-}
-
-/// Risk level for reflex actions.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum RiskLevel {
-    /// Safe to auto-execute (no state mutation)
-    Low,
-    /// Requires operator consent
-    Medium,
-    /// Requires explicit approval + rollback plan
-    High,
-}
-
-/// Reflex arc engine — maps breaches to recommended actions.
+/// Reflex arc engine — maps proprioception breaches to recommended actions.
+///
+/// ## Phase 2A: Detection-Only
+///
+/// This engine only recommends actions. It does not execute them.
+/// Execution is deferred to Phase 3+ when operator pre-approval workflows
+/// are implemented.
 pub struct ReflexArc {
-    /// Pending actions to recommend
+    /// Pending actions to recommend.
     actions: Vec<ReflexAction>,
 }
 
@@ -54,60 +33,60 @@ impl ReflexArc {
         // Sentinel age > 30 min → restart sentinel
         if let Some(age_s) = result.age_s {
             if age_s > 1800 {
-                self.actions.push(ReflexAction {
-                    action_id: "restart-sentinel",
-                    description: "Restart sentinel timer (age > 30 min)",
-                    risk: RiskLevel::Low,
-                    trigger: "sentinel_last_run_age_s > 1800s",
-                });
+                self.actions.push(ReflexAction::new(
+                    ACTION_RESTART_SENTINEL,
+                    "Restart sentinel timer (age > 30 min)",
+                    RiskLevel::Low,
+                    "sentinel_last_run_age_s > 1800s",
+                ));
             }
         }
 
         // Journal stall > 5 min → flush journal
         if let Some(stall_s) = result.journal_stall_s {
             if stall_s > 300 {
-                self.actions.push(ReflexAction {
-                    action_id: "flush-journal",
-                    description: "Force journal flush (stall > 5 min)",
-                    risk: RiskLevel::Low,
-                    trigger: "journal_writer_stall_s > 300s",
-                });
+                self.actions.push(ReflexAction::new(
+                    ACTION_FLUSH_JOURNAL,
+                    "Force journal flush (stall > 5 min)",
+                    RiskLevel::Low,
+                    "journal_writer_stall_s > 300s",
+                ));
             }
         }
 
         // LLM p95 > 20s → recommend fallback to offline mode
         if let Some(llm_ms) = result.llm_p95_latency_ms {
             if llm_ms > 20_000.0 {
-                self.actions.push(ReflexAction {
-                    action_id: "llm-fallback",
-                    description: "Switch to offline fallback (LLM p95 > 20s)",
-                    risk: RiskLevel::Medium,
-                    trigger: "llm_p95_latency_ms > 20000ms",
-                });
+                self.actions.push(ReflexAction::new(
+                    ACTION_LLM_FALLBACK,
+                    "Switch to offline fallback (LLM p95 > 20s)",
+                    RiskLevel::Medium,
+                    "llm_p95_latency_ms > 20000ms",
+                ));
             }
         }
 
         // Timer drift > 5 min → restart timer
         if let Some(drift_s) = result.timer_drift_s {
             if drift_s > 300 {
-                self.actions.push(ReflexAction {
-                    action_id: "restart-timer",
-                    description: "Restart systemd timer (drift > 5 min)",
-                    risk: RiskLevel::Medium,
-                    trigger: "timer_drift_s > 300s",
-                });
+                self.actions.push(ReflexAction::new(
+                    ACTION_RESTART_TIMER,
+                    "Restart systemd timer (drift > 5 min)",
+                    RiskLevel::Medium,
+                    "timer_drift_s > 300s",
+                ));
             }
         }
 
         // Help error rate > 50% → disable LLM help temporarily
         if let Some(error_rate) = result.help_error_rate_pct {
             if error_rate > 50.0 {
-                self.actions.push(ReflexAction {
-                    action_id: "disable-llm-help",
-                    description: "Temporarily disable LLM help (error rate > 50%)",
-                    risk: RiskLevel::High,
-                    trigger: "help_error_rate_pct > 50%",
-                });
+                self.actions.push(ReflexAction::new(
+                    ACTION_DISABLE_LLM_HELP,
+                    "Temporarily disable LLM help (error rate > 50%)",
+                    RiskLevel::High,
+                    "help_error_rate_pct > 50%",
+                ));
             }
         }
     }
@@ -123,17 +102,15 @@ impl ReflexArc {
     }
 
     /// Log reflex actions to journal (Phase 2A: detection-only).
-    pub fn log_actions(&self, writer: &JournalWriter) -> Result<()> {
+    pub fn log_actions(&self, writer: &russell_core::journal::JournalWriter) -> russell_core::Result<()> {
         for action in &self.actions {
-            let mut ev = Event::new("reflex_arc_action", EventSeverity::Warn);
-            ev.scope = Scope::Self_;
+            let mut ev = russell_core::event::Event::new("reflex_arc_action", russell_core::event::Severity::Warn);
+            ev.scope = russell_core::event::Scope::Self_;
             ev.tier = Some("proprio".into());
             ev.module = Some("reflex-arc".into());
             ev.summary = Some(format!("Recommended: {}", action.description));
-            ev.outputs
-                .insert("action_id".into(), action.action_id.into());
-            ev.outputs
-                .insert("risk".into(), format!("{:?}", action.risk).into());
+            ev.outputs.insert("action_id".into(), action.action_id.into());
+            ev.outputs.insert("risk".into(), format!("{:?}", action.risk).into());
             ev.outputs.insert("trigger".into(), action.trigger.into());
             writer.append(&ev)?;
         }
@@ -150,7 +127,7 @@ impl Default for ReflexArc {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::Severity;
+    use russell_core::event::Severity;
 
     #[test]
     fn test_reflex_arc_sentinel_age() {
@@ -176,7 +153,7 @@ mod tests {
 
         arc.evaluate(&result);
         assert_eq!(arc.actions().len(), 1);
-        assert_eq!(arc.actions()[0].action_id, "restart-sentinel");
+        assert_eq!(arc.actions()[0].action_id, ACTION_RESTART_SENTINEL);
     }
 
     #[test]
@@ -203,5 +180,34 @@ mod tests {
 
         arc.evaluate(&result);
         assert_eq!(arc.actions().len(), 0);
+    }
+
+    #[test]
+    fn test_reflex_arc_multiple_breaches() {
+        let mut arc = ReflexArc::new();
+        let result = ProprioResult {
+            age_s: Some(2000),
+            severity: Severity::Alert,
+            event_emitted: true,
+            journal_stall_s: Some(400),
+            journal_stall_severity: Severity::Alert,
+            llm_p95_latency_ms: Some(25_000.0),
+            llm_p95_severity: Severity::Alert,
+            timer_drift_s: None,
+            timer_drift_severity: Severity::Info,
+            help_error_rate_pct: None,
+            help_error_rate_severity: Severity::Info,
+            hkask_mcp_reachable_ms: None,
+            hkask_mcp_reachable_severity: Severity::Info,
+            remote_discovery_latency_s: None,
+            remote_discovery_latency_severity: Severity::Info,
+            journal_chain_intact: None,
+        };
+
+        arc.evaluate(&result);
+        assert_eq!(arc.actions().len(), 3);
+        assert_eq!(arc.actions()[0].action_id, ACTION_RESTART_SENTINEL);
+        assert_eq!(arc.actions()[1].action_id, ACTION_FLUSH_JOURNAL);
+        assert_eq!(arc.actions()[2].action_id, ACTION_LLM_FALLBACK);
     }
 }

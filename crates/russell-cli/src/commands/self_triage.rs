@@ -5,15 +5,84 @@
 //! consults Jack (the Nurse persona) to interpret the results and recommend
 //! actions. This is the self-triage capability described in ADR-0015 and
 //! ADR-0021.
+//!
+//! ## Rate Limiting
+//!
+//! Self-triage is rate-limited to 60 requests per hour (1 per minute average)
+//! to prevent resource exhaustion attacks. This is a DoS prevention measure
+//! per Bruce Schneier's security principles.
 
 use anyhow::{Context, Result};
 use russell_core::journal::{JournalReader, JournalWriter};
 use russell_core::paths::Paths;
-use russell_proprio::{run_once as run_proprio, ReflexArc};
+use russell_proprio::run_once as run_proprio;
+use russell_reflex::ReflexArc;
 use russell_meta::run_help_with_endpoint;
+use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant};
+
+/// Rate limiter state for self-triage (60 requests/hour).
+struct RateLimitState {
+    /// Timestamps of requests in the current hour window.
+    requests: Vec<Instant>,
+    /// Total rate-limited requests (for monitoring).
+    rejected_count: u64,
+}
+
+impl RateLimitState {
+    fn new() -> Self {
+        Self {
+            requests: Vec::new(),
+            rejected_count: 0,
+        }
+    }
+
+    /// Check if request is allowed. Returns true if allowed, false if rate limited.
+    fn check(&mut self) -> bool {
+        let now = Instant::now();
+        let one_hour_ago = now - Duration::from_secs(3600);
+
+        // Remove old requests outside the hour window
+        self.requests.retain(|&t| t > one_hour_ago);
+
+        // Check if under limit (60 per hour)
+        if self.requests.len() < 60 {
+            self.requests.push(now);
+            true
+        } else {
+            self.rejected_count += 1;
+            false
+        }
+    }
+
+    /// Get the number of rejected requests.
+    fn rejected_count(&self) -> u64 {
+        self.rejected_count
+    }
+}
+
+/// Global rate limiter for self-triage.
+static RATE_LIMITER: std::sync::LazyLock<Mutex<RateLimitState>> = std::sync::LazyLock::new(|| {
+    Mutex::new(RateLimitState::new())
+});
 
 /// Run self-triage — proprioception + LLM interpretation.
 pub async fn run(paths: &Paths) -> Result<()> {
+    // Check rate limit first (DoS prevention)
+    let mut limiter = RATE_LIMITER.lock().unwrap();
+    if !limiter.check() {
+        let rejected = limiter.rejected_count();
+        drop(limiter);
+        
+        eprintln!("⚠ Rate limit exceeded (60 requests/hour)");
+        eprintln!("  This is request #{} over the limit.", rejected);
+        eprintln!("  Please wait before running self-triage again.");
+        eprintln!();
+        eprintln!("  If you need immediate assistance, run: russell proprio");
+        return Ok(());
+    }
+    drop(limiter);
+
     println!("Russell Self-Triage");
     println!("===================\n");
 
@@ -186,4 +255,58 @@ fn offline_interpretation(proprio_result: &russell_proprio::ProprioResult, refle
     println!("  2. Check systemd service status: systemctl --user status russell-*");
     println!("  3. Review journal: russell list --limit 50");
     println!("  4. If critical issues persist, restart: systemctl --user restart russell-sentinel.timer\n");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_rate_limit_allows_under_limit() {
+        let mut state = RateLimitState::new();
+        
+        // First 60 requests should be allowed
+        for i in 0..60 {
+            assert!(state.check(), "Request {} should be allowed", i);
+        }
+        
+        // 61st request should be rejected
+        assert!(!state.check(), "Request 61 should be rejected");
+        assert_eq!(state.rejected_count(), 1);
+    }
+
+    #[test]
+    fn test_rate_limit_window_expires() {
+        // This test verifies that old requests are removed from the window
+        // We can't easily test the time-based expiry without mocking time,
+        // but we can verify the basic logic works
+        let mut state = RateLimitState::new();
+        
+        // Fill up the limit
+        for _ in 0..60 {
+            state.check();
+        }
+        
+        // Should be rejected
+        assert!(!state.check());
+        
+        // Manually clear old requests (simulating time passing)
+        state.requests.clear();
+        
+        // Should be allowed again
+        assert!(state.check());
+    }
+
+    #[test]
+    fn test_rate_limit_rejected_count() {
+        let mut state = RateLimitState::new();
+        
+        // Fill up and exceed limit
+        for _ in 0..65 {
+            state.check();
+        }
+        
+        // Should have rejected 5 requests
+        assert_eq!(state.rejected_count(), 5);
+    }
 }

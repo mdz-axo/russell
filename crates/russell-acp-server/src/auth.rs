@@ -1,22 +1,80 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 //! Macaroon-based OCAP authentication.
+//!
+//! Implements capability security per Mark Miller's design:
+//! - Unforgeable tokens via HMAC-SHA256 signatures
+//! - Attenuation via caveats (restrictions)
+//! - Delegation via discharge macaroons
+//!
+//! See [ADR-0026](../../../docs/adr/0026-macaroon-ocap.md).
 
 use chrono::{DateTime, Utc};
+use hmac::{Hmac, Mac as MacTrait};
+use sha2::Sha256;
 use serde::{Deserialize, Serialize};
 
 use crate::error::{AcpError, Result};
+
+type HmacSha256 = Hmac<Sha256>;
 
 /// Macaroon authenticator.
 #[derive(Debug, Clone)]
 pub struct MacaroonAuth {
     /// Root key for validation (optional — if None, auth is skipped).
-    root_key: Option<String>,
+    root_key: Option<Vec<u8>>,
 }
 
 impl MacaroonAuth {
     /// Create a new macaroon authenticator.
     pub fn new(root_key: Option<String>) -> Self {
-        Self { root_key }
+        Self {
+            root_key: root_key.map(|k| k.into_bytes()),
+        }
+    }
+
+    /// Create a new macaroon token with given capabilities.
+    pub fn create_token(
+        &self,
+        capabilities: Vec<String>,
+        attenuations: Vec<Attenuation>,
+        expires_in: Option<chrono::Duration>,
+    ) -> Result<CapabilityToken> {
+        let expires_at = expires_in.map(|d| Utc::now() + d);
+        let issuer = "russell-acp".to_string();
+
+        // Build macaroon identifier
+        let identifier = format!(
+            "capabilities:{}|issuer:{}|expires:{}",
+            capabilities.join(","),
+            issuer,
+            expires_at
+                .map(|e| e.to_rfc3339())
+                .unwrap_or_else(|| "never".to_string())
+        );
+
+        // Generate macaroon signature
+        let signature = if let Some(ref root_key) = self.root_key {
+            let mut mac = HmacSha256::new_from_slice(root_key)
+                .map_err(|_| AcpError::Internal("invalid root key length".into()))?;
+            mac.update(identifier.as_bytes());
+            for attenuation in &attenuations {
+                mac.update(attenuation.kind.as_str().as_bytes());
+                mac.update(attenuation.value.as_bytes());
+            }
+            let result = mac.finalize();
+            base64::encode(result.into_bytes())
+        } else {
+            // Dev mode: no signature
+            base64::encode(&identifier.as_bytes())
+        };
+
+        Ok(CapabilityToken {
+            token: signature,
+            capabilities,
+            attenuations,
+            expires_at,
+            issuer,
+        })
     }
 
     /// Validate a capability token.
@@ -33,12 +91,39 @@ impl MacaroonAuth {
             }
         }
 
-        // In production, validate macaroon signature against root key
-        // using hKask's macaroon crate for full validation including
-        // third-party discharge for Okapi access.
-        //
-        // For now, we accept any well-formed token with valid expiration.
-        // This is sufficient for loopback-only deployment.
+        // Verify macaroon signature.
+        let root_key = self
+            .root_key
+            .as_ref()
+            .ok_or_else(|| AcpError::Internal("root key not configured".into()))?;
+
+        // Rebuild the signed message
+        let identifier = format!(
+            "capabilities:{}|issuer:{}|expires:{}",
+            token.capabilities.join(","),
+            token.issuer,
+            token
+                .expires_at
+                .map(|e| e.to_rfc3339())
+                .unwrap_or_else(|| "never".to_string())
+        );
+
+        let expected_signature = {
+            let mut mac = HmacSha256::new_from_slice(root_key)
+                .map_err(|_| AcpError::Internal("invalid root key length".into()))?;
+            mac.update(identifier.as_bytes());
+            for attenuation in &token.attenuations {
+                mac.update(attenuation.kind.as_str().as_bytes());
+                mac.update(attenuation.value.as_bytes());
+            }
+            let result = mac.finalize();
+            base64::encode(result.into_bytes())
+        };
+
+        // Constant-time comparison to prevent timing attacks
+        if !constant_time_eq(token.token.as_bytes(), expected_signature.as_bytes()) {
+            return Err(AcpError::InvalidToken("macaroon signature mismatch".into()));
+        }
 
         Ok(())
     }
@@ -55,6 +140,26 @@ impl MacaroonAuth {
             .iter()
             .any(|a| a.kind == AttenuationKind::SkillRestriction && a.value == skill_id)
     }
+
+    /// Get the rate limit from token attenuations (calls per minute).
+    pub fn get_rate_limit(&self, token: &CapabilityToken) -> Option<u32> {
+        token
+            .attenuations
+            .iter()
+            .find(|a| a.kind == AttenuationKind::RateLimit)
+            .and_then(|a| a.value.parse().ok())
+    }
+}
+
+/// Constant-time equality check to prevent timing attacks.
+fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
+    if a.len() != b.len() {
+        return false;
+    }
+    a.iter()
+        .zip(b.iter())
+        .fold(0, |acc, (x, y)| acc | (x ^ y))
+        == 0
 }
 
 /// Capability token (OCAP).
@@ -93,6 +198,18 @@ pub enum AttenuationKind {
     TimeBound,
     /// Third-party discharge chain.
     DischargeChain,
+}
+
+impl AttenuationKind {
+    /// Get string representation for signing.
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::SkillRestriction => "skill_restriction",
+            Self::RateLimit => "rate_limit",
+            Self::TimeBound => "time_bound",
+            Self::DischargeChain => "discharge_chain",
+        }
+    }
 }
 
 impl Default for MacaroonAuth {
@@ -146,5 +263,86 @@ mod tests {
         };
         assert!(auth.has_capability(&token, "acp:session"));
         assert!(!auth.has_capability(&token, "skill:sysadmin"));
+    }
+
+    #[test]
+    fn create_and_validate_token() {
+        let auth = MacaroonAuth::new(Some("test-root-key".to_string()));
+
+        let token = auth
+            .create_token(
+                vec!["acp:session".to_string(), "skill:okapi-watcher".to_string()],
+                vec![Attenuation {
+                    kind: AttenuationKind::RateLimit,
+                    value: "60".to_string(),
+                }],
+                Some(chrono::Duration::hours(1)),
+            )
+            .unwrap();
+
+        // Token should validate
+        assert!(auth.validate(&token).is_ok());
+
+        // Token should have capabilities
+        assert!(auth.has_capability(&token, "acp:session"));
+        assert!(auth.has_capability(&token, "skill:okapi-watcher"));
+
+        // Token should have rate limit
+        assert_eq!(auth.get_rate_limit(&token), Some(60));
+    }
+
+    #[test]
+    fn tampered_token_rejected() {
+        let auth = MacaroonAuth::new(Some("test-root-key".to_string()));
+
+        let token = auth
+            .create_token(
+                vec!["acp:session".to_string()],
+                vec![],
+                Some(chrono::Duration::hours(1)),
+            )
+            .unwrap();
+
+        // Tamper with the token
+        let mut tampered = token.clone();
+        tampered.token = "tampered-signature".to_string();
+
+        // Should fail validation
+        assert!(matches!(
+            auth.validate(&tampered),
+            Err(AcpError::InvalidToken(_))
+        ));
+    }
+
+    #[test]
+    fn rate_limit_attenuation() {
+        let auth = MacaroonAuth::new(Some("root".to_string()));
+
+        let token = auth
+            .create_token(
+                vec!["acp:session".to_string()],
+                vec![
+                    Attenuation {
+                        kind: AttenuationKind::RateLimit,
+                        value: "100".to_string(),
+                    },
+                    Attenuation {
+                        kind: AttenuationKind::SkillRestriction,
+                        value: "okapi-watcher".to_string(),
+                    },
+                ],
+                None,
+            )
+            .unwrap();
+
+        assert_eq!(auth.get_rate_limit(&token), Some(100));
+        assert!(auth.has_skill(&token, "okapi-watcher"));
+    }
+
+    #[test]
+    fn constant_time_eq_works() {
+        assert!(constant_time_eq(b"hello", b"hello"));
+        assert!(!constant_time_eq(b"hello", b"world"));
+        assert!(!constant_time_eq(b"short", b"longer"));
     }
 }

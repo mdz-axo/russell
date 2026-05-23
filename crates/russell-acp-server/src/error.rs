@@ -61,6 +61,14 @@ pub enum AcpError {
     /// Serialization error.
     #[error("serialization error: {0}")]
     Serialization(#[from] serde_json::Error),
+
+    /// Internal error (bug, invariant violation).
+    #[error("internal error: {0}")]
+    Internal(String),
+
+    /// Invalid capability token (malformed or tampered).
+    #[error("invalid token: {0}")]
+    InvalidToken(String),
 }
 
 /// Result type alias.

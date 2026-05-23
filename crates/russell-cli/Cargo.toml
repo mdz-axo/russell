@@ -23,6 +23,7 @@ russell-sentinel.workspace = true
 russell-skills.workspace = true
 russell-meta.workspace = true
 russell-proprio.workspace = true
+russell-reflex.workspace = true
 # MCP client for hKask tool access (client feature only, server is deprecated)
 russell-mcp = { workspace = true, features = ["client"] }
 anyhow.workspace = true
@@ -40,6 +41,9 @@ ulid.workspace = true
 rand.workspace = true
 rpassword = "5"
 rusqlite.workspace = true
+
+# Rate limiting for self-triage (DoS prevention)
+governor = { version = "0.7", default-features = false, features = ["std"] }
 
 [dev-dependencies]
 tempfile.workspace = true

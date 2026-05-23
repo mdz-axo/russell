@@ -20,6 +20,7 @@ russell-skills = { workspace = true }
 russell-sentinel = { workspace = true }
 russell-acp-server = { workspace = true }
 russell-proprio = { workspace = true }
+russell-reflex = { workspace = true }
 
 # Async runtime
 tokio = { workspace = true, features = ["sync", "time", "macros", "rt-multi-thread"] }
