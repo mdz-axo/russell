@@ -41,6 +41,9 @@ chrono = { workspace = true }
 # UUID
 uuid = { workspace = true, features = ["v4", "serde"] }
 
+# HTTP client for CNS emission
+reqwest = { workspace = true }
+
 # hKask integration (optional — graceful degradation if unavailable)
 # hkask-types = { version = "0.21", optional = true }
 # hkask-cns = { version = "0.21", optional = true }

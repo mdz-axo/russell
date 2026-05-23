@@ -1770,6 +1770,7 @@ version = "0.20.0"
 dependencies = [
  "anyhow",
  "chrono",
+ "reqwest",
  "russell-acp-server",
  "russell-core",
  "russell-meta",

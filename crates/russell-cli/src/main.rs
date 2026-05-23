@@ -131,6 +131,21 @@ enum Command {
         #[arg(long, short = 'd')]
         deny: bool,
     },
+    /// Pod lifecycle management — status, register, activate, deactivate.
+    Pod {
+        #[command(subcommand)]
+        cmd: PodCmd,
+    },
+    /// Show agent persona.
+    Persona {
+        #[command(subcommand)]
+        cmd: PersonaCmd,
+    },
+    /// Manage memory artifacts.
+    Artifacts {
+        #[command(subcommand)]
+        cmd: ArtifactsCmd,
+    },
 }
 
 #[derive(Subcommand, Debug)]
@@ -187,6 +202,37 @@ enum SkillCmd {
     RestoreFromArchive {
         /// Skill name to restore from archive.
         name: String,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+enum PodCmd {
+    /// Show pod lifecycle state.
+    Status,
+}
+
+#[derive(Subcommand, Debug)]
+enum PersonaCmd {
+    /// Show agent persona YAML.
+    Show,
+}
+
+#[derive(Subcommand, Debug)]
+enum ArtifactsCmd {
+    /// List memory artifacts.
+    List {
+        /// Artifact type: semantic, episodic, evidence, or all.
+        #[arg(long, default_value = "all")]
+        artifact_type: String,
+    },
+    /// Export artifacts.
+    Export {
+        /// Output directory path.
+        #[arg(long)]
+        output: String,
+        /// Visibility filter: public, private, operator.
+        #[arg(long, default_value = "all")]
+        visibility: String,
     },
 }
 
@@ -277,5 +323,15 @@ async fn main() -> Result<()> {
             };
             commands::confirm::run(&paths, &args)
         }
+        Command::Pod { cmd } => match cmd {
+            PodCmd::Status => commands::pod::status(&paths),
+        },
+        Command::Persona { cmd } => match cmd {
+            PersonaCmd::Show => commands::pod::persona_show(&paths),
+        },
+        Command::Artifacts { cmd } => match cmd {
+            ArtifactsCmd::List { artifact_type } => commands::pod::artifacts_list(&paths, &artifact_type),
+            ArtifactsCmd::Export { output, visibility } => commands::pod::artifacts_export(&paths, &output, &visibility),
+        },
     }
 }

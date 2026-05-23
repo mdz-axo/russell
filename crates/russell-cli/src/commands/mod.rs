@@ -9,6 +9,7 @@ pub mod help;
 pub mod list;
 pub mod mcp_tools;
 pub mod okapi_probe;
+pub mod pod;
 pub mod profile;
 pub mod proprio;
 pub mod sentinel_once;

@@ -168,6 +168,57 @@ impl ArtifactStore {
         
         Ok(files)
     }
+    
+    /// Export artifacts to a tarball.
+    pub fn export(&self, output_path: &Path, visibility: ArtifactVisibility) -> std::io::Result<()> {
+        // Create output directory if needed
+        if let Some(parent) = output_path.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+        
+        // For now, just copy relevant files based on visibility
+        let source_dir = match visibility {
+            ArtifactVisibility::Public => self.semantic_dir(),
+            ArtifactVisibility::Private => self.episodic_dir(),
+            ArtifactVisibility::OperatorOnly => self.evidence_dir(),
+        };
+        
+        if source_dir.exists() {
+            for entry in std::fs::read_dir(&source_dir)? {
+                let entry = entry?;
+                let src = entry.path();
+                let dst = output_path.join(entry.file_name());
+                
+                if src.is_file() {
+                    std::fs::copy(&src, &dst)?;
+                } else if src.is_dir() {
+                    // Copy directory recursively
+                    self.copy_dir(&src, &dst)?;
+                }
+            }
+        }
+        
+        Ok(())
+    }
+    
+    /// Helper to copy directory recursively.
+    fn copy_dir(&self, src: &Path, dst: &Path) -> std::io::Result<()> {
+        std::fs::create_dir_all(dst)?;
+        
+        for entry in std::fs::read_dir(src)? {
+            let entry = entry?;
+            let src_path = entry.path();
+            let dst_path = dst.join(entry.file_name());
+            
+            if src_path.is_file() {
+                std::fs::copy(&src_path, &dst_path)?;
+            } else if src_path.is_dir() {
+                self.copy_dir(&src_path, &dst_path)?;
+            }
+        }
+        
+        Ok(())
+    }
 }
 
 #[cfg(test)]

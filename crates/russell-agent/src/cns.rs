@@ -42,15 +42,23 @@ pub struct CnsEmitter {
     agent_name: String,
     /// CNS endpoint (if configured)
     cns_endpoint: Option<String>,
+    /// HTTP client for CNS emission
+    http_client: Option<reqwest::Client>,
 }
 
 impl CnsEmitter {
     /// Create a new CNS emitter.
     pub fn new(pod_id: &PodID, persona: &AgentPersona) -> Self {
+        let cns_endpoint = std::env::var("HKASK_CNS_ENDPOINT").ok();
+        let http_client = cns_endpoint
+            .as_ref()
+            .and_then(|_| reqwest::Client::builder().build().ok());
+        
         Self {
             pod_id: pod_id.clone(),
             agent_name: persona.name().to_string(),
-            cns_endpoint: std::env::var("HKASK_CNS_ENDPOINT").ok(),
+            cns_endpoint,
+            http_client,
         }
     }
     
@@ -58,14 +66,19 @@ impl CnsEmitter {
     fn emit(&self, span: CnsSpan) {
         tracing::debug!(span = %span.name, "Emitting CNS span");
         
-        // If CNS endpoint configured, send via HTTP
-        if let Some(endpoint) = &self.cns_endpoint {
-            // tokio::spawn(send_to_cns(endpoint, span));
-            // For now, just log
-            tracing::info!("CNS span: {} (endpoint: {})", span.name, endpoint);
+        // If CNS endpoint configured and HTTP client available, send via HTTP
+        if let (Some(endpoint), Some(client)) = (&self.cns_endpoint, &self.http_client) {
+            let span_clone = span.clone();
+            let endpoint_clone = endpoint.clone();
+            let client_clone = client.clone();
+            
+            tokio::spawn(async move {
+                let _ = send_to_cns(&client_clone, &endpoint_clone, span_clone).await;
+            });
+            tracing::info!("CNS span emitted: {} → {}", span.name, endpoint);
         } else {
-            // No CNS endpoint — log locally (graceful degradation)
-            tracing::info!("CNS span: {}", span.name);
+            // No CNS endpoint — log locally (graceful degradation per JR-2)
+            tracing::info!("CNS span (local only): {}", span.name);
         }
     }
     
@@ -166,5 +179,27 @@ impl CnsEmitter {
             }),
         );
         self.emit(span);
+    }
+}
+
+/// Send CNS span to hKask endpoint.
+async fn send_to_cns(
+    client: &reqwest::Client,
+    endpoint: &str,
+    span: CnsSpan,
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    let response = client
+        .post(endpoint)
+        .json(&span)
+        .timeout(std::time::Duration::from_secs(5))
+        .send()
+        .await?;
+    
+    if response.status().is_success() {
+        tracing::debug!("CNS span accepted");
+        Ok(())
+    } else {
+        tracing::warn!("CNS span rejected: {}", response.status());
+        Err("CNS rejected span".into())
     }
 }

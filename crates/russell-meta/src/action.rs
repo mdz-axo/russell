@@ -662,7 +662,7 @@ mod tests {
                 rollback: russell_skills::Rollback::NoneNeeded {
                     rollback: russell_skills::RollbackNone::NoneNeeded,
                 },
-                timeout: "120s".into(),
+                timeout: "30s".into(),
                 needs_sudo: false,
             }],
             safety: Safety {
@@ -672,6 +672,8 @@ mod tests {
                 needs_network: false,
             },
             evaluation: None,
+            lexicon: None,
+            visibility: russell_skills::Visibility::Private,
         }
     }
 
