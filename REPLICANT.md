@@ -23,7 +23,7 @@ Russell follows a **public-except-episodic** visibility model:
 
 ## Skills Catalog
 
-Russell ships with 12 public skills:
+Russell ships with 13 public skills:
 
 | Skill | Symptoms | Probes | Interventions | Visibility |
 |---|---|---|---|---|
@@ -39,6 +39,7 @@ Russell ships with 12 public skills:
 | `pragmatic-semantics` | semantic_clarity | 0 | 0 | public |
 | `ubuntu-jack` | ubuntu_specific_health | 2 | 1 | public |
 | `web-search` | web_research_needed | 1 | 0 | public |
+| `package-checker` | package_outdated, package_missing | 1 | 0 | public |
 
 **Total**: 25 probes, 21 interventions, 30 symptoms in catalog
 

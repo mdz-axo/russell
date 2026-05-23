@@ -21,14 +21,13 @@ visibility.episodic=private
 artifact.skills=https://raw.githubusercontent.com/mdz-axolotl/russell/main/skills/
 artifact.manifest=https://raw.githubusercontent.com/mdz-axolotl/russell/main/AGENTS.md
 artifact.schema=https://raw.githubusercontent.com/mdz-axolotl/russell/main/docs/specifications/skill-manifest.schema.yaml
-artifact.citation=https://raw.githubusercontent.com/mdz-axolotl/russell/main/CITATION.cff
 
 repository=https://github.com/mdz-axolotl/russell
 license=MIT OR Apache-2.0
 author=mdz-axolotl
 
-skills.index=12
-skills.public=12
+skills.index=13
+skills.public=13
 skills.private=0
 
 probes.total=25

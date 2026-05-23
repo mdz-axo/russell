@@ -23,6 +23,9 @@ pub struct Session {
     /// Token ID that created this session (for ownership binding).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub token_id: Option<String>,
+    /// Pending action awaiting consent (if state is InputRequired).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pending_action: Option<crate::types::PendingAction>,
 }
 
 impl Session {
@@ -37,6 +40,7 @@ impl Session {
             last_activity: now,
             state: SessionState::Active,
             token_id: None,
+            pending_action: None,
         }
     }
 

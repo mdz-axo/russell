@@ -690,9 +690,10 @@ impl Drop for RussellPod {
 mod tests {
     use super::*;
     use std::fs;
+    use std::path::Path;
     use tempfile::TempDir;
 
-    fn create_test_persona(dir: &PathBuf) {
+    fn create_test_persona(dir: &Path) {
         let persona_content = r#"
 agent:
   name: "test-russell"

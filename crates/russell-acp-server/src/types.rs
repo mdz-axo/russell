@@ -192,6 +192,49 @@ pub struct PendingAction {
     pub risk: RiskBand,
     /// Requires operator consent.
     pub requires_consent: bool,
+    /// Action ID for consent response (UUID v4).
+    pub action_id: String,
+}
+
+/// Consent request (from hKask agent).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ConsentRequest {
+    /// Session ID.
+    pub session_id: String,
+    /// Action ID (from PendingAction).
+    pub action_id: String,
+    /// Consent decision (approve/deny).
+    pub decision: ConsentDecision,
+    /// Optional reason for decision.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reason: Option<String>,
+}
+
+/// Consent decision.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ConsentDecision {
+    /// Approve the action.
+    Approve,
+    /// Deny the action.
+    Deny,
+}
+
+/// Consent response.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ConsentResponse {
+    /// Session ID.
+    pub session_id: String,
+    /// Action ID.
+    pub action_id: String,
+    /// Decision recorded.
+    pub decision: ConsentDecision,
+    /// Execution result (if approved and executed).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub result: Option<String>,
+    /// Error (if approved but execution failed).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
 }
 
 /// Capabilities response.

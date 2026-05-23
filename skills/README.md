@@ -2,7 +2,7 @@
 
 **Replicant ID**: `russell`  
 **Visibility**: public-except-episodic  
-**Total Skills**: 12  
+**Total Skills**: 13  
 
 ## hKask Artifact Structure
 
@@ -30,6 +30,7 @@ Each Russell skill includes three artifact types for hKask registry compatibilit
 | `pragmatic-semantics` | ✅ Placeholder | 1 | 0 | 0 |
 | `ubuntu-jack` | ✅ Placeholder | 1 | 2 | 1 |
 | `web-search` | ✅ Placeholder | 1 | 1 | 0 |
+| `package-checker` | ✅ Placeholder | 1 | 1 | 0 |
 
 ## Templates
 

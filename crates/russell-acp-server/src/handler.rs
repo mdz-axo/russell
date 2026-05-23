@@ -134,6 +134,10 @@ impl AcpHandler {
                 self.session_status(request.params, validated_token.as_ref())
                     .await
             }
+            "acp/consent.respond" => {
+                self.consent_respond(request.params, validated_token.as_ref())
+                    .await
+            }
             "acp/capabilities" => self.get_capabilities(request.params).await,
             "acp/skill/info" => self.get_skill_info(request.params).await,
             "acp/skill/run" => self.run_skill(request.params).await,

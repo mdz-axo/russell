@@ -14,6 +14,44 @@ status: "Active"
 
 # Changelog
 
+## [0.20.0] — 2026-05-23
+
+### Added
+- **ACP server** (`russell-acp-server`): Agent Client Protocol server for hKask
+  integration. Supports `acp/capabilities`, `acp/session.create`,
+  `acp/session.message`, `acp/probe/run`. Macaroon-based auth.
+- **Agent crate** (`russell-agent`): Pod lifecycle management, persona
+  configuration, memory artifact export.
+- **Pod CLI commands**: `pod-status`, `pod-activate`, `pod-deactivate`,
+  `pod-persona-show`, `pod-artifacts-list`, `pod-artifacts-export`.
+- **Skill lifecycle CLI**: `skill-install`, `skill-prune` commands.
+- **Encryption**: age-based encryption for journal and evidence bundles.
+- **Hash chain integrity**: tamper-evident journal with `verify-journal` command.
+- **Rule engine**: per-probe TOML rules with operator-overridable thresholds
+  (`rules.d/*.toml`).
+- **Memory layer**: `russell digest --format daily-log` for markdown exports.
+
+### Changed
+- **Primary interface shifted to ACP**: CLI is now secondary; hKask integration
+  goes through the ACP server.
+- **Chat REPL removed**: Multi-turn conversation absorbed into ACP session
+  interface. `russell chat` no longer exists.
+- **Workshop REPL removed**: Skill workshop functionality absorbed into skill
+  lifecycle commands (`skill-install`, `skill-prune`).
+- **Kask → hKask migration**: Environment variables renamed from `KASK_*` to
+  `HKASK_*`. Backward-compatible fallbacks in MCP client.
+- **Workspace restructured**: 11 crates (removed `russell-reflex` — unused).
+- **Systemd units cleaned**: Removed `kask-gateway`, `kask-token-rotate`,
+  `russell-okapi` units. Added `russell-acp-server.service`.
+
+### Removed
+- `russell chat` command (use ACP sessions)
+- `russell workshop` command (use `skill-install`/`skill-prune`)
+- `russell mcp-tools` command (use ACP capabilities)
+- `russell-reflex` crate (zero consumers)
+- `kask-gateway.service`, `kask-token-rotate.*` systemd units
+- `russell-okapi.service`, `russell-okapi.timer` systemd units
+
 ## [0.3.0] — 2026-05-12
 
 ### Added
