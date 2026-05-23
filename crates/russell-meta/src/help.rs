@@ -12,6 +12,7 @@ use time::OffsetDateTime;
 use tracing::{info, warn};
 use ulid::Ulid;
 
+use russell_core::config::RuntimeConfig;
 use russell_core::journal::{HelpSessionInput, HelpSessionStatus, JournalWriter};
 use russell_core::paths::Paths;
 
@@ -20,16 +21,24 @@ use crate::error::{DoctorError, Result};
 /// Outcome from a `run_help` call.
 #[derive(Debug, Clone, Serialize)]
 pub struct HelpOutcome {
+    /// Unique session identifier.
     pub session_id: String,
+    /// Backend used ("hkask" or "offline").
     pub backend: &'static str,
+    /// Path to the evidence bundle directory.
     pub evidence_dir: PathBuf,
+    /// LLM response text or offline fallback summary.
     pub response: String,
+    /// Reason the LLM call was skipped (if applicable).
     pub skip_reason: Option<SkipReason>,
 }
 
+/// Reason the LLM inference was skipped.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 pub enum SkipReason {
+    /// hKask was unreachable; offline fallback was used.
     OfflineFallback,
+    /// No crit/alert events; threshold gate prevented escalation.
     ThresholdSkip,
 }
 
@@ -70,17 +79,29 @@ struct HKaskInferResponse {
     latency_ms: u64,
 }
 
-const HKASK_ENDPOINT: &str = "http://127.0.0.1:8080/api/llm/infer";
-
+/// Run the Nurse pipeline using the hKask endpoint from [`RuntimeConfig`].
+///
+/// Loads configuration from environment variables (see [`RuntimeConfig::from_env`]).
 pub async fn run_help(
     paths: &Paths,
     writer: &JournalWriter,
     note: Option<&str>,
     _hkask_tool_names: &[(String, Option<String>)],
 ) -> Result<HelpOutcome> {
-    run_help_with_endpoint(paths, writer, note, HKASK_ENDPOINT).await
+    let config = RuntimeConfig::from_env();
+    run_help_with_endpoint(paths, writer, note, &config.hkask_endpoint).await
 }
 
+/// Run the Nurse pipeline with a configurable hKask endpoint.
+///
+/// Gathers objective telemetry, checks the threshold gate, calls hKask
+/// for LLM inference, and journals the help session. Falls back to an
+/// offline summary if hKask is unreachable or the threshold gate skips.
+/// Run the Nurse pipeline with a configurable hKask endpoint.
+///
+/// Gathers objective telemetry, checks the threshold gate, calls hKask
+/// for LLM inference, and journals the help session. Falls back to an
+/// offline summary if hKask is unreachable or the threshold gate skips.
 pub async fn run_help_with_endpoint(
     paths: &Paths,
     writer: &JournalWriter,
@@ -195,14 +216,15 @@ async fn gather_objective(writer: &JournalWriter) -> ObjectiveData {
     let now = OffsetDateTime::now_utc().unix_timestamp();
     let since = now - 86400; // Last 24 hours
 
-    let severity_counts = reader.severity_counts(since, now).unwrap_or_else(|_| {
-        russell_core::journal::SeverityCounts {
-            crit: 0,
-            alert: 0,
-            warn: 0,
-            info: 0,
-        }
-    });
+    let severity_counts =
+        reader
+            .severity_counts(since, now)
+            .unwrap_or(russell_core::journal::SeverityCounts {
+                crit: 0,
+                alert: 0,
+                warn: 0,
+                info: 0,
+            });
 
     let events = reader.recent(20).unwrap_or_default();
 
@@ -261,9 +283,13 @@ async fn call_hkask(endpoint: &str, request: &HKaskInferRequest) -> Result<HKask
         .build()
         .map_err(|e| DoctorError::Config(format!("HTTP client: {e}")))?;
 
-    let response = client
-        .post(endpoint)
-        .json(request)
+    let mut req = client.post(endpoint).json(request);
+
+    if let Some(token) = load_service_token() {
+        req = req.bearer_auth(&token);
+    }
+
+    let response = req
         .send()
         .await
         .map_err(|e| DoctorError::Config(format!("hKask request: {e}")))?;
@@ -279,4 +305,52 @@ async fn call_hkask(endpoint: &str, request: &HKaskInferRequest) -> Result<HKask
         .json()
         .await
         .map_err(|e| DoctorError::Config(format!("hKask response: {e}")))
+}
+
+fn load_service_token() -> Option<String> {
+    let token_path = russell_core::paths::Paths::from_env()
+        .ok()?
+        .state
+        .join("russell.token");
+
+    if let Ok(token) = std::fs::read_to_string(&token_path) {
+        let trimmed = token.trim();
+        if !trimmed.is_empty() {
+            return Some(trimmed.to_owned());
+        }
+    }
+
+    let token = generate_service_token();
+    if let Some(parent) = token_path.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        let _ = std::fs::OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .mode(0o600)
+            .open(&token_path)
+            .and_then(|mut f| std::io::Write::write_all(&mut f, token.as_bytes()));
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = std::fs::write(&token_path, &token);
+    }
+    Some(token)
+}
+
+fn generate_service_token() -> String {
+    use sha2::{Digest, Sha256};
+    let mut hasher = Sha256::new();
+    hasher.update(std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos()
+        .to_le_bytes());
+    hasher.update(std::process::id().to_le_bytes());
+    hasher.update(b"russell-service-principal");
+    hex::encode(hasher.finalize())
 }

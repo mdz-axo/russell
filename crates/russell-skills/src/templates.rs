@@ -45,7 +45,7 @@ pub enum TemplateError {
 /// Template rendering context.
 ///
 /// Passed to Jinja2 templates as the `context` variable.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Default, Serialize)]
 pub struct TemplateContext {
     /// Probe results (probe_id -> output).
     #[serde(default)]
@@ -66,18 +66,6 @@ pub struct TemplateContext {
     /// Host telemetry (if available).
     #[serde(default)]
     pub host: HostContext,
-}
-
-impl Default for TemplateContext {
-    fn default() -> Self {
-        Self {
-            probes: BTreeMap::new(),
-            journal: JournalContext::default(),
-            params: BTreeMap::new(),
-            skill: SkillContext::default(),
-            host: HostContext::default(),
-        }
-    }
 }
 
 /// Journal context for templates.
@@ -223,10 +211,10 @@ impl TemplateCrate {
         if let Ok(entries) = std::fs::read_dir(&templates_dir) {
             for entry in entries.flatten() {
                 let path = entry.path();
-                if path.extension().map_or(false, |ext| ext == "j2") {
-                    if let Some(name) = path.file_stem() {
-                        templates.push(name.to_string_lossy().to_string());
-                    }
+                if path.extension().is_some_and(|ext| ext == "j2")
+                    && let Some(name) = path.file_stem()
+                {
+                    templates.push(name.to_string_lossy().to_string());
                 }
             }
         }

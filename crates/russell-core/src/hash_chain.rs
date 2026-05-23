@@ -20,8 +20,7 @@
 //!
 //! ## Design
 //!
-//! - Genesis hash: SHA-256 of `/etc/machine-id` contents (or a
-//!   fixed fallback if unavailable). This seeds the chain.
+//! - Genesis hash: SHA-256 of `/etc/machine-id` or a persisted random seed.
 //! - Each event hash: `SHA-256(prev_hash_hex || event_json)`.
 //! - Stored as 64-char lowercase hex string.
 //! - Verification: walk the chain forwards, recomputing each
@@ -33,13 +32,78 @@ use sha2::{Digest, Sha256};
 pub const HASH_HEX_LEN: usize = 64;
 
 /// Compute the genesis hash (chain seed).
+///
+/// Priority:
+/// 1. `/etc/machine-id` — stable per-host identifier.
+/// 2. `~/.local/state/harness/chain-seed` — generated random seed (persisted).
+/// 3. Generate and persist a new random seed.
+///
+/// The old fallback constant has been removed — a known seed allows
+/// an attacker to forge the entire hash chain (Schneier: never use
+/// a known constant as a cryptographic seed).
 #[must_use]
 pub fn genesis_hash() -> String {
-    let seed = std::fs::read_to_string("/etc/machine-id")
-        .unwrap_or_else(|_| "russell-genesis-seed-no-machine-id".to_string());
+    let seed = resolve_genesis_seed();
     let mut hasher = Sha256::new();
     hasher.update(seed.trim().as_bytes());
     hex::encode(hasher.finalize())
+}
+
+fn resolve_genesis_seed() -> String {
+    if let Ok(contents) = std::fs::read_to_string("/etc/machine-id") {
+        let trimmed = contents.trim();
+        if !trimmed.is_empty() {
+            return trimmed.to_owned();
+        }
+    }
+
+    let seed_path = seed_file_path();
+    if let Ok(contents) = std::fs::read_to_string(&seed_path) {
+        let trimmed = contents.trim();
+        if !trimmed.is_empty() {
+            return trimmed.to_owned();
+        }
+    }
+
+    let seed = generate_random_seed();
+    if let Some(parent) = seed_path.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        let _ = std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .mode(0o600)
+            .open(&seed_path)
+            .and_then(|mut f| std::io::Write::write_all(&mut f, seed.as_bytes()));
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = std::fs::write(&seed_path, &seed);
+    }
+    seed
+}
+
+fn seed_file_path() -> std::path::PathBuf {
+    let base = std::env::var("XDG_STATE_HOME")
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|_| {
+            std::env::var("HOME")
+                .map(|h| std::path::PathBuf::from(h).join(".local/state"))
+                .unwrap_or_else(|_| std::path::PathBuf::from("/tmp"))
+        });
+    base.join("harness").join("chain-seed")
+}
+
+fn generate_random_seed() -> String {
+    use std::collections::hash_map::DefaultHasher;
+    use std::hash::{Hash, Hasher};
+    let mut hasher = DefaultHasher::new();
+    std::time::SystemTime::now().hash(&mut hasher);
+    std::process::id().hash(&mut hasher);
+    format!("{:016x}{:016x}", hasher.finish(), hasher.finish())
 }
 
 /// Compute the hash of an event given the previous hash and the

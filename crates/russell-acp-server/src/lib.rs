@@ -64,6 +64,7 @@
 //! - Macaroon-based OCAP authentication
 //! - Persistence independence (SQLite journal remains local)
 
+#![deny(unsafe_code)]
 #![warn(missing_docs)]
 #![warn(rustdoc::missing_crate_level_docs)]
 
@@ -81,7 +82,7 @@ pub mod types;
 // Re-export main types for convenience.
 pub use auth::{CapabilityToken, MacaroonAuth};
 pub use dispatch::AcpDispatch;
-pub use encryption::{encrypt_token, decrypt_token, EncryptionKey};
+pub use encryption::{EncryptionKey, decrypt_token, encrypt_token};
 pub use error::{AcpError, Result};
 pub use handler::AcpHandler;
 pub use persona::JackPersonaProjection;
@@ -89,6 +90,6 @@ pub use rate_limit::RateLimiter;
 pub use session::{Session, SessionManager, SessionState, ToolCallRecord, Turn, TurnRole};
 pub use transport::AcpServer;
 pub use types::{
-    InterventionInfo, LexiconCategorization, LexiconDomain, ProbeInfo, RiskLevel, SafetyInfo,
-    SkillInfo, Visibility,
+    InterventionInfo, LexiconCategorization, LexiconDomain, ProbeInfo, SafetyInfo, SkillInfo,
+    Visibility,
 };

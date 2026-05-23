@@ -78,6 +78,11 @@ pub fn collect_with(registry: &ProbeRegistry) -> Vec<Sample> {
 static REGISTRY: std::sync::LazyLock<ProbeRegistry> =
     std::sync::LazyLock::new(ProbeRegistry::with_defaults);
 
+/// Access the default singleton registry.
+pub fn default_registry() -> &'static ProbeRegistry {
+    &REGISTRY
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

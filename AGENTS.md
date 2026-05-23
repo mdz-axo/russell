@@ -124,7 +124,7 @@ addition to this table.
 | **Autoimmune check** | Recursion guard on self-triage. `AutoimmuneGuard` active in `russell-proprio` — not yet wired into `run_once` (foundation built, wiring deferred). |
 | **Rule engine** | Per-probe TOML rules with operator-overridable thresholds. **Active.** `RuleSet` in `russell-core`, `rules.d/*.toml`, wired into `sentinel-once`. |
 | **Memory layer** | Markdown exports derived from the journal. **Active.** `memory/REVIEW.md`, `memory/daily/YYYY-MM-DD.md`, `russell digest --format daily-log`. Journal is sole canonical store; Markdown is rebuildable. |
-| **Chat REPL** | Interactive readline REPL with Jack's nurse persona. **Active.** `russell chat` — multi-turn conversation with token budgeting. |
+| **Chat REPL** | Interactive readline REPL with Jack's nurse persona. **Active.** `russell chat` — multi-turn conversation. |
 | **VSM layers** | Ops (Sentinel), Coordination (timers), Control (Nurse), Intelligence (Bootstrap + LLM), Policy (the human). |
 | **"First, do no harm"** | The refusal posture: observe > recommend > act. |
 | **Consent gate** | The consent mechanism in `russell chat`. Probes (risk: none) auto-execute when Jack proposes them. Interventions require operator consent — `/approve`, or natural-language ("ok", "yes", "do it", "go ahead"). `/deny`, "no", "nope", "cancel" refuse. |
@@ -306,63 +306,7 @@ they are the operator's engineering standards.
 When a JR principle and a P/C constraint conflict, JR wins
 (Russell-specific > shared engineering).
 
-## 12. Code Budget & Testing Policy
-
-**Line Budget:** ≤20,000 lines Rust production code.
-
-Russell is governed by JR-1 (*"Though she be but little, she is
-fierce"*). The budget creates natural pressure to delete before
-adding and to consolidate before spreading.
-
-### What Counts Toward Budget
-
-All code in `russell-*` crates counts toward the 20,000 line limit:
-- Production code in `src/` directories
-- Inline unit tests (`#[cfg(test)]` modules within source files)
-- Integration tests in `tests/` directories within functional crates
-
-### What Is Excluded From Budget
-
-- **Single test crate:** `russell-testing` — the only crate whose
-  code is excluded from the budget (created when pressure warrants).
-- **Embedded non-Rust content:** SQL migrations (`migrations/*.sql`),
-  prompt templates (`prompts/*.md`), skill manifests (`manifest.yaml`).
-  These are data, not logic.
-- **Generated code** (if any, e.g. from `build.rs`).
-- **Comments and blank lines** — use `tokei` which strips these.
-
-### Measurement
-
-```bash
-tokei crates/ --type Rust          # primary measure
-cargo run -- verify-journal        # ensure integrity (separate concern)
-```
-
-### Policy
-
-- Only ONE test crate is excluded (`russell-testing`)
-- Multiple test crates are not authorized — if more test space is
-  needed, use directories within `russell-testing`
-- When inline `#[cfg(test)]` code exceeds 30% of a crate's total,
-  extract test helpers/fixtures into `russell-testing`
-- Tests must have no dependencies on them from production code
-
-### Agent Guidance (approaching 20,000 lines)
-
-1. First priority: delete, consolidate, simplify production code
-2. Second priority: move inline unit tests to `russell-testing`
-3. Third: collapse duplicate methods (C7 — when implementations
-   diverge, one must yield)
-4. Never: create additional test crates
-
-### Budget vs. JR-1
-
-The budget is a *consequence* of JR-1, not a replacement. If the
-system is well-designed, 20,000 lines is generous for a single-host
-health harness. If you are bumping the ceiling, the design has
-drifted — consolidate rather than expand.
-
-## 13. Hallucinations (Do NOT Implement)
+## 12. Hallucinations (Do NOT Implement)
 
 These features have been explicitly rejected. If proposed again,
 cite this list:
@@ -378,7 +322,7 @@ cite this list:
 - Async streaming from LLM (the Nurse pipeline is request-response)
 - UCAN / capability tokens (OCAP is enforcement; IDRS is the contract)
 
-## 14. Essential Commands
+## 13. Essential Commands
 
 ```bash
 cargo check                          # quick type check
@@ -416,7 +360,7 @@ systemctl --user enable --now russell-sentinel.timer
 systemctl --user enable --now russell-acp-server.service
 ```
 
-## 15. Completion Standard
+## 14. Completion Standard
 
 Before claiming work is done:
 
@@ -429,7 +373,7 @@ Before claiming work is done:
 
 Never claim completion without running verification.
 
-## 16. Workspace Integrity
+## 15. Workspace Integrity
 
 Before editing any file:
 
@@ -439,7 +383,7 @@ Before editing any file:
 3. Add dependencies at `[workspace.dependencies]` level first
 4. New crates require a workspace member entry in root `Cargo.toml`
 
-## 17. What this file is not
+## 16. What this file is not
 
 - Not a tutorial. New contributors read [`docs/README.md`](docs/README.md) §3.
 - Not a reference. Every link above is the reference for its

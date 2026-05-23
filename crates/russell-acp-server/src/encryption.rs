@@ -6,11 +6,11 @@
 //!
 //! See [ADR-0027](../../../docs/adr/0027-token-encryption.md).
 
-use age::{Decryptor, Encryptor};
+use crate::error::{AcpError, Result};
 use age::secrecy::ExposeSecret;
+use age::{Decryptor, Encryptor};
 use base64::{Engine as _, engine::general_purpose::STANDARD};
 use std::io::{Read, Write};
-use crate::error::{AcpError, Result};
 
 /// Encryption key for token encryption.
 pub struct EncryptionKey {
@@ -57,7 +57,9 @@ impl EncryptionKey {
             .wrap_output(&mut encrypted)
             .expect("failed to wrap output");
 
-        writer.write_all(plaintext).expect("failed to write encrypted data");
+        writer
+            .write_all(plaintext)
+            .expect("failed to write encrypted data");
         writer.finish().expect("failed to finish encryption");
 
         Ok(STANDARD.encode(encrypted))
@@ -89,16 +91,18 @@ impl EncryptionKey {
 
 /// Encrypt capability token JSON.
 pub fn encrypt_token(token: &crate::auth::CapabilityToken, key: &EncryptionKey) -> Result<String> {
-    let json = serde_json::to_vec(token)
-        .map_err(|e| AcpError::Serialization(e))?;
-    
+    let json = serde_json::to_vec(token).map_err(|e| AcpError::Serialization(e))?;
+
     key.encrypt(&json)
 }
 
 /// Decrypt capability token JSON.
-pub fn decrypt_token(ciphertext: &str, key: &EncryptionKey) -> Result<crate::auth::CapabilityToken> {
+pub fn decrypt_token(
+    ciphertext: &str,
+    key: &EncryptionKey,
+) -> Result<crate::auth::CapabilityToken> {
     let plaintext = key.decrypt(ciphertext)?;
-    
+
     serde_json::from_slice(&plaintext)
         .map_err(|e| AcpError::InvalidToken(format!("invalid token JSON: {}", e)))
 }

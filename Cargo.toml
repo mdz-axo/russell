@@ -7,7 +7,6 @@ members = [
     "crates/russell-core",
     "crates/russell-sentinel",
     "crates/russell-proprio",
-    "crates/russell-reflex",
     "crates/russell-meta",
     "crates/russell-skills",
     "crates/russell-cli",
@@ -31,7 +30,6 @@ russell-sentinel = { path = "crates/russell-sentinel" }
 russell-skills   = { path = "crates/russell-skills" }
 russell-meta     = { path = "crates/russell-meta" }
 russell-proprio  = { path = "crates/russell-proprio" }
-russell-reflex   = { path = "crates/russell-reflex" }
 russell-mcp      = { path = "crates/russell-mcp" }
 russell-cli      = { path = "crates/russell-cli" }
 russell-testing  = { path = "crates/russell-testing" }

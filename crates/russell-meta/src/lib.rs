@@ -17,5 +17,7 @@ pub mod help;
 pub use error::{DoctorError, Result};
 pub use help::{HelpOutcome, run_help, run_help_with_endpoint};
 
+/// Jack's nurse persona prompt (loaded from `prompts/jack.md`).
 pub const JACK_PERSONA: &str = include_str!("../prompts/jack.md");
+/// Jack's chat-mode persona prompt (loaded from `prompts/jack-chat.md`).
 pub const JACK_CHAT_PERSONA: &str = include_str!("../prompts/jack-chat.md");

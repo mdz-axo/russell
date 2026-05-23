@@ -24,6 +24,8 @@ ulid.workspace = true
 reqwest.workspace = true
 strsim.workspace = true
 minijinja.workspace = true
+sha2.workspace = true
+hex.workspace = true
 regex = "1"
 lazy_static = "1"
 

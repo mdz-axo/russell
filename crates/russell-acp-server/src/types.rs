@@ -3,6 +3,8 @@
 
 use serde::{Deserialize, Serialize};
 
+use russell_core::risk::RiskBand;
+
 /// Visibility annotation (from skill manifests).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -34,27 +36,11 @@ pub struct LexiconCategorization {
     pub terms: Vec<String>,
 }
 
-/// Risk level (from skill manifests).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum RiskLevel {
-    /// No risk (read-only probes).
-    None,
-    /// Low risk (reversible, no data loss).
-    Low,
-    /// Medium risk (requires operator consent).
-    Medium,
-    /// High risk (potentially destructive).
-    High,
-    /// Critical risk (system-affecting).
-    Critical,
-}
-
 /// Safety information.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SafetyInfo {
     /// Maximum auto-execution risk level.
-    pub max_auto_risk: RiskLevel,
+    pub max_auto_risk: RiskBand,
     /// Interventions requiring explicit human consent.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub require_human_for: Vec<String>,
@@ -79,7 +65,7 @@ pub struct InterventionInfo {
     /// Human-readable description.
     pub description: String,
     /// Risk level.
-    pub risk: RiskLevel,
+    pub risk: RiskBand,
     /// Requires sudo.
     pub needs_sudo: bool,
     /// Rollback information.
@@ -206,7 +192,7 @@ pub struct PendingAction {
     /// Intervention ID.
     pub intervention_id: String,
     /// Risk level.
-    pub risk: RiskLevel,
+    pub risk: RiskBand,
     /// Requires operator consent.
     pub requires_consent: bool,
 }

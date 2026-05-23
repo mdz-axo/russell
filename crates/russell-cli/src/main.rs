@@ -70,7 +70,10 @@ enum Command {
     /// Run self-triage (Russell diagnoses own health).
     SelfTriage,
     /// Show docs.
-    Docs { #[arg(long)] strict: bool },
+    Docs {
+        #[arg(long)]
+        strict: bool,
+    },
     /// Verify journal integrity.
     VerifyJournal,
 }

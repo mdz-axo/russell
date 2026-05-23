@@ -32,6 +32,13 @@
 #![deny(rust_2018_idioms)]
 #![warn(missing_docs)]
 
+pub mod reflex;
+
+pub use reflex::{
+    ACTION_DISABLE_LLM_HELP, ACTION_FLUSH_JOURNAL, ACTION_LLM_FALLBACK, ACTION_RESTART_SENTINEL,
+    ACTION_RESTART_TIMER, ProprioReflex, ReflexAction,
+};
+
 use std::process::Command;
 use std::sync::{Mutex, MutexGuard};
 

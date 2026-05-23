@@ -15,9 +15,9 @@
 use anyhow::{Context, Result};
 use russell_core::journal::{JournalReader, JournalWriter};
 use russell_core::paths::Paths;
-use russell_proprio::run_once as run_proprio;
-use russell_reflex::ReflexArc;
 use russell_meta::run_help_with_endpoint;
+use russell_proprio::ProprioReflex;
+use russell_proprio::run_once as run_proprio;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
@@ -62,9 +62,8 @@ impl RateLimitState {
 }
 
 /// Global rate limiter for self-triage.
-static RATE_LIMITER: std::sync::LazyLock<Mutex<RateLimitState>> = std::sync::LazyLock::new(|| {
-    Mutex::new(RateLimitState::new())
-});
+static RATE_LIMITER: std::sync::LazyLock<Mutex<RateLimitState>> =
+    std::sync::LazyLock::new(|| Mutex::new(RateLimitState::new()));
 
 /// Run self-triage — proprioception + LLM interpretation.
 pub async fn run(paths: &Paths) -> Result<()> {
@@ -73,7 +72,7 @@ pub async fn run(paths: &Paths) -> Result<()> {
     if !limiter.check() {
         let rejected = limiter.rejected_count();
         drop(limiter);
-        
+
         eprintln!("⚠ Rate limit exceeded (60 requests/hour)");
         eprintln!("  This is request #{} over the limit.", rejected);
         eprintln!("  Please wait before running self-triage again.");
@@ -107,37 +106,64 @@ pub async fn run(paths: &Paths) -> Result<()> {
     // Display self-vitals
     println!("Self-Vitals:");
     println!("  sentinel_last_run_age_s:   {:?}", proprio_result.age_s);
-    println!("  journal_writer_stall_s:    {:?}", proprio_result.journal_stall_s);
-    println!("  llm_p95_latency_ms:        {:?}", proprio_result.llm_p95_latency_ms);
-    println!("  timer_drift_s:             {:?}", proprio_result.timer_drift_s);
-    println!("  help_error_rate_pct:       {:?}", proprio_result.help_error_rate_pct);
+    println!(
+        "  journal_writer_stall_s:    {:?}",
+        proprio_result.journal_stall_s
+    );
+    println!(
+        "  llm_p95_latency_ms:        {:?}",
+        proprio_result.llm_p95_latency_ms
+    );
+    println!(
+        "  timer_drift_s:             {:?}",
+        proprio_result.timer_drift_s
+    );
+    println!(
+        "  help_error_rate_pct:       {:?}",
+        proprio_result.help_error_rate_pct
+    );
     println!();
 
     // Show severity
     println!("Severity Assessment:");
     println!("  Overall:                {:?}", proprio_result.severity);
     println!("  Sentinel age:           {:?}", proprio_result.severity);
-    println!("  Journal stall:          {:?}", proprio_result.journal_stall_severity);
-    println!("  LLM latency:            {:?}", proprio_result.llm_p95_severity);
-    println!("  Timer drift:            {:?}", proprio_result.timer_drift_severity);
-    println!("  Help error rate:        {:?}", proprio_result.help_error_rate_severity);
+    println!(
+        "  Journal stall:          {:?}",
+        proprio_result.journal_stall_severity
+    );
+    println!(
+        "  LLM latency:            {:?}",
+        proprio_result.llm_p95_severity
+    );
+    println!(
+        "  Timer drift:            {:?}",
+        proprio_result.timer_drift_severity
+    );
+    println!(
+        "  Help error rate:        {:?}",
+        proprio_result.help_error_rate_severity
+    );
     println!();
 
     // Run reflex arcs
-    let mut reflex = ReflexArc::new();
+    let mut reflex = ProprioReflex::new();
     reflex.evaluate(&proprio_result);
 
     if !reflex.actions().is_empty() {
         println!("Reflex Arc Actions (Phase 2A: recommendations only):");
         for action in reflex.actions() {
-            println!("  [{}] {} (risk: {:?})", action.action_id, action.description, action.risk);
+            println!(
+                "  [{}] {} (risk: {:?})",
+                action.action_id, action.description, action.risk
+            );
         }
         println!();
     }
 
     // Consult Jack for interpretation
     println!("Consulting Jack (Nurse persona)...");
-    
+
     // Build self-triage note
     let note = format!(
         "Self-triage request. Current proprioception results:\n\
@@ -150,17 +176,23 @@ pub async fn run(paths: &Paths) -> Result<()> {
          Reflex arcs triggered: {}\n\
          \n\
          Please interpret these results and recommend actions for Russell's health.",
-        proprio_result.age_s, proprio_result.severity,
-        proprio_result.journal_stall_s, proprio_result.journal_stall_severity,
-        proprio_result.llm_p95_latency_ms, proprio_result.llm_p95_severity,
-        proprio_result.timer_drift_s, proprio_result.timer_drift_severity,
-        proprio_result.help_error_rate_pct, proprio_result.help_error_rate_severity,
+        proprio_result.age_s,
+        proprio_result.severity,
+        proprio_result.journal_stall_s,
+        proprio_result.journal_stall_severity,
+        proprio_result.llm_p95_latency_ms,
+        proprio_result.llm_p95_severity,
+        proprio_result.timer_drift_s,
+        proprio_result.timer_drift_severity,
+        proprio_result.help_error_rate_pct,
+        proprio_result.help_error_rate_severity,
         reflex.actions().len()
     );
 
     // Try to use configured Okapi endpoint, fall back to offline mode
-    let endpoint = std::env::var("OKAPI_ENDPOINT").unwrap_or_else(|_| String::from("http://localhost:5000/v1"));
-    
+    let endpoint = std::env::var("OKAPI_ENDPOINT")
+        .unwrap_or_else(|_| String::from("http://localhost:5000/v1"));
+
     match run_help_with_endpoint(paths, &writer, Some(&note), &endpoint).await {
         Ok(outcome) => {
             println!("\nJack's Assessment:");
@@ -171,7 +203,7 @@ pub async fn run(paths: &Paths) -> Result<()> {
         Err(e) => {
             println!("\n✗ LLM consultation failed: {}", e);
             println!("Running in offline mode...\n");
-            
+
             // Offline interpretation
             offline_interpretation(&proprio_result, &reflex);
         }
@@ -181,7 +213,7 @@ pub async fn run(paths: &Paths) -> Result<()> {
 }
 
 /// Offline interpretation when LLM is unavailable.
-fn offline_interpretation(proprio_result: &russell_proprio::ProprioResult, reflex: &ReflexArc) {
+fn offline_interpretation(proprio_result: &russell_proprio::ProprioResult, reflex: &ProprioReflex) {
     println!("Offline Health Assessment:");
     println!("==========================\n");
 
@@ -190,7 +222,10 @@ fn offline_interpretation(proprio_result: &russell_proprio::ProprioResult, refle
 
     if let Some(age) = proprio_result.age_s {
         if age > 1800 {
-            issues.push(format!("CRITICAL: Sentinel hasn't run in {}s (>30 min)", age));
+            issues.push(format!(
+                "CRITICAL: Sentinel hasn't run in {}s (>30 min)",
+                age
+            ));
         } else if age > 450 {
             issues.push(format!("WARNING: Sentinel age {}s (>7.5 min)", age));
         }
@@ -222,9 +257,15 @@ fn offline_interpretation(proprio_result: &russell_proprio::ProprioResult, refle
 
     if let Some(error_rate) = proprio_result.help_error_rate_pct {
         if error_rate > 50.0 {
-            issues.push(format!("CRITICAL: Help error rate {}% (>50%)", error_rate as u64));
+            issues.push(format!(
+                "CRITICAL: Help error rate {}% (>50%)",
+                error_rate as u64
+            ));
         } else if error_rate > 20.0 {
-            issues.push(format!("WARNING: Help error rate {}% (>20%)", error_rate as u64));
+            issues.push(format!(
+                "WARNING: Help error rate {}% (>20%)",
+                error_rate as u64
+            ));
         }
     }
 
@@ -243,7 +284,10 @@ fn offline_interpretation(proprio_result: &russell_proprio::ProprioResult, refle
     if !reflex.actions().is_empty() {
         println!("Recommended Actions:");
         for action in reflex.actions() {
-            println!("  [{}] {} (risk: {:?})", action.action_id, action.description, action.risk);
+            println!(
+                "  [{}] {} (risk: {:?})",
+                action.action_id, action.description, action.risk
+            );
         }
         println!();
         println!("Note: Phase 2A — Actions are recommendations only.");
@@ -254,7 +298,9 @@ fn offline_interpretation(proprio_result: &russell_proprio::ProprioResult, refle
     println!("  1. Review issues above");
     println!("  2. Check systemd service status: systemctl --user status russell-*");
     println!("  3. Review journal: russell list --limit 50");
-    println!("  4. If critical issues persist, restart: systemctl --user restart russell-sentinel.timer\n");
+    println!(
+        "  4. If critical issues persist, restart: systemctl --user restart russell-sentinel.timer\n"
+    );
 }
 
 #[cfg(test)]
@@ -264,12 +310,12 @@ mod tests {
     #[test]
     fn test_rate_limit_allows_under_limit() {
         let mut state = RateLimitState::new();
-        
+
         // First 60 requests should be allowed
         for i in 0..60 {
             assert!(state.check(), "Request {} should be allowed", i);
         }
-        
+
         // 61st request should be rejected
         assert!(!state.check(), "Request 61 should be rejected");
         assert_eq!(state.rejected_count(), 1);
@@ -281,18 +327,18 @@ mod tests {
         // We can't easily test the time-based expiry without mocking time,
         // but we can verify the basic logic works
         let mut state = RateLimitState::new();
-        
+
         // Fill up the limit
         for _ in 0..60 {
             state.check();
         }
-        
+
         // Should be rejected
         assert!(!state.check());
-        
+
         // Manually clear old requests (simulating time passing)
         state.requests.clear();
-        
+
         // Should be allowed again
         assert!(state.check());
     }
@@ -300,12 +346,12 @@ mod tests {
     #[test]
     fn test_rate_limit_rejected_count() {
         let mut state = RateLimitState::new();
-        
+
         // Fill up and exceed limit
         for _ in 0..65 {
             state.check();
         }
-        
+
         // Should have rejected 5 requests
         assert_eq!(state.rejected_count(), 5);
     }

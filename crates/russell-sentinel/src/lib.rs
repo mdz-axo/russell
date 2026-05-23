@@ -86,9 +86,11 @@ use russell_core::time::Clock;
 /// Uses the default probe registry (singleton). For dependency
 /// injection, use [`run_once_with_registry`].
 pub fn run_once(writer: &JournalWriter) -> Result<usize> {
-    let samples = probes::collect();
-    journal_samples(writer, &samples)?;
-    Ok(samples.len())
+    let clock = russell_core::time::SystemClock;
+    let rules = RuleSet::with_defaults();
+    let registry = probes::default_registry();
+    let (count, _events) = run_once_injectable(writer, &clock, &rules, registry)?;
+    Ok(count)
 }
 
 /// Run the probe set once using an explicitly-provided registry.
@@ -433,6 +435,12 @@ mod tests {
                     .lock()
                     .unwrap()
                     .push((ts, probe.to_string(), value_num));
+                Ok(())
+            }
+            fn append_help_session(
+                &self,
+                _input: &russell_core::journal::HelpSessionInput<'_>,
+            ) -> russell_core::Result<()> {
                 Ok(())
             }
         }

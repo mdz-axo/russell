@@ -192,8 +192,37 @@ These items remain deferred beyond the current build:
 - **No corrective proprioception arcs.** Detection-only (Phase 2A).
   Corrective arcs are deferred.
 - **No full MCP surface.** `russell-mcp` crate exists, surface deferred.
+- **No Landlock sandboxing.** Skill subprocesses run without filesystem
+  confinement. (Task 8 deferred.)
+- **No scoped journal access.** All readers have full journal visibility.
+  (Task 6 deferred.)
 
-## 7. Known Limitations
+## 7. Security Hardening (Phase 5, 2026-05-23)
+
+The following security improvements are **complete**:
+
+- **Unified `RiskBand` type** — Eliminated 4 duplicate risk enums across
+  `russell-skills`, `russell-acp-server`, `russell-reflex`, and `russell-core`.
+  Single canonical definition in `russell-core::risk::RiskBand`. (C4, C7)
+- **DNS rebinding protection** — MCP client validates all resolved IPs are
+  loopback, rejecting hostnames that resolve to non-loopback addresses.
+  Prevents `localhost.evil.com` attacks. (W-20)
+- **Configurable endpoints** — Eliminated hardcoded `127.0.0.1:8080` and
+  `127.0.0.1:11435`. All endpoints now configurable via `RuntimeConfig`
+  with env var overrides. (W-14, W-21)
+- **Service token authentication** — Russell generates and persists a
+  service token for hKask inference requests. Token stored at
+  `~/.local/state/harness/russell.token` with `0600` permissions. (W-22)
+- **Hardened hash chain genesis** — Removed fallback constant seed.
+  Genesis now uses `/etc/machine-id` or generates random 32-byte seed
+  on first run. (W-11)
+- **Hexagonal port migration** — Journal write/read operations abstracted
+  via `JournalWritePort` and `JournalReadPort` traits. Enables test doubles
+  and future storage backends. (W-04)
+- **ACP server hardening** — Added `#![deny(unsafe_code)]` to
+  `russell-acp-server`. (W-12)
+
+## 8. Known Limitations
 
 - **GPU path is hardcoded to `card1`.** On machines where the
   dGPU is at a different DRM card index, GPU probes return `None`.
@@ -212,7 +241,7 @@ These items remain deferred beyond the current build:
   probe spawns `df` as a controlled subprocess. The binary must
   be in `$PATH`.
 
-## 8. Success Criteria
+## 9. Success Criteria
 
 MVP is **complete** when all three of these are empirically true:
 
@@ -227,7 +256,7 @@ MVP is **complete** when all three of these are empirically true:
    offline-fallback resilience, and at least one was triggered
    in a real moment of operator uncertainty.
 
-## 9. Status and Next Step
+## 10. Status and Next Step
 
 Phase 0 (skeleton) is **complete**. Phase 1 (MVP Doctor) is
 **complete**. Phase 1b (install artifacts) is **shipped**.
@@ -236,13 +265,16 @@ sharpened) is **active** with 5 self-vitals, rule engine,
 EWMA baselines, and expanded probes. Phase 3 (skills and
 dispatch) is **complete** with the IDRS-gated dispatcher,
 consent flow, and the `okapi-watcher` skill operational.
+Phase 5 (security hardening) is **complete** with unified
+risk types, DNS rebinding protection, configurable endpoints,
+service token auth, hardened hash chain, and hexagonal ports.
 The next priorities are packaging hardening and the next
- soak cycle.
+soak cycle.
 
 See [`../status/CONSOLIDATED-STATUS.md`](../status/CONSOLIDATED-STATUS.md)
 for current state.
 
-## 10. References
+## 11. References
 
 - [`../architecture/PRINCIPLES_CATALOG.md`](../architecture/PRINCIPLES_CATALOG.md) — JR-1 through JR-7.
 - [`../architecture/overview.md`](../architecture/overview.md) — system shape.

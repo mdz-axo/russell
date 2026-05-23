@@ -1,24 +1,25 @@
 ---
 title: "Russell Consolidated Status"
 audience: [operators, developers, contributors, architects, agents]
-last_updated: 2026-05-22
+last_updated: 2026-05-23
 togaf_phase: "G"
-version: "3.0.0"
+version: "3.1.0"
 status: "Active"
 ---
 
 # Russell Consolidated Status
 
 <!-- TOGAF_DOMAIN: Governance -->
-<!-- VERSION: 3.0.0 -->
+<!-- VERSION: 3.1.0 -->
 <!-- STATUS: Active -->
-<!-- LAST_UPDATED: 2026-05-22 -->
+<!-- LAST_UPDATED: 2026-05-23 -->
 
 **Single source of truth for "where is the project?"** Updated at the end
 of every meaningful development session.
 
 ## 1. Headline
 
+- **Security Hardening (Phase 5) — COMPLETE** (2026-05-23). Unified risk types, DNS rebinding protection, configurable endpoints, service token auth, hardened hash chain, hexagonal ports. 256 tests pass.
 - **Documentation Refresh — COMPLETE** (2026-05-22). 35 files archived, 79 retained. Link integrity improved.
 - **Phase 0 (skeleton, read-only observation) — COMPLETE** as of 2026-04-18.
 - **Phase 1 (MVP Nurse — `russell jack`) — COMPLETE.**
@@ -26,7 +27,7 @@ of every meaningful development session.
 - **Phase 1c (20-day unattended soak) — CLOSED.**
 - **Phase 2 (observation sharpened) — COMPLETE.** Self-vitals (5), rule engine, EWMA baselines, process probes (7), GPU probes (5), disk probes (2), systemd probes (3). Baseline deviation integrated into Jack's SOAP objective.
 - **Phase 3 (skills and dispatch) — COMPLETE.** Extended with skill lifecycle management: workshop REPL (`russell workshop`), registry cache (`local-cache.yaml`), safety scanner (7 rules for manifest + KNOWLEDGE.md), skill discovery pipeline, and scenario testing skill (`scenario-tester`). 12 skills loaded (5 actionable with probes, 7 knowledge). `russell skill run` respects manifest `timeout:` field.
-- **Phase 4 (MCP surface, real skills, operational depth) — COMPLETE.** All skill lifecycle gaps closed (2026-05-20): `fetch <url> <name>` downloads skills from URLs with safety scanning, `build <name>` creates skill skeletons on disk, `adapt <name>` modifies manifests via LLM + editor, `search --remote` loads `~/.config/harness/registry-sources.yaml` and queries Brave Search API, batch operations (`prune --all-stale`, `install --all-evaluated`). `skill-manager` bundled meta-skill enables Jack to build, install, prune, restore, and delete skills from chat via ACTION syntax. Registry telemetry wired: `probe_runs`, `intervention_runs`, `avg_probe_duration_ms`, and `last_probe_run_at` updated on every execution. Quality scoring (`compute_score()`) operational. End-to-end scenario pipeline: `scenario-full` probe chains run-okapi → evaluate → journal. 218 tests pass. 21 scenario tests pass. 18,535 Rust lines (under 20,000 budget by 1,465 lines).
+- **Phase 4 (MCP surface, real skills, operational depth) — COMPLETE.** All skill lifecycle gaps closed (2026-05-20): `fetch <url> <name>` downloads skills from URLs with safety scanning, `build <name>` creates skill skeletons on disk, `adapt <name>` modifies manifests via LLM + editor, `search --remote` loads `~/.config/harness/registry-sources.yaml` and queries Brave Search API, batch operations (`prune --all-stale`, `install --all-evaluated`). `skill-manager` bundled meta-skill enables Jack to build, install, prune, restore, and delete skills from chat via ACTION syntax. Registry telemetry wired: `probe_runs`, `intervention_runs`, `avg_probe_duration_ms`, and `last_probe_run_at` updated on every execution. Quality scoring (`compute_score()`) operational. End-to-end scenario pipeline: `scenario-full` probe chains run-okapi → evaluate → journal. 218 tests pass. 21 scenario tests pass.
 - **Architecture:** JR-1 austerity maintained throughout. Seven ADRs deferred.
 
 ## 2. What exists today

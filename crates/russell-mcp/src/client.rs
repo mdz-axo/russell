@@ -80,50 +80,87 @@ impl McpClient for HKaskMcpClient {
 /// Russell MUST NOT connect to non-loopback MCP servers (ADR-0025 §4).
 /// This function is the structural enforcement — not convention, not
 /// configuration, but code that refuses.
+///
+/// ## DNS Rebinding Defense
+///
+/// Hostnames are resolved to IP addresses and ALL resolved IPs must be
+/// loopback. This prevents DNS rebinding attacks where a hostname like
+/// `localhost.evil.com` resolves to a non-loopback address.
 pub fn validate_endpoint(url: &str) -> Result<()> {
-    // Parse the URL to extract the host.
     let parsed = url
         .strip_prefix("http://")
         .or_else(|| url.strip_prefix("https://"))
         .unwrap_or(url);
 
-    // Extract host portion (before first `/` path separator).
     let authority = parsed.split('/').next().unwrap_or(parsed);
 
-    // Handle bracketed IPv6: [::1]:port
     let host = if authority.starts_with('[') {
-        // IPv6 bracketed form: extract between [ and ]
         authority
             .strip_prefix('[')
             .and_then(|s| s.split(']').next())
             .unwrap_or(authority)
     } else {
-        // IPv4 or hostname: take before last colon (port separator).
-        // But only split on last colon if what follows looks like a port.
         match authority.rsplit_once(':') {
             Some((host, maybe_port)) if maybe_port.chars().all(|c| c.is_ascii_digit()) => host,
             _ => authority,
         }
     };
 
+    // Fast path: literal loopback addresses need no DNS resolution.
     match host {
-        "127.0.0.1" | "localhost" | "::1" => Ok(()),
-        other => {
-            // Try parsing as an IP to check loopback.
-            if let Ok(ip) = other.parse::<std::net::Ipv4Addr>()
-                && ip.is_loopback()
-            {
-                return Ok(());
-            }
-            if let Ok(ip) = other.parse::<std::net::Ipv6Addr>()
-                && ip.is_loopback()
-            {
-                return Ok(());
-            }
+        "127.0.0.1" | "::1" => return Ok(()),
+        _ => {}
+    }
+
+    // Literal IP check (non-localhost IPv4/IPv6).
+    if let Ok(ip) = host.parse::<std::net::Ipv4Addr>() {
+        return if ip.is_loopback() {
+            Ok(())
+        } else {
             Err(McpError::NonLoopbackRefused {
                 url: url.to_owned(),
             })
+        };
+    }
+    if let Ok(ip) = host.parse::<std::net::Ipv6Addr>() {
+        return if ip.is_loopback() {
+            Ok(())
+        } else {
+            Err(McpError::NonLoopbackRefused {
+                url: url.to_owned(),
+            })
+        };
+    }
+
+    // Hostname: resolve DNS and verify ALL resolved IPs are loopback.
+    // "localhost" is accepted by name only as a special case (it is
+    // universally mapped to 127.0.0.1/::1 in /etc/hosts).
+    if host == "localhost" {
+        return Ok(());
+    }
+
+    // Resolve hostname — reject if ANY address is non-loopback.
+    let addrs = std::net::ToSocketAddrs::to_socket_addrs(&format!("{host}:0"))
+        .map_err(|_| McpError::NonLoopbackRefused {
+            url: url.to_owned(),
+        })?;
+
+    let mut found_any = false;
+    for addr in addrs {
+        found_any = true;
+        if !addr.ip().is_loopback() {
+            return Err(McpError::NonLoopbackRefused {
+                url: url.to_owned(),
+            });
         }
+    }
+
+    if found_any {
+        Ok(())
+    } else {
+        Err(McpError::NonLoopbackRefused {
+            url: url.to_owned(),
+        })
     }
 }
 
@@ -489,6 +526,18 @@ mod tests {
     #[test]
     fn https_loopback_accepted() {
         assert!(validate_endpoint("https://127.0.0.1:18100").is_ok());
+    }
+
+    #[test]
+    fn dns_rebinding_non_loopback_rejected() {
+        // A hostname that resolves to a non-loopback address must be rejected.
+        // This test uses a well-known public DNS name that will never resolve to 127.0.0.1.
+        assert!(validate_endpoint("http://one.one.one.one:18100").is_err());
+    }
+
+    #[test]
+    fn unresolvable_hostname_rejected() {
+        assert!(validate_endpoint("http://this-host-does-not-exist-russell-test.invalid:18100").is_err());
     }
 
     #[test]

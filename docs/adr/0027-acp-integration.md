@@ -1,4 +1,4 @@
-# ADR-0026: hKask ACP Integration
+# ADR-0027: hKask ACP Integration
 
 **Date:** 2026-05-22  
 **Status:** Proposed  

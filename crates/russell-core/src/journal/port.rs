@@ -46,6 +46,9 @@ pub trait JournalWritePort: Send {
         value_text: Option<&str>,
         unit: Option<&str>,
     ) -> Result<()>;
+
+    /// Append a help session record.
+    fn append_help_session(&self, input: &super::HelpSessionInput<'_>) -> Result<()>;
 }
 
 /// Read-side journal port — query events and samples.
@@ -100,6 +103,10 @@ impl JournalWritePort for super::JournalWriter {
         unit: Option<&str>,
     ) -> Result<()> {
         super::JournalWriter::append_sample(self, ts, scope, probe, value_num, value_text, unit)
+    }
+
+    fn append_help_session(&self, input: &super::HelpSessionInput<'_>) -> Result<()> {
+        super::JournalWriter::append_help_session(self, input)
     }
 }
 
@@ -170,6 +177,10 @@ impl JournalWritePort for InMemoryJournal {
             .lock()
             .unwrap()
             .push((ts, probe.to_string(), value_num));
+        Ok(())
+    }
+
+    fn append_help_session(&self, _input: &super::HelpSessionInput<'_>) -> Result<()> {
         Ok(())
     }
 }

@@ -2,7 +2,7 @@
 
 **Purpose:** Deploy Russell as an ACP agent for hKask integration.
 
-**ADR Reference:** [ADR-0026](../adr/0026-acp-integration.md)
+**ADR Reference:** [ADR-0027](../adr/0027-acp-integration.md)
 
 ---
 
@@ -232,7 +232,7 @@ cargo run --manifest-path crates/russell-skills/Cargo.toml -- test
 
 ## References
 
-- [ADR-0026](../adr/0026-acp-integration.md) — Architecture decisions
+- [ADR-0027](../adr/0027-acp-integration.md) — Architecture decisions
 - [ACP Specification](https://agentclientprotocol.com)
 - hKask hLexicon — separate repository
 - Macaroon Example Config — separate repository

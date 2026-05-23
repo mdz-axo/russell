@@ -13,10 +13,8 @@
 //! Design note: this is the *only* place that knows how to wake Okapi.
 //! All call-sites go through [`ensure_ready`].
 
+use russell_core::config::RuntimeConfig;
 use tracing::{info, warn};
-
-/// Default Okapi base URL (OpenAI-compat layer).
-pub const DEFAULT_BASE_URL: &str = "http://127.0.0.1:11435/v1";
 
 /// Derive the health-check URL from a base URL.
 ///
@@ -32,6 +30,14 @@ pub fn health_url_from_base(base_url: &str) -> String {
 }
 
 /// Ensure Okapi is reachable, starting it if necessary.
+///
+/// Uses the Okapi endpoint from [`RuntimeConfig`] (loaded from environment).
+pub async fn ensure_okapi_ready() -> bool {
+    let config = RuntimeConfig::from_env();
+    ensure_ready(&config.okapi_endpoint).await
+}
+
+/// Ensure Okapi is reachable at the given base URL, starting it if necessary.
 pub async fn ensure_ready(base_url: &str) -> bool {
     let tags_url = health_url_from_base(base_url);
 

@@ -180,20 +180,14 @@ impl Default for SkillKind {
 }
 
 /// Visibility annotation for ACP exposure (ADR-0026).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Visibility {
     /// Exposed via ACP to hKask agents.
     Public,
     /// Russell-only (never exposed).
+    #[default]
     Private,
-}
-
-impl Default for Visibility {
-    fn default() -> Self {
-        // Default to private for security — skills must explicitly declare public
-        Self::Private
-    }
 }
 
 /// hLexicon categorization (ADR-0026).
@@ -441,35 +435,11 @@ pub enum RollbackReboot {
     Reboot,
 }
 
-/// Risk band for an intervention.
-#[derive(Debug, Clone, Copy, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
-#[serde(rename_all = "snake_case")]
-pub enum RiskBand {
-    /// Read-only observation.
-    None,
-    /// Reversible, low impact.
-    Low,
-    /// Reversible, moderate impact.
-    Medium,
-    /// May require reboot or session loss.
-    High,
-    /// Data-loss possible.
-    Critical,
-}
-
-impl RiskBand {
-    /// Human-readable lowercase string for journaling.
-    #[must_use]
-    pub fn as_str(self) -> &'static str {
-        match self {
-            RiskBand::None => "none",
-            RiskBand::Low => "low",
-            RiskBand::Medium => "medium",
-            RiskBand::High => "high",
-            RiskBand::Critical => "critical",
-        }
-    }
-}
+/// Risk band for an intervention — re-exported from [`russell_core::risk::RiskBand`].
+///
+/// This is the canonical risk classification used across all Russell crates.
+/// Defined once in `russell-core` per C4 (repetition is a missing primitive).
+pub use russell_core::risk::RiskBand;
 
 /// Safety constraints for a skill.
 #[derive(Debug, Clone, Deserialize)]

@@ -25,9 +25,9 @@ use std::time::Duration;
 use tokio::sync::mpsc;
 use tracing::{debug, error, info, warn};
 
+use crate::Result;
 use crate::event::{Event, Scope};
 use crate::journal::JournalWriter;
-use crate::Result;
 
 /// Journal command — messages sent to journal writer task.
 #[derive(Debug, Clone)]
@@ -87,10 +87,9 @@ impl JournalHandle {
             unit: unit.map(String::from),
         };
 
-        self.sender
-            .send(cmd)
-            .await
-            .map_err(|e| crate::error::CoreError::Invariant(format!("channel send failed: {}", e)))?;
+        self.sender.send(cmd).await.map_err(|e| {
+            crate::error::CoreError::Invariant(format!("channel send failed: {}", e))
+        })?;
 
         Ok(())
     }
@@ -99,10 +98,9 @@ impl JournalHandle {
     pub async fn append_event(&self, event: Event) -> Result<()> {
         let cmd = JournalCommand::AppendEvent(event);
 
-        self.sender
-            .send(cmd)
-            .await
-            .map_err(|e| crate::error::CoreError::Invariant(format!("channel send failed: {}", e)))?;
+        self.sender.send(cmd).await.map_err(|e| {
+            crate::error::CoreError::Invariant(format!("channel send failed: {}", e))
+        })?;
 
         Ok(())
     }

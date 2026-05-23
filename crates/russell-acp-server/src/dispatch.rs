@@ -6,8 +6,8 @@ use std::time::Duration;
 
 use crate::error::{AcpError, Result};
 use crate::types::{
-    InterventionInfo, LexiconCategorization, LexiconDomain, ProbeInfo, RiskLevel, SafetyInfo,
-    SkillInfo, Visibility,
+    InterventionInfo, LexiconCategorization, LexiconDomain, ProbeInfo, SafetyInfo, SkillInfo,
+    Visibility,
 };
 use russell_core::journal::JournalWriter;
 use russell_skills::dispatch::{Dispatcher, StepType};
@@ -250,26 +250,15 @@ fn skill_to_info(skill: &Skill) -> SkillInfo {
             .map(|i| InterventionInfo {
                 id: i.id.clone(),
                 description: format!("Intervention: {}", i.id),
-                risk: risk_to_level(i.risk),
+                risk: i.risk,
                 needs_sudo: i.needs_sudo,
                 rollback: Some(format!("{:?}", i.rollback)),
             })
             .collect(),
         safety: SafetyInfo {
-            max_auto_risk: risk_to_level(skill.safety.max_auto_risk),
+            max_auto_risk: skill.safety.max_auto_risk,
             require_human_for: skill.safety.require_human_for.clone(),
         },
-    }
-}
-
-/// Convert russell_skills::RiskBand to ACP RiskLevel.
-fn risk_to_level(risk: russell_skills::RiskBand) -> RiskLevel {
-    match risk {
-        russell_skills::RiskBand::None => RiskLevel::None,
-        russell_skills::RiskBand::Low => RiskLevel::Low,
-        russell_skills::RiskBand::Medium => RiskLevel::Medium,
-        russell_skills::RiskBand::High => RiskLevel::High,
-        russell_skills::RiskBand::Critical => RiskLevel::Critical,
     }
 }
 

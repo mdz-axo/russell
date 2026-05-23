@@ -97,4 +97,4 @@ Expected: JSON response with 8 public skills listed.
 
 - [Full Installation Guide](INSTALL.md)
 - [ACP Integration Guide](acp-integration.md)
-- [ADR-0026](../adr/0026-acp-integration.md)
+- [ADR-0026](../adr/0027-acp-integration.md)

@@ -477,21 +477,21 @@ impl RussellPod {
                                         );
                                     }
 
-// 5b. Run reflex arcs — recommend automatic actions
-                                    let mut reflex = russell_reflex::ReflexArc::new();
+                                    // 5b. Run reflex arcs — recommend automatic actions
+                                    let mut reflex = russell_proprio::ProprioReflex::new();
                                     reflex.evaluate(&result);
-                                    
+
                                     if !reflex.actions().is_empty() {
                                         tracing::warn!(
                                             pod_id = %pod_id,
                                             actions = reflex.actions().len(),
                                             "Reflex arcs triggered"
                                         );
-                                        
+
                                         // Log recommended actions (Phase 2A: detection-only)
                                         if let Ok(writer_guard) = writer.lock() {
                                             let _ = reflex.log_actions(&writer_guard);
-                                            
+
                                             for action in reflex.actions() {
                                                 tracing::warn!(
                                                     pod_id = %pod_id,
