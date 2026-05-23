@@ -7,7 +7,6 @@ use tracing_subscriber::{fmt, prelude::*};
 use russell_acp_server::{
     AcpDispatch, AcpHandler, AcpServer, JackPersonaProjection, MacaroonAuth, RateLimiter,
 };
-use russell_meta::{ClientConfig};
 use russell_core::journal::JournalWriter;
 
 #[tokio::main]
@@ -17,23 +16,8 @@ async fn main() -> anyhow::Result<()> {
         .with(fmt::layer().with_target(false).with_thread_ids(false))
         .init();
 
-    // Load LLM client config.
-    let config = ClientConfig::from_env();
-    tracing::info!("LLM backend: {:?}", config.backend);
-
-        // Initialize Okapi client (or fallback).
-    let persona = match config.backend {
-        russell_meta::Backend::Okapi => {
-            JackPersonaProjection::new_okapi(&config).await?
-        },
-        russell_meta::Backend::Mock => {
-            JackPersonaProjection::new_mock()?
-        },
-        russell_meta::Backend::Offline => {
-            // Fall back to mock for offline mode.
-            JackPersonaProjection::new_mock()?
-        },
-    };
+    // Initialize Jack persona.
+    let persona = JackPersonaProjection::new()?;
 
     // Load skills from Russell's skill registry.
     let skills_dir = PathBuf::from(std::env::var("HOME")?)

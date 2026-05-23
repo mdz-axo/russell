@@ -6,6 +6,7 @@
 #![deny(unsafe_code)]
 #![deny(rust_2018_idioms)]
 #![warn(missing_docs)]
+#![allow(clippy::missing_docs_in_private_items)]
 
 pub mod action;
 pub mod error;

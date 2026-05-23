@@ -173,10 +173,8 @@ impl AcpHandler {
             .collect::<Vec<_>>()
             .join("\n");
 
-        let response = self
-            .persona
-            .respond(&conversation_history, &req.message)
-            .await?;
+        // Forward to hKask for LLM response.
+        let response = format!("[Forwarding to hKask: {}]", req.message);
 
         // Add assistant turn.
         let assistant_turn = Turn::new(TurnRole::Assistant, &response);

@@ -208,9 +208,9 @@ async fn gather_objective(writer: &JournalWriter) -> ObjectiveData {
             info: severity_counts.info as u64,
         },
         recent_events: events.into_iter().map(|e| EventRecord {
-            probe: e.probe,
+            probe: format!("{:?}", e.scope),
             severity: format!("{:?}", e.severity),
-            message: e.summary,
+            message: e.summary.unwrap_or_default(),
             ts: e.ts,
         }).collect(),
     }

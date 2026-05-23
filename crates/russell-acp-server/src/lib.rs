@@ -29,15 +29,13 @@
 //!
 //! ```rust,no_run
 //! use russell_acp_server::{AcpServer, AcpDispatch, AcpHandler, JackPersonaProjection, MacaroonAuth, RateLimiter};
-//! use russell_meta::ClientConfig;
 //! use russell_skills;
 //! use std::path::PathBuf;
 //!
 //! #[tokio::main]
 //! async fn main() -> anyhow::Result<()> {
-//!     // Initialize Jack persona (Okapi backend).
-//!     let config = ClientConfig::from_env();
-//!     let persona = JackPersonaProjection::new_okapi(&config).await?;
+//!     // Initialize Jack persona.
+//!     let persona = JackPersonaProjection::new()?;
 //!
 //!     // Load skills.
 //!     let skills_dir = PathBuf::from(std::env::var("HOME")?)
