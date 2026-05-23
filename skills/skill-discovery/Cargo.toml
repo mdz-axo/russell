@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: MIT OR Apache-2.0
+# skill-discovery skill template crate
+[package]
+name = "skill-skill-discovery"
+version = "1.0.0"
+edition = "2024"
+description = "Teach Jack to find, evaluate, download, and install new skills via web search"
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+# No runtime dependencies - templates rendered by russell-skills

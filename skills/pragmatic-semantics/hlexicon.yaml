@@ -1,0 +1,14 @@
+# hLexicon — pragmatic-semantics
+primary: flowdef
+
+terms:
+  - term: "Semantic memory"
+    description: "Fact-based memory stored as triples"
+    related: ["memory:semantic:*"]
+
+flows:
+  - name: "Store semantic memory"
+    steps:
+      - "Extract facts from observation"
+      - "Store as subject-predicate-object triples"
+      - "Index for retrieval"

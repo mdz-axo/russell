@@ -1,0 +1,22 @@
+{# skill-discovery: selector template #}
+{# Routes to appropriate response based on discovery action #}
+
+{% if params.action == "search" %}
+  {% set response_template = "search-results" %}
+{% elif params.action == "evaluate" %}
+  {% if probes["evaluation-pass"] == "true" %}
+    {% set response_template = "evaluate-pass" %}
+  {% else %}
+    {% set response_template = "evaluate-fail" %}
+  {% endif %}
+{% elif params.action == "download" %}
+  {% set response_template = "download-complete" %}
+{% elif params.action == "install" %}
+  {% set response_template = "install-complete" %}
+{% elif params.action == "recommend" %}
+  {% set response_template = "recommendations" %}
+{% else %}
+  {% set response_template = "welcome" %}
+{% endif %}
+
+{{ response_template }}

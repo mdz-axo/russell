@@ -1,0 +1,53 @@
+# hLexicon — human-readable terms for skill-manager skill
+# Used by Jack (the Nurse) to explain skill actions to the operator
+
+primary: flowdef
+
+terms:
+  - term: "Skill registry"
+    description: "Local cache mapping symptoms to skills for decision support"
+    related: ["probe:registry-status", "capability_gap"]
+    
+  - term: "Build skill"
+    description: "Create a new skill skeleton from template"
+    related: ["intervention:build", "skill_missing"]
+    
+  - term: "Install skill"
+    description: "Activate a skill for use by Russell"
+    related: ["intervention:install", "capability_gap"]
+    
+  - term: "Prune skill"
+    description: "Temporarily disable a skill (reversible)"
+    related: ["intervention:prune", "skill_stale"]
+    
+  - term: "Restore skill"
+    description: "Re-enable a previously pruned skill"
+    related: ["intervention:restore"]
+    
+  - term: "Retire skill"
+    description: "Archive and remove a deprecated skill"
+    related: ["intervention:retire", "skill_stale"]
+    
+  - term: "Capability gap"
+    description: "No installed skill can handle a detected symptom"
+    related: ["capability_gap", "intervention:build"]
+
+flows:
+  - name: "Discover capability gap"
+    steps:
+      - "Run probe:list-skills to see installed skills"
+      - "Run probe:registry-status to check symptom coverage"
+      - "If symptom has no matching skill, propose build intervention"
+      
+  - name: "Install new skill"
+    steps:
+      - "Run probe:check to validate skill manifest"
+      - "Run intervention:install to activate skill"
+      - "Run intervention:verify-skill-exists to confirm"
+      
+  - name: "Prune stale skill"
+    steps:
+      - "Run probe:stats to identify unused skills"
+      - "Propose prune intervention (low risk, reversible)"
+      - "On approval, run intervention:prune"
+      - "Skill moves to pruned state, can be restored"

@@ -1,0 +1,56 @@
+{# skill-workshop: audit report #}
+{# Registry audit report showing stale and problematic skills #}
+
+## Registry Audit Report
+
+**Scan date:** {{ probes["audit-timestamp"] | default("now") }}
+**Skills scanned:** {{ probes["total-scanned"] | default("0") }}
+
+### Stale Skills (no runs in 30+ days)
+
+{% if probes["stale-skills"] %}
+| Skill | Last Run | Days Stale | Recommendation |
+|-------|----------|------------|----------------|
+{% for skill in probes["stale-skills"] %}
+| {{ skill.id }} | {{ skill.last_run }} | {{ skill.days_stale }} | Prune or update |
+{% endfor %}
+{% else %}
+✓ No stale skills detected.
+{% endif %}
+
+### Invalid Skills (validation failures)
+
+{% if probes["invalid-skills"] %}
+| Skill | Error | Fix |
+|-------|-------|-----|
+{% for skill in probes["invalid-skills"] %}
+| {{ skill.id }} | {{ skill.error }} | Run `evaluate {{ skill.id }}` |
+{% endfor %}
+{% else %}
+✓ All skills pass validation.
+{% endif %}
+
+### Deprecated Skills (warning state)
+
+{% if probes["deprecated-skills"] %}
+{% for skill in probes["deprecated-skills"] %}
+- {{ skill.id }} — {{ skill.reason }}
+{% endfor %}
+{% else %}
+✓ No deprecated skills.
+{% endif %}
+
+### Recommended Actions
+
+{% if probes["stale-count"] > 0 %}
+1. **Prune stale skills:** `prune <skill-id>`
+{% endif %}
+{% if probes["invalid-count"] > 0 %}
+2. **Fix invalid skills:** `evaluate <skill-id>` then fix issues
+{% endif %}
+{% if probes["deprecated-count"] > 0 %}
+3. **Review deprecated:** Consider retire or update
+{% endif %}
+
+---
+*Audit complete. Want to prune stale skills or fix invalid ones?*

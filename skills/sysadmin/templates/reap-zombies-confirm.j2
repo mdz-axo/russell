@@ -1,0 +1,7 @@
+{# sysadmin: reap-zombies confirm #}
+## Reap Zombies ✓
+
+**Action:** `reap-zombies`
+**Result:** {{ probes["result"] | default("completed") }}
+
+Reaped {{ probes["reaped-count"] | default("0") }} zombie(s).

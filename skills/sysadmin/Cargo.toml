@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: MIT OR Apache-2.0
+# sysadmin skill template crate
+[package]
+name = "skill-sysadmin"
+version = "0.1.0"
+edition = "2024"
+description = "Host maintenance toolkit — systemd, zombies, clock, journal, coredumps"
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+# No runtime dependencies - templates rendered by russell-skills

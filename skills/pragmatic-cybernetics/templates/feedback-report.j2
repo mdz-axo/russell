@@ -1,0 +1,13 @@
+{# pragmatic-cybernetics: feedback report #}
+## Feedback Loop Analysis
+
+{% if probes["loops"] %}
+{% for loop in probes["loops"] %}
+### {{ loop.name }}
+- **Type:** {{ loop.type }}
+- **Gain:** {{ loop.gain }}
+- **Stability:** {{ loop.stability }}
+{% endfor %}
+{% else %}
+No feedback loops detected.
+{% endif %}

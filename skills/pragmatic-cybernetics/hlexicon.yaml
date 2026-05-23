@@ -1,0 +1,18 @@
+# hLexicon — pragmatic-cybernetics
+primary: flowdef
+
+terms:
+  - term: "Feedback loop"
+    description: "System output feeding back as input"
+    related: ["cybernetics:feedback:analyze"]
+    
+  - term: "Homeostasis"
+    description: "System self-regulation to maintain balance"
+    related: ["cybernetics:homeostasis:check"]
+
+flows:
+  - name: "Analyze feedback"
+    steps:
+      - "Collect probe data"
+      - "Identify feedback patterns"
+      - "Report loop behavior"

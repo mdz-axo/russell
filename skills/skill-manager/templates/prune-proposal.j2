@@ -1,0 +1,33 @@
+{# skill-manager: prune skill proposal #}
+{# Proposes pruning (temporarily disabling) a skill #}
+
+## Proposal: Prune Skill
+
+**Skill ID:** `{{ params.skill_id | default("unknown") }}`
+**Current state:** {{ probes["current-state"] | default("active") }}
+**Last used:** {{ probes["last-used"] | default("unknown") }}
+
+### What This Does
+
+Pruning temporarily disables a skill:
+1. Moves skill to `pruned` lifecycle state
+2. Excludes from dispatch consideration
+3. Preserves all files and configuration
+4. Can be reversed with `restore`
+
+### Why Prune?
+
+Common reasons:
+- Skill hasn't been used in 30+ days
+- Skill is redundant with another skill
+- Skill is under development/testing
+- Reducing dispatch complexity
+
+### Risk Level
+**Low** — Reversible, no data loss
+
+### Rollback
+Run `russell skill restore {{ params.skill_id | default("unknown") }}` to re-enable.
+
+---
+*Shall I prune `{{ params.skill_id | default("unknown") }}`?*

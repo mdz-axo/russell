@@ -1,0 +1,25 @@
+# web-search skill agent persona
+agent:
+  name: "web-search"
+  type: "Bot"
+  version: "0.2.0"
+  
+charter:
+  description: "Web search via Brave Search API for skill discovery and research"
+  editor: "russell"
+  
+capabilities:
+  - "search:web:query"
+  - "search:web:news"
+  - "search:web:images"
+  - "search:web:videos"
+  
+rights:
+  - read: "web_search_api"
+  
+responsibilities:
+  - "search: web on operator request"
+  - "report: search results with citations"
+  
+visibility:
+  default: "operator-only"

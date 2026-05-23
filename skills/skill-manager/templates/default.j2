@@ -1,0 +1,28 @@
+{# skill-manager: default response #}
+{# Fallback template for unrecognized requests #}
+
+## Skill Manager
+
+I can help you manage Russell skills:
+
+### Commands
+
+| Command | Description |
+|---------|-------------|
+| `russell skill list` | List installed skills |
+| `russell skill stats` | Show skill telemetry |
+| `russell skill check <id>` | Validate a skill manifest |
+| `russell skill build <id>` | Create new skill skeleton |
+| `russell skill install <id>` | Install a skill |
+| `russell skill prune <id>` | Temporarily disable |
+| `russell skill restore <id>` | Re-enable pruned skill |
+| `russell skill retire <id>` | Archive and remove |
+| `russell skill rebuild-cache` | Refresh symptom mappings |
+
+### Current State
+{% if probes["total-skills"] %}
+**Installed skills:** {{ probes["total-skills"] }}
+{% endif %}
+
+---
+*What would you like to do?*

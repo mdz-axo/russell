@@ -1,0 +1,35 @@
+{# skill-manager: list skills response #}
+{# Displays installed skills with lifecycle state #}
+
+## Skill Registry — Installed Skills
+
+**Total:** {{ probes["total-skills"] | default("0") }}
+**Active:** {{ probes["active-skills"] | default("0") }}
+**Pruned:** {{ probes["pruned-skills"] | default("0") }}
+**Deprecated:** {{ probes["deprecated-skills"] | default("0") }}
+
+### Skills by State
+
+#### Active
+{% if probes["active-list"] %}
+{{ probes["active-list"] }}
+{% else %}
+_No active skills listed._
+{% endif %}
+
+#### Pruned
+{% if probes["pruned-list"] %}
+{{ probes["pruned-list"] }}
+{% else %}
+_No pruned skills._
+{% endif %}
+
+#### Deprecated (warning)
+{% if probes["deprecated-list"] %}
+{{ probes["deprecated-list"] }}
+{% else %}
+_No deprecated skills._
+{% endif %}
+
+---
+*Use `russell skill stats` for detailed telemetry or `russell skill prune <id>` to disable unused skills.*

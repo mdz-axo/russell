@@ -1,0 +1,26 @@
+{# skill-manager: registry rebuild needed #}
+{# Displayed when registry cache is stale or corrupted #}
+
+## Registry Status: Rebuild Needed ⚠
+
+**Issue:** {{ probes["registry-error"] | default("Cache stale or missing") }}
+**Last successful rebuild:** {{ probes["cache-last-rebuilt"] | default("never") }}
+
+### Recommended Action
+
+Rebuild the skill registry cache:
+
+```bash
+russell skill rebuild-cache
+```
+
+This will:
+1. Scan all installed skills
+2. Extract symptom mappings from each manifest
+3. Rebuild `local-cache.yaml`
+4. Report any capability gaps
+
+**Risk:** None (read-only operation)
+
+---
+*Registry rebuild is safe and recommended after installing new skills.*

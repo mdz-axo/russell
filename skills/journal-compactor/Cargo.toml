@@ -1,0 +1,7 @@
+# SPDX-License-Identifier: MIT OR Apache-2.0
+[package]
+name = "skill-journal-compactor"
+version = "0.1.0"
+edition = "2024"
+description = "Journal compaction and maintenance"
+license = "MIT OR Apache-2.0"

@@ -1,0 +1,7 @@
+{# sysadmin: journal-vacuum confirm #}
+## Journal Vacuum ✓
+
+**Action:** `journalctl --vacuum-size=500M`
+**Result:** {{ probes["result"] | default("completed") }}
+
+Freed {{ probes["freed-mb"] | default("0") }}MB.

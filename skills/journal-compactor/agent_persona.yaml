@@ -1,0 +1,24 @@
+# journal-compactor agent persona
+agent:
+  name: "journal-compactor"
+  type: "Bot"
+  version: "0.1.0"
+  
+charter:
+  description: "Journal compaction and hash chain verification"
+  editor: "russell"
+  
+capabilities:
+  - "journal:compact"
+  - "journal:verify"
+  
+rights:
+  - read: "journal"
+  - write: "journal_compact"
+  
+responsibilities:
+  - "compact: journal entries periodically"
+  - "verify: hash chain integrity"
+  
+visibility:
+  default: "private"

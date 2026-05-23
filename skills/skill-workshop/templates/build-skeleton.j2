@@ -1,0 +1,46 @@
+{# skill-workshop: build skeleton #}
+{# Displayed after building a new skill skeleton #}
+
+## Skill Skeleton Created ✓
+
+**Skill ID:** {{ probes["created-skill-id"] | default(params.skill_id | default("unknown")) }}
+**Location:** `{{ probes["skill-path"] | default("~/.local/share/harness/skills/") }}{{ probes["created-skill-id"] | default(params.skill_id | default("unknown")) }}/`
+
+### What Was Created
+
+```
+{{ probes["created-skill-id"] | default(params.skill_id | default("unknown")) }}/
+├── Cargo.toml          # Rust package metadata
+├── manifest.yaml       # Skill definition (edit this)
+├── agent_persona.yaml  # Skill agent identity
+├── hlexicon.yaml       # Human-readable terms
+├── KNOWLEDGE.md        # Context for Jack
+├── scripts/
+│   ├── probe-example.sh
+│   └── intervention-example.sh
+└── templates/
+    └── default.j2
+```
+
+### Next Steps
+
+1. **Edit manifest.yaml** — Define your probes and interventions
+2. **Create scripts** — Implement probe/intervention logic in `scripts/`
+3. **Add templates** — Create Jinja2 response templates (optional)
+4. **Evaluate:**
+   ```
+   evaluate {{ probes["created-skill-id"] | default(params.skill_id | default("unknown")) }}
+   ```
+5. **Install when ready:**
+   ```
+   install {{ probes["created-skill-id"] | default(params.skill_id | default("unknown")) }}
+   ```
+
+### Resources
+
+- Template: `docs/templates/skill-manifest.yaml`
+- Rules: `docs/standards/skill-building-rules.md`
+- Examples: `skills/*/` directories
+
+---
+*Skill skeleton is ready for customization. What would you like to do next?*

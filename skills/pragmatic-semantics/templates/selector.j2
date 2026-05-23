@@ -1,0 +1,11 @@
+{# pragmatic-semantics: selector #}
+{% if params.action == "store" %}
+  {% set response_template = "store-confirm" %}
+{% elif params.action == "query" %}
+  {% set response_template = "query-results" %}
+{% elif params.action == "export" %}
+  {% set response_template = "export-confirm" %}
+{% else %}
+  {% set response_template = "menu" %}
+{% endif %}
+{{ response_template }}

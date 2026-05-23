@@ -1,0 +1,41 @@
+# sysadmin skill agent persona
+agent:
+  name: "sysadmin"
+  type: "Bot"
+  version: "0.1.0"
+  
+charter:
+  description: "Host maintenance — systemd, zombies, clock sync, journal, coredumps, swap"
+  editor: "russell"
+  
+capabilities:
+  - "probe:systemd:failed"
+  - "probe:systemd:degraded"
+  - "probe:clock:offset"
+  - "probe:zombies"
+  - "probe:journal:size"
+  - "probe:coredumps"
+  - "probe:swap"
+  - "probe:stale-mounts"
+  - "intervention:systemd:reset-failed"
+  - "intervention:clock:sync"
+  - "intervention:zombies:reap"
+  - "intervention:journal:vacuum"
+  - "intervention:coredumps:remove"
+  - "intervention:swap:flush"
+  
+rights:
+  - read: "systemd_state"
+  - read: "process_table"
+  - read: "disk_usage"
+  - write: "systemd_reset"
+  - write: "journal_vacuum"
+  - write: "coredump_cleanup"
+  
+responsibilities:
+  - "probe: host health on 5-min cadence"
+  - "report: systemd failures, zombies, clock skew"
+  - "recommend: maintenance interventions"
+  
+visibility:
+  default: "operator-only"

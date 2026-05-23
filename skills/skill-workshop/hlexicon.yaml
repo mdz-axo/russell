@@ -1,0 +1,52 @@
+# hLexicon — human-readable terms for skill-workshop skill
+# Used by Jack (the Nurse) to explain workshop operations to the operator
+
+primary: flowdef
+
+terms:
+  - term: "Skill workshop"
+    description: "Interactive REPL where Jack helps build, adapt, and manage skills"
+    related: ["repl:workshop:*"]
+    
+  - term: "Discover skills"
+    description: "Search web catalog for skills matching symptoms"
+    related: ["repl:workshop:discover", "skill_not_in_catalog"]
+    
+  - term: "Evaluate skill"
+    description: "Assess a skill's quality, safety, and relevance"
+    related: ["repl:workshop:evaluate", "skill_manifest_invalid"]
+    
+  - term: "Build skill"
+    description: "Create new skill from template or skeleton"
+    related: ["repl:workshop:build", "skill_probe_script_missing"]
+    
+  - term: "Adapt skill"
+    description: "Modify existing skill for local hardware/needs"
+    related: ["repl:workshop:adapt", "skill_hardware_incompatible"]
+    
+  - term: "Registry audit"
+    description: "Check skill registry for coverage and staleness"
+    related: ["repl:workshop:audit", "repl:workshop:coverage"]
+
+flows:
+  - name: "Discover and install skill"
+    steps:
+      - "Run workshop discover command to search catalog"
+      - "Evaluate candidate skills for quality and safety"
+      - "Install selected skill with workshop install command"
+      - "Verify skill runs correctly"
+      
+  - name: "Build skill from scratch"
+    steps:
+      - "Run workshop build command with symptom"
+      - "Edit manifest.yaml to define probes/interventions"
+      - "Create scripts for each probe/intervention"
+      - "Run workshop evaluate to validate"
+      - "Install when ready"
+      
+  - name: "Audit registry"
+    steps:
+      - "Run workshop audit to scan all skills"
+      - "Review staleness report (skills not run in 30d)"
+      - "Review coverage report (symptoms without skills)"
+      - "Prune stale skills or build for gaps"

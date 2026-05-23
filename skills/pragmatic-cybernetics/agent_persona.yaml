@@ -1,0 +1,26 @@
+# pragmatic-cybernetics agent persona
+agent:
+  name: "pragmatic-cybernetics"
+  type: "Bot"
+  version: "0.1.0"
+  
+charter:
+  description: "Cybernetics logic — feedback loops, homeostasis, VSM layers"
+  editor: "russell"
+  
+capabilities:
+  - "cybernetics:feedback:analyze"
+  - "cybernetics homeostasis:check"
+  - "cybernetics:vsm:map"
+  
+rights:
+  - read: "system_telemetry"
+  - read: "feedback_loops"
+  
+responsibilities:
+  - "analyze: feedback loop behavior"
+  - "check: homeostatic balance"
+  - "map: VSM layer functions"
+  
+visibility:
+  default: "private"

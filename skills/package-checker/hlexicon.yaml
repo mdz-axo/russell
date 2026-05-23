@@ -1,0 +1,14 @@
+# hLexicon — package-checker
+primary: flowdef
+
+terms:
+  - term: "Package check"
+    description: "Validate skill package structure"
+    related: ["check:package:structure"]
+
+flows:
+  - name: "Check package"
+    steps:
+      - "Verify directory structure"
+      - "Validate manifest.yaml"
+      - "Check scripts present"

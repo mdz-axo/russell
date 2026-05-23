@@ -1,0 +1,34 @@
+{# skill-manager: selector template #}
+{# Routes to appropriate response based on probe type and results #}
+
+{% if params.probe_type == "list-skills" %}
+  {% set response_template = "list-skills" %}
+{% elif params.probe_type == "stats" %}
+  {% set response_template = "stats" %}
+{% elif params.probe_type == "registry-status" %}
+  {% if probes["registry-healthy"] == "false" %}
+    {% set response_template = "registry-rebuild" %}
+  {% else %}
+    {% set response_template = "registry-status" %}
+  {% endif %}
+{% elif params.probe_type == "check" %}
+  {% if probes["check-valid"] == "true" %}
+    {% set response_template = "check-valid" %}
+  {% else %}
+    {% set response_template = "check-invalid" %}
+  {% endif %}
+{% elif params.action == "build" %}
+  {% set response_template = "build-proposal" %}
+{% elif params.action == "install" %}
+  {% set response_template = "install-confirm" %}
+{% elif params.action == "prune" %}
+  {% set response_template = "prune-proposal" %}
+{% elif params.action == "restore" %}
+  {% set response_template = "restore-confirm" %}
+{% elif params.action == "retire" %}
+  {% set response_template = "retire-warning" %}
+{% else %}
+  {% set response_template = "default" %}
+{% endif %}
+
+{{ response_template }}

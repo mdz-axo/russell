@@ -1,0 +1,35 @@
+{# sysadmin: selector #}
+{% if params.probe_type == "systemd" %}
+  {% if probes["failed-units"] or probes["degraded"] == "true" %}
+    {% set response_template = "systemd-issues" %}
+  {% else %}
+    {% set response_template = "systemd-ok" %}
+  {% endif %}
+{% elif params.probe_type == "zombies" %}
+  {% if probes["zombie-count"] > 0 %}
+    {% set response_template = "zombies-found" %}
+  {% else %}
+    {% set response_template = "no-zombies" %}
+  {% endif %}
+{% elif params.probe_type == "clock" %}
+  {% if probes["offset-seconds"] > 1 %}
+    {% set response_template = "clock-skew" %}
+  {% else %}
+    {% set response_template = "clock-ok" %}
+  {% endif %}
+{% elif params.probe_type == "journal" %}
+  {% if probes["journal-size-mb"] > 500 %}
+    {% set response_template = "journal-bloat" %}
+  {% else %}
+    {% set response_template = "journal-ok" %}
+  {% endif %}
+{% elif params.intervention == "reset-failed" %}
+  {% set response_template = "reset-failed-confirm" %}
+{% elif params.intervention == "reap-zombies" %}
+  {% set response_template = "reap-zombies-confirm" %}
+{% elif params.intervention == "journal-vacuum" %}
+  {% set response_template = "journal-vacuum-confirm" %}
+{% else %}
+  {% set response_template = "sysadmin-menu" %}
+{% endif %}
+{{ response_template }}

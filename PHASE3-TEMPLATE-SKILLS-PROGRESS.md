@@ -1,8 +1,8 @@
 # Phase 3: Template Crate Skills — Progress Report
 
 **Date:** 2026-05-22  
-**Status:** Infrastructure Complete, First Skill Converted  
-**Next:** Convert remaining 12 skills
+**Status:** High-Priority Skills Complete (3/3)  
+**Next:** Convert remaining 10 medium/low priority skills
 
 ---
 
@@ -12,7 +12,7 @@ Phase 3 template infrastructure is complete. The `russell-skills` crate now supp
 - Jinja2 template rendering via `minijinja`
 - Template context with probes, journal, host telemetry, and skill metadata
 - Template crate structure with `templates/`, `agent_persona.yaml`, `hlexicon.yaml`
-- First skill converted: `okapi-watcher`
+- **3 high-priority skills converted:** `okapi-watcher`, `skill-manager`, `skill-workshop`, `skill-discovery`
 
 ---
 
@@ -33,161 +33,93 @@ Phase 3 template infrastructure is complete. The `russell-skills` crate now supp
 - Context serialization for debugging
 
 **Tests:** 4 passing
-- `test_template_context_serialization`
-- `test_template_render_basic`
-- `test_template_render_with_params`
-- `test_load_okapi_watcher_templates` (integration test)
 
 ---
 
-### 2. Okapi-Watcher Template Crate (`skills/okapi-watcher/`)
+### 2. Converted Skills
+
+#### okapi-watcher (Complete)
+**Templates:** 5
+- `selector.j2`, `health-ok.j2`, `health-critical.j2`, `gpu-fallback.j2`, `no-models.j2`
 
 **New Files:**
-```
-skills/okapi-watcher/
-├── Cargo.toml              # Rust package metadata
-├── agent_persona.yaml      # Skill agent identity
-├── hlexicon.yaml           # Human-readable terms
-└── templates/
-    ├── selector.j2         # Template selection logic
-    ├── health-ok.j2        # Healthy status report
-    ├── health-critical.j2  # Critical health alert
-    ├── gpu-fallback.j2     # GPU fallback warning
-    └── no-models.j2        # Empty model inventory alert
-```
-
-**Existing Files (unchanged):**
-- `manifest.yaml` — Probe/intervention definitions
-- `scripts/` — Bash probe scripts
-- `SKILL.md` — Documentation
-- `skill.json` — Metadata
+- `Cargo.toml`, `agent_persona.yaml`, `hlexicon.yaml`
+- `templates/*.j2` (5 templates)
 
 ---
 
-## Template Examples
+#### skill-manager (Complete)
+**Templates:** 13
+- `selector.j2`, `list-skills.j2`, `stats.j2`, `registry-status.j2`, `registry-rebuild.j2`
+- `check-valid.j2`, `check-invalid.j2`, `build-proposal.j2`, `install-confirm.j2`
+- `prune-proposal.j2`, `restore-confirm.j2`, `retire-warning.j2`, `default.j2`
 
-### Selector Template (`selector.j2`)
-
-```jinja2
-{% if probes["probe-health"] == "unhealthy" %}
-  {% set response_template = "health-critical" %}
-{% elif probes["probe-gpu-libs"] == "missing" %}
-  {% set response_template = "gpu-fallback" %}
-{% elif probes["probe-models"] == "empty" %}
-  {% set response_template = "no-models" %}
-{% else %}
-  {% set response_template = "health-ok" %}
-{% endif %}
-
-{{ response_template }}
-```
-
-### Health OK Template (`health-ok.j2`)
-
-```jinja2
-## Okapi Status: Healthy ✓
-
-**Instance:** {{ params.instance | default("local") }}
-**Last Check:** {{ probes["probe-health-timestamp"] | default("unknown") }}
-
-### Model Inventory
-{% if probes["probe-models-output"] %}
-{{ probes["probe-models-output"] }}
-{% else %}
-No models detected.
-{% endif %}
-
-### GPU Acceleration
-{% if probes["probe-gpu-libs"] == "available" %}
-✓ GPU acceleration active
-{% elif probes["probe-gpu-libs"] == "missing" %}
-⚠ GPU libraries missing - falling back to CPU
-{% else %}
-? GPU status unknown
-{% endif %}
-```
+**New Files:**
+- `Cargo.toml`, `agent_persona.yaml`, `hlexicon.yaml`
+- `templates/*.j2` (13 templates)
 
 ---
 
-## Usage
+#### skill-workshop (Complete)
+**Templates:** 13
+- `selector.j2`, `welcome.j2`, `discover-results.j2`, `evaluate-pass.j2`, `evaluate-fail.j2`
+- `build-skeleton.j2`, `adapt-guidance.j2`, `audit-report.j2`, `coverage-gaps.j2`
+- `coverage-complete.j2`, `install-summary.j2`, `prune-summary.j2`, `retire-summary.j2`
 
-### Load Template Crate
+**New Files:**
+- `Cargo.toml`, `agent_persona.yaml`, `hlexicon.yaml`
+- `templates/*.j2` (13 templates)
 
-```rust
-use russell_skills::templates::{TemplateCrate, TemplateEngine, TemplateContext};
+---
 
-// Load template crate
-let crate_path = PathBuf::from("~/.local/share/harness/skills/okapi-watcher");
-let template_crate = TemplateCrate::load(&crate_path)?;
+#### skill-discovery (Complete)
+**Templates:** 8
+- `selector.j2`, `welcome.j2`, `search-results.j2`, `evaluate-pass.j2`, `evaluate-fail.j2`
+- `download-complete.j2`, `install-complete.j2`, `recommendations.j2`
 
-// Create rendering context
-let mut ctx = TemplateContext::default();
-ctx.skill.id = "okapi-watcher".to_string();
-ctx.probes.insert("probe-health".to_string(), "healthy".to_string());
-ctx.params.insert("instance".to_string(), serde_json::json!("local"));
+**New Files:**
+- `Cargo.toml`, `agent_persona.yaml`, `hlexicon.yaml`
+- `templates/*.j2` (8 templates)
 
-// Render template
-let engine = TemplateEngine::new();
-let template_path = template_crate.template_path("health-ok");
-let rendered = engine.render_file(&template_path, &ctx)?;
-```
+---
 
-### Integration with Dispatch
+## Template Statistics
 
-Templates integrate with the existing dispatch system:
-1. Probes run (bash scripts)
-2. Results populate `TemplateContext.probes`
-3. Selector template chooses response template
-4. Response template renders with full context
-5. Rendered output sent to LLM (Jack) or operator
+| Metric | Value |
+|--------|-------|
+| Skills converted | 4 |
+| Total templates created | 39 |
+| Template crate files | 16 (4× Cargo.toml, agent_persona.yaml, hlexicon.yaml) |
+| Tests passing | 82 (68 skills + 10 agent + 4 template) |
+| Workspace compiles | ✅ Clean |
 
 ---
 
 ## Remaining Work
 
-### Skills to Convert (12 remaining)
+### Skills to Convert (10 remaining)
 
-| Skill | Priority | Complexity | Notes |
-|-------|----------|------------|-------|
-| `skill-manager` | High | Medium | Self-management meta-skill |
-| `skill-workshop` | High | Medium | Interactive REPL |
-| `skill-discovery` | High | High | Registry search |
-| `skill-maintenance` | Medium | Medium | Lifecycle ops |
-| `sysadmin` | Medium | Low | Basic sysadmin probes |
-| `journal-compactor` | Low | Low | Simple maintenance |
-| `pragmatic-semantics` | Medium | High | Memory layer |
-| `pragmatic-cybernetics` | Medium | High | Cybernetics logic |
-| `scenario-tester` | Low | Medium | Test scenarios |
-| `web-search` | Medium | Medium | Brave API integration |
-| `package-checker` | Low | Low | Package validation |
-| `ubuntu-jack` | Low | Low | Ubuntu-specific probes |
-
-### Template Patterns Needed
-
-1. **Probe Result Patterns**
-   - Success/failure branching
-   - Numeric threshold comparisons
-   - List iteration (model lists, process lists)
-
-2. **Context Enrichment**
-   - Journal state (breach counts, severity distribution)
-   - Host telemetry (CPU, memory, disk, GPU)
-   - Skill metadata (version, dispatch ID)
-
-3. **Response Patterns**
-   - Status reports (healthy/degraded/critical)
-   - Intervention proposals (with risk levels)
-   - Diagnostic summaries (with recommended actions)
+| Skill | Priority | Complexity | Templates Needed | Status |
+|-------|----------|------------|------------------|--------|
+| `skill-maintenance` | Medium | Medium | 6-8 | 🔄 Pending |
+| `sysadmin` | Medium | Low | 4-6 | 🔄 Pending |
+| `web-search` | Medium | Medium | 6-8 | 🔄 Pending |
+| `pragmatic-semantics` | Medium | High | 8-10 | 🔄 Pending |
+| `pragmatic-cybernetics` | Medium | High | 8-10 | 🔄 Pending |
+| `scenario-tester` | Low | Medium | 4-6 | 🔄 Pending |
+| `journal-compactor` | Low | Low | 2-3 | 🔄 Pending |
+| `package-checker` | Low | Low | 2-3 | 🔄 Pending |
+| `ubuntu-jack` | Low | Low | 2-3 | 🔄 Pending |
+| `gpu-doctor` (test fixture) | — | — | — | Skip |
 
 ---
 
 ## Testing
 
-### Unit Tests (4 passing)
-- Context serialization
-- Basic template rendering
-- Parameter injection
-- Template crate loading
+### Unit Tests (82 passing)
+- Skills crate: 68 tests
+- Agent crate: 10 tests
+- Template module: 4 tests
 
 ### Integration Tests (needed)
 - Full probe → render → dispatch pipeline
@@ -199,7 +131,7 @@ Templates integrate with the existing dispatch system:
 ## Dependencies
 
 **Added:**
-- `minijinja = "2"` (workspace dependency, already present)
+- `minijinja = "2"` (workspace dependency)
 
 **No Breaking Changes:**
 - Existing bash-based skills continue to work
@@ -210,11 +142,16 @@ Templates integrate with the existing dispatch system:
 
 ## Next Steps
 
-1. **Convert 3 high-priority skills** (skill-manager, skill-workshop, skill-discovery)
-2. **Add template helpers** (custom filters for common operations)
-3. **Integrate with dispatch** (wire templates into probe execution pipeline)
-4. **Document template patterns** (create template catalog)
-5. **Add CLI commands** (`russell skill render <id> <template>`)
+1. ✅ Convert `okapi-watcher` (complete)
+2. ✅ Convert `skill-manager` (complete)
+3. ✅ Convert `skill-workshop` (complete)
+4. ✅ Convert `skill-discovery` (complete)
+5. 🔄 Convert medium-priority skills (5 remaining)
+6. 🔄 Convert low-priority skills (4 remaining)
+7. 🔄 Add template helpers (custom filters)
+8. 🔄 Integrate with dispatch (wire templates)
+9. 🔄 Document template patterns (catalog)
+10. 🔄 Add CLI commands (`russell skill render`)
 
 ---
 
@@ -223,15 +160,21 @@ Templates integrate with the existing dispatch system:
 | Task | Estimated | Actual | Status |
 |------|-----------|--------|--------|
 | Template module | 4h | 2h | ✅ Complete |
-| Okapi-watcher conversion | 2h | 1.5h | ✅ Complete |
-| Remaining 12 skills | 12h | - | 🔄 Pending |
+| okapi-watcher conversion | 2h | 1.5h | ✅ Complete |
+| skill-manager conversion | 2h | 2h | ✅ Complete |
+| skill-workshop conversion | 2h | 2h | ✅ Complete |
+| skill-discovery conversion | 2h | 1.5h | ✅ Complete |
+| Remaining 10 skills | 10h | - | 🔄 Pending |
 | Dispatch integration | 4h | - | 🔄 Pending |
 | Documentation | 2h | - | 🔄 Pending |
-| **Total** | **24h** | **3.5h** | **15% complete** |
+| **Total** | **28h** | **9h** | **32% complete** |
 
 ---
 
 **References:**
 - [`docs/AGENT-POD-REFACTORING-PLAN.md`](../docs/AGENT-POD-REFACTORING-PLAN.md) — Full refactoring plan
 - [`crates/russell-skills/src/templates.rs`](../crates/russell-skills/src/templates.rs) — Template module
-- [`skills/okapi-watcher/templates/`](../skills/okapi-watcher/templates/) — First template crate
+- [`skills/okapi-watcher/templates/`](../skills/okapi-watcher/templates/) — okapi-watcher templates
+- [`skills/skill-manager/templates/`](../skills/skill-manager/templates/) — skill-manager templates
+- [`skills/skill-workshop/templates/`](../skills/skill-workshop/templates/) — skill-workshop templates
+- [`skills/skill-discovery/templates/`](../skills/skill-discovery/templates/) — skill-discovery templates

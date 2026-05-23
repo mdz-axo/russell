@@ -1,0 +1,14 @@
+# hLexicon — journal-compactor
+primary: flowdef
+
+terms:
+  - term: "Journal compaction"
+    description: "Compress old journal entries"
+    related: ["journal:compact"]
+
+flows:
+  - name: "Compact journal"
+    steps:
+      - "Identify entries older than threshold"
+      - "Compact to archive format"
+      - "Update hash chain"

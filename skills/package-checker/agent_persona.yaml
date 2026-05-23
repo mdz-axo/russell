@@ -1,0 +1,23 @@
+# package-checker agent persona
+agent:
+  name: "package-checker"
+  type: "Bot"
+  version: "0.1.0"
+  
+charter:
+  description: "Validate skill package structure and content"
+  editor: "russell"
+  
+capabilities:
+  - "check:package:structure"
+  - "check:package:manifest"
+  
+rights:
+  - read: "skill_packages"
+  
+responsibilities:
+  - "check: package structure"
+  - "validate: manifest schema"
+  
+visibility:
+  default: "operator-only"

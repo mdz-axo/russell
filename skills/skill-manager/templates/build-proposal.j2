@@ -1,0 +1,29 @@
+{# skill-manager: build skill proposal #}
+{# Proposes building a new skill for a capability gap #}
+
+## Proposal: Build New Skill
+
+**Skill ID:** `{{ params.skill_id | default("new-skill") }}`
+**Target symptom:** {{ params.symptom | default("unknown") }}
+
+### What This Does
+
+Creates a new skill skeleton:
+1. Creates `~/.local/share/harness/skills/{{ params.skill_id | default("new-skill") }}/`
+2. Generates `manifest.yaml` with probe/intervention stubs
+3. Creates `scripts/` directory with placeholder scripts
+4. Creates `templates/` directory for Jinja2 templates
+
+### Next Steps (after build)
+
+1. **Edit manifest** — Define probes and interventions
+2. **Create scripts** — Implement probe/intervention logic
+3. **Add templates** — Create response templates (optional)
+4. **Validate** — Run `russell skill check {{ params.skill_id | default("new-skill") }}`
+5. **Install** — Run `russell skill install {{ params.skill_id | default("new-skill") }}`
+
+### Risk Level
+**None** — Build is a scaffolding operation, no system changes
+
+---
+*Shall I create the skill skeleton for `{{ params.skill_id | default("new-skill") }}`?*

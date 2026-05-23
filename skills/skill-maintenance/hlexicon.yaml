@@ -1,0 +1,23 @@
+# hLexicon — skill-maintenance
+primary: flowdef
+
+terms:
+  - term: "Skill staleness"
+    description: "Skill not run in 30+ days"
+    related: ["skill_version_stale"]
+    
+  - term: "Coverage gap"
+    description: "Symptom without matching skill"
+    related: ["skill_symptom_not_in_catalog"]
+    
+  - term: "Quality score"
+    description: "Skill quality assessment (manifest, scripts, docs, tests)"
+    related: ["audit:skill:quality"]
+
+flows:
+  - name: "Audit skill registry"
+    steps:
+      - "Scan all installed skills"
+      - "Check last run timestamp for each"
+      - "Flag skills stale >30 days"
+      - "Report coverage gaps"

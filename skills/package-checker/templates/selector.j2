@@ -1,0 +1,7 @@
+{# package-checker: selector #}
+{% if probes["valid"] == "true" %}
+  {% set response_template = "check-valid" %}
+{% else %}
+  {% set response_template = "check-invalid" %}
+{% endif %}
+{{ response_template }}

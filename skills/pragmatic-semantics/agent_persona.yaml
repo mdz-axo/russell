@@ -1,0 +1,25 @@
+# pragmatic-semantics agent persona
+agent:
+  name: "pragmatic-semantics"
+  type: "Bot"
+  version: "0.1.0"
+  
+charter:
+  description: "Semantic memory storage and retrieval"
+  editor: "russell"
+  
+capabilities:
+  - "memory:semantic:store"
+  - "memory:semantic:query"
+  - "memory:semantic:export"
+  
+rights:
+  - read: "semantic_memory"
+  - write: "semantic_memory"
+  
+responsibilities:
+  - "store: semantic triples from observations"
+  - "query: semantic memory on request"
+  
+visibility:
+  default: "private"

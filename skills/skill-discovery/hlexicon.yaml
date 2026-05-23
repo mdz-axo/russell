@@ -1,0 +1,43 @@
+# hLexicon — human-readable terms for skill-discovery skill
+# Used by Jack (the Nurse) to explain skill discovery to the operator
+
+primary: flowdef
+
+terms:
+  - term: "Skill discovery"
+    description: "Finding new skills via web search for Russell"
+    related: ["skill_not_in_catalog", "search:skill:*"]
+    
+  - term: "Skill catalog"
+    description: "Central registry of available Russell skills"
+    related: ["search:skill:catalog"]
+    
+  - term: "Kask Arsenal"
+    description: "hKask's skill/library repository"
+    related: ["search:skill:kask"]
+    
+  - term: "Skill evaluation"
+    description: "Assessing skill safety, quality, and hardware compatibility"
+    related: ["evaluate:skill:*", "skill_manifest_invalid"]
+    
+  - term: "Skill sandbox"
+    description: "Safe directory for downloading and testing new skills"
+    related: ["download:skill:*"]
+
+flows:
+  - name: "Discover skill via web search"
+    steps:
+      - "Identify capability gap (symptom without skill)"
+      - "Search web for Russell skills matching symptom"
+      - "Check Kask Arsenal for official skills"
+      - "Search GitHub for community skills"
+      - "Present top results to operator"
+      
+  - name: "Evaluate and install skill"
+    steps:
+      - "Download skill to sandbox directory"
+      - "Run safety scanner on manifest and scripts"
+      - "Check hardware compatibility"
+      - "Present evaluation report to operator"
+      - "On approval, install to skills directory"
+      - "Verify skill runs correctly"

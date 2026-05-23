@@ -1,0 +1,46 @@
+{# skill-discovery: download complete #}
+{# Displayed after downloading a skill to sandbox #}
+
+## Skill Downloaded ✓
+
+**Skill ID:** {{ probes["downloaded-skill-id"] | default(params.skill_id | default("unknown")) }}
+**Source:** {{ probes["skill-source"] | default("unknown") }}
+**Location:** `{{ probes["sandbox-path"] | default("~/.local/state/harness/sandbox/") }}{{ probes["downloaded-skill-id"] | default(params.skill_id | default("unknown")) }}/`
+
+### What Was Downloaded
+
+```
+{{ probes["downloaded-skill-id"] | default(params.skill_id | default("unknown")) }}/
+├── manifest.yaml       # Skill definition
+├── scripts/            # Probe/intervention scripts
+├── templates/          # Jinja2 templates (if any)
+├── KNOWLEDGE.md        # Context for Jack
+└── README.md           # Documentation
+```
+
+### Next Steps
+
+1. **Review the skill:**
+   ```bash
+   cd {{ probes["sandbox-path"] | default("~/.local/state/harness/sandbox/") }}{{ probes["downloaded-skill-id"] | default(params.skill_id | default("unknown")) }}/
+   cat manifest.yaml
+   ```
+
+2. **Evaluate:**
+   ```
+   discover evaluate {{ probes["downloaded-skill-id"] | default(params.skill_id | default("unknown")) }}
+   ```
+
+3. **Install (if evaluation passes):**
+   ```
+   discover install {{ probes["downloaded-skill-id"] | default(params.skill_id | default("unknown")) }}
+   ```
+
+### Sandbox Notes
+
+- Skills in sandbox are **not installed** — they cannot be dispatched
+- Sandbox is for **review and testing only**
+- Downloaded skills are **not automatically trusted**
+
+---
+*Skill downloaded to sandbox. Review and evaluate before installing.*

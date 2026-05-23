@@ -1,0 +1,35 @@
+{# skill-manager: retire skill warning #}
+{# Warns about retiring (archiving) a skill — medium risk #}
+
+## ⚠ Warning: Retire Skill
+
+**Skill ID:** `{{ params.skill_id | default("unknown") }}`
+**Version:** {{ probes["skill-version"] | default("unknown") }}
+**Current state:** {{ probes["current-state"] | default("active") }}
+
+### What This Does
+
+Retiring archives and removes a skill:
+1. Moves skill to `archived` lifecycle state
+2. Moves files to `~/.local/share/harness/skills-archive/{{ params.skill_id | default("unknown") }}/`
+3. Removes from active skill registry
+4. **Cannot be auto-restored** — requires manual intervention
+
+### Why Retire?
+
+Common reasons:
+- Skill is deprecated (replaced by newer version)
+- Skill is obsolete (no longer needed)
+- Skill has known issues that won't be fixed
+- Cleaning up unused skills
+
+### Risk Level
+**Medium** — Requires manual restoration from archive
+
+### Rollback
+Manual process:
+1. Locate archive: `~/.local/share/harness/skills-archive/{{ params.skill_id | default("unknown") }}/`
+2. Run `russell skill restore-from-archive {{ params.skill_id | default("unknown") }}`
+
+---
+*This action requires human confirmation. Type "yes" to proceed with retiring `{{ params.skill_id | default("unknown") }}`.*

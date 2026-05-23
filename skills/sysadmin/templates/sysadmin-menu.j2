@@ -1,0 +1,23 @@
+{# sysadmin: menu #}
+## System Administration
+
+I can help maintain your Linux host:
+
+### Probes
+| Probe | Description |
+|-------|-------------|
+| `probe systemd` | Check failed/degraded units |
+| `probe zombies` | Check for zombie processes |
+| `probe clock` | Check NTP offset |
+| `probe journal` | Check journal size |
+| `probe coredumps` | Check coredump files |
+| `probe swap` | Check swap usage |
+
+### Interventions
+| Intervention | Risk | Description |
+|--------------|------|-------------|
+| `reset-failed` | Low | Reset failed systemd units |
+| `reap-zombies` | Medium | Reap zombie processes |
+| `journal-vacuum` | Low | Shrink journal to 500MB |
+| `remove-coredumps` | Low | Remove coredump files |
+| `flush-swap` | Medium | Drop caches and flush swap |

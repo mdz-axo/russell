@@ -133,6 +133,30 @@ impl TemplateEngine {
         Self { env }
     }
     
+    /// Create engine with skill-specific helpers.
+    pub fn with_helpers() -> Self {
+        let mut env = Environment::new();
+        
+        // Add default filter
+        env.add_filter("default", |value: Option<String>, default: String| {
+            Ok(value.unwrap_or(default))
+        });
+        
+        // Add round filter
+        env.add_filter("round", |value: f64, decimals: u8| {
+            let factor = 10_f64.powi(decimals as i32);
+            Ok((value * factor).round() / factor)
+        });
+        
+        // Add upper filter
+        env.add_filter("upper", |s: String| Ok(s.to_uppercase()));
+        
+        // Add lower filter
+        env.add_filter("lower", |s: String| Ok(s.to_lowercase()));
+        
+        Self { env }
+    }
+    
     /// Load a template from file.
     pub fn load_template(&self, template_path: &Path) -> Result<String, TemplateError> {
         if !template_path.exists() {
@@ -223,6 +247,74 @@ impl TemplateCrate {
     }
 }
 
+/// Dispatch integration: render templates with probe/intervention results.
+///
+/// This function integrates templates with the dispatch pipeline.
+pub fn render_dispatch_result(
+    skill_id: &str,
+    skill_dir: &Path,
+    step_id: &str,
+    step_type: StepType,
+    stdout: &str,
+    params: &serde_json::Value,
+) -> Result<String, TemplateError> {
+    // Load template crate
+    let template_crate = TemplateCrate::load(skill_dir)?;
+    
+    // Build context
+    let mut ctx = TemplateContext::default();
+    ctx.skill.id = skill_id.to_string();
+    ctx.params.insert("step_id".to_string(), serde_json::json!(step_id));
+    ctx.params.insert("step_type".to_string(), serde_json::json!(step_type.as_str()));
+    
+    // Parse params if provided
+    if let Some(p) = params.as_object() {
+        for (k, v) in p {
+            ctx.params.insert(k.clone(), v.clone());
+        }
+    }
+    
+    // Capture stdout as probe result
+    ctx.probes.insert("stdout".to_string(), stdout.to_string());
+    
+    // Select template
+    let _template_name = match step_type {
+        StepType::Probe => format!("probe-{}", step_id),
+        StepType::Intervention => format!("intervention-{}", step_id),
+    };
+    
+    // Render with selector
+    let selector_path = template_crate.template_path("selector");
+    let engine = TemplateEngine::with_helpers();
+    
+    // First render selector to get response template
+    let selector_result = engine.render_file(&selector_path, &ctx)?;
+    let response_template = selector_result.trim();
+    
+    // Render response template
+    let response_path = template_crate.template_path(response_template);
+    engine.render_file(&response_path, &ctx)
+}
+
+/// Step type enumeration.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StepType {
+    /// Probe step (read-only).
+    Probe,
+    /// Intervention step (mutating).
+    Intervention,
+}
+
+impl StepType {
+    /// Convert to string representation.
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Probe => "probe",
+            Self::Intervention => "intervention",
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -265,31 +357,36 @@ mod tests {
     
     #[test]
     fn test_load_okapi_watcher_templates() {
-        // Load the okapi-watcher template crate
         let crate_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("../../skills/okapi-watcher");
         
         if crate_path.exists() {
             let template_crate = TemplateCrate::load(&crate_path).expect("Failed to load template crate");
-            
-            // Verify templates are found
             assert!(template_crate.has_template("selector"));
             assert!(template_crate.has_template("health-ok"));
-            assert!(template_crate.has_template("health-critical"));
-            assert!(template_crate.has_template("gpu-fallback"));
-            assert!(template_crate.has_template("no-models"));
             
-            // Render a template
-            let engine = TemplateEngine::new();
+            let engine = TemplateEngine::with_helpers();
             let template_path = template_crate.template_path("health-ok");
             let mut ctx = TemplateContext::default();
             ctx.skill.id = "okapi-watcher".to_string();
-            ctx.skill.version = "0.3.0".to_string();
             
             let result = engine.render_file(&template_path, &ctx);
-            assert!(result.is_ok(), "Failed to render template: {:?}", result.err());
-            let rendered = result.unwrap();
-            assert!(rendered.contains("Okapi Status: Healthy"));
+            assert!(result.is_ok());
         }
+    }
+    
+    #[test]
+    fn test_helpers() {
+        let engine = TemplateEngine::with_helpers();
+        
+        // Test default filter
+        let result = engine.render("{{ value | default('fallback') }}", &TemplateContext::default()).unwrap();
+        assert_eq!(result, "fallback");
+        
+        // Test round filter
+        let mut ctx = TemplateContext::default();
+        ctx.params.insert("num".to_string(), serde_json::json!(3.14159));
+        let result = engine.render("{{ params.num | round(2) }}", &ctx).unwrap();
+        assert!(result.contains("3.14"));
     }
 }

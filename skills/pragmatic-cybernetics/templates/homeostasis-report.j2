@@ -1,0 +1,12 @@
+{# pragmatic-cybernetics: homeostasis report #}
+## Homeostasis Check
+
+**Balance:** {{ probes["balance"] | default("unknown") }}
+
+{% if probes["metrics"] %}
+| Metric | Target | Actual | Deviation |
+|--------|--------|--------|-----------|
+{% for m in probes["metrics"] %}
+| {{ m.name }} | {{ m.target }} | {{ m.actual }} | {{ m.deviation }} |
+{% endfor %}
+{% endif %}

@@ -1,0 +1,16 @@
+{# sysadmin: journal bloat #}
+## Journal Size: {{ probes["journal-size-mb"] }}MB ⚠
+
+**Threshold:** 500MB
+**Usage:** {{ probes["usage-pct"] | default("unknown") }}%
+
+### Recommended Action
+
+Vacuum journal:
+```bash
+journalctl --user --vacuum-size=500M
+```
+
+**Risk:** Low (deletes old entries only)
+
+Shall I proceed?

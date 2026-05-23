@@ -1,0 +1,32 @@
+{# skill-workshop: retire summary #}
+{# Summary after retiring a skill #}
+
+## Skill Retired ⚠
+
+**Skill ID:** {{ probes["retired-skill-id"] | default(params.skill_id | default("unknown")) }}
+**Version:** {{ probes["retired-version"] | default("unknown") }}
+**Previous state:** {{ probes["previous-state"] | default("active") }}
+**Current state:** Archived
+
+### What Happened
+
+- Skill moved to archive directory
+- Removed from active registry
+- Registry cache updated
+- **Requires manual restoration**
+
+### Archive Location
+
+```
+~/.local/share/harness/skills-archive/{{ probes["retired-skill-id"] | default(params.skill_id | default("unknown")) }}/
+```
+
+### Rollback (Manual)
+
+To restore from archive:
+```
+restore-from-archive {{ probes["retired-skill-id"] | default(params.skill_id | default("")) }}
+```
+
+---
+*Skill is archived. Want to retire more skills or return to workshop menu?*

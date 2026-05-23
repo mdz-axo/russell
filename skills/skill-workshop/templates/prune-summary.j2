@@ -1,0 +1,33 @@
+{# skill-workshop: prune summary #}
+{# Summary after pruning a skill #}
+
+## Skill Pruned ✓
+
+**Skill ID:** {{ probes["pruned-skill-id"] | default(params.skill_id | default("unknown")) }}
+**Previous state:** Active
+**Current state:** Pruned
+
+### What Happened
+
+- Skill excluded from dispatch consideration
+- All files preserved in place
+- Registry cache updated
+- Reversible with `restore` command
+
+### Why Skills Are Pruned
+
+Common reasons:
+- Not used in 30+ days
+- Redundant with another skill
+- Under development/testing
+- Reducing dispatch complexity
+
+### Rollback
+
+To restore the skill:
+```
+restore {{ probes["pruned-skill-id"] | default(params.skill_id | default("")) }}
+```
+
+---
+*Skill is pruned. Want to prune more skills or return to workshop menu?*

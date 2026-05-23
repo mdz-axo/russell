@@ -1,0 +1,32 @@
+{# skill-workshop: welcome message #}
+{# Displayed when entering the workshop REPL #}
+
+## Welcome to the Skill Workshop
+
+I'm Jack, your skill-building assistant. This workshop helps you:
+
+### Commands
+
+| Command | Description |
+|---------|-------------|
+| `discover <symptom>` | Search for skills matching a symptom |
+| `evaluate <skill-id>` | Validate a skill's manifest and scripts |
+| `build <skill-id>` | Create a new skill skeleton |
+| `adapt <skill-id>` | Modify a skill for your hardware |
+| `audit` | Scan registry for stale/missing skills |
+| `coverage` | Show symptom coverage report |
+| `install <skill-id>` | Install a skill |
+| `prune <skill-id>` | Temporarily disable a skill |
+| `retire <skill-id>` | Archive and remove a skill |
+| `help` | Show this help message |
+| `exit` | Leave the workshop |
+
+### Current Registry State
+{% if probes["total-skills"] %}
+**Installed skills:** {{ probes["total-skills"] }}
+**Active:** {{ probes["active-skills"] | default("0") }}
+**Coverage:** {{ probes["coverage-pct"] | default("unknown") }}% of symptoms have skills
+{% endif %}
+
+---
+*What would you like to do? Type a command or ask me about skill building.*

@@ -1,0 +1,28 @@
+{# skill-manager: skill check invalid #}
+{# Displayed when a skill manifest fails validation #}
+
+## Skill Validation: Invalid ✗
+
+**Skill ID:** {{ probes["skill-id"] | default(params.skill_id | default("unknown")) }}
+**Errors:** {{ probes["validation-errors"] | default("Unknown validation failure") }}
+
+### Validation Failures
+{% if probes["error-details"] %}
+{{ probes["error-details"] }}
+{% else %}
+No detailed error information available.
+{% endif %}
+
+### Common Issues
+1. **Unknown symptom** — Symptom name not in SYMPTOMS catalog
+2. **Missing script** — Script referenced in manifest but not in `scripts/`
+3. **Invalid risk** — Risk band not one of: none, low, medium, high, critical
+4. **ID mismatch** — Manifest `id` doesn't match directory name
+
+### Recommended Actions
+1. Fix the validation errors in `manifest.yaml`
+2. Run `russell skill check {{ probes["skill-id"] | default(params.skill_id | default("")) }}` again
+3. If errors persist, consult `docs/standards/skill-building-rules.md`
+
+---
+*Skill cannot be installed until validation passes.*

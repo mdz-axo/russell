@@ -1,0 +1,30 @@
+{# skill-manager: restore skill confirmation #}
+{# Confirms successful skill restoration #}
+
+## Skill Restored ✓
+
+**Skill ID:** {{ probes["restored-skill-id"] | default(params.skill_id | default("unknown")) }}
+**Previous state:** Pruned
+**Current state:** Active
+
+### What Was Restored
+{% if probes["restored-probes"] %}
+**Probes:** {{ probes["restored-probes"] }}
+{% endif %}
+
+{% if probes["restored-interventions"] %}
+**Interventions:** {{ probes["restored-interventions"] }}
+{% endif %}
+
+### Symptom Coverage
+{% if probes["covers-symptoms"] %}
+This skill handles: {{ probes["covers-symptoms"] }}
+{% endif %}
+
+### Next Steps
+1. **Verify dispatch:** `russell skill check {{ probes["restored-skill-id"] | default(params.skill_id | default("")) }}`
+2. **Test probes:** Run a probe to verify functionality
+3. **Update registry:** `russell skill rebuild-cache` (if needed)
+
+---
+*Skill is now active and available for dispatch.*

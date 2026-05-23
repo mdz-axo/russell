@@ -1,0 +1,34 @@
+{# skill-workshop: selector template #}
+{# Routes to appropriate response based on workshop command #}
+
+{% if params.command == "discover" %}
+  {% set response_template = "discover-results" %}
+{% elif params.command == "evaluate" %}
+  {% if probes["evaluation-valid"] == "true" %}
+    {% set response_template = "evaluate-pass" %}
+  {% else %}
+    {% set response_template = "evaluate-fail" %}
+  {% endif %}
+{% elif params.command == "build" %}
+  {% set response_template = "build-skeleton" %}
+{% elif params.command == "adapt" %}
+  {% set response_template = "adapt-guidance" %}
+{% elif params.command == "audit" %}
+  {% set response_template = "audit-report" %}
+{% elif params.command == "coverage" %}
+  {% if probes["coverage-gaps"] %}
+    {% set response_template = "coverage-gaps" %}
+  {% else %}
+    {% set response_template = "coverage-complete" %}
+  {% endif %}
+{% elif params.command == "install" %}
+  {% set response_template = "install-summary" %}
+{% elif params.command == "prune" %}
+  {% set response_template = "prune-summary" %}
+{% elif params.command == "retire" %}
+  {% set response_template = "retire-summary" %}
+{% else %}
+  {% set response_template = "welcome" %}
+{% endif %}
+
+{{ response_template }}

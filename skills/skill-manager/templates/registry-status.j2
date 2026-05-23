@@ -1,0 +1,20 @@
+{# skill-manager: registry status healthy #}
+{# Displayed when registry cache is valid and up-to-date #}
+
+## Registry Status: Healthy ✓
+
+**Cache file:** {{ probes["cache-path"] | default("~/.local/share/harness/skills/local-cache.yaml") }}
+**Last rebuild:** {{ probes["cache-last-rebuilt"] | default("unknown") }}
+**Symptom → Skill mappings:** {{ probes["symptom-mappings"] | default("0") }}
+
+### Coverage Summary
+{% if probes["covered-symptoms"] %}
+✓ {{ probes["covered-symptoms"] }} symptoms have matching skills
+{% endif %}
+
+{% if probes["uncovered-symptoms"] %}
+⚠ {{ probes["uncovered-symptoms"] }} symptoms have NO matching skill (capability gap)
+{% endif %}
+
+---
+*Registry is healthy. Run `russell skill rebuild-cache` to refresh symptom mappings.*

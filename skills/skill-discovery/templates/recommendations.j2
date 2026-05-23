@@ -1,0 +1,52 @@
+{# skill-discovery: recommendations #}
+{# Skill recommendations based on capability gaps #}
+
+## Skill Recommendations
+
+Based on your current registry state and known capability gaps:
+
+### High Priority Recommendations
+
+{% if probes["high-priority-gaps"] %}
+| Symptom | Recommended Skill | Source | Confidence |
+|---------|-------------------|--------|------------|
+{% for gap in probes["high-priority-gaps"] %}
+| {{ gap.symptom }} | {{ gap.recommended_skill }} | {{ gap.source }} | {{ gap.confidence }} |
+{% endfor %}
+{% else %}
+✓ No high-priority capability gaps detected.
+{% endif %}
+
+### Medium Priority Recommendations
+
+{% if probes["medium-priority-gaps"] %}
+| Symptom | Recommended Skill | Source | Confidence |
+|---------|-------------------|--------|------------|
+{% for gap in probes["medium-priority-gaps"] %}
+| {{ gap.symptom }} | {{ gap.recommended_skill }} | {{ gap.source }} | {{ gap.confidence }} |
+{% endfor %}
+{% else %}
+✓ No medium-priority gaps.
+{% endif %}
+
+### Suggested Actions
+
+{% if probes["high-priority-gaps"] %}
+1. **Address high-priority gaps first:**
+   ```
+   discover search {{ probes["high-priority-gaps"][0].symptom | default("symptom") }}
+   ```
+{% endif %}
+
+2. **Review Kask Arsenal for official skills:**
+   ```
+   discover arsenal
+   ```
+
+3. **Build custom skills for uncovered symptoms:**
+   ```
+   workshop build <symptom>-watcher
+   ```
+
+---
+*Found {{ probes["total-recommendations"] | default("0") }} skill recommendations. Want to search for one?*

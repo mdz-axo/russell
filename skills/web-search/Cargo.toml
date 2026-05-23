@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: MIT OR Apache-2.0
+# web-search skill template crate
+[package]
+name = "skill-web-search"
+version = "0.2.0"
+edition = "2024"
+description = "Web search capability via Brave Search API"
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+# No runtime dependencies - templates rendered by russell-skills

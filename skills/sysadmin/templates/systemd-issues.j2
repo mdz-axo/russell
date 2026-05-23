@@ -1,0 +1,21 @@
+{# sysadmin: systemd issues found #}
+## Systemd State: Issues Detected ⚠
+
+{% if probes["degraded"] == "true" %}
+**State:** Degraded
+{% endif %}
+
+{% if probes["failed-units"] %}
+**Failed Units:** {{ probes["failed-units"] }}
+{% endif %}
+
+### Recommended Action
+
+Reset failed units:
+```bash
+systemctl --user reset-failed
+```
+
+**Risk:** Low (idempotent, no side effects)
+
+Shall I proceed?

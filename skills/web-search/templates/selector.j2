@@ -1,0 +1,9 @@
+{# web-search: selector #}
+{% if params.search_type == "news" %}
+  {% set response_template = "news-results" %}
+{% elif params.search_type == "images" %}
+  {% set response_template = "image-results" %}
+{% else %}
+  {% set response_template = "web-results" %}
+{% endif %}
+{{ response_template }}

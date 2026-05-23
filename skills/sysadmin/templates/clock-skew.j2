@@ -1,0 +1,21 @@
+{# sysadmin: clock skew #}
+## Clock Skew: {{ probes["offset-seconds"] }}s ⚠
+
+**Current time:** {{ probes["current-time"] | default("unknown") }}
+**NTP time:** {{ probes["ntp-time"] | default("unknown") }}
+
+### Impact
+- Certificate validation may fail
+- Log timestamps inaccurate
+- Scheduled jobs may misfire
+
+### Recommended Action
+
+Force clock sync:
+```bash
+timedatectl set-ntp true
+```
+
+**Risk:** Medium (requires sudo, may affect running services)
+
+Shall I proceed?

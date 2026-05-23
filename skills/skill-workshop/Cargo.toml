@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: MIT OR Apache-2.0
+# skill-workshop skill template crate
+[package]
+name = "skill-skill-workshop"
+version = "1.0.0"
+edition = "2024"
+description = "Interactive skill composition and adaptation for Russell's Nurse (Jack)"
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+# No runtime dependencies - templates rendered by russell-skills

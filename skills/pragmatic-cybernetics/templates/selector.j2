@@ -1,0 +1,9 @@
+{# pragmatic-cybernetics: selector #}
+{% if params.analysis == "feedback" %}
+  {% set response_template = "feedback-report" %}
+{% elif params.analysis == "homeostasis" %}
+  {% set response_template = "homeostasis-report" %}
+{% else %}
+  {% set response_template = "menu" %}
+{% endif %}
+{{ response_template }}

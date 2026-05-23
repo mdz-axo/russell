@@ -1,0 +1,51 @@
+{# skill-discovery: search results #}
+{# Displays web search results for skills #}
+
+## Skill Search Results
+
+**Query:** {{ params.symptom | default("unknown") }}
+**Sources:** {{ probes["search-sources"] | default("web, GitHub, Kask Arsenal") }}
+
+### Official Skills (Kask Arsenal)
+
+{% if probes["arsenal-results"] %}
+{{ probes["arsenal-results"] }}
+{% else %}
+_No official skills found in Kask Arsenal._
+{% endif %}
+
+### Community Skills (GitHub)
+
+{% if probes["github-results"] %}
+{{ probes["github-results"] }}
+{% else %}
+_No community skills found on GitHub._
+{% endif %}
+
+### Web Results
+
+{% if probes["web-results"] %}
+{{ probes["web-results"] }}
+{% else %}
+_No web results found._
+{% endif %}
+
+### Recommended Actions
+
+1. **Evaluate a skill:**
+   ```
+   discover evaluate <skill-url-or-id>
+   ```
+
+2. **Download for review:**
+   ```
+   discover download <skill-url-or-id>
+   ```
+
+3. **Try different search terms:**
+   ```
+   discover search <related-symptom>
+   ```
+
+---
+*Found {{ probes["total-results"] | default("0") }} skills. Want to evaluate or download one?*

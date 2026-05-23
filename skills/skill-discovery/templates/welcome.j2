@@ -1,0 +1,44 @@
+{# skill-discovery: welcome message #}
+{# Displayed when starting skill discovery #}
+
+## Skill Discovery
+
+I can help you find and install new skills for Russell.
+
+### What I Can Do
+
+| Action | Description |
+|--------|-------------|
+| **Search** | Find skills matching a symptom via web search |
+| **Evaluate** | Assess skill safety, quality, compatibility |
+| **Download** | Fetch skill to sandbox for review |
+| **Install** | Install skill after approval |
+| **Recommend** | Suggest skills for capability gaps |
+
+### Current State
+{% if probes["installed-skills"] %}
+**Installed skills:** {{ probes["installed-skills"] }}
+{% endif %}
+{% if probes["capability-gaps"] %}
+**Known gaps:** {{ probes["capability-gaps"] }}
+{% endif %}
+
+### Getting Started
+
+1. **Search for a skill:**
+   ```
+   discover search <symptom>
+   ```
+
+2. **Get recommendations:**
+   ```
+   discover recommend
+   ```
+
+3. **Check Kask Arsenal:**
+   ```
+   discover arsenal
+   ```
+
+---
+*What symptom do you need a skill for?*

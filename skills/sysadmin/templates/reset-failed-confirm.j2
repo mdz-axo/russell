@@ -1,0 +1,7 @@
+{# sysadmin: reset-failed confirm #}
+## Reset Failed Units ✓
+
+**Action:** `systemctl --user reset-failed`
+**Result:** {{ probes["result"] | default("completed") }}
+
+Cleared {{ probes["cleared-count"] | default("0") }} failed unit(s).

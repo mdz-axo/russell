@@ -1,0 +1,40 @@
+{# skill-workshop: evaluate fail #}
+{# Displayed when skill evaluation fails #}
+
+## Skill Evaluation: Fail ✗
+
+**Skill ID:** {{ probes["skill-id"] | default(params.skill_id | default("unknown")) }}
+**Errors:** {{ probes["error-count"] | default("1") }}
+
+### Validation Failures
+
+{% if probes["error-details"] %}
+{{ probes["error-details"] }}
+{% else %}
+Validation failed. Check manifest.yaml for issues.
+{% endif %}
+
+### Common Fixes
+
+| Issue | Fix |
+|-------|-----|
+| Unknown symptom | Add to SYMPTOMS catalog or use known symptom |
+| Missing script | Create script in `scripts/` directory |
+| Invalid risk | Use: none, low, medium, high, critical |
+| ID mismatch | Ensure manifest `id` matches directory name |
+| Bad rollback | Use valid rollback ID or `none_needed` |
+
+### Recommended Actions
+
+1. **Fix the issues** in the skill manifest and scripts
+2. **Re-evaluate:**
+   ```
+   evaluate {{ probes["skill-id"] | default(params.skill_id | default("")) }}
+   ```
+3. **Or build fresh skeleton:**
+   ```
+   build {{ probes["skill-id"] | default(params.skill_id | default("")) }}-fixed
+   ```
+
+---
+*Skill cannot be installed until evaluation passes.*

@@ -1,0 +1,16 @@
+{# web-search: web results #}
+## Web Search Results
+
+**Query:** {{ params.query | default("unknown") }}
+**Results:** {{ probes["result-count"] | default("0") }}
+
+{% if probes["results"] %}
+{% for result in probes["results"] %}
+### {{ result.title }}
+{{ result.description }}
+[{{ result.url }}]({{ result.url }})
+
+{% endfor %}
+{% else %}
+No results found.
+{% endif %}

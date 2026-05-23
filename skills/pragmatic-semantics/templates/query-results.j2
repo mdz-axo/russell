@@ -1,0 +1,10 @@
+{# pragmatic-semantics: query results #}
+## Query Results
+
+{% if probes["triples"] %}
+{% for triple in probes["triples"] %}
+- {{ triple.subject }} → {{ triple.predicate }} → {{ triple.object }}
+{% endfor %}
+{% else %}
+No matching triples found.
+{% endif %}

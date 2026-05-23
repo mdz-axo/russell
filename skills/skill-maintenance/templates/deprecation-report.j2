@@ -1,0 +1,12 @@
+{# skill-maintenance: deprecation report #}
+## Deprecation Report
+
+{% if probes["deprecated"] %}
+| Skill | Reason | Recommendation |
+|-------|--------|----------------|
+{% for skill in probes["deprecated"] %}
+| {{ skill.id }} | {{ skill.reason }} | {{ skill.recommendation }} |
+{% endfor %}
+{% else %}
+✓ No skills recommended for deprecation.
+{% endif %}

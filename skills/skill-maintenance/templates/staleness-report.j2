@@ -1,0 +1,24 @@
+{# skill-maintenance: staleness report #}
+## Staleness Audit Report
+
+**Scan date:** {{ probes["audit-timestamp"] | default("now") }}
+**Threshold:** 30 days
+
+### Stale Skills
+
+{% if probes["stale-skills"] %}
+| Skill | Last Run | Days Stale | Action |
+|-------|----------|------------|--------|
+{% for skill in probes["stale-skills"] %}
+| {{ skill.id }} | {{ skill.last_run }} | {{ skill.days_stale }} | Prune or update |
+{% endfor %}
+{% else %}
+✓ No stale skills detected.
+{% endif %}
+
+### Recommendation
+{% if probes["stale-count"] > 0 %}
+Consider pruning {{ probes["stale-count"] }} stale skill(s).
+{% else %}
+All skills have recent activity.
+{% endif %}

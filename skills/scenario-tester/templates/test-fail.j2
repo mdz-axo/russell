@@ -1,0 +1,5 @@
+{# scenario-tester: test fail #}
+## Test Failed ✗
+
+**Scenario:** {{ params.scenario | default("unknown") }}
+**Failure:** {{ probes["failure-reason"] | default("unknown") }}

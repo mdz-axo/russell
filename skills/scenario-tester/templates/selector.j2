@@ -1,0 +1,13 @@
+{# scenario-tester: selector #}
+{% if params.action == "run" %}
+  {% if probes["passed"] == "true" %}
+    {% set response_template = "test-pass" %}
+  {% else %}
+    {% set response_template = "test-fail" %}
+  {% endif %}
+{% elif params.action == "report" %}
+  {% set response_template = "test-report" %}
+{% else %}
+  {% set response_template = "menu" %}
+{% endif %}
+{{ response_template }}

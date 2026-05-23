@@ -1,0 +1,17 @@
+{# skill-maintenance: selector #}
+{% if params.audit_type == "staleness" %}
+  {% set response_template = "staleness-report" %}
+{% elif params.audit_type == "coverage" %}
+  {% if probes["has-gaps"] == "true" %}
+    {% set response_template = "coverage-gaps" %}
+  {% else %}
+    {% set response_template = "coverage-complete" %}
+  {% endif %}
+{% elif params.audit_type == "quality" %}
+  {% set response_template = "quality-report" %}
+{% elif params.audit_type == "deprecation" %}
+  {% set response_template = "deprecation-report" %}
+{% else %}
+  {% set response_template = "audit-menu" %}
+{% endif %}
+{{ response_template }}

@@ -1,0 +1,39 @@
+{# skill-manager: skill stats response #}
+{# Displays skill telemetry and usage statistics #}
+
+## Skill Telemetry
+
+### Registry Health
+- **Cache file:** {{ probes["cache-path"] | default("~/.local/share/harness/skills/local-cache.yaml") }}
+- **Last rebuild:** {{ probes["cache-last-rebuilt"] | default("unknown") }}
+- **Symptom mappings:** {{ probes["symptom-mappings"] | default("0") }}
+
+### Top Skills by Usage
+{% if probes["top-probe-skills"] %}
+**Most probe runs:**
+{{ probes["top-probe-skills"] }}
+{% endif %}
+
+{% if probes["top-intervention-skills"] %}
+**Most intervention runs:**
+{{ probes["top-intervention-skills"] }}
+{% endif %}
+
+### Stale Skills (no recent runs)
+{% if probes["stale-skills"] %}
+⚠ **Consider pruning:**
+{{ probes["stale-skills"] }}
+{% else %}
+✓ All skills have recent activity.
+{% endif %}
+
+### Lifecycle Distribution
+| State | Count |
+|-------|-------|
+| Active | {{ probes["active-count"] | default("0") }} |
+| Pruned | {{ probes["pruned-count"] | default("0") }} |
+| Deprecated | {{ probes["deprecated-count"] | default("0") }} |
+| Archived | {{ probes["archived-count"] | default("0") }} |
+
+---
+*Stale skills can be pruned with `russell skill prune <id>`. Pruned skills can be restored with `russell skill restore <id>`.*

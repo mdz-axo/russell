@@ -1,0 +1,30 @@
+# hLexicon — sysadmin
+primary: flowdef
+
+terms:
+  - term: "Systemd failed units"
+    description: "Units that failed and need reset"
+    related: ["probe-systemd-failed", "systemd-reset-failed"]
+    
+  - term: "Degraded state"
+    description: "System has failed units"
+    related: ["probe-systemd-degraded"]
+    
+  - term: "Clock skew"
+    description: "System time offset from NTP"
+    related: ["probe-clock-offset", "force-clock-sync"]
+    
+  - term: "Zombie processes"
+    description: "Defunct processes needing reaping"
+    related: ["probe-zombies", "reap-zombies"]
+    
+  - term: "Journal bloat"
+    description: "Systemd journal exceeding size limit"
+    related: ["probe-journal-size", "journal-vacuum"]
+
+flows:
+  - name: "Systemd maintenance"
+    steps:
+      - "Probe systemd failed/degraded state"
+      - "If failed units exist, propose reset-failed"
+      - "On consent, run intervention"

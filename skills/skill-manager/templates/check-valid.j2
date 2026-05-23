@@ -1,0 +1,26 @@
+{# skill-manager: skill check valid #}
+{# Displayed when a skill manifest passes validation #}
+
+## Skill Validation: Valid ✓
+
+**Skill ID:** {{ probes["skill-id"] | default(params.skill_id | default("unknown")) }}
+**Version:** {{ probes["skill-version"] | default("unknown") }}
+**Kind:** {{ probes["skill-kind"] | default("actionable") }}
+
+### Validation Results
+✓ Manifest schema valid
+✓ Symptom names recognized
+✓ Scripts referenced correctly
+✓ IDRS contract satisfied
+
+### Skill Summary
+{% if probes["skill-description"] %}
+{{ probes["skill-description"] }}
+{% endif %}
+
+**Probes:** {{ probes["probe-count"] | default("0") }}
+**Interventions:** {{ probes["intervention-count"] | default("0") }}
+**Max auto risk:** {{ probes["max-auto-risk"] | default("low") }}
+
+---
+*Skill is ready for installation with `russell skill install {{ probes["skill-id"] | default(params.skill_id | default("")) }}`.*

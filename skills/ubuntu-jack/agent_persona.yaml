@@ -1,0 +1,22 @@
+# ubuntu-jack agent persona
+agent:
+  name: "ubuntu-jack"
+  type: "Bot"
+  version: "0.1.0"
+  
+charter:
+  description: "Ubuntu-specific system probes"
+  editor: "russell"
+  
+capabilities:
+  - "probe:ubuntu:release"
+  - "probe:ubuntu:packages"
+  
+rights:
+  - read: "system_info"
+  
+responsibilities:
+  - "probe: Ubuntu release and packages"
+  
+visibility:
+  default: "operator-only"

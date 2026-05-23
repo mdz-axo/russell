@@ -1,0 +1,15 @@
+# hLexicon — scenario-tester
+primary: flowdef
+
+terms:
+  - term: "Scenario test"
+    description: "Repeatable stimulus-response probe"
+    related: ["test:scenario:run"]
+
+flows:
+  - name: "Run scenario"
+    steps:
+      - "Load scenario definition"
+      - "Apply stimulus"
+      - "Measure response"
+      - "Evaluate against thresholds"

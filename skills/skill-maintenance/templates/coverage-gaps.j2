@@ -1,0 +1,18 @@
+{# skill-maintenance: coverage gaps #}
+## Coverage Gap Report
+
+**Total symptoms:** {{ probes["total-symptoms"] | default("0") }}
+**Covered:** {{ probes["covered-symptoms"] | default("0") }}
+**Gaps:** {{ probes["gap-count"] | default("0") }}
+
+### Uncovered Symptoms
+
+{% if probes["gaps"] %}
+| Symptom | Category | Priority |
+|---------|----------|----------|
+{% for gap in probes["gaps"] %}
+| {{ gap.name }} | {{ gap.category }} | {{ gap.priority }} |
+{% endfor %}
+{% else %}
+✓ All symptoms covered.
+{% endif %}

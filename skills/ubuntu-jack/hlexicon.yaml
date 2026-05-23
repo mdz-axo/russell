@@ -1,0 +1,13 @@
+# hLexicon — ubuntu-jack
+primary: flowdef
+
+terms:
+  - term: "Ubuntu release"
+    description: "Ubuntu version and codename"
+    related: ["probe:ubuntu:release"]
+
+flows:
+  - name: "Check Ubuntu"
+    steps:
+      - "Read /etc/os-release"
+      - "Report version and codename"

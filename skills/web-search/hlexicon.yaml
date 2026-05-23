@@ -1,0 +1,18 @@
+# hLexicon — web-search
+primary: flowdef
+
+terms:
+  - term: "Web search"
+    description: "Search the web using Brave Search API"
+    related: ["search:web:query"]
+    
+  - term: "News search"
+    description: "Search recent news articles"
+    related: ["search:web:news"]
+
+flows:
+  - name: "Search web"
+    steps:
+      - "Receive search query"
+      - "Call Brave Search API"
+      - "Return top results with citations"

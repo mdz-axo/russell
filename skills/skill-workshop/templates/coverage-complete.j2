@@ -1,0 +1,31 @@
+{# skill-workshop: coverage complete #}
+{# Displayed when all symptoms have matching skills #}
+
+## Symptom Coverage: Complete ✓
+
+**Total symptoms:** {{ probes["total-symptoms"] | default("0") }}
+**Covered:** {{ probes["covered-symptoms"] | default("0") }}
+**Coverage:** 100%
+
+### Achievement Unlocked! 🎉
+
+All symptoms in the SYMPTOMS catalog have at least one matching skill.
+
+### Coverage Summary
+
+{% if probes["category-coverage"] %}
+| Category | Skills |
+|----------|--------|
+{% for cat in probes["category-coverage"] %}
+| {{ cat.name }} | {{ cat.skill_count }} |
+{% endfor %}
+{% endif %}
+
+### Next Steps
+
+1. **Maintain coverage** — Run `audit` regularly to catch stale skills
+2. **Improve quality** — Evaluate skills for best practices
+3. **Add new symptoms** — As new failure modes are discovered
+
+---
+*Full coverage achieved. Want to audit for stale skills or evaluate skill quality?*

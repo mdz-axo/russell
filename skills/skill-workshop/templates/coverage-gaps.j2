@@ -1,0 +1,51 @@
+{# skill-workshop: coverage gaps report #}
+{# Shows symptoms without matching skills #}
+
+## Symptom Coverage Report
+
+**Total symptoms in catalog:** {{ probes["total-symptoms"] | default("0") }}
+**Covered symptoms:** {{ probes["covered-symptoms"] | default("0") }}
+**Coverage:** {{ probes["coverage-pct"] | default("0") }}%
+
+### Coverage Gaps (symptoms without skills)
+
+{% if probes["uncovered-symptoms"] %}
+| Symptom | Category | Priority | Suggested Skill |
+|---------|----------|----------|----------------|
+{% for symptom in probes["uncovered-symptoms"] %}
+| {{ symptom.name }} | {{ symptom.category }} | {{ symptom.priority }} | {{ symptom.name }}-watcher |
+{% endfor %}
+{% else %}
+✓ All symptoms have matching skills!
+{% endif %}
+
+### Coverage by Category
+
+{% if probes["category-coverage"] %}
+| Category | Covered | Total | % |
+|----------|---------|-------|---|
+{% for cat in probes["category-coverage"] %}
+| {{ cat.name }} | {{ cat.covered }} | {{ cat.total }} | {{ cat.pct }}% |
+{% endfor %}
+{% endif %}
+
+### Recommended Actions
+
+{% if probes["uncovered-symptoms"] %}
+1. **Build skills for high-priority gaps:**
+   ```
+   build <symptom>-watcher
+   ```
+
+2. **Search for existing skills:**
+   ```
+   discover <symptom>
+   ```
+
+3. **Adapt existing skills to cover gaps**
+{% else %}
+✓ Full coverage achieved. Consider auditing for stale skills.
+{% endif %}
+
+---
+*Coverage report complete. Want to build skills for any gaps?*

@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: MIT OR Apache-2.0
+# skill-manager skill template crate
+[package]
+name = "skill-skill-manager"
+version = "0.1.0"
+edition = "2024"
+description = "Enables Jack to build, install, prune, retire, and restore skills autonomously"
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+# No runtime dependencies - templates rendered by russell-skills

@@ -1,0 +1,10 @@
+{# skill-maintenance: quality report #}
+## Skill Quality Report
+
+{% if probes["skills"] %}
+| Skill | Manifest | Scripts | Docs | Tests | Overall |
+|-------|----------|---------|------|-------|---------|
+{% for skill in probes["skills"] %}
+| {{ skill.id }} | {{ skill.manifest_score }} | {{ skill.script_score }} | {{ skill.docs_score }} | {{ skill.test_score }} | {{ skill.overall }} |
+{% endfor %}
+{% endif %}

@@ -1,0 +1,23 @@
+{# skill-maintenance: audit menu #}
+## Skill Maintenance Audit
+
+I can audit your skill registry for:
+
+| Audit Type | Description |
+|------------|-------------|
+| **Staleness** | Skills not run in 30+ days |
+| **Coverage** | Symptoms without matching skills |
+| **Quality** | Skill quality scores |
+| **Deprecation** | Skills recommended for retirement |
+
+### Current State
+**Installed skills:** {{ probes["total-skills"] | default("0") }}
+**Active:** {{ probes["active-skills"] | default("0") }}
+
+### Run Audit
+```
+audit staleness
+audit coverage
+audit quality
+audit deprecation
+```

@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: MIT OR Apache-2.0
+# skill-maintenance skill template crate
+[package]
+name = "skill-skill-maintenance"
+version = "1.0.0"
+edition = "2024"
+description = "Skill lifecycle auditing, staleness detection, and coverage analysis"
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+# No runtime dependencies - templates rendered by russell-skills

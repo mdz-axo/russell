@@ -1,0 +1,12 @@
+{# web-search: image results #}
+## Image Search Results
+
+**Query:** {{ params.query | default("unknown") }}
+
+{% if probes["image-results"] %}
+{% for image in probes["image-results"] %}
+![{{ image.title }}]({{ image.url }})
+{% endfor %}
+{% else %}
+No images found.
+{% endif %}

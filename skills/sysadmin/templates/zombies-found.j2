@@ -1,0 +1,19 @@
+{# sysadmin: zombies found #}
+## Zombie Processes: {{ probes["zombie-count"] }}
+
+**Parent PIDs:** {{ probes["parent-pids"] | default("unknown") }}
+
+### Impact
+- Consuming process table slots
+- May indicate parent process issues
+
+### Recommended Action
+
+Reap zombie processes:
+```bash
+# Sends SIGCHLD to parents
+```
+
+**Risk:** Medium (may restart parent services)
+
+Shall I proceed?

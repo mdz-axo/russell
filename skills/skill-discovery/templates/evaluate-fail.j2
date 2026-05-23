@@ -1,0 +1,46 @@
+{# skill-discovery: evaluate fail #}
+{# Displayed when skill evaluation fails #}
+
+## Skill Evaluation: Fail ✗
+
+**Skill ID:** {{ probes["skill-id"] | default(params.skill_id | default("unknown")) }}
+**Source:** {{ probes["skill-source"] | default("unknown") }}
+**Issues:** {{ probes["issue-count"] | default("1") }}
+
+### Safety Concerns
+
+{% if probes["safety-issues"] %}
+{{ probes["safety-issues"] }}
+{% else %}
+No specific safety issues detected.
+{% endif %}
+
+### Compatibility Issues
+
+{% if probes["compatibility-issues"] %}
+{{ probes["compatibility-issues"] }}
+{% else %}
+No compatibility issues detected.
+{% endif %}
+
+### Quality Issues
+
+{% if probes["quality-issues"] %}
+{{ probes["quality-issues"] }}
+{% else %}
+No quality issues detected.
+{% endif %}
+
+### Recommendation
+
+⚠ **Do NOT install** — Address issues first
+
+### Options
+
+1. **Contact skill author** — Report issues
+2. **Fork and fix** — Create your own version
+3. **Find alternative** — Search for different skill
+4. **Build from scratch** — Create new skill
+
+---
+*Skill has issues that must be resolved before installation.*

@@ -1,0 +1,51 @@
+{# skill-discovery: evaluate pass #}
+{# Displayed when skill evaluation passes #}
+
+## Skill Evaluation: Pass ✓
+
+**Skill ID:** {{ probes["skill-id"] | default(params.skill_id | default("unknown")) }}
+**Source:** {{ probes["skill-source"] | default("unknown") }}
+**Version:** {{ probes["skill-version"] | default("unknown") }}
+
+### Safety Scan Results
+
+✓ No prompt injection detected
+✓ No pipe-to-shell patterns
+✓ No secret exfiltration attempts
+✓ No destructive commands without IDRS
+✓ Risk bands properly declared
+
+### Compatibility Check
+
+{% if probes["hardware-compatible"] == "true" %}
+✓ Hardware compatible
+{% else %}
+⚠ Hardware differences detected: {{ probes["hardware-notes"] | default("unknown") }}
+{% endif %}
+
+{% if probes["os-compatible"] == "true" %}
+✓ OS compatible (Linux)
+{% else %}
+⚠ OS compatibility notes: {{ probes["os-notes"] | default("unknown") }}
+{% endif %}
+
+### Quality Assessment
+
+| Metric | Score |
+|--------|-------|
+| Manifest validity | {{ probes["manifest-score"] | default("N/A") }} |
+| Script coverage | {{ probes["script-score"] | default("N/A") }} |
+| Documentation | {{ probes["docs-score"] | default("N/A") }} |
+| Test coverage | {{ probes["test-score"] | default("N/A") }} |
+
+### Recommendation
+
+✓ **Safe to install**
+
+Install with:
+```
+discover install {{ probes["skill-id"] | default(params.skill_id | default("")) }}
+```
+
+---
+*Skill passed safety and compatibility checks. Ready for installation.*

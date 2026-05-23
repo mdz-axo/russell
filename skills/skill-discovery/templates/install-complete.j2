@@ -1,0 +1,53 @@
+{# skill-discovery: install complete #}
+{# Displayed after installing a discovered skill #}
+
+## Skill Installed ✓
+
+**Skill ID:** {{ probes["installed-skill-id"] | default(params.skill_id | default("unknown")) }}
+**Version:** {{ probes["installed-version"] | default("unknown") }}
+**Source:** {{ probes["skill-source"] | default("unknown") }}
+**State:** Active
+
+### What Was Installed
+
+{% if probes["installed-probes"] %}
+**Probes:** {{ probes["installed-probes"] }}
+{% endif %}
+
+{% if probes["installed-interventions"] %}
+**Interventions:** {{ probes["installed-interventions"] }}
+{% endif %}
+
+### Symptom Coverage
+
+{% if probes["covers-symptoms"] %}
+This skill handles: {{ probes["covers-symptoms"] }}
+{% endif %}
+
+### Post-Install Checklist
+
+1. ✓ Safety scan passed
+2. ✓ Compatibility verified
+3. ✓ Manifest validated
+4. ✓ Scripts present
+5. ⏳ Test probes (recommended)
+
+### Next Steps
+
+1. **Test the skill:**
+   ```
+   run-probe {{ probes["installed-skill-id"] | default(params.skill_id | default("")) }} <probe-id>
+   ```
+
+2. **Update registry:**
+   ```
+   rebuild-cache
+   ```
+
+3. **Verify coverage:**
+   ```
+   coverage
+   ```
+
+---
+*Skill is now active and available for dispatch.*

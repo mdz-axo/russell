@@ -1,0 +1,30 @@
+{# skill-manager: install skill confirmation #}
+{# Confirms successful skill installation #}
+
+## Skill Installed ✓
+
+**Skill ID:** {{ probes["installed-skill-id"] | default(params.skill_id | default("unknown")) }}
+**Version:** {{ probes["installed-version"] | default("unknown") }}
+**State:** Active
+
+### What Was Installed
+{% if probes["installed-probes"] %}
+**Probes:** {{ probes["installed-probes"] }}
+{% endif %}
+
+{% if probes["installed-interventions"] %}
+**Interventions:** {{ probes["installed-interventions"] }}
+{% endif %}
+
+### Symptom Coverage
+{% if probes["covers-symptoms"] %}
+This skill handles: {{ probes["covers-symptoms"] }}
+{% endif %}
+
+### Next Steps
+1. **Test probes:** `russell skill run {{ probes["installed-skill-id"] | default(params.skill_id | default("")) }} --probe <probe-id>`
+2. **Test interventions:** `russell skill run {{ probes["installed-skill-id"] | default(params.skill_id | default("")) }} --intervention <intervention-id>`
+3. **Verify registry:** `russell skill rebuild-cache`
+
+---
+*Skill is now active and available for dispatch.*

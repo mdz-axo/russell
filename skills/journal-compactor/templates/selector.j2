@@ -1,0 +1,13 @@
+{# journal-compactor: selector #}
+{% if params.action == "compact" %}
+  {% set response_template = "compact-confirm" %}
+{% elif params.action == "verify" %}
+  {% if probes["valid"] == "true" %}
+    {% set response_template = "verify-valid" %}
+  {% else %}
+    {% set response_template = "verify-invalid" %}
+  {% endif %}
+{% else %}
+  {% set response_template = "menu" %}
+{% endif %}
+{{ response_template }}

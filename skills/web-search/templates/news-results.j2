@@ -1,0 +1,16 @@
+{# web-search: news results #}
+## News Search Results
+
+**Query:** {{ params.query | default("unknown") }}
+**Freshness:** {{ params.freshness | default("recent") }}
+
+{% if probes["news-results"] %}
+{% for article in probes["news-results"] %}
+### {{ article.title }}
+{{ article.source }} - {{ article.date }}
+[Read more]({{ article.url }})
+
+{% endfor %}
+{% else %}
+No news articles found.
+{% endif %}
