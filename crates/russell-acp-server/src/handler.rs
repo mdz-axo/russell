@@ -29,6 +29,8 @@ pub struct AcpHandler {
     rate_limiter: RateLimiter,
     /// Whether authentication is required for all requests.
     require_auth: bool,
+    /// Inference backend for LLM responses (T6).
+    inference: Option<std::sync::Arc<dyn russell_core::inference::InferencePort>>,
 }
 
 impl AcpHandler {
@@ -46,7 +48,17 @@ impl AcpHandler {
             auth,
             rate_limiter,
             require_auth: false,
+            inference: None,
         }
+    }
+
+    /// Set the inference backend for LLM responses.
+    pub fn with_inference(
+        mut self,
+        inference: std::sync::Arc<dyn russell_core::inference::InferencePort>,
+    ) -> Self {
+        self.inference = Some(inference);
+        self
     }
 
     /// Set whether authentication is required for all requests.
@@ -230,16 +242,36 @@ impl AcpHandler {
         let user_turn = Turn::new(TurnRole::User, &req.message);
         session.add_turn(user_turn);
 
-        // Generate Jack's response.
-        let _conversation_history = session
+        // Build conversation context from recent turns.
+        let conversation_history = session
             .recent_turns(10)
             .iter()
             .map(|t| format!("{}: {}", role_label(t.role), t.content))
             .collect::<Vec<_>>()
             .join("\n");
 
-        // Forward to hKask for LLM response.
-        let response = format!("[Forwarding to hKask: {}]", req.message);
+        // Generate Jack's response using inference backend if available.
+        let response = if let Some(ref inference) = self.inference {
+            let prompt = format!(
+                "{}\n\nConversation History:\n{}\n\nUser: {}",
+                self.persona.system_prompt(),
+                conversation_history,
+                req.message
+            );
+            let soap = russell_core::inference::SoapBundle::new(&prompt);
+            match inference.infer(&prompt, Some(&soap)).await {
+                Ok(resp) => resp.text,
+                Err(e) => {
+                    warn!(error = %e, "inference failed, using fallback");
+                    format!("[Inference unavailable: {}]", e)
+                }
+            }
+        } else {
+            format!(
+                "[No inference backend configured. Message: {}]",
+                req.message
+            )
+        };
 
         // Add assistant turn.
         let assistant_turn = Turn::new(TurnRole::Assistant, &response);

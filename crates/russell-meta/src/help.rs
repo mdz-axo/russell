@@ -428,25 +428,61 @@ fn generate_service_token() -> String {
 ///
 /// The token is stored at `~/.local/state/harness/russell.capability_token`
 /// as base64-encoded JSON matching hKask's `CapabilityToken` schema.
+/// The token is encrypted at rest using age encryption (T10).
 ///
 /// Returns `None` if the token cannot be loaded or generated.
-fn load_capability_token() -> Option<String> {
+pub fn load_capability_token() -> Option<String> {
     use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
     use hmac::{Hmac, Mac};
+    use russell_core::encryption::EncryptionKey;
     use serde_json::json;
     use sha2::{Digest, Sha256};
 
     type HmacSha256 = Hmac<Sha256>;
 
-    let token_path = russell_core::paths::Paths::from_env()
-        .ok()?
-        .state
-        .join("russell.capability_token");
+    let paths = russell_core::paths::Paths::from_env().ok()?;
+    let token_path = paths.state.join("russell.capability_token");
+    let key_path = paths.state.join("russell.encryption_key");
 
-    // Try to load existing token
-    if let Ok(token) = std::fs::read_to_string(&token_path) {
-        let trimmed = token.trim();
+    // Load or generate encryption key
+    let encryption_key = if let Ok(key_str) = std::fs::read_to_string(&key_path) {
+        EncryptionKey::from_string(key_str.trim()).ok()?
+    } else {
+        let key = EncryptionKey::generate();
+        if let Some(parent) = key_path.parent() {
+            let _ = std::fs::create_dir_all(parent);
+        }
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::OpenOptionsExt;
+            let _ = std::fs::OpenOptions::new()
+                .write(true)
+                .create(true)
+                .truncate(true)
+                .mode(0o600)
+                .open(&key_path)
+                .and_then(|mut f| {
+                    std::io::Write::write_all(&mut f, key.to_encoded_string().as_bytes())
+                });
+        }
+        #[cfg(not(unix))]
+        {
+            let _ = std::fs::write(&key_path, key.to_encoded_string());
+        }
+        key
+    };
+
+    // Try to load and decrypt existing token
+    if let Ok(encrypted_token) = std::fs::read_to_string(&token_path) {
+        let trimmed = encrypted_token.trim();
         if !trimmed.is_empty() {
+            // Try to decrypt
+            if let Ok(plaintext) = encryption_key.decrypt(trimmed)
+                && let Ok(token_str) = String::from_utf8(plaintext)
+            {
+                return Some(token_str);
+            }
+            // Fallback: token might be unencrypted (legacy format)
             return Some(trimmed.to_owned());
         }
     }
@@ -492,7 +528,9 @@ fn load_capability_token() -> Option<String> {
 
     let token_b64 = BASE64.encode(serde_json::to_string(&token_json).ok()?.as_bytes());
 
-    // Persist token
+    // Encrypt and persist token
+    let encrypted_token = encryption_key.encrypt(token_b64.as_bytes()).ok()?;
+
     if let Some(parent) = token_path.parent() {
         let _ = std::fs::create_dir_all(parent);
     }
@@ -505,11 +543,11 @@ fn load_capability_token() -> Option<String> {
             .truncate(true)
             .mode(0o600)
             .open(&token_path)
-            .and_then(|mut f| std::io::Write::write_all(&mut f, token_b64.as_bytes()));
+            .and_then(|mut f| std::io::Write::write_all(&mut f, encrypted_token.as_bytes()));
     }
     #[cfg(not(unix))]
     {
-        let _ = std::fs::write(&token_path, &token_b64);
+        let _ = std::fs::write(&token_path, &encrypted_token);
     }
 
     Some(token_b64)

@@ -13,9 +13,11 @@ pub mod error;
 pub mod fallback;
 pub mod health;
 pub mod help;
+pub mod hkask_adapter;
 
 pub use error::{DoctorError, Result};
 pub use help::{HelpOutcome, run_help, run_help_with_endpoint};
+pub use hkask_adapter::HkaskInferenceAdapter;
 
 /// Jack's nurse persona prompt (loaded from `prompts/jack.md`).
 pub const JACK_PERSONA: &str = include_str!("../prompts/jack.md");

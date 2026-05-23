@@ -22,16 +22,31 @@ use crate::error::{AcpError, Result};
 type HmacSha256 = Hmac<Sha256>;
 
 /// Macaroon authenticator.
-#[derive(Debug)]
 pub struct MacaroonAuth {
     /// Root key for validation (optional — if None, auth is skipped in dev mode).
     root_key: Option<Vec<u8>>,
     /// Nonces used for replay protection (token_id -> nonce set).
+    /// Used as fallback when persistent store is unavailable.
     used_nonces: Mutex<HashSet<String>>,
     /// Revoked token IDs.
     revoked_tokens: Mutex<HashSet<String>>,
     /// Whether dev mode (no root key) is explicitly allowed.
     dev_mode_allowed: bool,
+    /// Persistent nonce store (journal writer) for replay protection.
+    /// If Some, nonces are persisted to SQLite and survive restarts.
+    journal: Option<std::sync::Arc<russell_core::journal::JournalWriter>>,
+}
+
+impl std::fmt::Debug for MacaroonAuth {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("MacaroonAuth")
+            .field("root_key", &self.root_key.as_ref().map(|_| "***"))
+            .field("used_nonces", &self.used_nonces)
+            .field("revoked_tokens", &self.revoked_tokens)
+            .field("dev_mode_allowed", &self.dev_mode_allowed)
+            .field("journal", &self.journal.as_ref().map(|_| "JournalWriter"))
+            .finish()
+    }
 }
 
 /// Generate a unique token ID.
@@ -69,7 +84,18 @@ impl MacaroonAuth {
             used_nonces: Mutex::new(HashSet::new()),
             revoked_tokens: Mutex::new(HashSet::new()),
             dev_mode_allowed,
+            journal: None,
         }
+    }
+
+    /// Set the persistent nonce store (journal writer) for replay protection.
+    /// When set, nonces are persisted to SQLite and survive process restarts.
+    pub fn with_journal(
+        mut self,
+        journal: std::sync::Arc<russell_core::journal::JournalWriter>,
+    ) -> Self {
+        self.journal = Some(journal);
+        self
     }
 
     /// Create a new macaroon token with given capabilities.
@@ -152,7 +178,22 @@ impl MacaroonAuth {
         }
 
         // Check replay (nonce must not have been used before).
-        {
+        if let Some(ref journal) = self.journal {
+            // Persistent nonce store — survives restarts.
+            let expires_unix = token
+                .expires_at
+                .map(|dt| dt.timestamp())
+                .unwrap_or(i64::MAX);
+            let replay = journal
+                .check_and_mark_nonce(&token.token_id, &token.nonce, expires_unix)
+                .map_err(|e| AcpError::Internal(format!("nonce store error: {e}")))?;
+            if replay {
+                return Err(AcpError::InvalidToken(
+                    "replay detected: nonce already used".into(),
+                ));
+            }
+        } else {
+            // In-memory fallback — resets on restart.
             let mut nonces = self.used_nonces.lock().unwrap();
             let nonce_key = format!("{}:{}", token.token_id, token.nonce);
             if !nonces.insert(nonce_key) {
@@ -321,6 +362,27 @@ pub struct CapabilityToken {
     pub issuer: String,
     /// Nonce for replay protection.
     pub nonce: String,
+}
+
+impl russell_core::identity::IdentityPort for CapabilityToken {
+    fn principal_id(&self) -> &str {
+        &self.token_id
+    }
+
+    fn has_capability(&self, capability: &str) -> bool {
+        self.capabilities.iter().any(|c| c == capability)
+    }
+
+    fn capabilities(&self) -> Vec<String> {
+        self.capabilities.clone()
+    }
+
+    fn is_valid(&self) -> bool {
+        match self.expires_at {
+            Some(expires) => Utc::now() <= expires,
+            None => true,
+        }
+    }
 }
 
 /// Attenuation (capability restriction).

@@ -20,9 +20,12 @@ pub struct AcpDispatch {
     /// Skills base directory.
     skills_dir: PathBuf,
     /// Journal for evidence logging.
-    journal: Option<JournalWriter>,
+    journal: Option<std::sync::Arc<JournalWriter>>,
     /// Evidence base directory.
     evidence_base: PathBuf,
+    /// Dispatcher pool — cached dispatchers keyed by skill ID (T12).
+    dispatcher_pool:
+        std::sync::Mutex<std::collections::HashMap<String, std::sync::Arc<Dispatcher>>>,
 }
 
 impl AcpDispatch {
@@ -34,11 +37,24 @@ impl AcpDispatch {
             skills_dir,
             journal: None,
             evidence_base,
+            dispatcher_pool: std::sync::Mutex::new(std::collections::HashMap::new()),
         }
     }
 
+    /// Get or create a dispatcher for a skill (pooled).
+    fn get_dispatcher(&self, skill_id: &str) -> std::sync::Arc<Dispatcher> {
+        let mut pool = self.dispatcher_pool.lock().unwrap();
+        if let Some(dispatcher) = pool.get(skill_id) {
+            return std::sync::Arc::clone(dispatcher);
+        }
+        let skill_dir = self.skills_dir.join(skill_id);
+        let dispatcher = std::sync::Arc::new(Dispatcher::new(&skill_dir));
+        pool.insert(skill_id.to_string(), std::sync::Arc::clone(&dispatcher));
+        dispatcher
+    }
+
     /// Set the journal writer for evidence logging.
-    pub fn with_journal(mut self, journal: JournalWriter) -> Self {
+    pub fn with_journal(mut self, journal: std::sync::Arc<JournalWriter>) -> Self {
         self.journal = Some(journal);
         self
     }
@@ -84,9 +100,8 @@ impl AcpDispatch {
             ));
         }
 
-        // Execute the probe.
-        let skill_dir = self.skills_dir.join(skill_id);
-        let dispatcher = Dispatcher::new(&skill_dir);
+        // Execute the probe using pooled dispatcher.
+        let dispatcher = self.get_dispatcher(skill_id);
 
         let outcome = if let Some(ref journal) = self.journal {
             dispatcher
@@ -141,9 +156,8 @@ impl AcpDispatch {
             .find(|p| p.id == probe_id)
             .ok_or_else(|| AcpError::ProbeNotFound(probe_id.to_string()))?;
 
-        // Execute the probe.
-        let skill_dir = self.skills_dir.join(skill_id);
-        let dispatcher = Dispatcher::new(&skill_dir);
+        // Execute the probe using pooled dispatcher.
+        let dispatcher = self.get_dispatcher(skill_id);
 
         let outcome = if let Some(ref journal) = self.journal {
             dispatcher

@@ -7,10 +7,13 @@
 
 pub mod channel;
 pub mod config;
+pub mod encryption;
 pub mod env;
 pub mod error;
 pub mod event;
 pub mod hash_chain;
+pub mod identity;
+pub mod inference;
 pub mod journal;
 pub mod paths;
 pub mod profile;

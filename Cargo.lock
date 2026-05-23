@@ -2237,6 +2237,7 @@ version = "0.20.0"
 dependencies = [
  "age",
  "anyhow",
+ "async-trait",
  "base64 0.22.1",
  "chrono",
  "governor",
@@ -2314,6 +2315,9 @@ dependencies = [
 name = "russell-core"
 version = "0.20.0"
 dependencies = [
+ "age",
+ "async-trait",
+ "base64 0.22.1",
  "hex",
  "insta",
  "rusqlite",
@@ -2356,6 +2360,7 @@ dependencies = [
 name = "russell-meta"
 version = "0.20.0"
 dependencies = [
+ "async-trait",
  "base64 0.22.1",
  "hex",
  "hmac",
@@ -2384,18 +2389,6 @@ version = "0.20.0"
 dependencies = [
  "rusqlite",
  "russell-core",
- "serde_json",
- "tempfile",
- "tracing",
-]
-
-[[package]]
-name = "russell-reflex"
-version = "0.20.0"
-dependencies = [
- "russell-core",
- "russell-proprio",
- "serde",
  "serde_json",
  "tempfile",
  "tracing",

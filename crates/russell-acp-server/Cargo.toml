@@ -60,6 +60,7 @@ hex = "0.4"
 
 # Token encryption at rest (Bruce Schneier: secrets must be encrypted)
 age = { version = "0.11", features = ["armor"] }
+async-trait.workspace = true
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["test-util"] }

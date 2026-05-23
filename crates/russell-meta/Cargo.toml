@@ -28,6 +28,7 @@ sha2.workspace = true
 hex.workspace = true
 hmac = "0.12"
 base64 = "0.22"
+async-trait.workspace = true
 regex = "1"
 lazy_static = "1"
 

@@ -435,6 +435,43 @@ impl JournalWriter {
         self.last_write_unix_s.store(now, Ordering::Relaxed);
         Ok(())
     }
+
+    /// Check if a nonce has been used and mark it as used if not.
+    /// Returns true if the nonce was already used (replay detected).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`CoreError::Sqlite`] on DB errors.
+    pub fn check_and_mark_nonce(
+        &self,
+        token_id: &str,
+        nonce: &str,
+        expires_at: i64,
+    ) -> Result<bool> {
+        // Clean up expired nonces first
+        self.conn.execute(
+            "DELETE FROM used_nonces WHERE expires_at < ?1",
+            params![crate::time::now_unix()],
+        )?;
+
+        // Check if nonce exists
+        let mut stmt = self
+            .conn
+            .prepare("SELECT 1 FROM used_nonces WHERE token_id = ?1 AND nonce = ?2")?;
+        let exists = stmt.exists(params![token_id, nonce])?;
+
+        if exists {
+            return Ok(true);
+        }
+
+        // Mark nonce as used
+        self.conn.execute(
+            "INSERT INTO used_nonces (token_id, nonce, expires_at) VALUES (?1, ?2, ?3)",
+            params![token_id, nonce, expires_at],
+        )?;
+
+        Ok(false)
+    }
 }
 
 impl JournalReader {
