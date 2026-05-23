@@ -1,0 +1,40 @@
+{# okapi-watcher: GPU fallback warning #}
+{# Rendered when GPU libraries are missing #}
+
+## Okapi Status: GPU Fallback ⚠
+
+**Issue:** GPU acceleration unavailable - falling back to CPU inference
+
+### Impact
+- Inference will be **significantly slower**
+- Large models may fail to load
+- Memory pressure on system RAM
+
+### Diagnostic Details
+{% if probes["probe-gpu-libs-error"] %}
+**Error:** {{ probes["probe-gpu-libs-error"] }}
+{% endif %}
+
+**GPU VRAM:** {{ host.gpu_vram_pct | default("unknown") }}%
+**GPU Temp:** {{ host.gpu_temp_c | default("unknown") }}°C
+
+### Recommended Actions
+
+1. **Check GPU drivers:**
+   ```bash
+   nvidia-smi  # NVIDIA
+   rocm-smi    # AMD
+   ```
+
+2. **Verify CUDA/ROCm installation:**
+   ```bash
+   ldconfig -p | grep cuda
+   ```
+
+3. **Restart Okapi** (may reload GPU libraries):
+   ```bash
+   systemctl --user restart okapi
+   ```
+
+---
+*Okapi watcher detected GPU fallback. Performance degraded.*

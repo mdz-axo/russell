@@ -23,6 +23,7 @@ tracing.workspace = true
 zeroize.workspace = true
 sha2 = "0.10"
 hex = "0.4"
+minijinja.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true

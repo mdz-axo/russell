@@ -1,0 +1,14 @@
+{# okapi-watcher: selector template #}
+{# Chooses the appropriate response template based on probe results #}
+
+{% if probes["probe-health"] == "unhealthy" %}
+  {% set response_template = "health-critical" %}
+{% elif probes["probe-gpu-libs"] == "missing" %}
+  {% set response_template = "gpu-fallback" %}
+{% elif probes["probe-models"] == "empty" %}
+  {% set response_template = "no-models" %}
+{% else %}
+  {% set response_template = "health-ok" %}
+{% endif %}
+
+{{ response_template }}

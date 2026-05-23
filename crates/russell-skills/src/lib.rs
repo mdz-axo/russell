@@ -34,6 +34,9 @@ pub mod dispatch;
 /// Skill registry — cache, lifecycle, lookup, safety scanner.
 pub mod registry;
 
+/// Jinja2 template support for skill prompts.
+pub mod templates;
+
 pub use symptom_catalog::SYMPTOMS;
 
 /// Errors that can occur during manifest loading.

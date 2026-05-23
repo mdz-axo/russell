@@ -1,0 +1,27 @@
+{# okapi-watcher: health critical #}
+{# Rendered when Okapi is unhealthy or unresponsive #}
+
+## Okapi Status: Critical ⚠
+
+**Instance:** {{ params.instance | default("local") }}
+**Issue:** {{ probes["probe-health-error"] | default("Unresponsive") }}
+
+### Diagnostic Summary
+- **Health probe:** {{ probes["probe-health"] | default("failed") }}
+- **Last successful check:** {{ probes["probe-health-timestamp"] | default("unknown") }}
+- **Systemd state:** {{ probes["probe-systemd-state"] | default("unknown") }}
+
+### Recommended Action
+
+I recommend restarting the Okapi service:
+
+```bash
+systemctl --user restart okapi
+```
+
+**Risk level:** Low (idempotent, auto-rollback on failure)
+
+Would you like me to proceed with the restart?
+
+---
+*Okapi watcher detected critical health issue. Intervention recommended.*

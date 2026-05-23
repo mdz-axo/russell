@@ -1,0 +1,33 @@
+# hLexicon — human-readable terms for okapi-watcher skill
+# Used by Jack (the Nurse) to explain skill actions to the operator
+
+primary: flowdef
+
+terms:
+  - term: "Okapi health"
+    description: "Whether the local Okapi instance is responding normally"
+    related: ["probe-health", "llm_slow"]
+    
+  - term: "Model inventory"
+    description: "List of AI models available through Okapi"
+    related: ["probe-models", "gpu_fallback_to_cpu"]
+    
+  - term: "GPU acceleration"
+    description: "Whether Okapi is using GPU for inference"
+    related: ["probe-gpu-libs", "resource_exhaustion"]
+    
+  - term: "Capability check"
+    description: "Verify Okapi supports required AI features"
+    related: ["probe-capabilities"]
+    
+  - term: "Restart Okapi"
+    description: "Restart the local Okapi systemd service"
+    related: ["intervention:restart-okapi"]
+
+flows:
+  - name: "Okapi health check"
+    steps:
+      - "Run probe-health to check Okapi responsiveness"
+      - "Run probe-models to list available models"
+      - "Run probe-gpu-libs to verify GPU acceleration"
+      - "If any probe fails, recommend restart-okapi intervention"

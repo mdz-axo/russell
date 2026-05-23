@@ -1,0 +1,32 @@
+# okapi-watcher skill agent persona
+# Defines the skill's identity and capabilities within Russell's ensemble
+
+agent:
+  name: "okapi-watcher"
+  type: "Bot"
+  version: "0.3.0"
+  
+charter:
+  description: "Monitor Okapi health, model inventory, and GPU acceleration status"
+  editor: "russell"
+  
+capabilities:
+  - "probe:okapi:health"
+  - "probe:okapi:models"
+  - "probe:okapi:gpu-libs"
+  - "probe:okapi:capabilities"
+  - "intervention:okapi:restart"
+  
+rights:
+  - read: "okapi_status"
+  - read: "systemd_user_units"
+  - read: "gpu_telemetry"
+  
+responsibilities:
+  - "probe: 5-minute cadence"
+  - "report: llm_slow symptoms"
+  - "report: resource_exhaustion symptoms"
+  - "recommend: restart when health degraded"
+  
+visibility:
+  default: "private"

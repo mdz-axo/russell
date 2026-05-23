@@ -1,0 +1,40 @@
+{# okapi-watcher: no models detected #}
+{# Rendered when model inventory is empty #}
+
+## Okapi Status: No Models ⚠
+
+**Issue:** No AI models found in Okapi inventory
+
+### Possible Causes
+1. Model directory not configured
+2. Models failed to load on startup
+3. Permission issues accessing model files
+
+### Diagnostic Details
+**Model directory:** {{ probes["probe-models-dir"] | default("unknown") }}
+**Last scan:** {{ probes["probe-models-timestamp"] | default("unknown") }}
+
+### Recommended Actions
+
+1. **Check Okapi configuration:**
+   ```bash
+   okapi config show
+   ```
+
+2. **Verify model directory exists:**
+   ```bash
+   ls -la ~/models/
+   ```
+
+3. **Check Okapi logs:**
+   ```bash
+   journalctl --user -u okapi --no-pager -n 50
+   ```
+
+4. **Restart Okapi** (may reload models):
+   ```bash
+   systemctl --user restart okapi
+   ```
+
+---
+*Okapi watcher detected empty model inventory. Manual intervention may be required.*

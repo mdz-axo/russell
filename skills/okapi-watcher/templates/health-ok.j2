@@ -1,0 +1,31 @@
+{# okapi-watcher: health check OK #}
+{# Rendered when Okapi is healthy and responding #}
+
+## Okapi Status: Healthy ✓
+
+**Instance:** {{ params.instance | default("local") }}
+**Last Check:** {{ probes["probe-health-timestamp"] | default("unknown") }}
+
+### Model Inventory
+{% if probes["probe-models-output"] %}
+{{ probes["probe-models-output"] }}
+{% else %}
+No models detected.
+{% endif %}
+
+### GPU Acceleration
+{% if probes["probe-gpu-libs"] == "available" %}
+✓ GPU acceleration active
+{% elif probes["probe-gpu-libs"] == "missing" %}
+⚠ GPU libraries missing - falling back to CPU
+{% else %}
+? GPU status unknown
+{% endif %}
+
+### Capabilities
+{% if probes["probe-capabilities-output"] %}
+{{ probes["probe-capabilities-output"] }}
+{% endif %}
+
+---
+*Okapi watcher probe complete. No action required.*

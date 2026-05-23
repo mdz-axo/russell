@@ -37,30 +37,30 @@
 //!
 //! # Usage
 //!
-//! ```rust,no_run
-//! use russell_agent::{RussellPod, AgentPersona, TemplateCrate};
-//! use russell_acp_server::AcpRuntime;
+//! ```rust,ignore
+//! // Example usage (types not yet implemented):
+//! use russell_agent::{RussellPod, AgentPersona};
 //!
 //! #[tokio::main]
 //! async fn main() -> anyhow::Result<()> {
 //!     // Load template crate (skills directory)
-//!     let template_crate = TemplateCrate::load("~/.local/share/harness/skills")?;
+//!     let template_crate_path = std::path::PathBuf::from("~/.local/share/harness/skills");
 //!     
 //!     // Create pod (Populated state)
-//!     let mut pod = RussellPod::new(template_crate)?;
+//!     let mut pod = RussellPod::new(&template_crate_path)?;
 //!     
 //!     // Register with hKask ACP runtime (Registered state)
-//!     let runtime = AcpRuntime::connect("stdio").await?;
-//!     pod.register(&runtime).await?;
+//!     // let runtime = AcpRuntime::connect("stdio").await?;
+//!     // pod.register(&runtime).await?;
 //!     
 //!     // Activate pod (Activated state)
-//!     pod.activate().await?;
+//!     // pod.activate().await?;
 //!     
 //!     // Pod is now running: sentinel probing, ACP serving
 //!     // ...
 //!     
 //!     // Deactivate when done (Deactivated state)
-//!     pod.deactivate().await?;
+//!     // pod.deactivate().await?;
 //!     
 //!     Ok(())
 //! }

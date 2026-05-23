@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: MIT OR Apache-2.0
+# okapi-watcher skill template crate
+[package]
+name = "skill-okapi-watcher"
+version = "0.3.0"
+edition = "2024"
+description = "Monitor local Okapi instance health and model inventory"
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+# No runtime dependencies - templates rendered by russell-skills

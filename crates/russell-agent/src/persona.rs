@@ -109,6 +109,7 @@ pub struct AgentPersona {
     pub visibility: AgentVisibility,
 }
 
+/// Agent metadata — name, type, version, and identity.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AgentMeta {
     /// Agent name (e.g., "russell")

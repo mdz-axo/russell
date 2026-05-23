@@ -5,7 +5,7 @@ use std::path::PathBuf;
 use uuid::Uuid;
 
 use crate::persona::AgentPersona;
-use crate::lifecycle::{PodLifecycleState, LifecycleError, LifecycleResult, validate_transition};
+use crate::lifecycle::{PodLifecycleState, LifecycleResult, validate_transition};
 use crate::cns::CnsEmitter;
 use crate::artifacts::ArtifactStore;
 
@@ -99,9 +99,6 @@ pub struct RussellPod {
     
     /// Sentinel handle (if activated).
     sentinel: Option<SentinelHandle>,
-    
-    /// Base directory for agent artifacts.
-    base_dir: PathBuf,
 }
 
 /// ACP server handle.
@@ -161,7 +158,6 @@ impl RussellPod {
             artifacts,
             acp_server: None,
             sentinel: None,
-            base_dir: template_crate_path,
         };
         
         // Emit CNS span for pod population
