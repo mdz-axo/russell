@@ -19,7 +19,7 @@ of every meaningful development session.
 
 ## 1. Headline
 
-- **Security Hardening (Phase 5) — COMPLETE** (2026-05-23). Unified risk types, DNS rebinding protection, configurable endpoints, service token auth, hardened hash chain, hexagonal ports. 256 tests pass.
+- **Security Hardening (Phase 5) — COMPLETE** (2026-05-23). Unified risk types, DNS rebinding protection, configurable endpoints, service token auth, hardened hash chain, hexagonal ports. 288 tests pass.
 - **Documentation Refresh — COMPLETE** (2026-05-22). 35 files archived, 79 retained. Link integrity improved.
 - **Phase 0 (skeleton, read-only observation) — COMPLETE** as of 2026-04-18.
 - **Phase 1 (MVP Nurse — `russell jack`) — COMPLETE.**
@@ -27,7 +27,7 @@ of every meaningful development session.
 - **Phase 1c (20-day unattended soak) — CLOSED.**
 - **Phase 2 (observation sharpened) — COMPLETE.** Self-vitals (5), rule engine, EWMA baselines, process probes (7), GPU probes (5), disk probes (2), systemd probes (3). Baseline deviation integrated into Jack's SOAP objective.
 - **Phase 3 (skills and dispatch) — COMPLETE.** Extended with skill lifecycle management: workshop REPL (`russell workshop`), registry cache (`local-cache.yaml`), safety scanner (7 rules for manifest + KNOWLEDGE.md), skill discovery pipeline, and scenario testing skill (`scenario-tester`). 12 skills loaded (5 actionable with probes, 7 knowledge). `russell skill run` respects manifest `timeout:` field.
-- **Phase 4 (MCP surface, real skills, operational depth) — COMPLETE.** All skill lifecycle gaps closed (2026-05-20): `fetch <url> <name>` downloads skills from URLs with safety scanning, `build <name>` creates skill skeletons on disk, `adapt <name>` modifies manifests via LLM + editor, `search --remote` loads `~/.config/harness/registry-sources.yaml` and queries Brave Search API, batch operations (`prune --all-stale`, `install --all-evaluated`). `skill-manager` bundled meta-skill enables Jack to build, install, prune, restore, and delete skills from chat via ACTION syntax. Registry telemetry wired: `probe_runs`, `intervention_runs`, `avg_probe_duration_ms`, and `last_probe_run_at` updated on every execution. Quality scoring (`compute_score()`) operational. End-to-end scenario pipeline: `scenario-full` probe chains run-okapi → evaluate → journal. 218 tests pass. 21 scenario tests pass.
+- **Phase 4 (MCP surface, real skills, operational depth) — COMPLETE.** All skill lifecycle gaps closed (2026-05-20): `fetch <url> <name>` downloads skills from URLs with safety scanning, `build <name>` creates skill skeletons on disk, `adapt <name>` modifies manifests via LLM + editor, `search --remote` loads `~/.config/harness/registry-sources.yaml` and queries Brave Search API, batch operations (`prune --all-stale`, `install --all-evaluated`). `skill-manager` bundled meta-skill enables Jack to build, install, prune, restore, and delete skills from chat via ACTION syntax. Registry telemetry wired: `probe_runs`, `intervention_runs`, `avg_probe_duration_ms`, and `last_probe_run_at` updated on every execution. Quality scoring (`compute_score()`) operational. End-to-end scenario pipeline: `scenario-full` probe chains run-okapi → evaluate → journal. 288 tests pass. 21 scenario tests pass.
 - **Architecture:** JR-1 austerity maintained throughout. Seven ADRs deferred.
 
 ## 2. What exists today
@@ -47,7 +47,7 @@ of every meaningful development session.
 
 ### Code
 
-- Rust workspace with 7 crates (all active).
+- Rust workspace with 11 crates (all active).
 - `russell-core` implements paths, event schema (`Severity`/`Scope`
   with `Display`+`FromStr`), profile, journal (SQLite + WAL +
   migrations), telemetry, time (`approx_days_between`).
@@ -61,14 +61,13 @@ of every meaningful development session.
   Includes `AutoimmuneGuard` (process-wide mutex for future meta-Doctor).
   Detects degraded internal state (slow LLM, journal stall, timer drift)
   before the operator notices. All vitals are read-only; no mutation.
-- `russell-cli` implements seventeen verbs: `status`, `list`,
-  `profile [--init]`, `digest`, `sentinel-once`, `jack`,
-  `chat`, `skill` (subcommands: `list`, `run`, `stats`, `check`,
-  `install`, `prune`, `restore`, `retire`), `workshop`,
-  `okapi-probe`, `proprio`, `mcp-tools`.
-  `chat` is split into 7 submodules (consent, commands, execute,
-  hkask, objective, spinner, history) for maintainability.
-- 218 tests passing.
+- `russell-cli` implements 18 subcommands: `status`, `pod-status`,
+  `pod-activate`, `pod-deactivate`, `pod-persona-show`,
+  `pod-artifacts-list`, `pod-artifacts-export`, `list`,
+  `digest`, `sentinel-once`, `jack`, `skill-list`, `skill-run`,
+  `skill-install`, `skill-prune`, `proprio`, `self-triage`,
+  `docs`, `verify-journal`.
+- 288 tests passing.
 - 21 scenario tests passing (`scenario-tests.sh`).
 - 12 skills loaded (okapi-watcher, web-search, skill-discovery,
   skill-workshop, skill-maintenance, scenario-tester, sysadmin,
