@@ -128,9 +128,6 @@ pub struct SessionMessageRequest {
     pub session_id: String,
     /// Message content.
     pub message: String,
-    /// Correlation ID for tracing.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub correlation_id: Option<String>,
 }
 
 /// Session message response.

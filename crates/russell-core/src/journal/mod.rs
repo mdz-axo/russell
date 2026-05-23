@@ -171,6 +171,8 @@ pub struct EventRow {
     pub action: String,
     /// One-line summary, if any.
     pub summary: Option<String>,
+    /// Evidence bundle path, if any (Task 13).
+    pub evidence_ref: Option<String>,
 }
 
 impl JournalWriter {
@@ -523,6 +525,7 @@ impl JournalReader {
                     module: r.get(5)?,
                     action: r.get(6)?,
                     summary: r.get(7)?,
+                    evidence_ref: None,
                 })
             })?
             .collect::<std::result::Result<Vec<_>, _>>()?;
@@ -1214,6 +1217,7 @@ impl JournalReader {
                     module: r.get(5)?,
                     action: r.get(6)?,
                     summary: r.get(7)?,
+                    evidence_ref: None,
                 })
             })?
             .collect::<std::result::Result<Vec<_>, _>>()?;
@@ -1336,6 +1340,72 @@ impl JournalReader {
     /// Raw read-only connection for internal harness use.
     pub fn open_ro_conn(&self) -> Result<Connection> {
         self.open_ro()
+    }
+
+    /// Quick spot-check of the journal hash chain. Verifies the last 10
+    /// events. Returns:
+    /// - `Some(true)` if intact or no chained events exist
+    /// - `Some(false)` if a chain break was detected
+    /// - `None` if the check could not run (DB error)
+    pub fn check_chain_integrity(&self) -> Option<bool> {
+        let conn = self.open_ro().ok()?;
+        let mut stmt = conn
+            .prepare(
+                "SELECT prev_hash, payload, hash FROM events \
+                 WHERE hash IS NOT NULL \
+                 ORDER BY ts_unix DESC, id DESC \
+                 LIMIT 10",
+            )
+            .ok()?;
+
+        let links: Vec<(String, String, String)> = stmt
+            .query_map([], |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, String>(2)?,
+                ))
+            })
+            .ok()?
+            .filter_map(|r| r.ok())
+            .collect();
+
+        if links.is_empty() {
+            return Some(true);
+        }
+
+        let links: Vec<_> = links.into_iter().rev().collect();
+
+        match crate::hash_chain::verify_chain(&links) {
+            crate::hash_chain::ChainVerdict::Intact { .. } => Some(true),
+            crate::hash_chain::ChainVerdict::Empty => Some(true),
+            crate::hash_chain::ChainVerdict::Broken { .. } => Some(false),
+        }
+    }
+
+    /// Retrieve the N most recent events that have non-NULL evidence_ref.
+    pub fn recent_with_evidence(&self, limit: usize) -> Result<Vec<EventRow>> {
+        let conn = self.open_ro()?;
+        let mut stmt = conn.prepare(
+            "SELECT id, ts, severity, scope, tier, module, action, summary, evidence_ref \
+             FROM events WHERE evidence_ref IS NOT NULL AND evidence_ref != '' \
+             ORDER BY ts_unix DESC, id DESC LIMIT ?1",
+        )?;
+        let rows = stmt.query_map(rusqlite::params![limit as i64], |row| {
+            Ok(EventRow {
+                id: row.get(0)?,
+                ts: row.get(1)?,
+                severity: row.get::<_, String>(2)?.parse().unwrap_or(Severity::Info),
+                scope: row.get::<_, String>(3)?.parse().unwrap_or(Scope::Host),
+                tier: row.get(4)?,
+                module: row.get(5)?,
+                action: row.get(6)?,
+                summary: row.get(7)?,
+                evidence_ref: row.get(8)?,
+            })
+        })?;
+        rows.collect::<std::result::Result<Vec<_>, _>>()
+            .map_err(|e| CoreError::Invariant(format!("query failed: {e}")))
     }
 }
 

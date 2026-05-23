@@ -29,7 +29,7 @@ impl RateLimiter {
     /// Check rate limit for a token.
     pub fn check(&mut self, token: &str) -> Result<()> {
         let now = Instant::now();
-        let calls = self.calls.entry(token.to_string()).or_insert(Vec::new());
+        let calls = self.calls.entry(token.to_string()).or_default();
 
         // Remove old timestamps outside the window.
         calls.retain(|t| now - *t < self.window);
@@ -47,7 +47,7 @@ impl RateLimiter {
     /// Get remaining calls for a token.
     pub fn remaining(&mut self, token: &str) -> u32 {
         let now = Instant::now();
-        let calls = self.calls.entry(token.to_string()).or_insert(Vec::new());
+        let calls = self.calls.entry(token.to_string()).or_default();
         calls.retain(|t| now - *t < self.window);
         self.limit.saturating_sub(calls.len() as u32)
     }

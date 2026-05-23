@@ -36,7 +36,7 @@ impl EncryptionKey {
     }
 
     /// Export as string (Bech32 format for storage).
-    pub fn to_string(&self) -> String {
+    pub fn to_encoded_string(&self) -> String {
         self.secret_key.to_string().expose_secret().to_string()
     }
 
@@ -91,7 +91,7 @@ impl EncryptionKey {
 
 /// Encrypt capability token JSON.
 pub fn encrypt_token(token: &crate::auth::CapabilityToken, key: &EncryptionKey) -> Result<String> {
-    let json = serde_json::to_vec(token).map_err(|e| AcpError::Serialization(e))?;
+    let json = serde_json::to_vec(token).map_err(AcpError::Serialization)?;
 
     key.encrypt(&json)
 }
@@ -116,7 +116,7 @@ mod tests {
     #[test]
     fn test_key_generation() {
         let key = EncryptionKey::generate();
-        assert!(!key.to_string().is_empty());
+        assert!(!key.to_encoded_string().is_empty());
     }
 
     #[test]
@@ -154,7 +154,7 @@ mod tests {
     #[test]
     fn test_key_export_import() {
         let key1 = EncryptionKey::generate();
-        let encoded = key1.to_string();
+        let encoded = key1.to_encoded_string();
 
         let key2 = EncryptionKey::from_string(&encoded).unwrap();
 

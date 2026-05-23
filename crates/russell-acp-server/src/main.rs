@@ -60,8 +60,8 @@ async fn main() -> anyhow::Result<()> {
     let rate_limiter = RateLimiter::default();
 
     // Create handler and server.
-    let handler = AcpHandler::new(persona, dispatch, auth, rate_limiter)
-        .with_require_auth(require_auth);
+    let handler =
+        AcpHandler::new(persona, dispatch, auth, rate_limiter).with_require_auth(require_auth);
     let server = AcpServer::new(handler);
 
     // Serve over stdio.

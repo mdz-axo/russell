@@ -11,6 +11,7 @@
 use std::collections::HashSet;
 use std::sync::Mutex;
 
+use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
 use chrono::{DateTime, Utc};
 use hmac::{Hmac, Mac as MacTrait};
 use serde::{Deserialize, Serialize};
@@ -105,7 +106,7 @@ impl MacaroonAuth {
                 mac.update(attenuation.value.as_bytes());
             }
             let result = mac.finalize();
-            base64::encode(result.into_bytes())
+            BASE64.encode(result.into_bytes())
         } else {
             // Dev mode: no signature (only if explicitly allowed)
             if !self.dev_mode_allowed {
@@ -113,7 +114,7 @@ impl MacaroonAuth {
                     "root key required in production mode".into(),
                 ));
             }
-            base64::encode(&identifier.as_bytes())
+            BASE64.encode(identifier.as_bytes())
         };
 
         Ok(CapabilityToken {
@@ -193,7 +194,7 @@ impl MacaroonAuth {
                 mac.update(attenuation.value.as_bytes());
             }
             let result = mac.finalize();
-            base64::encode(result.into_bytes())
+            BASE64.encode(result.into_bytes())
         };
 
         // Constant-time comparison to prevent timing attacks
@@ -241,17 +242,21 @@ impl MacaroonAuth {
             if let Some(val) = part.strip_prefix("id:") {
                 token_id = val.to_string();
             } else if let Some(val) = part.strip_prefix("capabilities:") {
-                capabilities = val.split(',').filter(|s| !s.is_empty()).map(String::from).collect();
+                capabilities = val
+                    .split(',')
+                    .filter(|s| !s.is_empty())
+                    .map(String::from)
+                    .collect();
             } else if let Some(val) = part.strip_prefix("issuer:") {
                 issuer = val.to_string();
             } else if let Some(val) = part.strip_prefix("nonce:") {
                 nonce = val.to_string();
-            } else if let Some(val) = part.strip_prefix("expires:") {
-                if val != "never" {
-                    expires_at = DateTime::parse_from_rfc3339(val)
-                        .ok()
-                        .map(|dt| dt.with_timezone(&Utc));
-                }
+            } else if let Some(val) = part.strip_prefix("expires:")
+                && val != "never"
+            {
+                expires_at = DateTime::parse_from_rfc3339(val)
+                    .ok()
+                    .map(|dt| dt.with_timezone(&Utc));
             }
         }
 

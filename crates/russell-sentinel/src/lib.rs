@@ -76,8 +76,9 @@ use probes::Sample;
 use russell_core::Result;
 use russell_core::RuleSet;
 use russell_core::event::{Event, Scope, Severity};
+use russell_core::journal::JournalWriter;
+use russell_core::journal::port::JournalReadPort;
 use russell_core::journal::port::JournalWritePort;
-use russell_core::journal::{JournalReader, JournalWriter};
 use russell_core::time::Clock;
 
 /// Run the probe set once and append samples to the journal.
@@ -111,7 +112,7 @@ pub fn run_once_with_registry(
 pub fn run_once_with_rules(
     writer: &JournalWriter,
     rules: &RuleSet,
-    reader: Option<&JournalReader>,
+    reader: Option<&dyn JournalReadPort>,
 ) -> Result<(usize, Vec<Event>)> {
     let samples = probes::collect();
     journal_samples(writer, &samples)?;
@@ -130,7 +131,7 @@ pub fn run_once_with_rules(
 pub fn run_once_with_rules_and_registry(
     writer: &JournalWriter,
     rules: &RuleSet,
-    reader: Option<&JournalReader>,
+    reader: Option<&dyn JournalReadPort>,
     registry: &probes::ProbeRegistry,
 ) -> Result<(usize, Vec<Event>)> {
     let samples = probes::collect_with(registry);
@@ -216,7 +217,7 @@ pub fn evaluate_samples_basic(rules: &RuleSet, samples: &[Sample]) -> Vec<Event>
 pub fn evaluate_samples_with_rates(
     rules: &RuleSet,
     samples: &[Sample],
-    reader: &JournalReader,
+    reader: &dyn JournalReadPort,
 ) -> Vec<Event> {
     let now = russell_core::time::now_unix();
 
@@ -233,7 +234,9 @@ pub fn evaluate_samples_with_rates(
         }
 
         // Rate-of-change check: compare against previous sample.
-        if let Some((prev_val, prev_ts)) = reader.previous_sample(&s.name, now) {
+        if let Ok(Some((prev_val, prev_ts))) =
+            <dyn JournalReadPort>::previous_sample(reader, &s.name, now)
+        {
             let dt = ((now - prev_ts).max(1)) as f64;
             let rate = (v - prev_val).abs() / dt;
             let sev_rate = rules.evaluate_rate(&s.name, rate);
@@ -281,7 +284,7 @@ fn build_breach_event(
 
 /// Evaluate externally-written scenario metrics against the rule set.
 pub fn evaluate_scenario_samples(
-    reader: &JournalReader,
+    reader: &dyn JournalReadPort,
     rules: &RuleSet,
     window_seconds: i64,
     existing_events: &[Event],
@@ -289,7 +292,7 @@ pub fn evaluate_scenario_samples(
     let now = russell_core::time::now_unix();
     let since = now - window_seconds;
 
-    let samples = match reader.host_samples_summary(since, now) {
+    let samples = match <dyn JournalReadPort>::host_samples_summary(reader, since, now) {
         Ok(s) => s,
         Err(_) => {
             tracing::debug!("cannot read scenario samples for rule evaluation");

@@ -19,6 +19,7 @@ pub struct AcpHandler {
     /// Session manager.
     sessions: SessionManager,
     /// Jack persona.
+    #[allow(dead_code)]
     persona: JackPersonaProjection,
     /// Skill dispatch.
     dispatch: AcpDispatch,
@@ -75,15 +76,15 @@ impl AcpHandler {
         }
 
         // Check rate limit (if auth provided).
-        if let Some(ref auth) = request.auth {
-            if let Err(e) = self.rate_limiter.check(&auth.token) {
-                return JsonRpcResponse {
-                    jsonrpc: "2.0".to_string(),
-                    id: request.id,
-                    result: None,
-                    error: Some(JsonRpcError::from(e)),
-                };
-            }
+        if let Some(ref auth) = request.auth
+            && let Err(e) = self.rate_limiter.check(&auth.token)
+        {
+            return JsonRpcResponse {
+                jsonrpc: "2.0".to_string(),
+                id: request.id,
+                result: None,
+                error: Some(JsonRpcError::from(e)),
+            };
         }
 
         // Validate auth (if provided).
@@ -105,10 +106,22 @@ impl AcpHandler {
 
         // Dispatch to method handler.
         let result = match request.method.as_str() {
-            "acp/session.create" => self.create_session(request.params, validated_token.as_ref()).await,
-            "acp/session.message" => self.session_message(request.params, validated_token.as_ref()).await,
-            "acp/session.close" => self.close_session(request.params, validated_token.as_ref()).await,
-            "acp/session.status" => self.session_status(request.params, validated_token.as_ref()).await,
+            "acp/session.create" => {
+                self.create_session(request.params, validated_token.as_ref())
+                    .await
+            }
+            "acp/session.message" => {
+                self.session_message(request.params, validated_token.as_ref())
+                    .await
+            }
+            "acp/session.close" => {
+                self.close_session(request.params, validated_token.as_ref())
+                    .await
+            }
+            "acp/session.status" => {
+                self.session_status(request.params, validated_token.as_ref())
+                    .await
+            }
             "acp/capabilities" => self.get_capabilities(request.params).await,
             "acp/skill/info" => self.get_skill_info(request.params).await,
             "acp/skill/run" => self.run_skill(request.params).await,
@@ -168,7 +181,9 @@ impl AcpHandler {
             .map_err(|e| AcpError::InvalidRequest(format!("invalid params: {}", e)))?;
 
         let token_id = token.map(|t| t.token_id.clone());
-        let session_id = self.sessions.create_session_with_token(&req.persona, token_id);
+        let session_id = self
+            .sessions
+            .create_session_with_token(&req.persona, token_id);
         info!(session_id = %session_id, "Created ACP session");
 
         Ok(json!(CreateSessionResponse {
@@ -193,7 +208,10 @@ impl AcpHandler {
 
         let session_id = req.session_id.clone();
 
-        if !self.sessions.verify_session_ownership(&session_id, token.map(|t| t.token_id.as_str())) {
+        if !self
+            .sessions
+            .verify_session_ownership(&session_id, token.map(|t| t.token_id.as_str()))
+        {
             return Err(AcpError::CapabilityNotGranted(format!(
                 "session '{session_id}' not owned by this token"
             )));
@@ -213,7 +231,7 @@ impl AcpHandler {
         session.add_turn(user_turn);
 
         // Generate Jack's response.
-        let conversation_history = session
+        let _conversation_history = session
             .recent_turns(10)
             .iter()
             .map(|t| format!("{}: {}", role_label(t.role), t.content))
@@ -243,10 +261,17 @@ impl AcpHandler {
         token: Option<&CapabilityToken>,
     ) -> Result<serde_json::Value> {
         let session_id = params
-            .and_then(|p| p.get("session_id").and_then(|v| v.as_str()).map(String::from))
+            .and_then(|p| {
+                p.get("session_id")
+                    .and_then(|v| v.as_str())
+                    .map(String::from)
+            })
             .ok_or_else(|| AcpError::InvalidRequest("missing session_id".to_string()))?;
 
-        if !self.sessions.verify_session_ownership(&session_id, token.map(|t| t.token_id.as_str())) {
+        if !self
+            .sessions
+            .verify_session_ownership(&session_id, token.map(|t| t.token_id.as_str()))
+        {
             return Err(AcpError::CapabilityNotGranted(format!(
                 "session '{session_id}' not owned by this token"
             )));
@@ -267,10 +292,17 @@ impl AcpHandler {
         token: Option<&CapabilityToken>,
     ) -> Result<serde_json::Value> {
         let session_id = params
-            .and_then(|p| p.get("session_id").and_then(|v| v.as_str()).map(String::from))
+            .and_then(|p| {
+                p.get("session_id")
+                    .and_then(|v| v.as_str())
+                    .map(String::from)
+            })
             .ok_or_else(|| AcpError::InvalidRequest("missing session_id".to_string()))?;
 
-        if !self.sessions.verify_session_ownership(&session_id, token.map(|t| t.token_id.as_str())) {
+        if !self
+            .sessions
+            .verify_session_ownership(&session_id, token.map(|t| t.token_id.as_str()))
+        {
             return Err(AcpError::CapabilityNotGranted(format!(
                 "session '{session_id}' not owned by this token"
             )));

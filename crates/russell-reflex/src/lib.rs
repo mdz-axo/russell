@@ -39,6 +39,9 @@ mod action;
 mod arc;
 mod risk;
 
-pub use action::{ReflexAction, ACTION_RESTART_SENTINEL, ACTION_FLUSH_JOURNAL, ACTION_LLM_FALLBACK, ACTION_RESTART_TIMER, ACTION_DISABLE_LLM_HELP};
+pub use action::{
+    ACTION_DISABLE_LLM_HELP, ACTION_FLUSH_JOURNAL, ACTION_LLM_FALLBACK, ACTION_RESTART_SENTINEL,
+    ACTION_RESTART_TIMER, ReflexAction,
+};
 pub use arc::ReflexArc;
 pub use risk::RiskLevel;

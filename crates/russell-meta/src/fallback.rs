@@ -7,12 +7,13 @@
 
 use std::fmt::Write as _;
 
-use russell_core::journal::{JournalReader, SeverityCounts};
+use russell_core::journal::SeverityCounts;
+use russell_core::journal::port::EventQueryPort;
 
 use crate::error::Result;
 
 /// Compose the offline response given a journal snapshot.
-pub fn summarise(reader: &JournalReader, note: Option<&str>) -> Result<String> {
+pub fn summarise(reader: &dyn EventQueryPort, note: Option<&str>) -> Result<String> {
     let now = russell_core::time::now_unix();
     let since_24h = now - 24 * 3600;
     let counts = reader.severity_counts(since_24h, i64::MAX)?;

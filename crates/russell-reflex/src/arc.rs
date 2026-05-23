@@ -2,8 +2,8 @@
 //! Reflex arc engine — maps breaches to recommended actions.
 
 use crate::action::{
-    ReflexAction, ACTION_DISABLE_LLM_HELP, ACTION_FLUSH_JOURNAL, ACTION_LLM_FALLBACK,
-    ACTION_RESTART_SENTINEL, ACTION_RESTART_TIMER,
+    ACTION_DISABLE_LLM_HELP, ACTION_FLUSH_JOURNAL, ACTION_LLM_FALLBACK, ACTION_RESTART_SENTINEL,
+    ACTION_RESTART_TIMER, ReflexAction,
 };
 use crate::risk::RiskLevel;
 use russell_proprio::ProprioResult;
@@ -31,63 +31,63 @@ impl ReflexArc {
     /// Evaluate proprioception result and queue reflex actions.
     pub fn evaluate(&mut self, result: &ProprioResult) {
         // Sentinel age > 30 min → restart sentinel
-        if let Some(age_s) = result.age_s {
-            if age_s > 1800 {
-                self.actions.push(ReflexAction::new(
-                    ACTION_RESTART_SENTINEL,
-                    "Restart sentinel timer (age > 30 min)",
-                    RiskLevel::Low,
-                    "sentinel_last_run_age_s > 1800s",
-                ));
-            }
+        if let Some(age_s) = result.age_s
+            && age_s > 1800
+        {
+            self.actions.push(ReflexAction::new(
+                ACTION_RESTART_SENTINEL,
+                "Restart sentinel timer (age > 30 min)",
+                RiskLevel::Low,
+                "sentinel_last_run_age_s > 1800s",
+            ));
         }
 
         // Journal stall > 5 min → flush journal
-        if let Some(stall_s) = result.journal_stall_s {
-            if stall_s > 300 {
-                self.actions.push(ReflexAction::new(
-                    ACTION_FLUSH_JOURNAL,
-                    "Force journal flush (stall > 5 min)",
-                    RiskLevel::Low,
-                    "journal_writer_stall_s > 300s",
-                ));
-            }
+        if let Some(stall_s) = result.journal_stall_s
+            && stall_s > 300
+        {
+            self.actions.push(ReflexAction::new(
+                ACTION_FLUSH_JOURNAL,
+                "Force journal flush (stall > 5 min)",
+                RiskLevel::Low,
+                "journal_writer_stall_s > 300s",
+            ));
         }
 
         // LLM p95 > 20s → recommend fallback to offline mode
-        if let Some(llm_ms) = result.llm_p95_latency_ms {
-            if llm_ms > 20_000.0 {
-                self.actions.push(ReflexAction::new(
-                    ACTION_LLM_FALLBACK,
-                    "Switch to offline fallback (LLM p95 > 20s)",
-                    RiskLevel::Medium,
-                    "llm_p95_latency_ms > 20000ms",
-                ));
-            }
+        if let Some(llm_ms) = result.llm_p95_latency_ms
+            && llm_ms > 20_000.0
+        {
+            self.actions.push(ReflexAction::new(
+                ACTION_LLM_FALLBACK,
+                "Switch to offline fallback (LLM p95 > 20s)",
+                RiskLevel::Medium,
+                "llm_p95_latency_ms > 20000ms",
+            ));
         }
 
         // Timer drift > 5 min → restart timer
-        if let Some(drift_s) = result.timer_drift_s {
-            if drift_s > 300 {
-                self.actions.push(ReflexAction::new(
-                    ACTION_RESTART_TIMER,
-                    "Restart systemd timer (drift > 5 min)",
-                    RiskLevel::Medium,
-                    "timer_drift_s > 300s",
-                ));
-            }
+        if let Some(drift_s) = result.timer_drift_s
+            && drift_s > 300
+        {
+            self.actions.push(ReflexAction::new(
+                ACTION_RESTART_TIMER,
+                "Restart systemd timer (drift > 5 min)",
+                RiskLevel::Medium,
+                "timer_drift_s > 300s",
+            ));
         }
 
         // Help error rate > 50% → disable LLM help temporarily
-        if let Some(error_rate) = result.help_error_rate_pct {
-            if error_rate > 50.0 {
-                self.actions.push(ReflexAction::new(
-                    ACTION_DISABLE_LLM_HELP,
-                    "Temporarily disable LLM help (error rate > 50%)",
-                    RiskLevel::High,
-                    "help_error_rate_pct > 50%",
-                ));
-            }
+        if let Some(error_rate) = result.help_error_rate_pct
+            && error_rate > 50.0
+        {
+            self.actions.push(ReflexAction::new(
+                ACTION_DISABLE_LLM_HELP,
+                "Temporarily disable LLM help (error rate > 50%)",
+                RiskLevel::High,
+                "help_error_rate_pct > 50%",
+            ));
         }
     }
 
@@ -102,15 +102,23 @@ impl ReflexArc {
     }
 
     /// Log reflex actions to journal (Phase 2A: detection-only).
-    pub fn log_actions(&self, writer: &russell_core::journal::JournalWriter) -> russell_core::Result<()> {
+    pub fn log_actions(
+        &self,
+        writer: &russell_core::journal::JournalWriter,
+    ) -> russell_core::Result<()> {
         for action in &self.actions {
-            let mut ev = russell_core::event::Event::new("reflex_arc_action", russell_core::event::Severity::Warn);
+            let mut ev = russell_core::event::Event::new(
+                "reflex_arc_action",
+                russell_core::event::Severity::Warn,
+            );
             ev.scope = russell_core::event::Scope::Self_;
             ev.tier = Some("proprio".into());
             ev.module = Some("reflex-arc".into());
             ev.summary = Some(format!("Recommended: {}", action.description));
-            ev.outputs.insert("action_id".into(), action.action_id.into());
-            ev.outputs.insert("risk".into(), format!("{:?}", action.risk).into());
+            ev.outputs
+                .insert("action_id".into(), action.action_id.into());
+            ev.outputs
+                .insert("risk".into(), format!("{:?}", action.risk).into());
             ev.outputs.insert("trigger".into(), action.trigger.into());
             writer.append(&ev)?;
         }
@@ -149,6 +157,7 @@ mod tests {
             remote_discovery_latency_s: None,
             remote_discovery_latency_severity: Severity::Info,
             journal_chain_intact: None,
+            evidence_integrity_ok: None,
         };
 
         arc.evaluate(&result);
@@ -176,6 +185,7 @@ mod tests {
             remote_discovery_latency_s: None,
             remote_discovery_latency_severity: Severity::Info,
             journal_chain_intact: None,
+            evidence_integrity_ok: None,
         };
 
         arc.evaluate(&result);
@@ -202,6 +212,7 @@ mod tests {
             remote_discovery_latency_s: None,
             remote_discovery_latency_severity: Severity::Info,
             journal_chain_intact: None,
+            evidence_integrity_ok: None,
         };
 
         arc.evaluate(&result);

@@ -160,9 +160,6 @@ pub enum RollbackStrategy {
 /// Backward-compatibility alias for code that previously used the
 /// separate `RollbackOutcome` type. New code should use [`RunOutcome`]
 /// directly — it now carries rollback information inline.
-/// separate `RollbackOutcome` type. New code should use [`RunOutcome`]
-/// directly — it now carries rollback information inline.
-/// directly — it now carries rollback information inline.
 #[deprecated(
     since = "0.2.0",
     note = "use RunOutcome directly; rollback is now an inline field"
@@ -221,19 +218,12 @@ pub struct Dispatcher {
     /// Maximum risk band that may be auto-executed.
     /// Interventions above this cap are refused with [`RiskError::RiskTooHigh`].
     /// Default: `Low`.
-    /// Interventions above this cap are refused with [`RiskError::RiskTooHigh`].
-    /// Default: `Low`.
-    /// Default: `Low`.
     pub max_auto_risk: RiskBand,
     /// Sudo credential for interventions that need root privileges.
-    /// Zeroed on drop. Set to `None` if no sudo interventions expected.
     /// Zeroed on drop. Set to `None` if no sudo interventions expected.
     pub sudo_password: Option<SudoCredential>,
     /// Arbitrary content to pipe to the subprocess stdin after sudo auth
     /// (if applicable). Used for interventions like `create-manifest` where
-    /// the LLM produces content that must be piped to the CLI command.
-    /// (if applicable). Used for interventions like `create-manifest` where
-    /// the LLM produces content that must be piped to the CLI command.
     /// the LLM produces content that must be piped to the CLI command.
     pub stdin_content: Option<String>,
     /// Environment variables this skill is allowed to access.
@@ -271,9 +261,6 @@ impl std::fmt::Debug for Dispatcher {
 pub enum CommandPathError {
     /// Command uses a bare name that would be resolved via PATH.
     /// Skill commands must use relative (`./scripts/foo.sh`) or
-    /// absolute (`/usr/bin/python3`) paths.
-    /// Skill commands must use relative (`./scripts/foo.sh`) or
-    /// absolute (`/usr/bin/python3`) paths.
     /// absolute (`/usr/bin/python3`) paths.
     #[error("bare command name {name:?} rejected — use relative ./scripts/ path or absolute path")]
     BareCommand {
@@ -829,12 +816,6 @@ impl Dispatcher {
 ///
 /// The dispatcher doesn't own manifests, so the caller resolves the
 /// strategy before calling `run_intervention_with_rollback`.
-///
-/// The dispatcher doesn't own manifests, so the caller resolves the
-/// strategy before calling `run_intervention_with_rollback`.
-/// The dispatcher doesn't own manifests, so the caller resolves the
-/// strategy before calling `run_intervention_with_rollback`.
-/// strategy before calling `run_intervention_with_rollback`.
 #[must_use]
 pub fn resolve_rollback_strategy(rollback: &crate::Rollback) -> RollbackStrategy {
     match rollback {
@@ -851,10 +832,9 @@ pub fn resolve_rollback_strategy(rollback: &crate::Rollback) -> RollbackStrategy
 /// Task 3.3: Evidence bundle sealing — computes SHA-256 hashes of all
 /// evidence files and writes a manifest.json for tamper detection.
 ///
+/// Write stdout, stderr, and event JSON to the evidence directory.
+///
 /// Task 3.3: Evidence bundle sealing — computes SHA-256 hashes of all
-/// evidence files and writes a manifest.json for tamper detection.
-/// Task 3.3: Evidence bundle sealing — computes SHA-256 hashes of all
-/// evidence files and writes a manifest.json for tamper detection.
 /// evidence files and writes a manifest.json for tamper detection.
 fn write_evidence(dir: &Path, outcome: &RunOutcome, event: &Event) -> Result<()> {
     use sha2::{Digest, Sha256};
@@ -892,8 +872,13 @@ fn write_evidence(dir: &Path, outcome: &RunOutcome, event: &Event) -> Result<()>
 
     // Write event JSON.
     let event_json = serde_json::to_string_pretty(&event_with_hashes)?;
-    std::fs::write(dir.join("event.json"), event_json)
+    std::fs::write(dir.join("event.json"), &event_json)
         .map_err(|e| russell_core::CoreError::io(dir, e))?;
+
+    // Compute event.json hash for manifest sealing.
+    let mut event_hasher = Sha256::new();
+    event_hasher.update(event_json.as_bytes());
+    let event_hash = hex::encode(event_hasher.finalize());
 
     // Write manifest.json with file hashes and timestamp (Task 3.3).
     let manifest = serde_json::json!({
@@ -909,7 +894,8 @@ fn write_evidence(dir: &Path, outcome: &RunOutcome, event: &Event) -> Result<()>
                 "size_bytes": outcome.stderr.len()
             },
             "event.json": {
-                "note": "Self-hash not included"
+                "sha256": event_hash,
+                "size_bytes": event_json.len()
             }
         }
     });
@@ -1448,71 +1434,4 @@ mod tests {
 
         assert!(!verify_evidence_bundle(&bundle).unwrap());
     }
-}
-
-#[test]
-fn verify_evidence_bundle_detects_intact_bundle() {
-    use sha2::{Digest, Sha256};
-    let dir = tempfile::tempdir().unwrap();
-    let bundle = dir.path().join("bundle");
-    std::fs::create_dir_all(&bundle).unwrap();
-
-    let stdout = b"hello world\n";
-    std::fs::write(bundle.join("stdout.txt"), stdout).unwrap();
-    let mut hasher = Sha256::new();
-    hasher.update(stdout);
-    let stdout_hash = hex::encode(hasher.finalize());
-
-    let manifest = serde_json::json!({
-        "version": "1.0",
-        "created_at": "2026-05-23T00:00:00Z",
-        "files": {
-            "stdout.txt": {
-                "sha256": stdout_hash,
-                "size_bytes": stdout.len()
-            }
-        }
-    });
-    std::fs::write(
-        bundle.join("manifest.json"),
-        serde_json::to_string_pretty(&manifest).unwrap(),
-    )
-    .unwrap();
-
-    assert!(verify_evidence_bundle(&bundle).unwrap());
-}
-
-#[test]
-fn verify_evidence_bundle_detects_tampered_file() {
-    use sha2::{Digest, Sha256};
-    let dir = tempfile::tempdir().unwrap();
-    let bundle = dir.path().join("bundle");
-    std::fs::create_dir_all(&bundle).unwrap();
-
-    let stdout = b"original content\n";
-    std::fs::write(bundle.join("stdout.txt"), stdout).unwrap();
-    let mut hasher = Sha256::new();
-    hasher.update(stdout);
-    let stdout_hash = hex::encode(hasher.finalize());
-
-    let manifest = serde_json::json!({
-        "version": "1.0",
-        "created_at": "2026-05-23T00:00:00Z",
-        "files": {
-            "stdout.txt": {
-                "sha256": stdout_hash,
-                "size_bytes": stdout.len()
-            }
-        }
-    });
-    std::fs::write(
-        bundle.join("manifest.json"),
-        serde_json::to_string_pretty(&manifest).unwrap(),
-    )
-    .unwrap();
-
-    // Tamper with the file after writing the manifest
-    std::fs::write(bundle.join("stdout.txt"), b"tampered content\n").unwrap();
-
-    assert!(!verify_evidence_bundle(&bundle).unwrap());
 }

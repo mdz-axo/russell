@@ -44,7 +44,8 @@ use std::sync::{Mutex, MutexGuard};
 
 use russell_core::Result;
 use russell_core::event::{Event, Scope, Severity};
-use russell_core::journal::{JournalReader, JournalWriter};
+use russell_core::journal::JournalWriter;
+use russell_core::journal::port::SelfTelemetryPort;
 use tracing::{debug, warn};
 
 // ---------------------------------------------------------------------------
@@ -102,11 +103,9 @@ pub const PROBE_REMOTE_DISCOVERY_LATENCY: &str = "remote_discovery_latency_s";
 
 /// Threshold (seconds) above which the sentinel-age vital emits `warn`.
 /// 1.5× the 300 s cadence.
-/// 1.5× the 300 s cadence.
 pub const SENTINEL_WARN_THRESHOLD_S: i64 = 450;
 
 /// Threshold (seconds) above which the sentinel-age vital emits `alert`.
-/// 6× the 300 s cadence (30 minutes).
 /// 6× the 300 s cadence (30 minutes).
 pub const SENTINEL_ALERT_THRESHOLD_S: i64 = 1_800;
 
@@ -136,7 +135,6 @@ pub const LLM_P95_ALERT_THRESHOLD_MS: f64 = 20_000.0;
 
 /// Threshold (seconds) above which the timer-drift vital emits `warn`.
 /// 1.5× the 60 s timer cadence.
-/// 1.5× the 60 s timer cadence.
 pub const DRIFT_WARN_THRESHOLD_S: i64 = 90;
 
 /// Threshold (seconds) above which the timer-drift vital emits `alert`.
@@ -158,7 +156,6 @@ pub const ERROR_RATE_ALERT_THRESHOLD_PCT: f64 = 50.0;
 
 /// Threshold (milliseconds) above which the hkask MCP latency vital emits `warn`.
 /// 2× the 2s health probe timeout.
-/// 2× the 2s health probe timeout.
 pub const HKASK_LATENCY_WARN_THRESHOLD_MS: u64 = 2_000;
 
 // ---------------------------------------------------------------------------
@@ -167,11 +164,9 @@ pub const HKASK_LATENCY_WARN_THRESHOLD_MS: u64 = 2_000;
 
 /// Threshold (seconds) above which the remote discovery latency vital
 /// emits `warn`. ~1 hour — stale index.
-/// emits `warn`. ~1 hour — stale index.
 pub const REMOTE_DISCOVERY_WARN_THRESHOLD_S: i64 = 3_600;
 
 /// Threshold (seconds) above which the remote discovery latency vital
-/// emits `alert`. ~24 hours — registry unreachable.
 /// emits `alert`. ~24 hours — registry unreachable.
 pub const REMOTE_DISCOVERY_ALERT_THRESHOLD_S: i64 = 86_400;
 
@@ -199,12 +194,6 @@ impl AutoimmuneGuard {
     ///
     /// Returns `Some(guard)` if acquired, `None` if the guard is already
     /// held by another caller.
-    ///
-    /// Returns `Some(guard)` if acquired, `None` if the guard is already
-    /// held by another caller.
-    /// Returns `Some(guard)` if acquired, `None` if the guard is already
-    /// held by another caller.
-    /// held by another caller.
     #[must_use]
     pub fn try_enter(&self) -> Option<MutexGuard<'_, ()>> {
         self.0.try_lock().ok()
@@ -220,9 +209,6 @@ impl Default for AutoimmuneGuard {
 /// The process-wide autoimmune guard — prevents re-entrant metacognitive-layer
 /// runs (a Nurse run whose subject is Russell himself). Held for the
 /// duration of any proprioception cycle.
-/// runs (a Nurse run whose subject is Russell himself). Held for the
-/// duration of any proprioception cycle.
-/// duration of any proprioception cycle.
 static AUTOIMMUNE: std::sync::LazyLock<AutoimmuneGuard> =
     std::sync::LazyLock::new(AutoimmuneGuard::new);
 
@@ -235,7 +221,6 @@ static AUTOIMMUNE: std::sync::LazyLock<AutoimmuneGuard> =
 pub struct ProprioResult {
     // -- Sentinel age (MVP, JR-5) --
     /// The computed sentinel age in seconds, or `None` if no host samples
-    /// exist yet (first-ever cycle).
     /// exist yet (first-ever cycle).
     pub age_s: Option<i64>,
     /// The severity band the sentinel fell into.
@@ -252,14 +237,12 @@ pub struct ProprioResult {
     // -- LLM p95 latency (Phase 2A) --
     /// p95 of LLM latency in last 24h, in milliseconds. `None` if fewer
     /// than 4 data points exist.
-    /// than 4 data points exist.
     pub llm_p95_latency_ms: Option<f64>,
     /// Severity of the LLM latency vital.
     pub llm_p95_severity: Severity,
 
     // -- Timer drift (Phase 2A) --
     /// Seconds since the systemd timer last triggered. `None` if systemctl
-    /// is unavailable or the timer isn't found.
     /// is unavailable or the timer isn't found.
     pub timer_drift_s: Option<i64>,
     /// Severity of the timer drift vital.
@@ -268,14 +251,12 @@ pub struct ProprioResult {
     // -- Help error rate (Phase 2A) --
     /// Percentage of help sessions in error/fallback/threshold_skip state,
     /// over the last 24h. `None` if no sessions exist.
-    /// over the last 24h. `None` if no sessions exist.
     pub help_error_rate_pct: Option<f64>,
     /// Severity of the help error rate vital.
     pub help_error_rate_severity: Severity,
 
     // -- HKask MCP reachability (Phase 4C, ADR-0025 §5) --
     /// HKask MCP latency in milliseconds, or `None` if the probe was not
-    /// run (no hkask config) or the endpoint was unreachable.
     /// run (no hkask config) or the endpoint was unreachable.
     pub hkask_mcp_reachable_ms: Option<u64>,
     /// Severity of the hkask MCP reachability vital.
@@ -284,7 +265,6 @@ pub struct ProprioResult {
     // -- Remote discovery latency (Gap 5) --
     /// Time since last successful remote skill registry fetch, in seconds.
     /// `None` if remote discovery is not configured or has never run.
-    /// `None` if remote discovery is not configured or has never run.
     pub remote_discovery_latency_s: Option<i64>,
     /// Severity of the remote discovery latency vital.
     pub remote_discovery_latency_severity: Severity,
@@ -292,9 +272,6 @@ pub struct ProprioResult {
     // -- Journal chain integrity (T6) --
     /// Whether the journal hash chain is intact. `true` if verification
     /// passed (or no chained events exist yet). `false` if a break was
-    /// detected. `None` if verification could not run.
-    /// passed (or no chained events exist yet). `false` if a break was
-    /// detected. `None` if verification could not run.
     /// detected. `None` if verification could not run.
     pub journal_chain_intact: Option<bool>,
 
@@ -306,7 +283,6 @@ pub struct ProprioResult {
 }
 
 /// Input from the async HKask MCP health probe, passed into the proprio cycle
-/// by the CLI layer (which performs the async HTTP check).
 /// by the CLI layer (which performs the async HTTP check).
 #[derive(Debug, Clone, Copy)]
 pub struct HkaskHealthInput {
@@ -321,7 +297,7 @@ pub struct HkaskHealthInput {
 // ---------------------------------------------------------------------------
 
 /// Run the proprioception cycle once.
-pub fn run_once(writer: &JournalWriter, reader: &JournalReader) -> Result<ProprioResult> {
+pub fn run_once(writer: &JournalWriter, reader: &dyn SelfTelemetryPort) -> Result<ProprioResult> {
     let _guard = AUTOIMMUNE.enter();
     run_once_inner(writer, reader, &SystemdTimerSource, None)
 }
@@ -329,7 +305,7 @@ pub fn run_once(writer: &JournalWriter, reader: &JournalReader) -> Result<Propri
 /// Run the proprioception cycle once with a caller-provided [`TimerSource`].
 pub fn run_once_with(
     writer: &JournalWriter,
-    reader: &JournalReader,
+    reader: &dyn SelfTelemetryPort,
     timer: &dyn TimerSource,
 ) -> Result<ProprioResult> {
     let _guard = AUTOIMMUNE.enter();
@@ -339,7 +315,7 @@ pub fn run_once_with(
 /// Run the proprioception cycle once with HKask MCP health data.
 pub fn run_once_with_hkask(
     writer: &JournalWriter,
-    reader: &JournalReader,
+    reader: &dyn SelfTelemetryPort,
     hkask_health: HkaskHealthInput,
 ) -> Result<ProprioResult> {
     let _guard = AUTOIMMUNE.enter();
@@ -350,20 +326,14 @@ pub fn run_once_with_hkask(
 /// and [`run_once_with_hkask`].
 ///
 /// When `hkask_health` is `Some`, also gathers and journals the
-/// `hkask_mcp_reachable_ms` self-vital.
+/// Core proprioception logic. Called by [`run_once`], [`run_once_with`],
 /// and [`run_once_with_hkask`].
 ///
 /// When `hkask_health` is `Some`, also gathers and journals the
 /// `hkask_mcp_reachable_ms` self-vital.
-///
-/// When `hkask_health` is `Some`, also gathers and journals the
-/// `hkask_mcp_reachable_ms` self-vital.
-/// When `hkask_health` is `Some`, also gathers and journals the
-/// `hkask_mcp_reachable_ms` self-vital.
-/// `hkask_mcp_reachable_ms` self-vital.
 fn run_once_inner(
     writer: &JournalWriter,
-    reader: &JournalReader,
+    reader: &dyn SelfTelemetryPort,
     timer: &dyn TimerSource,
     hkask_health: Option<HkaskHealthInput>,
 ) -> Result<ProprioResult> {
@@ -604,7 +574,7 @@ fn gather_journal_stall(writer: &JournalWriter, now: i64) -> Result<(Option<i64>
 /// Gather the LLM p95 latency vital.
 fn gather_llm_p95_latency(
     writer: &JournalWriter,
-    reader: &JournalReader,
+    reader: &dyn SelfTelemetryPort,
     now: i64,
 ) -> Result<(Option<f64>, Severity)> {
     let p95 = reader.llm_latency_p95_ms()?;
@@ -620,16 +590,6 @@ fn gather_llm_p95_latency(
 ///
 /// Uses the provided [`TimerSource`] to query the sentinel timer's last
 /// trigger time. Gracefully returns `None` if the query fails or the timer
-/// doesn't exist.
-///
-/// Uses the provided [`TimerSource`] to query the sentinel timer's last
-/// trigger time. Gracefully returns `None` if the query fails or the timer
-/// doesn't exist.
-/// Uses the provided [`TimerSource`] to query the sentinel timer's last
-/// trigger time. Gracefully returns `None` if the query fails or the timer
-/// doesn't exist.
-/// trigger time. Gracefully returns `None` if the query fails or the timer
-/// doesn't exist.
 /// doesn't exist.
 fn gather_timer_drift(
     writer: &JournalWriter,
@@ -727,9 +687,6 @@ fn read_timer_last_trigger() -> std::result::Result<Option<u64>, String> {
 /// Parse a human-readable timestamp like "Sat 2026-05-09 21:55:25 PDT"
 /// into Unix seconds. Uses `date -d` as a subprocess (simplest correct
 /// parser for arbitrary locale formats).
-/// into Unix seconds. Uses `date -d` as a subprocess (simplest correct
-/// parser for arbitrary locale formats).
-/// parser for arbitrary locale formats).
 fn parse_human_timestamp(s: &str) -> std::result::Result<u64, String> {
     let output = Command::new("date")
         .args(["-d", s, "+%s"])
@@ -754,7 +711,7 @@ fn parse_human_timestamp(s: &str) -> std::result::Result<u64, String> {
 /// Gather the help error rate vital.
 fn gather_help_error_rate(
     writer: &JournalWriter,
-    reader: &JournalReader,
+    reader: &dyn SelfTelemetryPort,
     now: i64,
 ) -> Result<(Option<f64>, Severity)> {
     let rate = reader.help_error_rate_pct()?;
@@ -885,44 +842,12 @@ fn emit_event(
 /// - `Some(true)` if intact or no chained events exist
 /// - `Some(false)` if a chain break was detected
 /// - `None` if the check could not run (DB error)
-fn check_journal_chain_integrity(reader: &JournalReader) -> Option<bool> {
-    let conn = reader.open_ro_conn().ok()?;
-    let mut stmt = conn
-        .prepare(
-            "SELECT prev_hash, payload, hash FROM events \
-             WHERE hash IS NOT NULL \
-             ORDER BY ts_unix DESC, id DESC \
-             LIMIT 10",
-        )
-        .ok()?;
-
-    let links: Vec<(String, String, String)> = stmt
-        .query_map([], |row| {
-            Ok((
-                row.get::<_, String>(0)?,
-                row.get::<_, String>(1)?,
-                row.get::<_, String>(2)?,
-            ))
-        })
-        .ok()?
-        .filter_map(|r| r.ok())
-        .collect();
-
-    if links.is_empty() {
-        return Some(true); // No chained events yet — not a failure.
+fn check_journal_chain_integrity(reader: &dyn SelfTelemetryPort) -> Option<bool> {
+    let result = reader.check_chain_integrity();
+    if result == Some(false) {
+        warn!("journal hash chain BROKEN — tamper evidence detected");
     }
-
-    // Reverse to chronological order for verification.
-    let links: Vec<_> = links.into_iter().rev().collect();
-
-    match russell_core::hash_chain::verify_chain(&links) {
-        russell_core::hash_chain::ChainVerdict::Intact { .. } => Some(true),
-        russell_core::hash_chain::ChainVerdict::Empty => Some(true),
-        russell_core::hash_chain::ChainVerdict::Broken { .. } => {
-            warn!("journal hash chain BROKEN — tamper evidence detected");
-            Some(false)
-        }
-    }
+    result
 }
 
 // ---------------------------------------------------------------------------

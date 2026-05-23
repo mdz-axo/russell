@@ -450,7 +450,7 @@ impl HKaskMcpClient {
             .get(&health_url)
             .header("Accept", "application/json");
 
-        if let Some(ref token) = self.config.token {
+        if let Ok(token) = self.token_provider.get_token().await {
             req = req.bearer_auth(token);
         }
 

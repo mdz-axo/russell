@@ -86,7 +86,7 @@ impl AcpServer {
             send_response(&mut stdout, &response).await?;
 
             request_count += 1;
-            if request_count % GC_INTERVAL_REQUESTS == 0 {
+            if request_count.is_multiple_of(GC_INTERVAL_REQUESTS) {
                 let cleaned = self.handler.sessions_mut().cleanup_old_sessions();
                 if cleaned > 0 {
                     debug!(cleaned, "GC: removed old sessions");
