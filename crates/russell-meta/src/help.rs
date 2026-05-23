@@ -43,16 +43,8 @@ struct HKaskInferRequest {
 
 #[derive(Serialize)]
 struct ObjectiveData {
-    samples: Vec<SampleRecord>,
     severity_counts: SeverityCounts,
     recent_events: Vec<EventRecord>,
-}
-
-#[derive(Serialize)]
-struct SampleRecord {
-    probe: String,
-    value: f64,
-    ts: String,
 }
 
 #[derive(Serialize)]
@@ -114,9 +106,9 @@ pub async fn run_help_with_endpoint(
             prompt_chars: 0,
             response_chars: response.len() as i64,
             latency_ms: None,
-            evidence_ref: &evidence_dir.to_string_lossy(),
             status: HelpSessionStatus::ThresholdSkip,
             error_kind: None,
+            evidence_ref: &evidence_dir.to_string_lossy(),
         };
         writer.append_help_session(&input)?;
         return Ok(HelpOutcome {
@@ -151,9 +143,9 @@ pub async fn run_help_with_endpoint(
                 prompt_chars: 0,
                 response_chars: response.len() as i64,
                 latency_ms: None,
-                evidence_ref: &evidence_dir.to_string_lossy(),
-            status: HelpSessionStatus::Fallback,
+                status: HelpSessionStatus::Fallback,
                 error_kind: None,
+                evidence_ref: &evidence_dir.to_string_lossy(),
             };
             writer.append_help_session(&input)?;
             return Ok(HelpOutcome {
@@ -177,14 +169,15 @@ pub async fn run_help_with_endpoint(
         prompt_chars: 0,
         response_chars: response.response.len() as i64,
         latency_ms: Some(response.latency_ms as i64),
-        evidence_ref: &evidence_dir.to_string_lossy(),
-            status: HelpSessionStatus::Ok,
+        status: HelpSessionStatus::Ok,
         error_kind: None,
+        evidence_ref: &evidence_dir.to_string_lossy(),
     };
     writer.append_help_session(&input)?;
 
     let evidence_path = evidence_dir.join("response.json");
-    std::fs::write(&evidence_path, serde_json::to_string_pretty(&response)?)?;
+    std::fs::write(&evidence_path, serde_json::to_string_pretty(&response)?)
+        .map_err(|e| DoctorError::io(&evidence_path, e))?;
 
     info!(session_id, model = %response.model, "help session complete");
 
@@ -198,14 +191,28 @@ pub async fn run_help_with_endpoint(
 }
 
 async fn gather_objective(writer: &JournalWriter) -> ObjectiveData {
-    let samples = writer.get_recent_samples(50).unwrap_or_default();
-    let severity_counts = writer.get_severity_counts().unwrap_or_default();
-    let events = writer.get_recent_events(20).unwrap_or_default();
+    let reader = writer.reader();
+    let now = OffsetDateTime::now_utc().unix_timestamp();
+    let since = now - 86400; // Last 24 hours
+
+    let severity_counts = reader.severity_counts(since, now)
+        .unwrap_or_else(|_| russell_core::journal::SeverityCounts { crit: 0, alert: 0, warn: 0, info: 0 });
+    
+    let events = reader.recent(20).unwrap_or_default();
 
     ObjectiveData {
-        samples: samples.into_iter().map(|s| SampleRecord { probe: s.probe, value: s.value, ts: s.ts }).collect(),
-        severity_counts: SeverityCounts { crit: severity_counts.crit, alert: severity_counts.alert, warn: severity_counts.warn, info: severity_counts.info },
-        recent_events: events.into_iter().map(|e| EventRecord { probe: e.probe, severity: format!("{:?}", e.severity), message: e.message, ts: e.ts }).collect(),
+        severity_counts: SeverityCounts {
+            crit: severity_counts.crit as u64,
+            alert: severity_counts.alert as u64,
+            warn: severity_counts.warn as u64,
+            info: severity_counts.info as u64,
+        },
+        recent_events: events.into_iter().map(|e| EventRecord {
+            probe: e.probe,
+            severity: format!("{:?}", e.severity),
+            message: e.summary,
+            ts: e.ts,
+        }).collect(),
     }
 }
 
@@ -221,9 +228,9 @@ fn fallback_summary(objective: &ObjectiveData) -> String {
         objective.severity_counts.crit, objective.severity_counts.alert,
         objective.severity_counts.warn, objective.severity_counts.info));
     lines.push(String::new());
-    lines.push("Recent probes:".to_string());
-    for sample in objective.samples.iter().take(10) {
-        lines.push(format!("  - {}: {:.2}", sample.probe, sample.value));
+    lines.push("Recent events:".to_string());
+    for event in objective.recent_events.iter().take(10) {
+        lines.push(format!("  - [{}] {}: {}", event.severity, event.probe, event.message));
     }
     lines.join("\n")
 }
