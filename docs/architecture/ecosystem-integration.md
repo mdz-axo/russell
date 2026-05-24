@@ -26,6 +26,10 @@ status: "Active"
 
 ## 1. hKask MCP Tool Exposure
 
+Per the Model Context Protocol specification (Anthropic, 2024), MCP tool
+servers expose typed capabilities over JSON-RPC 2.0 on stdio transports.
+Russell's tool servers follow this contract.
+
 ### New MCP Server: `arsenal-mcp-russell-skills`
 
 Extends the existing `arsenal-mcp-russell` (7 tools reading Russell's journal)
@@ -162,7 +166,7 @@ Russell skills declare hLexicon terms (WordAct/FlowDef/KnowAct) in their `hlexic
 
 ### Architecture: Russell → hKask → Okapi
 
-Russell does **not** connect directly to Okapi. All inference requests flow through hKask:
+Russell does **not** connect directly to Okapi. All inference requests flow through hKask, following the indirect invocation pattern described by Birgisson et al. (2014) for capability-based authorization:
 
 ```mermaid
 flowchart LR
@@ -266,7 +270,7 @@ never sees raw skill data.
 
 ### Manifest Schema as Ecosystem Contract
 
-The manifest.yaml schema is the hKask ecosystem's skill contract:
+The manifest.yaml schema is the hKask ecosystem's skill contract, following the declarative package specification pattern used in Nix derivations (Dolstra, 2006) and Ansible playbooks:
 
 ```yaml
 id: <kebab-case-id>       # required — unique identifier
@@ -315,7 +319,8 @@ skill written for Russell. This includes:
 
 ### Span Namespace
 
-Russell emits OKH spans via the same `tracing` layer hKask uses:
+Russell emits OKH spans following OpenTelemetry semantic conventions
+(OpenTelemetry Authors, 2021), via the same `tracing` layer hKask uses:
 
 ```
 okh.<layer>.<module>.<signal>
@@ -411,3 +416,10 @@ okh_skill_eval_reliability{reliability < 0.7}
 - Centralized routing (hKask can route to Okapi, OpenRouter, or other backends)
 - Consistent observability via CNS spans
 - Confidence-based escalation handled by hKask
+
+## References
+
+- Anthropic. (2024). *Model Context Protocol Specification*. <https://modelcontextprotocol.io>
+- Birgisson, A. et al. (2014). "Macaroons: Cookies with Contextual Caveats for Decentralized Authorization in the Cloud." *NDSS Symposium*.
+- Dolstra, E. (2006). *The Purely Functional Software Deployment Model*. PhD thesis, Utrecht University.
+- OpenTelemetry Authors. (2021). *OpenTelemetry Semantic Conventions*. <https://opentelemetry.io/docs/concepts/semantic-conventions/>

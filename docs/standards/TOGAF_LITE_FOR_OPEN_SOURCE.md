@@ -519,7 +519,7 @@ The project demonstrates TOGAF-Lite at the "Standard" tier (30–75 docs per §8
 |-----------|-------------|------------|
 | **Learning curve** | Contributors unfamiliar with TOGAF must learn the phase vocabulary | Include a TOGAF Alignment Note in the documentation portal; the vocabulary is small (10 phases, 4 domains) |
 | **Over-structuring risk** | Small projects may create empty directories | Start minimal (§7.3); add structure only when the project outgrows the current level |
-| **Maintenance burden** | README portals must be updated when documents are added or removed | Treat this as a Broken Windows item — enforce at review time |
+| **Maintenance burden** | You must update README portals when documents enter or leave | Treat this as a Broken Windows item — enforce at review time |
 | **TOGAF drift** | The pattern may diverge from TOGAF conventions over time | Document all deviations explicitly (as Peripheral does in its Pragmatic Simplification section) |
 
 ---
@@ -548,7 +548,7 @@ The project demonstrates TOGAF-Lite at the "Standard" tier (30–75 docs per §8
 
 [^cockburn]: Cockburn, A. (2001). *Agile Software Development*. Addison-Wesley. "A document is barely sufficient when its purpose is clear and it would cause harm to write less." Informs the pragmatic simplification philosophy of TOGAF-Lite.
 
-[^ambler]: Ambler, S. W. (2002). *Agile Modeling: Effective Practices for Extreme Programming and the Unified Process*. Wiley. "Create Simple Content" — documentation should be created at the last responsible moment and kept as simple as possible. Informs the "drop governance overhead" principle.
+[^ambler]: Ambler, S. W. (2002). *Agile Modeling: Effective Practices for Extreme Programming and the Unified Process*. Wiley. "Create Simple Content" — create documentation at the last responsible moment and keep it as simple as possible. Informs the "drop governance overhead" principle.
 
 [^iso42010]: ISO/IEC/IEEE. (2011). *Systems and Software Engineering — Architecture Description*. ISO/IEC/IEEE 42010:2011. The architecture description standard that informs TOGAF-Lite's viewpoint and correspondence conventions.
 
@@ -568,6 +568,6 @@ The project demonstrates TOGAF-Lite at the "Standard" tier (30–75 docs per §8
 
 ---
 
-*This pattern specification is maintained as part of the Kask documentation corpus. It is designed to be self-contained and reusable by other open-source projects. Pattern updated 2026-05-12: corrected counts after consolidation (38 stack + 20 arsenal = 58 workspace packages, 75 active docs). See Kask's `docs/README.md` for the Kask-specific TOGAF-Lite mapping.*
+*This pattern specification lives as part of the Kask documentation corpus. It aims to be self-contained and reusable by other open-source projects. Pattern updated 2026-05-12: corrected counts after consolidation (38 stack + 20 arsenal = 58 workspace packages, 75 active docs). See Kask's `docs/README.md` for the Kask-specific TOGAF-Lite mapping.*
 
 [^kask_docs]: Kask Project. (2026). "Kask Documentation Portal." `docs/README.md` v5.4.0. The documentation portal demonstrating TOGAF-Lite at Standard tier. 67 active files and 64 Cargo workspace packages in 2 workspaces, verified 2026-05-08.

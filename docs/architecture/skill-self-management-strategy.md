@@ -19,6 +19,11 @@ status: "Active"
 
 ## 1. Current State
 
+Following the autonomic computing pattern (Kephart & Chess, 2003),
+Russell's skill system must self-manage: observe its own skill health,
+adapt to gaps, and maintain operational coverage without operator
+intervention for routine tasks.
+
 ### What works (2026-05-21)
 
 | Capability | Surface | Automation |
@@ -41,7 +46,7 @@ status: "Active"
 
 ## 2. Design Principles
 
-1. **JR-2: Observe > Recommend > Act.** Telemetry first, then management actions. Jack must see usage data before he can make decisions.
+1. **JR-2: Observe > Recommend > Act.** Telemetry first, then management actions. Jack must see usage data before he can make decisions. This follows Boyd's OODA loop (observe-orient-decide-act) in its emphasis on observation preceding action (Osinga, 2007).
 2. **JR-4: Small but present.** A handful of new registry verbs, not a full rebuild. The existing workshop code is the foundation.
 3. **The skill system manages skills.** A `skill-manager` skill wraps registry operations, not ad-hoc CLI commands. This keeps the model consistent: Jack runs skills, skills do things, the registry reflects the result.
 4. **Auditable (JR-7).** Every registry mutation writes a `harness.event.v1` record. The registry cache remains rebuildable from journal + manifests.
@@ -280,7 +285,9 @@ Bare command names like `["russell", "skill", "list"]` fall to the dispatcher's 
 
 ## 5. Registry Mutation Audit Trail
 
-Every mutation to the registry cache writes a `harness.event.v1` record:
+Every mutation to the registry cache writes a `harness.event.v1` record,
+following the event sourcing pattern (Vernon, 2015) where state changes
+are append-only facts:
 
 ```
 event_type: skill.lifecycle.transition
@@ -345,3 +352,9 @@ This pattern:
 | Registry corruption from concurrent writes | Low | Registry is single-writer (only chat CLI process touches it). Sentinel is read-only on skills. |
 | Telemetry flooding (287 samples/day × many skills) | Low | Counters are integers, not arrays. The `RegistryEntry` struct grows by ~40 bytes total. |
 | Operator confusion between CLI skill verbs and Jack's skill management | Low | Both paths exist: CLI verbs (`skill-install`, `skill-prune`, etc.) for operators, ACTION syntax through ACP for Jack. The `skill-manager` skill wraps the same underlying operations. |
+
+## References
+
+- Kephart, J.O. & Chess, D.M. (2003). "The Vision of Autonomic Computing." *IEEE Computer* 36(1).
+- Osinga, F.P.B. (2007). *Science, Strategy and War: The Strategic Theory of John Boyd*. Routledge.
+- Vernon, V. (2015). *Implementing Domain-Driven Design*. Addison-Wesley. Ch. 8: Event Sourcing.

@@ -28,70 +28,9 @@ design document wins. When both are silent, file an ADR.
 
 ## 1. What Russell is, in one diagram
 
-```mermaid
-flowchart TB
-  subgraph POLICY [Policy — the human operator]
-    USER[Operator]
-    HKASK[hKask Platform]
-  end
-
-  subgraph INTEL [Intelligence]
-    BOOT[Bootstrap]
-    LLM[Local LLM via Okapi]
-  end
-
-  subgraph CONTROL [Control]
-    META[Metacognitive layer]
-    PROPRIO[Proprioception]
-  end
-
-  subgraph COORD [Coordination]
-    CLOCK[systemd --user timers]
-  end
-
-  subgraph OPS [Operations]
-    SENTINEL[Sentinel]
-    ACP[ACP Server]
-    SKILLS[Skill dispatcher]
-  end
-
-  subgraph PERSIST [Persistence]
-    JOURNAL[(SQLite journal.db)]
-    PROFILE[profile.json]
-    EVIDENCE[Evidence bundles]
-    RULES[rules.d/*.toml]
-  end
-
-  subgraph SURFACE [Surfaces]
-    CLI[russell CLI]
-  end
-
-  USER --> CLI
-  HKASK <-->|ACP stdio| ACP
-  CLI & ACP --> META & SKILLS
-  CLOCK --> SENTINEL
-  SENTINEL --> JOURNAL
-  META --> JOURNAL
-  META --> SKILLS --> JOURNAL & EVIDENCE
-  META --> LLM
-  PROPRIO --> META
-  BOOT --> PROFILE
-  PROFILE --> META & SENTINEL
-  RULES --> SENTINEL
-  JOURNAL --> CLI
-```
-
-<!-- DIAGRAM_ALIGNMENT
-id: DIAG-OVERVIEW-001
-type: flowchart
-verified_date: 2026-05-22
-verified_against: AGENTS.md §5 (VSM layers); ADR-0026 (ACP integration)
-reference_sources: PRINCIPLES_CATALOG.md JR-1 through JR-7; cybernetic-health-harness.md
-status: VERIFIED
--->
-
 The five VSM layers — Policy, Intelligence, Control, Coordination,
-Operations — are not just diagramming convenience. Each layer has
+Operations — follow Stafford Beer's Viable System Model (Beer, 1972).
+They are not just diagramming convenience. Each layer has
 a corresponding ADR and a corresponding area of the code:
 
 | VSM layer | Locked decision | Code home |
@@ -159,7 +98,7 @@ derived.
 
 - Path: `~/.local/state/harness/journal.db`.
 - Engine: SQLite with WAL + `synchronous=NORMAL`
-  ([ADR-0004](../adr/0004-sqlite-journal.md)).
+  ([ADR-0004](../adr/0004-sqlite-journal.md); SQLite Consortium, 2024).
 - Tables: `samples`, `events`, `baselines`, `confirmations`,
   `migrations`. Self-scope data (proprioception) uses
   `scope='self'` in the same `samples` and `events` tables
@@ -245,7 +184,9 @@ and [ADR-0021](../adr/0021-proprioception-phase2-reflex-arcs.md).
 ## 6. Honeymoon and first 30 days
 
 Russell is deliberately cautious for the first 30 days after
-bootstrap. Russell clamps effective `max_auto_risk` to `low` for any
+bootstrap, following the "conservative early, aggressive late"
+pattern from statistical process control (Roberts, 1959).
+Russell clamps effective `max_auto_risk` to `low` for any
 skill with `risk: high` interventions, regardless of manifest
 settings. Rationale: baselines need data to be meaningful;
 without them the Nurse lacks the evidence to justify an
@@ -346,3 +287,9 @@ specific reference models:
 - Not a roadmap. That lives in
   [`cybernetic-health-harness.md`](../../cybernetic-health-harness.md)
   §20.
+
+## References
+
+- Beer, S. (1972). *Brain of the Firm*. Wiley.
+- Roberts, S.W. (1959). "Control Chart Tests Based on Geometric Moving Averages." *Technometrics* 1(3).
+- SQLite Consortium. (2024). *Write-Ahead Logging*. <https://www.sqlite.org/wal.html>

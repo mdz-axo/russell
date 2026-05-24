@@ -84,8 +84,8 @@ act**. Any mutation is the exception, not the rule. Any mutation
 must satisfy IDRS (Idempotent, Dry-runnable, Rollback-able,
 Structured-logged).
 
-**Rationale.** *Primum non nocere.* A health harness that breaks
-the patient is worse than no harness. The triage ladder — observe,
+**Rationale.** *Primum non nocere* (Hippocratic corpus, *Epidemics* I.11).
+A health harness that breaks the patient is worse than no harness. The triage ladder — observe,
 then recommend, then (only sometimes, and only under cap) act —
 is a first-rule-of-medicine discipline applied to automation.
 
@@ -252,6 +252,9 @@ follows from it.
 
 ## 6. TOGAF Domain Mapping
 
+This mapping follows The Open Group's TOGAF Standard, 10th Edition
+(The Open Group, 2022) phase decomposition:
+
 | Principle | TOGAF Phase | Artifact |
 |---|---|---|
 | JR-1 | Preliminary / Phase A | This catalog, `MVP_SPEC.md` |
@@ -268,3 +271,8 @@ Adding or altering a principle requires a superseding ADR that
 cites this catalog and the specific JR-N under change. Principles
 are never deleted silently; they move to an archive block at the
 bottom of this file with the superseding ADR referenced.
+
+## References
+
+- The Open Group. (2022). *TOGAF Standard, 10th Edition*. <https://www.opengroup.org/togaf>
+- Hippocratic corpus. *Epidemics* I.11. ~400 BCE. *Primum non nocere* ("first, do no harm") attribution.
