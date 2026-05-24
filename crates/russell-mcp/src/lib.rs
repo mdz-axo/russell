@@ -9,9 +9,9 @@
 //! Russell gains an MCP client that connects **exclusively** to the local
 //! hKask installation's MCP endpoint. No general remote MCP servers.
 //!
-//! **Note:** The MCP server feature for IDE frontends is deprecated.
-//! Use the ACP server (`russell-acp-server`) for hKask integration.
-//! The MCP client remains available for Russell to access hKask's 193 MCP tools.
+//! This crate provides MCP **client** functionality only. The MCP server
+//! feature was removed in v0.20.0; use `russell-acp-server` for hKask
+//! agent integration (ADR-0027).
 //!
 //! # Architecture
 //!
@@ -24,7 +24,6 @@
 //! # Feature flags
 //!
 //! - `client` (default) — MCP client for hKask tool access.
-//! - `server` (deprecated) — MCP server for IDE frontends. Use ACP instead.
 //!
 //! # Safety constraints
 //!
@@ -51,7 +50,3 @@ pub mod port;
 pub mod registry;
 #[cfg(feature = "client")]
 pub mod types;
-
-// Note: The MCP server feature is deprecated.
-// Use russell-acp-server for hKask integration instead.
-// The server module has been removed.

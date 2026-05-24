@@ -178,8 +178,10 @@ flowchart LR
 
 <!-- DIAGRAM_ALIGNMENT
 id: DIAG-RUSSELL-OKAPI-001
-verified_date: 2026-05-20
-verified_against: russell/docs/architecture/ecosystem-integration.md
+type: flowchart
+verified_date: 2026-05-24
+verified_against: russell/docs/architecture/ecosystem-integration.md; ADR-0025; ADR-0027
+reference_sources: ADR-0025 (MCP client), ADR-0027 (ACP integration)
 status: VERIFIED
 -->
 
@@ -409,29 +411,3 @@ okh_skill_eval_reliability{reliability < 0.7}
 - Centralized routing (hKask can route to Okapi, OpenRouter, or other backends)
 - Consistent observability via CNS spans
 - Confidence-based escalation handled by hKask
-┌─────────────────────────────────────────────────────────────────────┐
-│                        KASK ECOSYSTEM                                │
-│                                                                      │
-│  ┌──────────────┐    ┌──────────────┐    ┌──────────────────────┐   │
-│  │   Russell     │    │   hKask       │    │   Okapi              │  │
-│  │   (skill host)│    │   (control   │    │   (LLM router)       │  │
-│  │               │    │    plane)    │    │                      │  │
-│  │  - Skill reg. │◄──►│  - MCP tools │    │  - skill_hint ctx    │  │
-│  │  - Dispatch   │    │  - Curator   │◄──►│  - knowledge inj.    │  │
-│  │  - Telemetry  │    │  - Dashboard │    │  - prompt assembly   │  │
-│  └──────┬───────┘    └──────┬───────┘    └──────────┬───────────┘  │
-│         │                   │                        │              │
-│         │  .rsk.tar.gz      │  MCP tools/call        │  skill_hint  │
-│         │  (skill bundles)  │  (loopback)            │  (API ext.)  │
-│         │                   │                        │              │
-│         ▼                   ▼                        ▼              │
-│  ┌──────────────────────────────────────────────────────────────┐  │
-│  │                Shared Infrastructure                          │  │
-│  │                                                                │  │
-│  │  - Manifest YAML schema (ecosystem contract)                   │  │
-│  │  - OKH tracing spans (opentelemetry → Loki → Grafana)          │  │
-│  │  - .rsk.tar.gz bundle format (portable skill unit)             │  │
-│  │  - REUSE_MANIFEST.md (provenance across operator boundaries)   │  │
-│  └──────────────────────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────────────────────┘
-```

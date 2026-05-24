@@ -16,7 +16,7 @@ status: "Deferred"
 
 ## Context
 
-[`ADR-0021`](0021-proprioception-phase2-reflex-arcs.md) implemented reflex arcs that automatically propose interventions when probe thresholds are breached. However, interventions exceeding the auto-execution risk cap require explicit operator consent.
+[`ADR-0021`](../0021-proprioception-phase2-reflex-arcs.md) implemented reflex arcs that automatically propose interventions when probe thresholds are breached. However, interventions exceeding the auto-execution risk cap require explicit operator consent.
 
 The Andon cord principle (from lean manufacturing) dictates that any operator can stop the line when they detect a problem. In Russell's context, the Andon cord is the operator's explicit approval/denial mechanism for reflex interventions.
 
@@ -81,5 +81,5 @@ russell confirm <event-id> --deny     # Deny a reflex intervention
 
 ## References
 
-- [`AGENTS.md`](../../AGENTS.md) §5 — vocabulary (Andon cord definition)
-- [`ADR-0021`](0021-proprioception-phase2-reflex-arcs.md) — reflex arc foundation
+- [`AGENTS.md`](../../../AGENTS.md) §5 — vocabulary (Andon cord definition)
+- [`ADR-0021`](../0021-proprioception-phase2-reflex-arcs.md) — reflex arc foundation

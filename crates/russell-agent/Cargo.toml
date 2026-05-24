@@ -51,7 +51,6 @@ reqwest = { workspace = true }
 
 [features]
 default = []
-# cns = ["hkask-types", "hkask-cns"]  # Enable CNS span emission (deferred until hKask crates available)
 
 [dev-dependencies]
 tempfile.workspace = true

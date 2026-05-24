@@ -21,7 +21,7 @@ status: "Proposed"
 
 ## Context
 
-[`MVP_SPEC.md §2.1`](../specifications/MVP_SPEC.md) describes `russell jack` as
+[`MVP_SPEC.md §2.1`](../../specifications/MVP_SPEC.md) describes `russell jack` as
 sending all gathered Sentinel samples to the LLM on **every invocation**, regardless
 of whether anything notable has happened. The pattern is:
 
@@ -162,8 +162,8 @@ configurable without code changes.
 
 ## References
 
-- [`MVP_SPEC.md §2.1`](../specifications/MVP_SPEC.md) — current `jack` spec
-- [`JR-2`](../architecture/PRINCIPLES_CATALOG.md) — Observe > Recommend > Act
-- [`russell-meta/src/fallback.rs`](../../crates/russell-meta/src/fallback.rs) — existing `verdict()` + `summarise()`
-- [`russell-meta/src/help.rs`](../../crates/russell-meta/src/help.rs) — current `run_help_with_config`
+- [`MVP_SPEC.md §2.1`](../../specifications/MVP_SPEC.md) — current `jack` spec
+- [`JR-2`](../../architecture/PRINCIPLES_CATALOG.md) — Observe > Recommend > Act
+- [`russell-meta/src/fallback.rs`](../../../crates/russell-meta/src/fallback.rs) — existing `verdict()` + `summarise()`
+- [`russell-meta/src/help.rs`](../../../crates/russell-meta/src/help.rs) — current `run_help_with_config`
 - OpenClaw architecture (external) — inspiration for deterministic pre-flight pattern

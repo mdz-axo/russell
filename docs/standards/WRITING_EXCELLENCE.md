@@ -1,18 +1,18 @@
 ---
 title: "Writing Excellence Protocol"
 audience: [contributors, developers, agents]
-last_updated: 2026-05-09
+last_updated: 2026-05-24
 togaf_phase: "Preliminary"
-version: "0.11.0"
+version: "1.0.0"
 status: "Active"
 ---
 
 # Writing Excellence Protocol
 
 <!-- TOGAF_DOMAIN: Cross-cutting -->
-<!-- VERSION: 0.11.0 -->
+<!-- VERSION: 1.0.0 -->
 <!-- STATUS: Active -->
-<!-- LAST_UPDATED: 2026-05-09 -->
+<!-- LAST_UPDATED: 2026-05-24 -->
 
 **Audience:** All contributors authoring documentation; AI agents generating or editing prose
 **TOGAF Phase:** Preliminary — Framework and Principles
@@ -22,8 +22,8 @@ status: "Active"
 ## 1. Purpose
 
 This protocol defines the voice, style, and discipline standards for the
-Kask documentation corpus. It is not an abstract style guide — it is
-grounded in the work and philosophy of three women whose contributions to
+Russell documentation corpus. It is not an abstract style guide — it is
+grounded in the work and philosophy of four women whose contributions to
 technical communication define what excellence means in our field. Their
 stories are not decoration; they are the operating principles that govern
 how we write, what we demand of ourselves, and why clarity is a moral
@@ -54,7 +54,7 @@ is no use doing anything unless you can communicate it."*[^hopper-communicate]
 
 | Principle | Operational Rule |
 |-----------|-----------------|
-| Write for the reader's vocabulary, not the author's | Agent-facing documentation uses MCP tool names and JSON schemas. Operator documentation uses CLI commands and configuration paths. Never assume the reader shares your mental model. |
+| Write for the reader's vocabulary, not the author's | Agent-facing documentation uses ACP method names and JSON schemas. Operator documentation uses CLI commands and configuration paths. Never assume the reader shares your mental model. |
 | If the audience cannot understand it, the writer has failed — not the reader | Every `describe()` output, every README quick-start section, every error message must be comprehensible on first reading without requiring prior context. |
 | Build the bridge others said was impossible | When a concept seems "too complex to document clearly," that is precisely when documentation matters most. The reactive surface pipeline, the bitemporal memory semantics, the policy engine — these demand Hopper-level clarity. |
 
@@ -82,7 +82,7 @@ a future reader she would never meet.
 | Principle | Operational Rule |
 |-----------|-----------------|
 | Document with enough precision that the specification is independently verifiable | Every data model, every API contract, every state transition must be stated with sufficient precision that a reader can write a test from the documentation alone — without consulting source code. |
-| See beyond the immediate implementation to the implications | The kask container is not merely a data structure; it is an organizing principle for agent collaboration. Documentation must articulate *why* a design exists, not merely *what* it does. The `describe()` method is not a feature — it is a statement about how agents perceive and share capability. |
+| See beyond the immediate implementation to the implications | The Russell pod is not merely a process wrapper; it is an organizing principle for agent identity and lifecycle. Documentation must articulate *why* a design exists, not merely *what* it does. The ACP session interface is not a feature — it is a statement about how agents interact safely with host observation. |
 | Annotate with more depth than the original | When documenting a design decision, the annotation (rationale, context, consequences, alternatives considered) must exceed the decision statement itself in length and value. An ADR with a one-line "Context" section is a failure of Lovelacian duty. |
 
 ### 2.3 Karen Schriver (b. 1955) — Design for the Reader
@@ -131,18 +131,19 @@ collaborating with contributors efficiently by keeping docs close to code
 or in the same system as code, with a source file concept and an output
 for deliverables."*[^gentle-about]
 
-What makes Gentle's contribution singular for Kask is that in an
+What makes Gentle's contribution singular for Russell is that in an
 agent-native system, documentation is not a companion to code — it *is*
-the code. When an AI agent reads `BUSINESS.md` to understand what tools a
-kask exposes, or parses `APPLICATION.md` to determine which MCP server
-backs a tool call, or follows the data model in `DATA.md` to validate a
-schema — the documentation is executing as specification. The TOGAF-aligned
-architecture documents in this repository are consumed by AI agents as
-operational truth, not by humans as reading material. Gentle's insight
-that docs must share the code's lifecycle, testing, and CI discipline is
-not merely best practice here — it is a correctness requirement. A stale
-document in an agent-native system is not an inconvenience; it is a
-bug that produces incorrect agent behavior.
+the code. When an AI agent reads `AGENTS.md` to understand what
+vocabulary governs the system, or parses `overview.md` to determine
+which crate owns a feature, or follows the data model in
+`PERSISTENCE_CATALOG.md` to validate a schema — the documentation is
+executing as specification. The TOGAF-aligned architecture documents
+in this repository are consumed by AI agents as operational truth, not
+by humans as reading material. Gentle's insight that docs must share
+the code's lifecycle, testing, and CI discipline is not merely best
+practice here — it is a correctness requirement. A stale document in an
+agent-native system is not an inconvenience; it is a bug that produces
+incorrect agent behavior.
 
 This is the Gentle Principle at its most consequential: **in a system
 where AI agents consume documentation as their primary interface to
@@ -154,7 +155,7 @@ defect.
 
 | Principle | Operational Rule |
 |-----------|-----------------|
-| Documentation lives in the same repository and shares the same review process as code | All Kask documentation lives under `docs/` in the same git repository. Changes to documentation go through the same PR review, CI checks, and merge process as code changes. Documentation and code changes for the same feature belong in the same commit. |
+| Documentation lives in the same repository and shares the same review process as code | All Russell documentation lives under `docs/` in the same git repository. Changes to documentation go through the same PR review, CI checks, and merge process as code changes. Documentation and code changes for the same feature belong in the same commit. |
 | Automate quality gates; do not rely on human vigilance alone | Link checking (`check_links.sh`), package count verification (`cargo metadata`), stale-name detection (`grep`), and diagram metadata presence must be automated gates — not manual checklist items that humans forget under deadline pressure. |
 | Documentation must accept contributions from the people who know the system best — the developers writing the code | The documentation format (Markdown), tooling (git, grep, standard CLI), and conventions (DIAGRAM_ALIGNMENT metadata, footnote format) are deliberately chosen to be native to developers. No proprietary toolchain, no CMS, no separate publishing system. A developer who can write a `cargo test` can write a documentation section. |
 | Continuous integration for docs means broken docs block the build, just as broken tests do | The `check_links.sh` script and the knowledge graph regeneration are CI-equivalent gates. A stale package count is a documentation bug with the same severity as a compilation error — it means the system description no longer matches the system. |
@@ -266,7 +267,7 @@ AGENTS.md, status documents, any document that agents parse to determine
 system structure or capability.
 
 This test treats documentation accuracy as a functional correctness
-property. A package count wrong by one, a removed workspace still named
+property. A package count wrong by one, a removed skill still named
 in a diagram, a stale tool name in a contract table — these are not
 cosmetic issues. They are defects that produce incorrect agent behavior
 in a system where documentation is the agent's primary interface to

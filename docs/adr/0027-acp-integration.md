@@ -51,7 +51,7 @@ Russell skills are categorized with **hLexicon taxonomy** (WordAct/FlowDef/KnowA
 | Visibility | Count | Skills | Exposure |
 |------------|-------|--------|----------|
 | **Public** | 8 | journal-compactor, journal-viewer, package-checker, pragmatic-cybernetics, pragmatic-semantics, scenario-tester, ubuntu-jack, web-search | Exposed via ACP to hKask agents |
-| **Private** | 8 | okapi-watcher, skill-discovery, skill-maintenance, skill-manager, skill-workshop, sysadmin | Russell-only, never exposed |
+| **Private** | 7 | okapi-watcher, skill-discovery, skill-maintenance, skill-manager, sysadmin | Russell-only, never exposed |
 
 **Rationale:**
 - Public skills are read-only or informational — no host mutation risk

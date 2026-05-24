@@ -6,7 +6,7 @@ last_updated: "2026-05-09"
 pattern_name: "TOGAF-Lite for Open Source"
 category: "Documentation Architecture Pattern"
 togaf_phase: "Preliminary"
-audience: "Open-source project maintainers, documentation architects, technical writers"
+audience: ["Open-source project maintainers", "documentation architects", "technical writers"]
 keywords: ["TOGAF", "documentation", "open source", "architecture", "pattern"]
 ---
 
@@ -143,6 +143,7 @@ graph TD
 
 <!-- DIAGRAM_ALIGNMENT
 id: DIAG-PATTERN-001
+type: flowchart
 verified_date: 2026-05-11
 verified_against: docs/architecture/DOC-ARCHITECTURE.md §11
 reference_sources: REF-TOGAF-10 (The Open Group 2022)

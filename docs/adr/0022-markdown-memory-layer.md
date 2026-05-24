@@ -267,5 +267,5 @@ same way.
 - [JR-7](../architecture/PRINCIPLES_CATALOG.md) — Persistence is auditable
 - [`PERSISTENCE_CATALOG.md`](../specifications/PERSISTENCE_CATALOG.md) — full persistence register
 - [`THE_JACK.md`](../architecture/THE_JACK.md) — Jack's persona design
-- [ADR-0020](0020-threshold-gated-llm-escalation.md) — threshold-gated LLM (related: threshold-skip sessions still contribute to memory)
+- [ADR-0020](deferred/0020-threshold-gated-llm-escalation.md) — threshold-gated LLM (related: threshold-skip sessions still contribute to memory)
 - OpenClaw architecture (external) — inspiration for Markdown memory pattern

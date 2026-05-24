@@ -186,7 +186,7 @@ impl SimpleIdentity {
 
 ## References
 
-- [ADR-0026: Macaroon OCAP Authentication](0026-macaroon-ocap.md)
+- [ADR-0026: Metacognitive Layer](0026-metacognitive-layer.md) — macaroon authentication design was incorporated into the identity port and metacognitive layer rename
 - [ADR-0033: Explicit Port Interfaces](0033-explicit-port-interfaces.md)
 - Adversarial Review Action Plan (2026-05-23) §Task T7
 - Alastair Cockburn, *Hexagonal Architecture* (2005)

@@ -178,7 +178,7 @@ the implementation has:
 - Jack proposes interventions via `ACTION: <skill>/<intervention>` syntax
 - The Jack persona teaches this format; the prompt's Objective section reinforces it
 - `russell jack` parses ACTION: lines from responses, displays guidance
-- `russell chat` supports `/approve` and `/deny` for operator consent
+- ACP sessions support consent for operator approval (`/approve` and `/deny`)
 - The dispatcher enforces `check_risk()` before execution (system cap: Low)
 - Sudo-requiring interventions use NOPASSWD configuration (no password prompt)
 

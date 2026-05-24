@@ -18,7 +18,7 @@ status: "Accepted"
 - **Date:** 2026-05-14 (original), 2026-05-19 (hKask migration)
 - **Deciders:** Project operator
 - **Tags:** `mcp`, `hkask`, `trust`, `tools`, `phase-4`
-- **Lifts:** Partial lift of [ADR-0003](deferred/0003-mcp-transport.md)
+- **Lifts:** Partial lift of [ADR-0003](0003-mcp-transport.md)
   deferral (client-side only); extends [ADR-0023](0023-lift-adr-0007-phase3-skills.md)
   skill surface to include hKask-mediated tools.
 
@@ -265,7 +265,7 @@ violate separation of concerns.
 
 1. Extend the poka-yoke to accept `hkask/<tool-name>` IDs.
 2. Extend `ACTION:` syntax parsing for `hkask/` prefix.
-3. Wire hKask tool calls into `russell chat` consent flow.
+3. Wire hKask tool calls into the ACP session consent flow.
 4. Add `hkask_mcp_reachable` self-vital to proprioception.
 
 ### Phase 4C — Doctor integration
@@ -304,7 +304,7 @@ the operational procedure for provisioning it.
 
 ## References
 
-- [ADR-0003](deferred/0003-mcp-transport.md) — MCP transport (stdio, deferred).
+- [ADR-0003](0003-mcp-transport.md) — MCP transport (stdio, deferred).
 - [ADR-0008](0008-llm-triage-never-emits-shell.md) — LLM never emits shell.
 - [ADR-0023](0023-lift-adr-0007-phase3-skills.md) — Phase 3 skills.
 - [`../../AGENTS.md`](../../AGENTS.md) §6 — IDRS contract.

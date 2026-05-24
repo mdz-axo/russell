@@ -207,7 +207,6 @@ Russell ships with 12 public skills (all hKask-compatible):
 |---|---|---|---|---|
 | `okapi-watcher` | 3 | 3 | 1 | ✅ SKILL.md + skill.json |
 | `skill-manager` | 6 | 3 | 6 | ✅ SKILL.md + skill.json |
-| `skill-workshop` | 2 | 2 | 4 | ✅ SKILL.md + skill.json |
 | `skill-maintenance` | 2 | 2 | 2 | ✅ SKILL.md + skill.json |
 | `skill-discovery` | 2 | 2 | 3 | ✅ SKILL.md + skill.json |
 | `sysadmin` | 3 | 2 | 3 | ✅ SKILL.md + skill.json |

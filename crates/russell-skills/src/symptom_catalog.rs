@@ -20,6 +20,8 @@
 use std::path::Path;
 
 /// The compiled-in symptom catalog YAML (fallback seed).
+/// Retained for future runtime YAML loading; currently unused because
+/// the static `SYMPTOMS` array covers all known symptoms.
 #[allow(dead_code)]
 const SYMPTOMS_YAML: &str = include_str!("../data/symptoms.yaml");
 
@@ -116,6 +118,8 @@ pub static SYMPTOMS: &[&str] = &[
 ];
 
 /// Load symptoms from a YAML file on disk.
+/// Retained for future runtime YAML loading; currently unused because
+/// the static `SYMPTOMS` array covers all known symptoms.
 #[allow(dead_code)]
 pub fn load_symptoms_from_file(path: &Path) -> Vec<String> {
     match std::fs::read_to_string(path) {
@@ -127,6 +131,7 @@ pub fn load_symptoms_from_file(path: &Path) -> Vec<String> {
 /// Parse a YAML list of symptom strings.
 ///
 /// Handles the `- name` format used in `data/symptoms.yaml`.
+/// Retained for future runtime YAML loading.
 #[allow(dead_code)]
 fn parse_symptoms_yaml(yaml: &str) -> Vec<String> {
     // Simple line-based parser: lines starting with "- " are symptom entries.

@@ -97,6 +97,6 @@ Revisit this decision when:
 
 ## References
 
-- [ADR-0027: hKask ACP Integration](0027-acp-integration.md)
-- [ADR-0041: ACP Consent Protocol](0041-acp-consent-protocol.md)
+- [ADR-0027: hKask ACP Integration](../0027-acp-integration.md)
+- [ADR-0041: ACP Consent Protocol](../0041-acp-consent-protocol.md)
 - Adversarial Review Action Plan (2026-05-23) §Tier 3 recommendations

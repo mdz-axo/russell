@@ -63,7 +63,8 @@ status: VERIFIED
 **Owner.** `russell-core::journal::JournalWriter` (single writer).
 **Access.** `russell-core::journal::JournalReader` (many readers).
 **Schema version.** Tracked in `schema_migrations` table. Current
-version: **1** (file `crates/russell-core/src/journal/migrations/0001_init.sql`).
+version: **7** (7 migration files under
+`crates/russell-core/src/journal/migrations/`).
 **Mode.** WAL (`PRAGMA journal_mode=WAL`,
 `synchronous=NORMAL`) per ADR-0004.
 **Retention.** Unbounded in MVP. Phase 2 introduces a digest-driven
@@ -76,10 +77,11 @@ against the file.
 |---|---|---|---|
 | `schema_migrations` | Forward-only migration log | `journal::migrations::apply_one` | migration runner |
 | `samples` | Time-series probe observations | Sentinel, Meta-Sentinel, Proprio | digest, baselines, `arsenal-mcp-russell` |
-| `events` | Structured log rows conforming to `harness.event.v1` | every mutating + observational action | `list`, `digest`, `help` |
+| `events` | Structured log rows conforming to `harness.event.v1`; includes `outputs` (0005), `prev_hash` + `hash` (0006) columns | every mutating + observational action | `list`, `digest`, `help`, `verify-journal` |
 | `baselines` | EWMA mean/var + p50/p95/p99 per probe | `journal::compute_baselines` (daily refresh in sentinel-once) | `read_baselines`, rules, SOAP prompt |
-| `confirmations` | Consent-flow approval records for risk≥medium interventions | `russell-cli::chat` consent path | Phase 3 dispatcher audit |
-| `help_sessions` | One row per `russell jack` round-trip | `russell-meta::help` | `digest`, future UI |
+| `confirmations` | Consent-flow approval records for risk≥medium interventions | ACP consent path | Phase 3 dispatcher audit |
+| `help_sessions` | One row per `russell jack` round-trip; `status` includes `threshold_skip` (0003, 0004) | `russell-meta::help` | `digest`, future UI |
+| `used_nonces` | Macaroon nonce replay prevention (0007) | `russell-acp-server::MacaroonAuth` | token validation |
 
 Column details are in `crates/russell-core/src/journal/migrations/`.
 
@@ -254,6 +256,26 @@ proactive notifications.
 **Format.** Free-form Markdown. Not parsed; included in the
 Doctor's system context if present. Russell never writes to
 this file.
+
+### 2.12 `~/.local/state/harness/russell.token` (Russell-owned)
+
+**Owner.** `russell-core::env` (generated on first use).
+**Content.** Service token for hKask inference requests.
+**Permissions.** `0600` (owner read/write only).
+**Retention.** Until operator deletes or token rotation replaces it
+(ADR-0047).
+
+### 2.13 `~/.local/state/harness/artifacts/` (Russell-owned)
+
+**Owner.** `russell-agent::ArtifactStore`.
+**Content.** Memory artifact directories organized by type:
+- `semantic/` — structured triple files (`YYYY-MM-DD.triples`)
+- `episodic/` — session episode files (`YYYY-MM-DD.episodes`)
+- `evidence/` — evidence bundles (`YYYY-MM-DD/bundle.json`)
+- `skills/<skill_id>/` — skill-specific artifacts
+**Visibility.** Artifacts have visibility annotations (Public /
+Private / OperatorOnly) controlling export scope.
+**Retention.** Unbounded; operator manages via `pod-artifacts-export`.
 
 ## 3. Reset Procedures
 

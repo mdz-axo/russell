@@ -194,6 +194,6 @@ pub enum ConsentDecision {
 ## References
 
 - [ADR-0027: hKask ACP Integration](0027-acp-integration.md)
-- [ADR-0036: Andon Cord for Reflex Arcs](0036-andon-cord-reflex-arcs.md) (deferred, consent absorbed here)
+- [ADR-0036: Andon Cord for Reflex Arcs](deferred/0036-andon-cord-reflex-arcs.md) (deferred, consent absorbed here)
 - Adversarial Review Action Plan (2026-05-23) §Tier 1 recommendations
 - JR-2: Observe > Recommend > Act

@@ -136,7 +136,7 @@ pub fn load_capability_token() -> Option<String> {
 
 ## References
 
-- [ADR-0026: Macaroon OCAP Authentication](0026-macaroon-ocap.md)
+- [ADR-0026: Metacognitive Layer](0026-metacognitive-layer.md) — macaroon authentication design incorporated into the identity port
 - [ADR-0038: Identity Port](0038-identity-port.md)
 - Bruce Schneier, *Applied Cryptography* (1996) — key lifetime principles
 - Adversarial Review Action Plan (2026-05-23) §Tier 2 recommendations

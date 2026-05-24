@@ -10,16 +10,7 @@ status: "Active"
 <!-- TOGAF_DOMAIN: Cross-cutting -->
 <!-- VERSION: 1.0.0 -->
 <!-- STATUS: Active -->
-<!-- LAST_UPDATED: 2026-05-13 -->
-
-<!-- DIAGRAM_ALIGNMENT
-id: DIAG-RUBRIC-001
-type: ER diagram
-verified_date: 2026-05-13
-verified_against: TOGAF_LITE_FOR_OPEN_SOURCE.md, WRITING_EXCELLENCE.md, DOCUMENTATION_STANDARDS.md
-reference_sources: All three governing standards
-status: VERIFIED
--->
+<!-- LAST_UPDATED: 2026-05-24 -->
 
 # Documentation Excellence Validation Rubric
 

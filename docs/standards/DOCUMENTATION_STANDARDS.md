@@ -120,7 +120,7 @@ portal or is archived. There are no orphans.
 ### 5.2 When a decision is deferred
 
 ADRs whose subject is explicitly outside the MVP go under
-[`docs/adr/deferred/`](../adr/deferred/0003-mcp-transport.md). They retain their
+[`docs/adr/deferred/`](../adr/0003-mcp-transport.md). They retain their
 `Status: Accepted` line and remain load-bearing for their
 future phase. Being deferred is not a demotion; it is a
 sequencing fact.

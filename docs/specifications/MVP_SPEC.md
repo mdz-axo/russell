@@ -51,15 +51,23 @@ The MVP exposes capabilities through two interfaces:
 |---|---|---|---|
 | `russell status` | none | Read-only summary of paths, kill-switch, journal, profile | local fs |
 | `russell list` | none | Most-recent journal events | local sqlite |
-| `russell profile [--init]` | none | Show / initialize `profile.json` | local fs |
 | `russell digest [--since-hours N]` | none | Markdown summary of recent activity | local sqlite |
 | `russell sentinel-once` | none | Fire the Sentinel once, append samples, evaluate rules | local fs |
 | `russell jack [--note "..."]` | none | Compose SOAP-shaped prompt and consult the LLM; print response | network *(opt-in)* |
 | `russell skill list` | none | List loaded skills, probes, and interventions | local fs |
 | `russell skill run <id>` | varies | Execute a skill probe or intervention via the IDRS-gated dispatcher | local fs + process |
+| `russell skill install <name>` | low | Install or activate a skill (idempotent) | local fs |
+| `russell skill prune <name>` | low | Deprecate a skill (keep files) | local fs |
 | `russell proprio` | none | Run self-observation and append self-vital samples | local sqlite |
 | `russell self-triage` | none | Russell diagnoses own health | local sqlite |
-| `russell self-triage` | none | Russell diagnoses own health | local sqlite |
+| `russell pod-status` | none | Show agent pod lifecycle state | local fs |
+| `russell pod-activate` | none | Activate the agent pod (start sentinel + ACP) | local fs |
+| `russell pod-deactivate` | none | Deactivate the agent pod | local fs |
+| `russell pod-persona-show` | none | Display current agent persona | local fs |
+| `russell pod-artifacts-list` | none | List stored artifacts | local fs |
+| `russell pod-artifacts-export` | none | Export artifacts filtered by visibility | local fs |
+| `russell docs` | none | Open documentation | local fs |
+| `russell verify-journal` | none | Audit hash chain integrity | local sqlite |
 
 ### 2.1 The `jack` verb — the "cry for help"
 
@@ -125,15 +133,19 @@ the rule engine. Default rules ship in `rules.d/`. Operator
 overrides live in `~/.local/share/harness/rules.d/`. Breach
 events are written to the journal.
 
-**Self-vitals (proprioception).** Five active, per JR-5:
+**Self-vitals (proprioception).** Nine self-observation points active, per JR-5:
 
 | Self-vital | Source | Rule |
 |---|---|---|
 | `sentinel_last_run_age_s` | journal `MAX(ts)` | Warn > 450s, Alert > 1800s |
-| `journal_writer_stall_s` | write-append timing | Warn > 5s |
-| `llm_p95_latency_ms` | help_session latency | Warn > 2000ms |
+| `journal_writer_stall_s` | write-append timing | Warn > 60s, Alert > 300s |
+| `llm_p95_latency_ms` | help_session latency | Warn > 8000ms, Alert > 20000ms |
 | `timer_drift_s` | cadence interval | Warn > target+20% |
-| `help_error_rate_pct` | failed LLM calls / total | Warn > 10% |
+| `help_error_rate_pct` | failed LLM calls / total | Warn > 20%, Alert > 50% |
+| `hkask_mcp_reachable_ms` | MCP endpoint ping | Warn > 1000ms |
+| `remote_discovery_latency_s` | remote skill registry lookup | Warn > 5s |
+| `journal_chain_intact` | hash chain verification | Fail = `false` |
+| `evidence_integrity_ok` | evidence bundle checksums | Fail = `false` |
 
 ## 4. The Skill System
 
@@ -201,13 +213,18 @@ These items remain deferred beyond the current build:
   filesystem confinement. (ADR-0024.)
 - **ACP server** — `russell-acp-server` provides Agent Client Protocol
   over JSON-RPC 2.0 stdio with macaroon OCAP auth. (ADR-0027.)
+- **Agent pod** — `russell-agent` implements pod lifecycle
+  (Populated→Registered→Activated→Deactivated), persona configuration
+  via YAML, CNS observability span emission, and memory artifact storage.
+  Pod CLI verbs: `pod-status`, `pod-activate`, `pod-deactivate`,
+  `pod-persona-show`, `pod-artifacts-list`, `pod-artifacts-export`.
 
 ## 7. Security Hardening (Phase 5, 2026-05-23)
 
 The following security improvements are **complete**:
 
 - **Unified `RiskBand` type** — Eliminated 4 duplicate risk enums across
-  `russell-skills`, `russell-acp-server`, `russell-reflex`, and `russell-core`.
+  `russell-skills`, `russell-acp-server`, `russell-proprio`, and `russell-core`.
   Single canonical definition in `russell-core::risk::RiskBand`. (C4, C7)
 - **DNS rebinding protection** — MCP client validates all resolved IPs are
   loopback, rejecting hostnames that resolve to non-loopback addresses.
