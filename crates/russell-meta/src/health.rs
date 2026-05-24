@@ -8,6 +8,9 @@
 //! 1. Pings Okapi's `/api/tags` endpoint (3 s timeout).
 //! 2. If unreachable, attempts `systemctl --user start okapi`.
 //! 3. Waits for readiness (up to ~6 s after start).
+
+/// Default Okapi base URL.
+pub const DEFAULT_BASE_URL: &str = "http://127.0.0.1:11435/v1";
 //! 4. Returns whether Okapi is ready.
 //!
 //! Design note: this is the *only* place that knows how to wake Okapi.

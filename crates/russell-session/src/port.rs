@@ -10,8 +10,8 @@ use serde_json::Value as JsonValue;
 ///
 /// Implementations provide intervention execution with appropriate
 /// visibility enforcement and evidence logging.
-#[async_trait::async_trait]
-pub trait InterventionPort: Send + Sync {
+#[async_trait::async_trait(?Send)]
+pub trait InterventionPort {
     /// Execute an approved intervention.
     ///
     /// Returns the execution result on success, or an error message on failure.

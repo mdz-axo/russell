@@ -24,14 +24,14 @@ use russell_session::SessionEngine;
 /// Shared application state — holds the session engine.
 pub struct AppState {
     /// The session engine (shared across all surfaces).
-    pub engine: tokio::sync::Mutex<SessionEngine>,
+    pub engine: std::sync::Mutex<SessionEngine>,
 }
 
 impl AppState {
     /// Create new app state with the given session engine.
     pub fn new(engine: SessionEngine) -> Self {
         Self {
-            engine: tokio::sync::Mutex::new(engine),
+            engine: std::sync::Mutex::new(engine),
         }
     }
 }

@@ -52,6 +52,8 @@ enum Command {
     },
     /// Run Sentinel once.
     SentinelOnce,
+    /// Interactive chat with Jack.
+    Chat,
     /// Consult LLM for health assessment.
     Jack {
         #[arg(long)]
@@ -96,6 +98,7 @@ async fn main() -> Result<()> {
         Command::List { limit } => commands::list::run(&paths, limit),
         Command::Digest { since_hours } => commands::digest::run(&paths, since_hours, "stdout"),
         Command::SentinelOnce => commands::sentinel_once::run(&paths),
+        Command::Chat => commands::chat::run(&paths).await,
         Command::Jack { note } => commands::help::run(&paths, note.as_deref()).await,
         Command::SkillList => commands::skill::list(&paths),
         Command::SkillRun { id } => commands::skill::run(&paths, &id, false).await,

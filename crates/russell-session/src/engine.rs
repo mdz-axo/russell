@@ -27,7 +27,7 @@ pub struct SessionEngine {
     /// Inference backend for LLM responses.
     inference: Option<std::sync::Arc<dyn InferencePort>>,
     /// Intervention execution port.
-    intervention_port: Option<Box<dyn InterventionPort + Send>>,
+    intervention_port: Option<Box<dyn InterventionPort>>,
 }
 
 impl SessionEngine {
@@ -48,7 +48,7 @@ impl SessionEngine {
     }
 
     /// Set the intervention execution port.
-    pub fn with_intervention_port(mut self, port: Box<dyn InterventionPort + Send>) -> Self {
+    pub fn with_intervention_port(mut self, port: Box<dyn InterventionPort>) -> Self {
         self.intervention_port = Some(port);
         self
     }

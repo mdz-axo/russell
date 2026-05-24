@@ -21,11 +21,13 @@ use russell_session::{
 };
 
 /// ACP-specific intervention port adapter.
+///
+/// Uses `?Send` because the ACP handler runs on a single thread (stdio server).
 struct AcpInterventionAdapter {
-    dispatch: std::sync::Arc<dyn SkillDispatchPort + Send + Sync>,
+    dispatch: std::sync::Arc<dyn SkillDispatchPort>,
 }
 
-#[async_trait::async_trait]
+#[async_trait::async_trait(?Send)]
 impl russell_session::InterventionPort for AcpInterventionAdapter {
     async fn execute(
         &self,
@@ -48,7 +50,7 @@ pub struct AcpHandler {
     #[allow(dead_code)]
     persona: JackPersonaProjection,
     /// Skill dispatch port (hexagonal).
-    dispatch: std::sync::Arc<dyn SkillDispatchPort + Send + Sync>,
+    dispatch: std::sync::Arc<dyn SkillDispatchPort>,
     /// Macaroon auth.
     auth: MacaroonAuth,
     /// Rate limiter.
@@ -69,9 +71,9 @@ impl AcpHandler {
         auth: MacaroonAuth,
         rate_limiter: RateLimiter,
     ) -> Self {
-        let dispatch_arc: std::sync::Arc<dyn SkillDispatchPort + Send + Sync> =
+        let dispatch_arc: std::sync::Arc<dyn SkillDispatchPort> =
             std::sync::Arc::new(dispatch);
-        let intervention_adapter: Box<dyn russell_session::InterventionPort + Send> =
+        let intervention_adapter: Box<dyn russell_session::InterventionPort> =
             Box::new(AcpInterventionAdapter {
                 dispatch: std::sync::Arc::clone(&dispatch_arc),
             });

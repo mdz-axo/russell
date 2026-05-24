@@ -35,14 +35,14 @@ max_tokens = 4096
 {% endfor %}
 {% endif %}
 
-{% if hkask_tools %}
-### HKask MCP Tools
+{% if kask_tools %}
+### Kask MCP Tools
 
 | Tool | Risk |
 |---|---|
-{% for tool in hkask_tools %}
+{% for tool in kask_tools %}
 | {{ tool.name }} | {{ tool.risk }} |
 {% endfor %}
 
-**HKask syntax:** `ACTION: hkask/<tool-name>`
+**Kask syntax:** `ACTION: kask/<tool-name>`
 {% endif %}

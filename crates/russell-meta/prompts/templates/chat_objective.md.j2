@@ -3,8 +3,8 @@
    Inference: temperature=0.4, conversational mode.
    Variables: profile_block, severity_block, samples_table,
              freshness_block, actionable_skills, knowledge_skills,
-             hkask_tools, events_table, skill_telemetry
- #}
+             kask_tools, events_table, skill_telemetry
+#}
 [inference]
 temperature = 0.4
 max_tokens = 2048
@@ -31,10 +31,10 @@ max_tokens = 2048
 {% endfor %}{% for iv in s.interventions %}- `{{ s.id }}`/`{{ iv.id }}` (intervention, risk: {{ iv.risk }})
 {% endfor %}{% endfor %}
 {% endif %}
-{% if hkask_tools %}
+{% if kask_tools %}
 
-### HKask MCP tools
-{% for t in hkask_tools %}- `hkask`/`{{ t.name }}` (tool, risk: {{ t.risk }}){% if t.description %} — {{ t.description }}{% endif %}
+### Kask MCP tools
+{% for t in kask_tools %}- `kask`/`{{ t.name }}` (tool, risk: {{ t.risk }}){% if t.description %} — {{ t.description }}{% endif %}
 
 {% endfor %}
 {% endif %}

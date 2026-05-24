@@ -9,15 +9,13 @@ use axum::{
     extract::{Path, State},
     http::StatusCode,
     response::IntoResponse,
-    routing::{delete, get, post},
+    routing::{get, post},
     Router,
 };
 use serde::{Deserialize, Serialize};
-use tracing::{info, warn};
+use tracing::warn;
 
-use russell_session::{
-    ConsentDecision, ConsentRequest, CreateSessionRequest, SessionEngine, SessionMessageRequest,
-};
+use russell_session::{ConsentDecision, ConsentRequest, SessionEngine};
 
 use crate::AppState;
 
@@ -35,7 +33,6 @@ pub fn build_router(state: AppState) -> Router {
 /// Create session request body.
 #[derive(Debug, Deserialize)]
 pub struct CreateSessionBody {
-    /// Optional persona name.
     #[serde(default = "default_persona")]
     pub persona: String,
 }
@@ -44,30 +41,24 @@ fn default_persona() -> String {
     "jack".to_string()
 }
 
-/// Create session response.
-#[derive(Debug, Serialize)]
-pub struct SessionResponse {
-    pub session_id: String,
-    pub created_at: String,
-    pub persona: String,
-}
-
 async fn create_session(
     State(state): State<AppState>,
     Json(body): Json<CreateSessionBody>,
 ) -> impl IntoResponse {
-    let mut engine = state.engine.lock().await;
+    let mut engine = state.engine.lock().unwrap();
     match engine.create_session(&body.persona) {
         Ok(resp) => (StatusCode::CREATED, Json(resp)).into_response(),
         Err(e) => {
             warn!(error = %e, "Failed to create session");
-            (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()})))
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": e.to_string()})),
+            )
                 .into_response()
         }
     }
 }
 
-/// Send message request body.
 #[derive(Debug, Deserialize)]
 pub struct SendMessageBody {
     pub message: String,
@@ -78,7 +69,7 @@ async fn send_message(
     Path(session_id): Path<String>,
     Json(body): Json<SendMessageBody>,
 ) -> impl IntoResponse {
-    let mut engine = state.engine.lock().await;
+    let mut engine = state.engine.lock().unwrap();
     match engine.send_message(&session_id, &body.message) {
         Ok(resp) => (StatusCode::OK, Json(resp)).into_response(),
         Err(e) => {
@@ -92,7 +83,6 @@ async fn send_message(
     }
 }
 
-/// Consent request body.
 #[derive(Debug, Deserialize)]
 pub struct ConsentBody {
     pub action_id: String,
@@ -113,7 +103,7 @@ async fn respond_consent(
         reason: body.reason,
     };
 
-    let mut engine = state.engine.lock().await;
+    let mut engine = state.engine.lock().unwrap();
     match engine.respond_consent(request) {
         Ok(resp) => (StatusCode::OK, Json(resp)).into_response(),
         Err(e) => {
@@ -133,7 +123,7 @@ async fn get_session(
     State(state): State<AppState>,
     Path(session_id): Path<String>,
 ) -> impl IntoResponse {
-    let engine = state.engine.lock().await;
+    let engine = state.engine.lock().unwrap();
     match engine.get_session(&session_id) {
         Ok(session) => (
             StatusCode::OK,
@@ -147,7 +137,10 @@ async fn get_session(
             })),
         )
             .into_response(),
-        Err(e) => (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": e.to_string()})))
+        Err(e) => (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({"error": e.to_string()})),
+        )
             .into_response(),
     }
 }
@@ -156,14 +149,17 @@ async fn close_session(
     State(state): State<AppState>,
     Path(session_id): Path<String>,
 ) -> impl IntoResponse {
-    let mut engine = state.engine.lock().await;
+    let mut engine = state.engine.lock().unwrap();
     match engine.close_session(&session_id) {
         Ok(()) => (
             StatusCode::OK,
             Json(serde_json::json!({"session_id": session_id, "closed": true})),
         )
             .into_response(),
-        Err(e) => (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": e.to_string()})))
+        Err(e) => (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({"error": e.to_string()})),
+        )
             .into_response(),
     }
 }
