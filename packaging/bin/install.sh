@@ -41,16 +41,28 @@ say() { printf '\033[1;34m[install]\033[0m %s\n' "$*"; }
 
 say "Building russell ($PROFILE)…"
 if [ "$PROFILE" = "release" ]; then
-  (cd "$REPO" && cargo build --release -p russell-cli)
+  (cd "$REPO" && cargo build --release -p russell-cli -p russell-acp-server)
   BIN="$REPO/target/release/russell"
+  ACP_BIN="$REPO/target/release/russell-acp-server"
 else
-  (cd "$REPO" && cargo build -p russell-cli)
+  (cd "$REPO" && cargo build -p russell-cli -p russell-acp-server)
   BIN="$REPO/target/debug/russell"
+  ACP_BIN="$REPO/target/debug/russell-acp-server"
 fi
 
 say "Installing binary → ~/.local/bin/russell"
 mkdir -p "$HOME/.local/bin"
 install -m 0755 "$BIN" "$HOME/.local/bin/russell"
+
+if [ -f "$ACP_BIN" ]; then
+  say "Installing ACP server → ~/.local/bin/russell-acp-server"
+  install -m 0755 "$ACP_BIN" "$HOME/.local/bin/russell-acp-server"
+fi
+
+if [ -f "$ACP_BIN" ]; then
+  say "Installing ACP server → ~/.local/bin/russell-acp-server"
+  install -m 0755 "$ACP_BIN" "$HOME/.local/bin/russell-acp-server"
+fi
 
 say "Installing systemd user units → ~/.config/systemd/user/"
 mkdir -p "$HOME/.config/systemd/user"
@@ -65,11 +77,17 @@ mkdir -p "$HOME/.config/harness" "$HOME/.local/state/harness/runs" \
          "$HOME/.local/share/harness/skills"
 
 say "Installing skills → ~/.local/share/harness/skills/"
-cp -r "$REPO/skills/ollama-watcher" "$HOME/.local/share/harness/skills/"
-cp -r "$REPO/skills/ubuntu-jack"    "$HOME/.local/share/harness/skills/"
-cp -r "$REPO/skills/sysadmin"       "$HOME/.local/share/harness/skills/"
-chmod +x "$HOME/.local/share/harness/skills/ollama-watcher/scripts/"*.sh 2>/dev/null || true
-chmod +x "$HOME/.local/share/harness/skills/sysadmin/scripts/"*.sh 2>/dev/null || true
+for skill_dir in "$REPO"/skills/*/; do
+  skill_name=$(basename "$skill_dir")
+  [[ "$skill_name" =~ ^[_\.] ]] && continue
+  if [ ! -d "$HOME/.local/share/harness/skills/$skill_name" ]; then
+    cp -r "$skill_dir" "$HOME/.local/share/harness/skills/"
+    say "  → $skill_name skill installed"
+  else
+    say "  → $skill_name skill already present (not overwritten)"
+  fi
+done
+chmod +x "$HOME/.local/share/harness/skills/"*/scripts/*.sh 2>/dev/null || true
 
 # Build and install arsenal-mcp-russell if Kask repo is available
 KASK_REPO="${HOME}/Clones/kask"
@@ -81,11 +99,10 @@ if [ -d "$KASK_REPO" ] && [ -f "$KASK_REPO/Cargo.toml" ]; then
     say "Installing arsenal-mcp-russell → ~/.local/bin/"
     mkdir -p "$HOME/.local/bin"
     install -m 0755 "$MCP_BIN" "$HOME/.local/bin/arsenal-mcp-russell"
-    
-    # Update MCP registry to point to correct location
+
     say "Updating MCP registry…"
     mkdir -p "$HOME/.config/stack"
-    cat > "$HOME/.config/stack/mcp-registry.json" <<'MCPREG'
+    cat > "$HOME/.config/stack/mcp-registry.json" <<MCPREG
 {
   "version": "1.0",
   "native_servers": {
@@ -93,7 +110,7 @@ if [ -d "$KASK_REPO" ] && [ -f "$KASK_REPO/Cargo.toml" ]; then
       "name": "russell",
       "transport": {
         "type": "stdio",
-        "command": "/home/mdz-axolotl/.local/bin/arsenal-mcp-russell",
+        "command": "${HOME}/.local/bin/arsenal-mcp-russell",
         "args": []
       },
       "enabled": true,
@@ -107,7 +124,7 @@ if [ -d "$KASK_REPO" ] && [ -f "$KASK_REPO/Cargo.toml" ]; then
       "name": "okapi-metrics",
       "transport": {
         "type": "stdio",
-        "command": "/home/mdz-axolotl/.local/bin/arsenal-mcp-okapi-metrics",
+        "command": "${HOME}/.local/bin/arsenal-mcp-okapi-metrics",
         "args": []
       },
       "enabled": true,
@@ -123,55 +140,7 @@ if [ -d "$KASK_REPO" ] && [ -f "$KASK_REPO/Cargo.toml" ]; then
   "auto_start_all": true
 }
 MCPREG
-    
-# Build stack-api for MCP HTTP gateway
-    say "Building Kask MCP HTTP gateway (stack-api)…"
-    (cd "$KASK_REPO" && cargo build -p stack-api)
-    if [ -f "$KASK_REPO/target/debug/stack-api" ]; then
-      say "Installing kask-gateway systemd service…"
-      install -m 0644 "$REPO/packaging/systemd/kask-gateway.service" "$HOME/.config/systemd/user/"
-      systemctl --user daemon-reload
-      systemctl --user enable kask-gateway.service
-      systemctl --user start kask-gateway.service
-      
-      # Verify gateway is running
-      sleep 2
-      if curl -sf "http://127.0.0.1:18100/health" >/dev/null 2>&1; then
-        say "✓ Kask gateway started and healthy at http://127.0.0.1:18100"
-      else
-        say "WARNING: Kask gateway may not have started correctly"
-        say "  Check: systemctl --user status kask-gateway.service"
-      fi
-    fi
-    
-    # Set up token rotation
-    say "Installing token rotation script and timer…"
-    mkdir -p "$HOME/.local/bin"
-    install -m 0755 "$REPO/scripts/rotate-russell-token.sh" "$HOME/.local/bin/"
-    install -m 0644 "$REPO/packaging/systemd/kask-token-rotate.service" "$HOME/.config/systemd/user/"
-    install -m 0644 "$REPO/packaging/systemd/kask-token-rotate.timer" "$HOME/.config/systemd/user/"
-    
-    # Create token directory
-    mkdir -p "$(dirname "$TOKEN_FILE")"
-    
-    # Initial token setup if principal exists
-    if stack-admin key get --for russell &>/dev/null; then
-      say "Setting up initial Russell MCP token…"
-      stack-admin key get --for russell --format json > "$TOKEN_FILE" 2>/dev/null || true
-      if [ -f "$TOKEN_FILE" ] && [ -s "$TOKEN_FILE" ]; then
-        chmod 600 "$TOKEN_FILE"
-        say "✓ Initial token installed"
-      fi
-    else
-      say "NOTE: Russell service principal not found in Kask"
-      say "  To create it, run in Kask repo:"
-      say "    stack-admin key create --for russell --type service \\"
-      say "      --display 'Russell (Host Curator)' --ttl 168h"
-    fi
-    
-    systemctl --user daemon-reload
-    systemctl --user enable kask-token-rotate.timer
-    say "✓ Token rotation timer enabled (runs weekly)"
+    say "✓ MCP registry updated"
   else
     say "WARNING: arsenal-mcp-russell build failed, MCP tools unavailable"
   fi

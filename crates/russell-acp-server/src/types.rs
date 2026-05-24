@@ -292,6 +292,14 @@ pub struct JsonRpcRequest {
     /// Authentication (macaroon token).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub auth: Option<AuthInfo>,
+    /// ACP protocol version (for hKask interop).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub acp_version: Option<String>,
+}
+
+impl JsonRpcRequest {
+    /// ACP protocol version constant.
+    pub const ACP_VERSION: &'static str = "0.1.0";
 }
 
 /// Authentication info.

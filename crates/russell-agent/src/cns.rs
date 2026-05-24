@@ -16,6 +16,33 @@ pub const DEFAULT_CNS_ENDPOINT: &str = "http://127.0.0.1:8080/api/v1/cns/span";
 /// Environment variable for overriding the CNS endpoint.
 const ENV_CNS_ENDPOINT: &str = "HKASK_CNS_ENDPOINT";
 
+/// CNS port — hexagonal trait for observability span emission.
+///
+/// Implementations decide what happens with emitted spans:
+/// HTTP delivery, local logging, or silent discard.
+pub trait CnsPort: Send + Sync {
+    /// Emit pod populated span.
+    fn emit_populated(&self);
+
+    /// Emit pod registered span.
+    fn emit_registered(&self);
+
+    /// Emit pod activated span.
+    fn emit_activated(&self);
+
+    /// Emit pod deactivated span.
+    fn emit_deactivated(&self);
+
+    /// Emit probe executed span.
+    fn emit_probe_executed(&self, probe_id: &str, skill_id: &str);
+
+    /// Emit skill dispatched span.
+    fn emit_skill_dispatched(&self, skill_id: &str, action: &str);
+
+    /// Emit LLM escalation span.
+    fn emit_llm_escalation(&self, model: &str, latency_ms: u64);
+}
+
 /// CNS span — structured event for observability.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CnsSpan {
@@ -243,6 +270,93 @@ impl CnsEmitter {
             }),
         );
         self.emit(span);
+    }
+}
+
+/// Logging CNS adapter — emits spans as structured log lines, no network I/O.
+pub struct LoggingCnsAdapter {
+    pod_id: PodID,
+}
+
+impl LoggingCnsAdapter {
+    /// Create a new logging CNS adapter.
+    pub fn new(pod_id: &PodID, _persona: &AgentPersona) -> Self {
+        Self {
+            pod_id: pod_id.clone(),
+        }
+    }
+}
+
+impl CnsPort for LoggingCnsAdapter {
+    fn emit_populated(&self) {
+        tracing::info!(pod_id = %self.pod_id, "CNS: pod populated");
+    }
+
+    fn emit_registered(&self) {
+        tracing::info!(pod_id = %self.pod_id, "CNS: pod registered");
+    }
+
+    fn emit_activated(&self) {
+        tracing::info!(pod_id = %self.pod_id, "CNS: pod activated");
+    }
+
+    fn emit_deactivated(&self) {
+        tracing::info!(pod_id = %self.pod_id, "CNS: pod deactivated");
+    }
+
+    fn emit_probe_executed(&self, probe_id: &str, skill_id: &str) {
+        tracing::info!(pod_id = %self.pod_id, probe_id, skill_id, "CNS: probe executed");
+    }
+
+    fn emit_skill_dispatched(&self, skill_id: &str, action: &str) {
+        tracing::info!(pod_id = %self.pod_id, skill_id, action, "CNS: skill dispatched");
+    }
+
+    fn emit_llm_escalation(&self, model: &str, latency_ms: u64) {
+        tracing::info!(pod_id = %self.pod_id, model, latency_ms, "CNS: LLM escalation");
+    }
+}
+
+/// No-op CNS adapter — discards all spans. Useful for testing and benchmarking.
+pub struct NoopCnsAdapter;
+
+impl CnsPort for NoopCnsAdapter {
+    fn emit_populated(&self) {}
+    fn emit_registered(&self) {}
+    fn emit_activated(&self) {}
+    fn emit_deactivated(&self) {}
+    fn emit_probe_executed(&self, _probe_id: &str, _skill_id: &str) {}
+    fn emit_skill_dispatched(&self, _skill_id: &str, _action: &str) {}
+    fn emit_llm_escalation(&self, _model: &str, _latency_ms: u64) {}
+}
+
+impl CnsPort for CnsEmitter {
+    fn emit_populated(&self) {
+        self.emit_populated();
+    }
+
+    fn emit_registered(&self) {
+        self.emit_registered();
+    }
+
+    fn emit_activated(&self) {
+        self.emit_activated();
+    }
+
+    fn emit_deactivated(&self) {
+        self.emit_deactivated();
+    }
+
+    fn emit_probe_executed(&self, probe_id: &str, skill_id: &str) {
+        self.emit_probe_executed(probe_id, skill_id);
+    }
+
+    fn emit_skill_dispatched(&self, skill_id: &str, action: &str) {
+        self.emit_skill_dispatched(skill_id, action);
+    }
+
+    fn emit_llm_escalation(&self, model: &str, latency_ms: u64) {
+        self.emit_llm_escalation(model, latency_ms);
     }
 }
 

@@ -102,7 +102,7 @@ pub mod pod;
 
 // Re-export main types for convenience.
 pub use artifacts::{ArtifactStore, ArtifactType, ArtifactVisibility};
-pub use cns::{CnsEmitter, CnsSpan};
+pub use cns::{CnsEmitter, CnsPort, CnsSpan, LoggingCnsAdapter, NoopCnsAdapter};
 pub use lifecycle::{LifecycleError, LifecycleResult, PodLifecycleState};
 pub use persona::{AgentCapabilities, AgentCharter, AgentPersona, AgentType};
 pub use pod::{PodID, RussellPod};

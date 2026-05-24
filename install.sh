@@ -65,11 +65,13 @@ done
 #######################
 
 if [ "$ACTION" = "uninstall" ]; then
-    echo "==> Stopping and disabling Russell timers…"
-    systemctl --user stop russell-sentinel.timer 2>/dev/null || true
-    systemctl --user stop russell-digest.timer 2>/dev/null || true
-    systemctl --user disable russell-sentinel.timer 2>/dev/null || true
-    systemctl --user disable russell-digest.timer 2>/dev/null || true
+    echo "==> Stopping and disabling Russell timers and services…"
+    for unit in russell-sentinel.timer russell-digest.timer \
+                russell-okapi.timer russell-okapi.service \
+                russell-acp-server.service; do
+        systemctl --user stop "$unit" 2>/dev/null || true
+        systemctl --user disable "$unit" 2>/dev/null || true
+    done
 
     echo "==> Removing systemd units…"
     rm -f "${SYSTEMD_USER_DIR}/russell-sentinel.service"
@@ -78,6 +80,10 @@ if [ "$ACTION" = "uninstall" ]; then
     rm -f "${SYSTEMD_USER_DIR}/russell-digest.timer"
     rm -f "${SYSTEMD_USER_DIR}/russell-failure@.service"
     rm -f "${SYSTEMD_USER_DIR}/russell-acp-server.service"
+    rm -f "${SYSTEMD_USER_DIR}/russell-okapi.service"
+    rm -f "${SYSTEMD_USER_DIR}/russell-okapi.timer"
+    rm -f "${SYSTEMD_USER_DIR}/russell-okapi.service"
+    rm -f "${SYSTEMD_USER_DIR}/russell-okapi.timer"
 
     echo "==> Removing binaries…"
     rm -f "${BIN_DIR}/${BINARY_NAME}"
@@ -152,7 +158,7 @@ cp "$BINARY_SRC" "${BIN_DIR}/${BINARY_NAME}"
 chmod +x "${BIN_DIR}/${BINARY_NAME}"
 
 # Also install russell-acp-server for hKask integration
-ACP_SERVER_SRC="${REPO_ROOT}/target/release/russell-acp-server"
+ACP_SERVER_SRC="${REPO_ROOT}/target/${MODE}/russell-acp-server"
 if [ -f "$ACP_SERVER_SRC" ]; then
     cp "$ACP_SERVER_SRC" "${BIN_DIR}/russell-acp-server"
     chmod +x "${BIN_DIR}/russell-acp-server"

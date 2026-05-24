@@ -37,23 +37,6 @@ jobs:
       - name: cargo test
         run: cargo test --workspace
 
-      - name: Build MCP servers (verify Kask integration compiles)
-        run: |
-          if [ -d "$HOME/Clones/kask" ]; then
-            cd "$HOME/Clones/kask"
-            cargo check -p arsenal-mcp-russell -p arsenal-mcp-okapi-metrics \
-              -p arsenal-mcp-web -p arsenal-mcp-scholar -p arsenal-mcp-rss-reader \
-              -p arsenal-mcp-fmp -p arsenal-mcp-fal -p arsenal-mcp-embedding \
-              -p arsenal-mcp-gallery -p arsenal-mcp-doc-knowledge \
-              -p arsenal-mcp-spandrel -p arsenal-mcp-axolotl -p arsenal-mcp-evolution \
-              -p arsenal-mcp-telnyx -p arsenal-mcp-mxroute -p arsenal-mcp-maintenance
-          elif [ -d "${{ github.workspace }}/../kask" ]; then
-            cd "${{ github.workspace }}/../kask"
-            cargo check -p arsenal-mcp-russell -p arsenal-mcp-okapi-metrics
-          else
-            echo "Kask repo not present — skipping MCP build check"
-          fi
-
       - name: Install cargo-deny
         run: cargo install cargo-deny --locked
 

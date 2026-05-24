@@ -46,6 +46,8 @@ pub mod error;
 #[cfg(feature = "client")]
 pub mod health;
 #[cfg(feature = "client")]
+pub mod port;
+#[cfg(feature = "client")]
 pub mod registry;
 #[cfg(feature = "client")]
 pub mod types;

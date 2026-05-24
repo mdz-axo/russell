@@ -14,8 +14,12 @@ use crate::types::{ProbeInfo, SkillInfo};
 /// Implementations provide skill discovery, information retrieval,
 /// and probe/intervention execution. The ACP handler depends on this
 /// trait rather than a concrete implementation.
-#[async_trait::async_trait]
-pub trait SkillDispatchPort: Send {
+///
+/// No `Send` bound: the ACP handler is single-tasked (stdio server)
+/// and `AcpDispatch` contains `Arc<JournalWriter>` (non-`Send` due
+/// to interior mutability).
+#[async_trait::async_trait(?Send)]
+pub trait SkillDispatchPort {
     /// Load all public skills exposed via ACP.
     fn load_public_skills(&self) -> Vec<SkillInfo>;
 
@@ -52,7 +56,6 @@ mod tests {
 
     #[test]
     fn test_port_trait_exists() {
-        // Verify the trait is defined and can be used as a trait object.
         fn _accepts_port(_port: Box<dyn SkillDispatchPort>) {}
     }
 }

@@ -5,6 +5,7 @@ use std::path::PathBuf;
 use std::time::Duration;
 
 use crate::error::{AcpError, Result};
+use crate::port::SkillDispatchPort;
 use crate::types::{
     InterventionInfo, LexiconCategorization, LexiconDomain, ProbeInfo, SafetyInfo, SkillInfo,
     Visibility,
@@ -277,6 +278,97 @@ fn skill_to_info(skill: &Skill) -> SkillInfo {
 
 /// Format duration as string.
 fn format_duration(d: String) -> String {
-    // Parse duration string (e.g., "30s", "2m") and format
     d
+}
+
+#[async_trait::async_trait(?Send)]
+impl SkillDispatchPort for AcpDispatch {
+    fn load_public_skills(&self) -> Vec<SkillInfo> {
+        self.load_public_skills()
+    }
+
+    fn get_skill_info(&self, skill_id: &str) -> Option<SkillInfo> {
+        self.get_skill_info(skill_id)
+    }
+
+    fn list_probes(&self) -> Vec<ProbeInfo> {
+        self.list_probes()
+    }
+
+    async fn dispatch_skill(&self, skill_id: &str, args: &serde_json::Value) -> Result<String> {
+        self.dispatch_skill(skill_id, args).await
+    }
+
+    async fn run_probe(
+        &self,
+        skill_id: &str,
+        probe_id: &str,
+        args: &serde_json::Value,
+    ) -> Result<String> {
+        self.run_probe(skill_id, probe_id, args).await
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::port::SkillDispatchPort;
+    use crate::types::ProbeInfo;
+    use serde_json::json;
+
+    struct MockSkillDispatch {
+        skills: Vec<SkillInfo>,
+        probes: Vec<ProbeInfo>,
+    }
+
+    #[async_trait::async_trait(?Send)]
+    impl SkillDispatchPort for MockSkillDispatch {
+        fn load_public_skills(&self) -> Vec<SkillInfo> {
+            self.skills.clone()
+        }
+
+        fn get_skill_info(&self, skill_id: &str) -> Option<SkillInfo> {
+            self.skills.iter().find(|s| s.id == skill_id).cloned()
+        }
+
+        fn list_probes(&self) -> Vec<ProbeInfo> {
+            self.probes.clone()
+        }
+
+        async fn dispatch_skill(
+            &self,
+            skill_id: &str,
+            _args: &serde_json::Value,
+        ) -> Result<String> {
+            Ok(format!("mock dispatch: {}", skill_id))
+        }
+
+        async fn run_probe(
+            &self,
+            skill_id: &str,
+            probe_id: &str,
+            _args: &serde_json::Value,
+        ) -> Result<String> {
+            Ok(format!("mock probe: {}/{}", skill_id, probe_id))
+        }
+    }
+
+    #[tokio::test]
+    async fn mock_skill_dispatch_implements_port() {
+        let mock = MockSkillDispatch {
+            skills: Vec::new(),
+            probes: Vec::new(),
+        };
+        let port: Box<dyn SkillDispatchPort> = Box::new(mock);
+        assert!(port.load_public_skills().is_empty());
+        assert!(port.list_probes().is_empty());
+        assert_eq!(
+            port.dispatch_skill("test", &json!({})).await.unwrap(),
+            "mock dispatch: test"
+        );
+        assert_eq!(
+            port.run_probe("s", "p", &json!({})).await.unwrap(),
+            "mock probe: s/p"
+        );
+    }
 }

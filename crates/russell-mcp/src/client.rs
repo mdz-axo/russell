@@ -18,6 +18,7 @@ use tracing::debug;
 use crate::auth::TokenProvider;
 use crate::config::HKaskMcpConfig;
 use crate::error::{McpError, Result};
+use crate::port::McpPort;
 use crate::types::{McpToolDefinition, ToolCallResult};
 
 /// MCP Client trait — hexagonal port for MCP tool access.
@@ -74,6 +75,25 @@ impl McpClient for HKaskMcpClient {
 
     fn endpoint(&self) -> &str {
         self.endpoint()
+    }
+}
+
+#[async_trait::async_trait]
+impl McpPort for HKaskMcpClient {
+    async fn list_tools(&self) -> Result<Vec<McpToolDefinition>> {
+        self.list_tools().await
+    }
+
+    async fn call_tool(
+        &self,
+        name: &str,
+        arguments: Option<serde_json::Value>,
+    ) -> Result<ToolCallResult> {
+        self.call_tool(name, arguments).await
+    }
+
+    async fn health_check(&self) -> Result<()> {
+        self.ping().await
     }
 }
 

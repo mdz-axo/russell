@@ -28,15 +28,19 @@ echo "  ✓ systemd: $(systemctl --user --version | head -1)"
 
 # Build and install
 echo ""
-echo "[2/6] Building russell-acp-server..."
+echo "[2/6] Building Russell binaries..."
 cd "${SCRIPT_DIR}/../.."
-cargo build --release -p russell-acp-server
+cargo build --release -p russell-cli -p russell-acp-server
 
 echo ""
-echo "[3/6] Installing binary..."
-cp target/release/russell-acp-server "${HOME_DIR}/.cargo/bin/"
-chmod +x "${HOME_DIR}/.cargo/bin/russell-acp-server"
-echo "  ✓ Installed to ${HOME_DIR}/.cargo/bin/russell-acp-server"
+echo "[3/6] Installing binaries..."
+mkdir -p "${HOME_DIR}/.local/bin"
+cp target/release/russell "${HOME_DIR}/.local/bin/"
+chmod +x "${HOME_DIR}/.local/bin/russell"
+echo "  ✓ Installed to ${HOME_DIR}/.local/bin/russell"
+cp target/release/russell-acp-server "${HOME_DIR}/.local/bin/"
+chmod +x "${HOME_DIR}/.local/bin/russell-acp-server"
+echo "  ✓ Installed to ${HOME_DIR}/.local/bin/russell-acp-server"
 
 # Install systemd units
 echo ""

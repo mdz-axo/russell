@@ -8,10 +8,10 @@ use tracing::{debug, info, warn};
 use crate::CapabilityToken;
 use crate::SessionState;
 use crate::auth::MacaroonAuth;
-use crate::cns::AcpCnsEmitter;
-use crate::dispatch::AcpDispatch;
+use crate::cns::CnsPort;
 use crate::error::{AcpError, Result};
 use crate::persona::JackPersonaProjection;
+use crate::port::SkillDispatchPort;
 use crate::rate_limit::RateLimiter;
 use crate::session::{SessionManager, Turn, TurnRole};
 use crate::types::*;
@@ -23,8 +23,8 @@ pub struct AcpHandler {
     /// Jack persona.
     #[allow(dead_code)]
     persona: JackPersonaProjection,
-    /// Skill dispatch.
-    dispatch: AcpDispatch,
+    /// Skill dispatch port (hexagonal).
+    dispatch: Box<dyn SkillDispatchPort>,
     /// Macaroon auth.
     auth: MacaroonAuth,
     /// Rate limiter.
@@ -36,21 +36,21 @@ pub struct AcpHandler {
     /// Journal reader for proprioception notifications (T2-2).
     journal_reader: Option<russell_core::journal::JournalReader>,
     /// CNS span emitter for observability (T2-3).
-    cns: Option<AcpCnsEmitter>,
+    cns: Option<Box<dyn CnsPort>>,
 }
 
 impl AcpHandler {
     /// Create a new ACP handler.
     pub fn new(
         persona: JackPersonaProjection,
-        dispatch: AcpDispatch,
+        dispatch: impl SkillDispatchPort + 'static,
         auth: MacaroonAuth,
         rate_limiter: RateLimiter,
     ) -> Self {
         Self {
             sessions: SessionManager::new(),
             persona,
-            dispatch,
+            dispatch: Box::new(dispatch),
             auth,
             rate_limiter,
             require_auth: true,
@@ -76,8 +76,8 @@ impl AcpHandler {
     }
 
     /// Set the CNS span emitter for observability (T2-3).
-    pub fn with_cns(mut self, cns: AcpCnsEmitter) -> Self {
-        self.cns = Some(cns);
+    pub fn with_cns(mut self, cns: impl CnsPort + 'static) -> Self {
+        self.cns = Some(Box::new(cns));
         self
     }
 

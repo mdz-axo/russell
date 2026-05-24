@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: MIT OR Apache-2.0
 [Unit]
 Description=Russell ACP Server — hKask integration
-Documentation=file:///home/mdz-axolotl/Clones/russell/docs/README.md
+Documentation=https://github.com/Replicant-Partners/russell
 After=network.target okapi.service
 Wants=okapi.service
 ConditionPathExists=%h/.local/share/harness/skills
@@ -27,4 +27,4 @@ StandardError=journal
 SyslogIdentifier=russell-acp
 
 [Install]
-WantedBy=multi-user.target
+WantedBy=default.target
