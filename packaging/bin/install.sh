@@ -97,14 +97,16 @@ fi
 say "Reloading systemd user daemon"
 systemctl --user daemon-reload
 
-say "Enabling timers"
+say "Enabling timers and services"
 systemctl --user enable russell-sentinel.timer
 systemctl --user enable russell-digest.timer
+systemctl --user enable russell-acp-server.service
 
 if [ "$NO_START" -eq 0 ]; then
-  say "Starting timers"
+  say "Starting timers and services"
   systemctl --user start russell-sentinel.timer
   systemctl --user start russell-digest.timer
+  systemctl --user start russell-acp-server.service 2>/dev/null || true
 else
   say "Skipping start (--no-start)"
 fi

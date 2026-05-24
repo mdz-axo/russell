@@ -67,7 +67,8 @@ done
 if [ "$ACTION" = "uninstall" ]; then
     echo "==> Stopping and disabling Russell timers and services…"
     for unit in russell-sentinel.timer russell-digest.timer \
-                russell-acp-server.service; do
+                russell-acp-server.service \
+                russell-okapi.service russell-okapi.timer; do
         systemctl --user stop "$unit" 2>/dev/null || true
         systemctl --user disable "$unit" 2>/dev/null || true
     done
@@ -79,6 +80,8 @@ if [ "$ACTION" = "uninstall" ]; then
     rm -f "${SYSTEMD_USER_DIR}/russell-digest.timer"
     rm -f "${SYSTEMD_USER_DIR}/russell-failure@.service"
     rm -f "${SYSTEMD_USER_DIR}/russell-acp-server.service"
+    rm -f "${SYSTEMD_USER_DIR}/russell-okapi.service"
+    rm -f "${SYSTEMD_USER_DIR}/russell-okapi.timer"
 
     echo "==> Removing binaries…"
     rm -f "${BIN_DIR}/${BINARY_NAME}"
@@ -104,11 +107,13 @@ echo "==> Building Russell (${MODE})…"
 cd "$REPO_ROOT"
 
 if [ "$MODE" = "release" ]; then
-    cargo build --release 2>&1
+    cargo build --release -p russell-cli -p russell-acp-server 2>&1
     BINARY_SRC="${REPO_ROOT}/target/release/${BINARY_NAME}"
+    ACP_SERVER_SRC="${REPO_ROOT}/target/release/russell-acp-server"
 else
-    cargo build 2>&1
+    cargo build -p russell-cli -p russell-acp-server 2>&1
     BINARY_SRC="${REPO_ROOT}/target/debug/${BINARY_NAME}"
+    ACP_SERVER_SRC="${REPO_ROOT}/target/debug/russell-acp-server"
 fi
 
 if [ ! -f "$BINARY_SRC" ]; then
@@ -153,7 +158,6 @@ cp "$BINARY_SRC" "${BIN_DIR}/${BINARY_NAME}"
 chmod +x "${BIN_DIR}/${BINARY_NAME}"
 
 # Also install russell-acp-server for hKask integration
-ACP_SERVER_SRC="${REPO_ROOT}/target/${MODE}/russell-acp-server"
 if [ -f "$ACP_SERVER_SRC" ]; then
     cp "$ACP_SERVER_SRC" "${BIN_DIR}/russell-acp-server"
     chmod +x "${BIN_DIR}/russell-acp-server"
