@@ -37,8 +37,8 @@ probes:
     capture: stdout
     timeout: 180s
 
-  - id: probe-scenario-run-chat
-    cmd: ["bash", "./scripts/scenario-run-chat.sh"]
+  - id: probe-scenario-run-acp
+    cmd: ["bash", "./scripts/scenario-run-acp.sh"]
     capture: stdout
     timeout: 120s
 

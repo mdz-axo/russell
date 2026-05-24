@@ -67,7 +67,6 @@ done
 if [ "$ACTION" = "uninstall" ]; then
     echo "==> Stopping and disabling Russell timers and services…"
     for unit in russell-sentinel.timer russell-digest.timer \
-                russell-okapi.timer russell-okapi.service \
                 russell-acp-server.service; do
         systemctl --user stop "$unit" 2>/dev/null || true
         systemctl --user disable "$unit" 2>/dev/null || true
@@ -80,10 +79,6 @@ if [ "$ACTION" = "uninstall" ]; then
     rm -f "${SYSTEMD_USER_DIR}/russell-digest.timer"
     rm -f "${SYSTEMD_USER_DIR}/russell-failure@.service"
     rm -f "${SYSTEMD_USER_DIR}/russell-acp-server.service"
-    rm -f "${SYSTEMD_USER_DIR}/russell-okapi.service"
-    rm -f "${SYSTEMD_USER_DIR}/russell-okapi.timer"
-    rm -f "${SYSTEMD_USER_DIR}/russell-okapi.service"
-    rm -f "${SYSTEMD_USER_DIR}/russell-okapi.timer"
 
     echo "==> Removing binaries…"
     rm -f "${BIN_DIR}/${BINARY_NAME}"
@@ -243,10 +238,7 @@ if [ ! -f "${CONFIG_DIR}/russell.env" ]; then
 # Russell environment configuration.
 # See docs/operations/REUSE_MANIFEST.md for available vars.
 
-# Okapi model for auto-load (used by russell-okapi.service)
-# RUSSELL_OKAPI_DEFAULT_MODEL=
-
-# Override the LLM backend endpoint
+# Okapi endpoint for LLM inference
 # OLLAMA_HOST=127.0.0.1:11435
 
 # Override the LLM model for `russell jack`

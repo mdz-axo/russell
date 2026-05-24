@@ -157,15 +157,6 @@ pub enum RollbackStrategy {
     Reboot,
 }
 
-/// Backward-compatibility alias for code that previously used the
-/// separate `RollbackOutcome` type. New code should use [`RunOutcome`]
-/// directly — it now carries rollback information inline.
-#[deprecated(
-    since = "0.2.0",
-    note = "use RunOutcome directly; rollback is now an inline field"
-)]
-pub type RollbackOutcome = RunOutcome;
-
 /// Whether a dispatch is a probe (read-only) or intervention (mutating).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum StepType {

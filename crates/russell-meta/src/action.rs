@@ -17,7 +17,7 @@
 //! Probes are read-only, risk:none, and may auto-execute.
 //! Interventions require operator consent per JR-2.
 //!
-//! Both `russell jack` and `russell chat` use this module,
+//! Both `russell jack` and the ACP server use this module,
 //! eliminating duplicated parsing and resolution logic.
 
 use russell_skills::RiskBand;
@@ -163,8 +163,7 @@ impl ResolvedAction {
     }
 
     /// Append extra CLI arguments to the command argv.
-    /// Only Applies to probes and interventions; no-op for hKask tools.
-    /// Only Applies to probes and interventions; no-op for hKask tools.
+    /// Only applies to probes and interventions; no-op for hKask tools.
     pub fn append_cmd_args(&mut self, args: &[String]) {
         match self {
             Self::Probe { cmd, .. } | Self::Intervention { cmd, .. } => {
@@ -212,7 +211,6 @@ pub enum ActionError {
         interventions: Vec<String>,
     },
     /// Nested ACTION: detected in LLM output (prompt injection attempt).
-    /// Task 3.4: Security hardening against LLM action injection.
     /// Task 3.4: Security hardening against LLM action injection.
     NestedActionDetected {
         /// The raw response containing nested ACTION: patterns.
@@ -467,9 +465,6 @@ fn resolve_hkask_tool(
 /// Extract required field names from a tool's JSON Schema `input_schema`.
 ///
 /// Returns an empty vec if the schema is `None` or has no `required` array.
-///
-/// Returns an empty vec if the schema is `None` or has no `required` array.
-/// Returns an empty vec if the schema is `None` or has no `required` array.
 fn extract_required_fields(schema: &Option<serde_json::Value>) -> Vec<String> {
     schema
         .as_ref()
@@ -531,7 +526,6 @@ fn extract_arguments_from_response(response: &str, _tool_name: &str) -> Option<s
 }
 
 /// Parse `--key value` or `key=value` pairs into a JSON object.
-/// Handles quoted values with internal spaces.
 /// Handles quoted values with internal spaces.
 fn parse_key_value_args(args_str: &str) -> Option<serde_json::Value> {
     let mut map = serde_json::Map::new();

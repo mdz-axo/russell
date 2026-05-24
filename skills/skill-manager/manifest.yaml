@@ -10,9 +10,9 @@ min_harness_version: 0.20.0
 kind: actionable
 
 symptoms:
-  - capability_gap
-  - skill_stale
-  - skill_missing
+  - skill_coverage_gap
+  - skill_version_stale
+  - skill_not_in_catalog
 
 applies_when:
   - os_family: linux

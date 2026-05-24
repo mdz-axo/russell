@@ -14,8 +14,6 @@ path = "src/main.rs"
 
 [features]
 default = []
-# Deprecated: MCP server for IDE frontends. Use russell-acp-server instead.
-mcp-server = ["russell-mcp/server"]
 
 [dependencies]
 russell-core.workspace = true

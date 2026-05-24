@@ -8,65 +8,39 @@
 hKask:
   mcp_endpoint: http://127.0.0.1:8080/mcp
   agent_id: russell-prod-1
-  
+
 macaroon:
-  # Storage backend for macaroons
-  # Options: keychain (recommended), file (development)
-  storage: keychain
-  
-  # Keychain configuration (macOS/iOS/Windows)
-  keychain:
-    service: russell-macaroons
-    access_group: com.russell.agent
-    
-  # File storage configuration (Linux/development)
+  storage: file
+
   file:
     path: ~/.config/russell/macaroons.json
     encryption: aes-256-gcm
-    # Encryption key from environment or key management service
     encryption_key_env: RUSSELL_MACAROON_KEY
-  
-  # Auto-refresh configuration
+
   auto_refresh:
     enabled: true
-    # Refresh macaroons before they expire
     before_expiry: 1h
-    
-    # Retry on failure
     retry:
       max_attempts: 3
       backoff_seconds: 30
-  
-  # Discharge configuration for Okapi access
+
   discharge:
-    # hKask discharge endpoint
     endpoint: http://127.0.0.1:8080/mcp/v1/discharge
-    
-    # Automatic discharge request for skills requiring Okapi access
     auto_request: true
-    
-    # Cache discharge macaroons
     cache:
       enabled: true
-      ttl: 30m  # Cache discharge for 30 minutes
-  
-  # Okapi connection (for direct access when needed)
+      ttl: 30m
+
   okapi:
     endpoint: http://127.0.0.1:11435
-    
-    # Macaroon binding (primary + discharge)
     binding:
       enabled: true
-      # Automatically bind discharge to primary macaroon
       auto_bind: true
-  
-  # Audit logging
+
   audit:
     enabled: true
     log_file: ~/.config/russell/logs/macaroon_audit.log
     retention_days: 30
-    
-    # Events to log
     events:
       - macaroon_stored
       - macaroon_loaded
@@ -75,142 +49,25 @@ macaroon:
       - discharge_bound
       - mcp_tool_invoked
       - auth_failure
-  
-  # Security settings
+
   security:
-    # Require TLS for macaroon transmission
     require_tls: true
-    
-    # Allow localhost without TLS (development)
     allow_localhost: true
-    
-    # Macaroon validation
     validate:
-      # Check expiration before use
       check_expiration: true
-      
-      # Warn before expiry (relative duration)
       warn_before_expiry: 30m
-      
-      # Reject macaroons without required caveats
       require_caveats:
         - iid
         - before
         - skill
 
-# Skill configurations
-skills:
-  # Evolution watcher skill
-  evolution-watcher:
-    enabled: true
-    
-    # Macaroon caveats for this skill
-    macaroon:
-      endpoints:
-        - /api/evolution/scan
-        - /api/evolution/propose
-        - /api/evolution/execute
-      models:
-        - qwen3:8b
-        - qwen3:70b
-      okapi_access: true
-    
-    # Invocation settings
-    invocation:
-      # Attenuate macaroon per invocation
-      attenuate: true
-      
-      # Add invocation-specific caveats
-      extra_caveats:
-        - "jti:{{uuid}}"  # Unique token ID per invocation
-  
-  # RDF embedding skill
-  rdf-embedding:
-    enabled: true
-    
-    macaroon:
-      endpoints:
-        - /api/embed/rdf
-        - /api/embed/sentences
-      models:
-        - qwen3-embedding:0.6b
-        - qwen3-embedding:1.8b
-      okapi_access: true
-  
-  # Performance benchmark skill
-  perf-benchmark:
-    enabled: false  # Disabled by default
-    
-    macaroon:
-      endpoints:
-        - /api/generate
-        - /api/chat
-      models:
-        - "*"
-      okapi_access: true
-    
-    quota:
-      tokens_per_invocation: 100000
-      max_invocations_per_hour: 10
-  
-  # System diagnoser skill
-  system-diagnoser:
-    enabled: true
-    
-    macaroon:
-      endpoints:
-        - /api/generate
-      models:
-        - qwen3:8b
-      okapi_access: false
-
-# CLI command configuration
 cli:
-  # Default command output format
-  format: table  # Options: table, json, yaml
-  
-  # Verbose output
+  format: table
   verbose: false
-  
-  # Color output
-  color: auto  # Options: auto, always, never
+  color: auto
 
-# Monitoring and alerting
-monitoring:
-  # Prometheus metrics endpoint
-  metrics:
-    enabled: true
-    endpoint: :9090/metrics
-  
-  # Alerts for macaroon issues
-  alerts:
-    # Alert when macaroon expires soon
-    expiry_warning:
-      enabled: true
-      threshold: 1h
-      channel: syslog  # Options: syslog, webhook, email
-    
-    # Alert on auth failures
-    auth_failure:
-      enabled: true
-      threshold: 5  # Alert after 5 failures in 5 minutes
-      channel: syslog
-    
-    # Alert on quota exhaustion
-    quota_exhausted:
-      enabled: true
-      channel: syslog
-
-# Development settings (override in ~/.config/russell/config.local.yaml)
 development:
-  # Debug logging
   debug: false
-  
-  # Skip TLS verification (development only!)
   skip_tls_verify: false
-  
-  # Use file storage instead of keychain
   use_file_storage: false
-  
-  # Mock macaroon operations (no actual crypto)
   mock: false

@@ -110,6 +110,9 @@ pub static SYMPTOMS: &[&str] = &[
     "agent_test_scenario_failed",
     "agent_concurrent_load_timeout",
     "agent_resource_exhaustion_under_load",
+    // Scenario testing — security and capability probes
+    "capability_attenuation_failure",
+    "prompt_sanitization_failure",
 ];
 
 /// Load symptoms from a YAML file on disk.

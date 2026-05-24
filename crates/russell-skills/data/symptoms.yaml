@@ -100,3 +100,7 @@
 - agent_test_scenario_failed
 - agent_concurrent_load_timeout
 - agent_resource_exhaustion_under_load
+- capability_attenuation_failure
+- prompt_sanitization_failure
+- capability_attenuation_failure
+- prompt_sanitization_failure
