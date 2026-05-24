@@ -157,7 +157,7 @@ emits a count (`pkg_cross_provider_conflict_count`) as a signal,
 but the detailed finding is an event with structured `outputs`
 that Jack can reference.
 
-This is where the **connector to Jack/Kask** adds the most value:
+This is where the **connector to Jack/hKask** adds the most value:
 the LLM can reason about "numpy 1.24 via apt shadows numpy 1.26
 via pip, which means your CUDA-enabled numpy is being overridden
 by the system package" — something a simple threshold rule cannot

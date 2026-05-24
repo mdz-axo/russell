@@ -30,7 +30,7 @@ Russell is a **cybernetic health harness** for a single Linux AI/ML workstation,
 ┌──────────────────────────┼───────────────────────────────────────┐
 │                    Russell ACP Server                            │
 │  ┌────────────────────────┼────────────────────────────────┐    │
-│  │  Jack Persona (LLLM)  │  Public Skills (8)             │    │
+│  │  Jack Persona (LLM)   │  Public Skills (8)             │    │
 │  │  - Okapi backend      │  - journal-viewer              │    │
 │  │  - SOAP prompts       │  - web-search                  │    │
 │  │  - Nurse voice        │  - scenario-tester             │    │
@@ -241,7 +241,7 @@ cargo fmt --check              # Format check
 cargo run -- sentinel-once     # Fire one observe cycle
 cargo run -- verify-journal    # Audit hash chain
 cargo run -- skill list        # List skills
-cargo run -- chat              # Interactive REPL with Jack
+cargo run -- jack              # LLM-assisted Nurse session
 ```
 
 ### Adding Skills

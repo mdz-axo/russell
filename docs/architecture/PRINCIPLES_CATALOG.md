@@ -258,7 +258,7 @@ follows from it.
 | JR-1 | Preliminary / Phase A | This catalog, `MVP_SPEC.md` |
 | JR-2 | Phase C (IS) / Governance | ADR-0008, ADR-0023 (skills dispatch), Safety standard |
 | JR-3 | Phase C (IS) | ADR-0008, ADR-0023 (poka-yoke dispatcher) |
-| JR-4 | Phase C (IS) | ADR-0016, ADR-0025 (Kask MCP client) |
+| JR-4 | Phase C (IS) | ADR-0016, ADR-0025 (hKask MCP client) |
 | JR-5 | Phase G (Governance) | ADR-0015, ADR-0021 (reflex arcs) |
 | JR-6 | Phase D (Technology) | ADR-0013, ADR-0017, `REUSE_MANIFEST.md` |
 | JR-7 | Phase C (Data) | ADR-0004, ADR-0006, ADR-0024 (skill lifecycle), `PERSISTENCE_CATALOG.md` |

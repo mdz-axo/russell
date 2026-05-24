@@ -15,6 +15,12 @@ status: "Active"
 <!--
 audience: Doctor (machine-generated) and downstream readers
 format: harness.soap.v1
+reference_model: Weed, L. (1968). "Medical Records that Guide and Teach."
+    New England Journal of Medicine 278(11):593-600.
+    SOAP (Subjective, Objective, Assessment, Plan) is the standard
+    clinical documentation format. Russell adapts it for machine
+    health: Subjective = operator note, Objective = probe data,
+    Assessment = LLM interpretation, Plan = proposed interventions.
 -->
 
 # SOAP — <evidence_id>

@@ -1,8 +1,18 @@
-# Russell in hKask — Replicant Integration Guide
+---
+title: "Russell in hKask — Replicant Integration Guide"
+audience: [developers, operators, agents]
+last_updated: 2026-05-19
+togaf_phase: "H"
+version: "1.0.0"
+status: "Active"
+---
 
-**Last Updated**: 2026-05-19  
-**Replicant ID**: `russell`  
-**Status**: Active  
+<!-- TOGAF_DOMAIN: Change Management — hKask Integration -->
+<!-- VERSION: 1.0.0 -->
+<!-- STATUS: Active -->
+<!-- LAST_UPDATED: 2026-05-19 -->
+
+# Russell in hKask — Replicant Integration Guide
 
 ## Overview
 

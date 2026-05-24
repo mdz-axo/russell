@@ -26,7 +26,7 @@ of every meaningful development session.
 - **Phase 1b (install artifacts + systemd units) — SHIPPED + installed.**
 - **Phase 1c (20-day unattended soak) — CLOSED.**
 - **Phase 2 (observation sharpened) — COMPLETE.** Self-vitals (5), rule engine, EWMA baselines, process probes (7), GPU probes (5), disk probes (2), systemd probes (3). Baseline deviation integrated into Jack's SOAP objective.
-- **Phase 3 (skills and dispatch) — COMPLETE.** Extended with skill lifecycle management: workshop REPL (`russell workshop`), registry cache (`local-cache.yaml`), safety scanner (7 rules for manifest + KNOWLEDGE.md), skill discovery pipeline, and scenario testing skill (`scenario-tester`). 12 skills loaded (5 actionable with probes, 7 knowledge). `russell skill run` respects manifest `timeout:` field.
+- **Phase 3 (skills and dispatch) — COMPLETE.** Extended with skill lifecycle management: registry cache (`local-cache.yaml`), safety scanner (7 rules for manifest + KNOWLEDGE.md), skill discovery pipeline, and scenario testing skill (`scenario-tester`). 13 skills loaded (5 actionable with probes, 8 knowledge). ACP server for hKask integration. `russell skill run` respects manifest `timeout:` field.
 - **Phase 4 (MCP surface, real skills, operational depth) — COMPLETE.** All skill lifecycle gaps closed (2026-05-20): `fetch <url> <name>` downloads skills from URLs with safety scanning, `build <name>` creates skill skeletons on disk, `adapt <name>` modifies manifests via LLM + editor, `search --remote` loads `~/.config/harness/registry-sources.yaml` and queries Brave Search API, batch operations (`prune --all-stale`, `install --all-evaluated`). `skill-manager` bundled meta-skill enables Jack to build, install, prune, restore, and delete skills from chat via ACTION syntax. Registry telemetry wired: `probe_runs`, `intervention_runs`, `avg_probe_duration_ms`, and `last_probe_run_at` updated on every execution. Quality scoring (`compute_score()`) operational. End-to-end scenario pipeline: `scenario-full` probe chains run-okapi → evaluate → journal. 288 tests pass. 21 scenario tests pass.
 - **Architecture:** JR-1 austerity maintained throughout. Seven ADRs deferred.
 
@@ -41,13 +41,13 @@ of every meaningful development session.
 - Persistence catalog (`PERSISTENCE_CATALOG.md`).
 - Reuse manifest (`REUSE_MANIFEST.md`).
 - TOGAF traceability matrix.
-- 17 active ADRs + 7 deferred.
+- 30 active ADRs + 10 deferred.
 - 5 templates (ADR, skill manifest, SOAP bundle, daily log, review entry).
 - Archive: `docs/archive/2026-05-22-documentation-refresh/` (phase logs, analysis, superseded proposals)
 
 ### Code
 
-- Rust workspace with 11 crates (all active).
+- Rust workspace with 10 crates (all active).
 - `russell-core` implements paths, event schema (`Severity`/`Scope`
   with `Display`+`FromStr`), profile, journal (SQLite + WAL +
   migrations), telemetry, time (`approx_days_between`).
@@ -124,7 +124,7 @@ are met on the observed machine.
 - **Success:** Achieved 2026-04-18. 22 tests green; end-to-end
   sandbox verified.
 
-### Phase 1 — MVP Doctor (CURRENT)
+### Phase 1 — MVP Nurse (COMPLETE)
 
 - **Goal:** `russell jack` calls the configured LLM (default
   Ollama + `deepseekv4pro`; opt-in OpenRouter with ZDR),
@@ -176,7 +176,7 @@ are met on the observed machine.
   [`../specifications/MVP_SPEC.md`](../specifications/MVP_SPEC.md) §6.
 - **Success:** Closed 2026-05-06 per ADR-0018. 20 days, 2 062 cycles, 99.95% reliability.
 
-### Phase 2 — Observation sharpened (CURRENT)
+### Phase 2 — Observation sharpened (COMPLETE)
 
 Rule engine, EWMA baselines, self-vital, sample summary in SOAP.
 Phase 1c is closed; work begins.
@@ -191,7 +191,7 @@ Phase 1c is closed; work begins.
 ### Phase 3 — Skills and dispatch (COMPLETE)
 
 Skill manifest loader, dispatcher, first host-scope skill, IDRS
-journaling, risk enforcement, rollback, `russell chat`.
+journaling, risk enforcement, rollback. ACP server for hKask.
 ADR-0007 deferral lifted per ADR-0023.
 
 - [x] ADR-0023: formal lift of ADR-0007 deferral
@@ -208,12 +208,13 @@ ADR-0007 deferral lifted per ADR-0023.
 ### Phase 4 — MCP surface, real skills, operational depth (CURRENT)
 
 `russell-mcp` is an operational MCP client (ADR-0025) connecting to
-Kask's `stack-api` gateway. Russell has access to 193 tools across
-16 MCP servers registered in the Kask mcp-registry. Skill lifecycle
-is operational with registry cache, workshop REPL, safety scanner,
+hKask's `stack-api` gateway. Russell has access to 193 tools across
+16 MCP servers registered in the hKask mcp-registry. Skill lifecycle
+is operational with registry cache, safety scanner,
 and scenario testing pipeline. The `skill-manager` bundled meta-skill
-enables in-chat skill management (build, install, prune, restore,
-delete) via ACTION syntax. Registry telemetry (`probe_runs`,
+enables skill management (build, install, prune, restore,
+delete) via ACTION syntax through the ACP session interface.
+Registry telemetry (`probe_runs`,
 `intervention_runs`, EWMA duration, last-run timestamps) is wired into
 the dispatch path. The skill catalogue covers 12+ symptoms with installed
 skills (up from 3 at Phase 3 close). Scenario metrics feed into the

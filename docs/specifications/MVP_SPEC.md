@@ -1,18 +1,18 @@
 ---
 title: "MVP Russell — the Minimal Viable Terrier"
 audience: [operators, developers, architects, contributors, agents]
-last_updated: 2026-05-11
+last_updated: 2026-05-24
 togaf_phase: "Requirements Management"
-version: "1.1.0"
+version: "1.3.0"
 status: "Active"
 ---
 
 # MVP Russell — the Minimal Viable Terrier
 
 <!-- TOGAF_DOMAIN: Requirements Management -->
-<!-- VERSION: 1.2.0 -->
+<!-- VERSION: 1.3.0 -->
 <!-- STATUS: Active -->
-<!-- LAST_UPDATED: 2026-05-22 -->
+<!-- LAST_UPDATED: 2026-05-24 -->
 
 This is the **pinned boundary** of MVP Russell. Anything outside
 this boundary requires an ADR or a spec update to this document.
@@ -55,11 +55,11 @@ The MVP exposes capabilities through two interfaces:
 | `russell digest [--since-hours N]` | none | Markdown summary of recent activity | local sqlite |
 | `russell sentinel-once` | none | Fire the Sentinel once, append samples, evaluate rules | local fs |
 | `russell jack [--note "..."]` | none | Compose SOAP-shaped prompt and consult the LLM; print response | network *(opt-in)* |
-| `russell chat` | none | Interactive multi-turn conversation with Jack, consent flow for interventions | network *(opt-in)* |
 | `russell skill list` | none | List loaded skills, probes, and interventions | local fs |
 | `russell skill run <id>` | varies | Execute a skill probe or intervention via the IDRS-gated dispatcher | local fs + process |
-| `russell okapi-probe` | none | Probe the Okapi inference engine metrics endpoint | network |
 | `russell proprio` | none | Run self-observation and append self-vital samples | local sqlite |
+| `russell self-triage` | none | Russell diagnoses own health | local sqlite |
+| `russell self-triage` | none | Russell diagnoses own health | local sqlite |
 
 ### 2.1 The `jack` verb — the "cry for help"
 
@@ -83,17 +83,16 @@ operator is shown the risk band and prompted for consent.
 **Offline fallback.** If the LLM is unreachable, a rule-based
 summary of severity counts and most-recent events is printed.
 
-### 2.2 The `chat` verb — interactive consent flow
+### 2.2 The ACP consent flow — interactive operator consent
 
-`russell chat` is the canonical path for operator consent to
-interventions. Jack can:
+The ACP session interface is the canonical path for operator consent
+to interventions (ADR-0041). Through ACP sessions, Jack can:
 
 - **Run probes** (risk: none) immediately via `ACTION:` — no
-  consent required. Probe output is printed inline.
-- **Propose interventions** via `ACTION:` — the operator
-  consents with natural language ("ok", "yes", "do it",
-  "go ahead") or `/approve`. Refusal via "no", "nope",
-  "cancel", or `/deny`.
+  consent required. Probe output is returned in the session.
+- **Propose interventions** via `ACTION:` — the hKask agent
+  surfaces a `PendingAction` to the operator, who responds
+  with `acp/consent.respond` (approve or deny).
 
 The skill dispatcher executes approved interventions with full
 IDRS journaling. Risk enforcement gates on `max_auto_risk`
@@ -173,7 +172,6 @@ Every byte Russell writes is named. Full catalog at
 | `~/.local/state/harness/evidence/skills/<skill>/<step>/` | `russell-skills::dispatch` | per-dispatch JSON | 90 days |
 | `~/.local/share/harness/skills/<id>/` | `russell-skills` | manifest + scripts | operator-owned |
 | `~/.local/share/harness/rules.d/*.toml` | `russell-core::rule` | TOML | operator-owned |
-| `~/.local/share/harness/memory/chats/<session-id>.jsonl` | `russell-cli::chat` | JSON lines | unbounded |
 | `~/.config/harness/russell.env` | operator | key=value | operator-owned |
 | `~/.config/harness/disable` | kill switch | empty file | operator-owned |
 
@@ -181,8 +179,6 @@ Every byte Russell writes is named. Full catalog at
 
 These items remain deferred beyond the current build:
 
-- **No MCP server.** The `russell mcp` crate exists as a
-  placeholder; full MCP surface is deferred. (ADR-0003.)
 - **No PolKit helpers.** Sudo for interventions uses NOPASSWD
   configuration by the operator. No PolKit integration. (ADR-0005.)
 - **No remote skill registry.** Skills are local to the machine.
@@ -191,11 +187,20 @@ These items remain deferred beyond the current build:
 - **No chaos probe.** Deferred.
 - **No corrective proprioception arcs.** Detection-only (Phase 2A).
   Corrective arcs are deferred.
-- **No full MCP surface.** `russell-mcp` crate exists, surface deferred.
-- **No Landlock sandboxing.** Skill subprocesses run without filesystem
-  confinement. (Task 8 deferred.)
-- **No scoped journal access.** All readers have full journal visibility.
-  (Task 6 deferred.)
+- **No multi-agent session topology.** Single-agent 1:1 sessions.
+  (ADR-0045, deferred.)
+- **No ACP protocol versioning.** Single protocol version.
+  (ADR-0046, deferred.)
+
+### Implemented (formerly deferred)
+
+- **MCP client** — `russell-mcp` client connects to hKask MCP endpoint
+  for tool access. Server feature deprecated; ACP is the primary
+  integration protocol. (ADR-0003, deferral lifted; ADR-0027.)
+- **Landlock sandboxing** — Skill subprocesses run under Landlock
+  filesystem confinement. (ADR-0024.)
+- **ACP server** — `russell-acp-server` provides Agent Client Protocol
+  over JSON-RPC 2.0 stdio with macaroon OCAP auth. (ADR-0027.)
 
 ## 7. Security Hardening (Phase 5, 2026-05-23)
 

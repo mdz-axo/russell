@@ -1225,7 +1225,7 @@ graph TB
 id: DIAG-CHH-VSM-005
 type: flowchart
 verified_date: 2026-05-15
-verified_against: Section 22 — VSM Layers (Policy, Intelligence, Control, Coordination, Operations)
+verified_against: Section 17 — VSM Layers (Policy, Intelligence, Control, Coordination, Operations)
 reference_sources: PRINCIPLES_CATALOG.md, THE_JACK.md, CAPABILITY_GRAPH.md
 status: VERIFIED
 note: Aspirational architecture — diagrams verified against design document, not current code per doc status header

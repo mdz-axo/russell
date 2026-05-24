@@ -22,7 +22,7 @@ The adversarial multi-perspective review (2026-05-19) identified weakness A3:
 
 Russell had two separate MCP crates:
 
-1. **`russell-mcp`** — MCP client for Kask integration (HTTP REST API client, token auth, tool registry)
+1. **`russell-mcp`** — MCP client for hKask integration (HTTP REST API client, token auth, tool registry)
 2. **`russell-mcp-server`** — MCP server for IDE frontends (rmcp-based stdio server)
 
 This created:
@@ -40,7 +40,7 @@ Consolidate both crates into a single `russell-mcp` crate with feature flags:
 1. **Single crate** — `russell-mcp` contains both client and server code.
 
 2. **Feature flags**:
-   - `client` (default) — MCP client for Kask integration (reqwest, auth, registry)
+   - `client` (default) — MCP client for hKask integration (reqwest, auth, registry)
    - `server` — MCP server for IDE frontends (rmcp, tools)
 
 3. **Directory structure** (actual implementation):

@@ -26,7 +26,7 @@ Russell's nursing subsystem. He is **not decorative**. The
 persona shapes:
 
 - The system prompt sent to the LLM for `russell jack` and
-  `russell chat`.
+  the ACP server.
 - The CLI's own output phrasing when Jack responds.
 - Error messages and their register.
 - What Russell says when he has nothing to say.
@@ -164,8 +164,8 @@ in voice:
 
 The operational persona lives at
 `crates/russell-meta/prompts/jack.md`. That file is what
-the Nurse injects as the LLM's system prompt. A separate
-`jack-chat.md` provides the chat-mode variant. Both are
+the Nurse injects as the LLM's system prompt. The persona is
+shared across `russell jack` and the ACP server. It is
 **reviewed like code**; a PR that changes Jack's voice is
 a PR that reviewers read carefully.
 

@@ -316,7 +316,7 @@ mod tests {
 
 ## Connector Boundary: Sharing with Jack / Kask
 
-Package probe results flow to the LLM (Jack) or Kask platform via:
+Package probe results flow to the LLM (Jack) or hKask platform via:
 
 1. **Samples → Journal** (connector: `JournalWriter::append_sample`)
 2. **Journal → SOAP bundle** (tool: compose Objective text from recent samples)

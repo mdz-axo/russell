@@ -1,16 +1,16 @@
 ---
 title: "Architecture Overview"
 audience: [architects, developers, contributors]
-last_updated: 2026-05-06
+last_updated: 2026-05-24
 togaf_phase: "A"
-version: "1.1.0"
+version: "1.2.0"
 status: "Active"
 ---
 
 <!-- TOGAF_DOMAIN: Architecture Vision -->
 <!-- VERSION: 1.2.0 -->
 <!-- STATUS: Active -->
-<!-- LAST_UPDATED: 2026-05-22 -->
+<!-- LAST_UPDATED: 2026-05-24 -->
 
 <!--
 audience: contributors orienting themselves before editing code
@@ -310,7 +310,28 @@ both directions is via HTTP REST to `stack-api` (Russell → hKask)
 and via the SQLite journal read by `arsenal-mcp-russell`
 (hKask → Russell).
 
-## 9. What this document is not
+## 9. Reference Models and Influences
+
+Russell's architecture draws on established patterns from multiple
+disciplines. Each subsystem traces its conceptual provenance to
+specific reference models:
+
+| Subsystem | Reference Model | Source |
+|---|---|---|
+| **Hexagonal architecture** | Ports and Adapters | Cockburn, A. (2005). *Hexagonal Architecture*. |
+| **Reflex engine** | Subsumption architecture | Brooks, R. (1991). "Intelligence without representation." *Artificial Intelligence* 47(1–3). |
+| **EWMA baselines** | Exponentially Weighted Moving Average | Roberts, S.W. (1959). "Control Chart Tests Based on Geometric Moving Averages." *Technometrics* 1(3). |
+| **Proprioception** | Viable System Model (VSM) | Beer, S. (1972). *Brain of the Firm*. Wiley. |
+| **Proprioception** | Law of Requisite Variety | Ashby, W.R. (1956). *An Introduction to Cybernetics*. Chapman & Hall. |
+| **IDRS contract** | Let-it-crash + declarative config | Armstrong, J. (2003). *Making reliable distributed systems in the presence of software errors*. Erlang thesis. |
+| **IDRS contract** | NixOS declarative system config | Dolstra, E. (2006). *The Purely Functional Software Deployment Model*. PhD thesis, Utrecht. |
+| **SOAP bundles** | SOAP note format | Weed, L. (1968). "Medical Records that Guide and Teach." *New England Journal of Medicine* 278. |
+| **Macaroon OCAP auth** | Contextual caveats | Birgisson, A. et al. (2014). "Macaroons: Cookies with Contextual Caveats for Decentralized Authorization in the Cloud." *NDSS*. |
+| **Landlock sandbox** | Landlock LSM | Landlock project. <https://landlock.io>. Linux kernel security module. |
+| **ACP protocol** | Agent Client Protocol | hKask ACP specification. See [ADR-0027](../adr/0027-acp-integration.md). |
+| **Skill manifests** | Nix derivations + Ansible playbooks | Declarative package specification patterns. |
+
+## 10. What this document is not
 
 - Not a spec. The spec is the ADRs plus the design document.
 - Not an API reference. That lives in rustdoc.

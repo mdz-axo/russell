@@ -12,11 +12,6 @@ status: "Active"
 <!-- STATUS: Active -->
 <!-- LAST_UPDATED: 2026-05-06 -->
 
-<!-- TOGAF_DOMAIN: Technology -->
-<!-- VERSION: 1.0.0 -->
-<!-- STATUS: Active -->
-<!-- LAST_UPDATED: 2026-05-06 -->
-
 # Crate Audit: russell-sentinel
 
 ## Summary

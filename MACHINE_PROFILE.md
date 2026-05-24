@@ -17,8 +17,8 @@ status: "Active"
 Observed 2026-05-11 on `mdz-axolotl-Laptop-16`.
 Updated: 2026-05-11 (GPU probe coverage, DRM mappings, VRAM sizes).
 This is the source-of-truth for every recommendation in
-[PLAN.md](PLAN.md). Re-run the probes in §7 when anything
-material changes.
+[`docs/status/CONSOLIDATED-STATUS.md`](docs/status/CONSOLIDATED-STATUS.md).
+Re-run the probes in §7 when anything material changes.
 
 ---
 
@@ -78,9 +78,8 @@ GPU probes at `/sys/class/drm/card*/device/`.
   GPU probes use sysfs directly (no subprocess).
 - **Known hazard:** ROCm 7.2.0 has an open regression that
   causes VRAM over-allocation / OOM with Ollama on Navi 3x /
-  Strix iGPUs (upstream issue [ROCm #5902]). See §10 of
-  [PLAN.md](PLAN.md) — the `gpu-doctor` playbook is partly
-  about detecting this.
+   Strix iGPUs (upstream issue [ROCm #5902]). The `okapi-watcher`
+   skill monitors GPU health as part of the sentinel cycle.
 
 ## 4. Storage
 
@@ -109,7 +108,8 @@ plan). `fstrim.timer` is already running weekly.
 Because 25.10 is non-LTS, **end of standard support is July
 2026**. A deliberate upgrade-planning checkpoint belongs on
 the annual cadence — don't let the OS silently fall out of
-support. (See §11 in [PLAN.md](PLAN.md).)
+support. (Track OS lifecycle in
+[`docs/status/CONSOLIDATED-STATUS.md`](docs/status/CONSOLIDATED-STATUS.md).)
 
 ## 6. Toolchain & Workloads
 
@@ -212,6 +212,6 @@ probes from this machine every 5 minutes:
 | `systemd_user_failed_count` | 5 | Persistent Snap scope failures |
 | `systemd_system_failed_count` | 0 | — |
 
-Okapi probes (via `russell okapi-probe` timer, separate 5-min cadence)
-cover tokens_generated, requests_active, errors_total, GPU
-memory from within the inference container, and adapter counts.
+Okapi health is monitored via the `okapi-watcher` skill, which
+queries tokens, requests, errors, GPU memory, and adapter counts
+during sentinel cycles.

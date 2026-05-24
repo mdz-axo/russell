@@ -4,6 +4,14 @@
 
 **ADR Reference:** [ADR-0027](../adr/0027-acp-integration.md)
 
+**Reference Models:**
+- Macaroon OCAP: Birgisson, A. et al. (2014). "Macaroons: Cookies with Contextual Caveats for Decentralized Authorization in the Cloud." *NDSS*.
+- Agent Client Protocol: hKask ACP specification (JSON-RPC 2.0 over stdio).
+
+**Reference Models:**
+- Macaroon OCAP: Birgisson, A. et al. (2014). "Macaroons: Cookies with Contextual Caveats for Decentralized Authorization in the Cloud." *NDSS*.
+- Agent Client Protocol: hKask ACP specification (JSON-RPC 2.0 over stdio).
+
 ---
 
 ## Overview

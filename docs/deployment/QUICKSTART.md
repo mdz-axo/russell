@@ -1,3 +1,31 @@
+---
+title: "Russell ACP Quickstart"
+audience: [operators, developers]
+last_updated: 2026-05-24
+togaf_phase: "H"
+version: "1.0.0"
+status: "Active"
+---
+
+<!-- TOGAF_DOMAIN: Technology — Deployment -->
+<!-- VERSION: 1.0.0 -->
+<!-- STATUS: Active -->
+<!-- LAST_UPDATED: 2026-05-24 -->
+
+---
+title: "Russell ACP Quickstart"
+audience: [operators, developers]
+last_updated: 2026-05-24
+togaf_phase: "H"
+version: "1.0.0"
+status: "Active"
+---
+
+<!-- TOGAF_DOMAIN: Technology — Deployment -->
+<!-- VERSION: 1.0.0 -->
+<!-- STATUS: Active -->
+<!-- LAST_UPDATED: 2026-05-24 -->
+
 # Russell ACP Quickstart
 
 **5-minute setup for hKask integration**

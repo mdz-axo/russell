@@ -239,7 +239,7 @@ silent version pinning.
 
 - **Journal samples:** Not a standard probe — too complex for a scalar. Surfaces as a structured event (`harness.event.v1` with `outputs` map).
 - **Digest:** "Provider Conflicts" section (only when detected).
-- **Jack consultation:** This is Jack's strongest value-add — the LLM can reason about shadowing implications and recommend resolution order. The connector to Jack/Kask carries the conflict list in the SOAP Objective for assessment.
+- **Jack consultation:** This is Jack's strongest value-add — the LLM can reason about shadowing implications and recommend resolution order. The connector to Jack/hKask carries the conflict list in the SOAP Objective for assessment.
 
 ---
 

@@ -1,3 +1,31 @@
+---
+title: "Russell Replicant — hKask Universal Agentic Registry"
+audience: [operators, developers, agents]
+last_updated: 2026-05-24
+togaf_phase: "Preliminary"
+version: "1.1.0"
+status: "Active"
+---
+
+<!-- TOGAF_DOMAIN: Business Architecture -->
+<!-- VERSION: 1.1.0 -->
+<!-- STATUS: Active -->
+<!-- LAST_UPDATED: 2026-05-24 -->
+
+---
+title: "Russell Replicant — hKask Universal Agentic Registry"
+audience: [operators, developers, agents]
+last_updated: 2026-05-24
+togaf_phase: "Preliminary"
+version: "1.1.0"
+status: "Active"
+---
+
+<!-- TOGAF_DOMAIN: Business Architecture -->
+<!-- VERSION: 1.1.0 -->
+<!-- STATUS: Active -->
+<!-- LAST_UPDATED: 2026-05-24 -->
+
 # Russell Replicant — hKask Universal Agentic Registry
 
 **Replicant ID**: `russell`  
@@ -7,7 +35,7 @@
 
 ## Overview
 
-Russell is a replicant in the hKask Universal Agentic Registry — a cybernetic health harness that observes Linux AI/ML workstations, remembers what it saw in a SQLite journal, and reports through a read-only CLI. When asked, Russell cries for help via a local LLM (Okapi by default).
+Russell is a replicant in the hKask Universal Agentic Registry — a cybernetic health harness that observes Linux AI/ML workstations, remembers what it saw in a SQLite journal, and reports through the ACP (Agent Client Protocol) server and a local CLI. When asked, Russell cries for help via a local LLM (Okapi by default).
 
 ## Visibility Model
 
@@ -28,7 +56,7 @@ Russell ships with 13 public skills:
 | Skill | Symptoms | Probes | Interventions | Visibility |
 |---|---|---|---|---|
 | `okapi-watcher` | llm_slow, resource_exhaustion, gpu_fallback_to_cpu | 3 | 1 | public |
-| `skill-manager` | skill_not_in_catalog, skill_stale, skill_invalid | 3 | 6 | public |
+| `skill-manager` | skill_not_in_catalog, skill_version_stale, skill_coverage_gap | 4 | 6 | public |
 | `skill-workshop` | skill_composition, skill_adaptation | 2 | 4 | public |
 | `skill-maintenance` | skill_stale, skill_coverage_gap | 2 | 2 | public |
 | `skill-discovery` | skill_missing, skill_search | 2 | 3 | public |
@@ -50,8 +78,9 @@ Russell implements the **Observe > Recommend > Act** posture (JR-2):
 1. **Sentinel** — 5-minute cadence probe collection
 2. **Journal** — SQLite with hash-chain integrity (tamper-evident)
 3. **Nurse (Jack)** — LLM consultation via Okapi/OpenRouter
-4. **Proprioception** — Self-observation (5 self-vitals)
+4. **Proprioception** — Self-observation (7 self-vitals)
 5. **Skills** — YAML manifests + scripts (IDRS-contract mutations)
+6. **ACP Server** — Agent Client Protocol for hKask integration (primary interface)
 
 ## IDRS Contract
 

@@ -253,13 +253,13 @@ The model is **minimal**:
 ## 6. Connector Boundary: Jack / Kask Integration
 
 When Russell needs to **share** this domain model with an external
-system (Jack's LLM consultation, or the Kask platform), the
+system (Jack's LLM consultation, or the hKask platform), the
 connector boundary is:
 
 | Direction | Connector | Data shape |
 |---|---|---|
 | Russell → Jack (LLM) | Ollama / OpenRouter HTTP POST | SOAP bundle with samples serialized as Objective text |
-| Russell → Kask (MCP) | MCP tool response | JSON conforming to `harness.event.v1` or sample arrays |
+| Russell → hKask (MCP) | MCP tool response | JSON conforming to `harness.event.v1` or sample arrays |
 | Jack → Russell | LLM response text | Unstructured assessment (Russell does NOT parse for commands — JR-3) |
 
 The **tool** that prepares data for these connectors is the SOAP

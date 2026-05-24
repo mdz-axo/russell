@@ -1,3 +1,31 @@
+---
+title: "ACP Server Systemd Deployment"
+audience: [operators]
+last_updated: 2026-05-24
+togaf_phase: "H"
+version: "1.0.0"
+status: "Active"
+---
+
+<!-- TOGAF_DOMAIN: Technology — Deployment -->
+<!-- VERSION: 1.0.0 -->
+<!-- STATUS: Active -->
+<!-- LAST_UPDATED: 2026-05-24 -->
+
+---
+title: "ACP Server Systemd Deployment"
+audience: [operators]
+last_updated: 2026-05-24
+togaf_phase: "H"
+version: "1.0.0"
+status: "Active"
+---
+
+<!-- TOGAF_DOMAIN: Technology — Deployment -->
+<!-- VERSION: 1.0.0 -->
+<!-- STATUS: Active -->
+<!-- LAST_UPDATED: 2026-05-24 -->
+
 # ACP Server Systemd Deployment
 
 This document describes how to deploy the Russell ACP server as a systemd service for integration with hKask.

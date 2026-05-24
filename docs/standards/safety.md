@@ -25,6 +25,20 @@ last-reviewed: 2026-04-17
 > If you are adding code that mutates host state, this document
 > is the contract you are agreeing to.
 
+**Reference models:** The IDRS contract synthesises patterns from
+Erlang's let-it-crash philosophy (Armstrong 2003), NixOS declarative
+system configuration (Dolstra 2006), and SRE error budgets
+(Beyer, Jones, Petoff, Murphy 2016, *Site Reliability Engineering*,
+O'Reilly). The risk-band model follows the defence-in-depth principle
+from NIST SP 800-53.
+
+**Reference models:** The IDRS contract synthesises patterns from
+Erlang's let-it-crash philosophy (Armstrong 2003), NixOS declarative
+system configuration (Dolstra 2006), and SRE error budgets
+(Beyer, Jones, Petoff, Murphy 2016, *Site Reliability Engineering*,
+O'Reilly). The risk-band model follows the defence-in-depth principle
+from NIST SP 800-53.
+
 ## 1. The IDRS contract
 
 Every mutating action — a skill intervention, a CLI subcommand, an

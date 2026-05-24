@@ -167,7 +167,7 @@ russell skill prune "$SKILL_ID"
 
 ## 5. Building Skills (Jack's Workflow)
 
-### From Chat (`russell chat`)
+### From ACP Session
 
 1. **Discover gap:**
    ```

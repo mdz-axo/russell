@@ -31,7 +31,7 @@ consultation" metaphor it was born under. It now performs:
 2. **LLM client abstraction** — routing, inference hint application,
    model resolution and correction.
 3. **Action resolution** — parsing ACTION syntax from LLM output,
-   dispatching to skills and Kask tools, consent gating.
+   dispatching to skills and hKask tools, consent gating.
 4. **Help orchestration** — the full `russell jack` pipeline.
 5. **Fallback reasoning** — rule-based logic when no LLM available.
 6. **Self-assessment** — quality scoring, outcome tracking, prompt
@@ -114,7 +114,7 @@ A system without metacognition cannot:
 
 ### Reference Model Implications
 
-For the Kask ecosystem, `russell-meta` establishes that every
+For the hKask ecosystem, `russell-meta` establishes that every
 cybernetic agent needs a dedicated metacognitive layer that:
 
 1. **Separates the persona from the mechanism.** Jack is a voice;

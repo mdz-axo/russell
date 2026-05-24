@@ -1,7 +1,8 @@
 ---
 title: "Russell — Operator & Testing Guide"
 audience: [operators, testers, agents]
-last_updated: 2026-05-23
+last_updated: 2026-05-24
+togaf_phase: "G"
 version: "2.0.0"
 status: "Active"
 ---

@@ -41,7 +41,7 @@ Every component decomposes into:
 
 In this domain:
 - **Tools:** Parse statvfs into percentages, parse apt stdout into counts, compose SOAP bundles, format digest sections.
-- **Connectors:** statvfs syscall, subprocess invocations, journal SQLite writes, OpenRouter HTTP POST (the LLM call that shares machine status with Jack/Kask for assessment).
+- **Connectors:** statvfs syscall, subprocess invocations, journal SQLite writes, OpenRouter HTTP POST (the LLM call that shares machine status with Jack/hKask for assessment).
 
 ## Document Map
 
@@ -77,12 +77,12 @@ Before implementation begins:
 7. Wire into `collect()` / `collect_extended()` (Task 5 orchestration).
 8. Verify: `russell digest` and `russell jack` surface new samples without code changes (they already query all samples generically).
 
-## Relationship to Kask
+## Relationship to hKask
 
-When Russell operates as part of the Kask platform:
+When Russell operates as part of the hKask platform:
 
 - The **MCP connector** (`russell-mcp`, currently deferred) exposes journal samples as MCP tool responses.
 - The **LLM connector** (`russell-meta`) shares machine status with Jack for assessment via SOAP bundles sent to OpenRouter.
 - Both are **connectors** in the tool/connector sense: they transfer formed data across boundaries without transformation logic.
 
-The disk/package probes produce the **data** that flows through these connectors. The probes themselves are unaware of Jack, Kask, or any external consumer.
+The disk/package probes produce the **data** that flows through these connectors. The probes themselves are unaware of Jack, hKask, or any external consumer.

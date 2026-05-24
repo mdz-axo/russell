@@ -50,7 +50,7 @@ The audit-crate.md discipline applied to the full data flow:
 │ read_provenance_toml()  github_releases_api()                   │
 │ JournalWriter::append_sample()                                  │
 │ Okapi / OpenRouter HTTP POST (Nurse → LLM)                      │
-│ MCP tool response (Russell → Kask)                              │
+│ MCP tool response (Russell → hKask)                              │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -121,7 +121,7 @@ russell jack --note "disk seems full"
   → JournalWriter::append_help_session()    [connector: persist evidence]
 ```
 
-The Jack/Kask connector carries disk and package health data to
+The Jack/hKask connector carries disk and package health data to
 the LLM for assessment. Jack can then reason about:
 - "Your root partition is 87% full and cache_huggingface_mib is 45 GiB — consider pruning old models"
 - "You have 12 apt packages pending update and 3 provenance-tracked binaries are stale"

@@ -23,7 +23,7 @@ status: "Active"
 
 | Capability | Surface | Automation |
 |---|---|---|
-| Run probes / interventions | `russell chat` — ACTION syntax | Jack proposes, probes auto-fire, interventions need consent |
+| Run probes / interventions | ACP session — ACTION syntax | Jack proposes, probes auto-fire, interventions need consent |
 | List skills | `russell skill list` | CLI + `skill-manager/list-skills` probe |
 | Discover skills | `russell workshop` — `search --remote` | Operator-driven |
 | Install / prune / adapt | `russell workshop` + `skill-manager` interventions | Both operator-driven and Jack-driven |
@@ -78,7 +78,7 @@ status: "Active"
 
 3. **Wire into the dispatch path.** In `chat.rs`, after every probe or intervention dispatch (both success and failure paths), call `registry.record_probe_run(skill_id, success, duration)`.
 
-4. **Load registry on chat start, save periodically.** Currently `russell chat` loads the Kask tool registry but not the skill registry. Add skill registry load on startup and save on exit (or on a 5-minute periodic flush).
+4. **Load registry on session start, save periodically.** Currently the ACP server loads the hKask tool registry but not the skill registry. Add skill registry load on startup and save on exit (or on a 5-minute periodic flush).
 
 5. **Show metrics in Jack's context.** Add a "Skill Performance" table to the Objective section of Jack's SOAP prompt when the skill-maintenance knowledge skill is loaded:
 
@@ -93,7 +93,7 @@ status: "Active"
 
 ### Track B: Jack's Skill Management Capabilities
 
-**Goal:** Jack can build, install, modify, prune, and restore skills from within `russell chat`, using the ACTION syntax.
+**Goal:** Jack can build, install, modify, prune, and restore skills from within the ACP session interface, using the ACTION syntax.
 
 **Approach:** Create a bundled `skill-manager` skill with real probes and interventions.
 
@@ -243,7 +243,7 @@ Jack: I'll adapt it now to add the probe...
 
 1. Extend `RegistryEntry` with new metric fields.
 2. Add `record_probe_run()` / `record_intervention_run()` to `RegistryCache`.
-3. Load `RegistryCache` in `russell chat` startup, wire dispatch path to record runs.
+3. Load `RegistryCache` on ACP session startup, wire dispatch path to record runs.
 4. Save registry on chat exit and periodic flush.
 5. Add `russell skill stats` CLI verb.
 

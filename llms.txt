@@ -1,5 +1,5 @@
 russell-replicant
-description=Cybernetic health harness for Linux AI/ML workstations. Russell observes, remembers, and reports — Jack the Nurse persona watches over the machine.
+description=Cybernetic health harness for Linux AI/ML workstations. Russell observes, remembers, and reports through ACP and CLI — Jack the Nurse persona watches over the machine.
 
 canonical.home=https://github.com/mdz-axolotl/russell
 canonical.docs=https://github.com/mdz-axolotl/russell/tree/main/docs
@@ -31,5 +31,5 @@ skills.public=13
 skills.private=0
 
 probes.total=25
-interventions.total=8
+interventions.total=21
 symptoms.catalog=30
