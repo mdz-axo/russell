@@ -2253,11 +2253,11 @@ dependencies = [
 name = "russell-api-server"
 version = "0.20.0"
 dependencies = [
+ "anyhow",
  "axum",
  "chrono",
  "russell-core",
  "russell-meta",
- "russell-session",
  "serde",
  "serde_json",
  "tokio",
@@ -2265,6 +2265,7 @@ dependencies = [
  "tower-http",
  "tracing",
  "tracing-subscriber",
+ "uuid",
 ]
 
 [[package]]

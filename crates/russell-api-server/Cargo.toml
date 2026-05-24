@@ -19,7 +19,8 @@ path = "src/main.rs"
 [dependencies]
 russell-core = { workspace = true }
 russell-meta = { workspace = true }
-russell-session = { workspace = true }
+uuid = { workspace = true, features = ["v4"] }
+anyhow = { workspace = true }
 tokio = { workspace = true, features = ["net"] }
 serde = { workspace = true }
 serde_json = { workspace = true }

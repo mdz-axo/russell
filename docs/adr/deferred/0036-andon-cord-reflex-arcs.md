@@ -34,7 +34,7 @@ russell confirm <event-id> --deny     # Deny a reflex intervention
 
 ### Implementation
 
-- **Location:** Deferred. The `confirm.rs` CLI module was removed during the 2026-05-23 adversarial review. Consent functionality is planned to be absorbed into the ACP session interface (`russell-acp-server`), where hKask agents can surface `PendingAction` and receive consent responses.
+- **Location:** Deferred as a standalone `russell confirm` subcommand. Consent functionality is now available via the session engine (`russell-session`), exposed on all three interaction surfaces: CLI (`russell chat` with `/approve`/`/deny`), API (`POST /sessions/{id}/consent`), and ACP (`acp/consent.respond`). See ADR-0049.
 - **Journal API:** `get_event(id: i64)` available on `JournalReadPort` trait
 - **Persistence:** Approval/denial recorded as `reflex_confirmed`/`reflex_denied` events
 

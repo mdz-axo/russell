@@ -7,6 +7,9 @@
 #![deny(rust_2018_idioms)]
 #![warn(missing_docs)]
 #![allow(clippy::missing_docs_in_private_items)]
+#![allow(clippy::too_many_arguments)]
+#![allow(clippy::collapsible_if)]
+#![allow(clippy::while_let_on_iterator)]
 
 pub mod action;
 pub mod client;

@@ -418,7 +418,10 @@ pub fn select_knowledge(slots: &[KnowledgeSlot], budget_tokens: usize) -> Vec<&K
     }
 
     let budget = budget_tokens.min(65535);
-    let weights: Vec<usize> = slots.iter().map(|s| s.token_estimate.min(budget + 1)).collect();
+    let weights: Vec<usize> = slots
+        .iter()
+        .map(|s| s.token_estimate.min(budget + 1))
+        .collect();
     let values: Vec<u64> = slots
         .iter()
         .map(|s| (s.relevance * s.token_estimate as f64 * 1_000_000.0) as u64)

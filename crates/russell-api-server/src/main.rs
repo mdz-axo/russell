@@ -5,8 +5,6 @@ use anyhow::Result;
 use tracing::info;
 
 use russell_api_server::AppState;
-use russell_meta::JACK_PERSONA;
-use russell_session::SessionEngine;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -17,21 +15,7 @@ async fn main() -> Result<()> {
         )
         .init();
 
-    let system_prompt = format!(
-        "You are Jack, Russell's nurse persona.\n\n\
-         {}\n\n\
-         API Context:\n\
-         - You are interacting via the HTTP REST API\n\
-         - Your conversation partner may be an operator or automated client\n\
-         - You observe the host, run probes, and recommend actions\n\
-         - You NEVER emit shell commands — you rank intervention IDs\n\
-         - You propose interventions; the operator consents; the dispatcher executes",
-        JACK_PERSONA
-    );
-
-    let engine = SessionEngine::new(&system_prompt);
-    let state = AppState::new(engine);
-
+    let state = AppState::new();
     let app = russell_api_server::routes::build_router(state);
 
     let addr = std::net::SocketAddr::from(([127, 0, 0, 1], 8421));

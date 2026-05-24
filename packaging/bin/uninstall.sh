@@ -24,23 +24,18 @@ say() { printf '\033[1;34m[uninstall]\033[0m %s\n' "$*"; }
 say "Stopping timers and services"
 systemctl --user stop russell-sentinel.timer  2>/dev/null || true
 systemctl --user stop russell-digest.timer    2>/dev/null || true
-systemctl --user stop russell-okapi.timer     2>/dev/null || true
-systemctl --user stop russell-okapi.service   2>/dev/null || true
 systemctl --user stop russell-acp-server.service 2>/dev/null || true
 
 say "Disabling timers and services"
 systemctl --user disable russell-sentinel.timer 2>/dev/null || true
 systemctl --user disable russell-digest.timer   2>/dev/null || true
-systemctl --user disable russell-okapi.timer    2>/dev/null || true
-systemctl --user disable russell-okapi.service  2>/dev/null || true
 systemctl --user disable russell-acp-server.service 2>/dev/null || true
 
 say "Removing systemd user units"
 for u in russell-sentinel.timer russell-sentinel.service \
          russell-digest.timer   russell-digest.service \
          russell-failure@.service \
-         russell-acp-server.service \
-         russell-okapi.service russell-okapi.timer; do
+         russell-acp-server.service; do
   rm -f "$HOME/.config/systemd/user/$u"
 done
 systemctl --user daemon-reload

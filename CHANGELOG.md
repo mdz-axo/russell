@@ -14,6 +14,26 @@ status: "Active"
 
 # Changelog
 
+## [Unreleased]
+
+### Added
+- **Chat REPL restored** (`russell chat`): Interactive Jack session available
+  on three surfaces — CLI, API, ACP. See ADR-0049.
+- **API server** (`russell-api-server`): HTTP REST API for Jack sessions.
+  Endpoints: `POST /sessions`, `POST /sessions/{id}/messages`,
+  `POST /sessions/{id}/consent`, `GET /sessions/{id}`, `DELETE /sessions/{id}`.
+- **Session engine** (`russell-session`): Shared session logic for ACP server.
+  `SessionEngine`, `SessionManager`, consent flow.
+- **ADR-0049**: Three-surface interaction requirement (CLI, API, ACP).
+
+### Changed
+- **Workspace restructured**: 12 crates (added `russell-session`,
+  `russell-api-server`).
+
+### Fixed
+- **Chat REPL removal corrected**: The adversarial review (2026-05-23)
+  incorrectly removed the CLI chat surface. Restored from git history.
+
 ## [0.20.0] — 2026-05-23
 
 ### Added
@@ -35,7 +55,7 @@ status: "Active"
 - **Primary interface shifted to ACP**: CLI is now secondary; hKask integration
   goes through the ACP server.
 - **Chat REPL removed**: Multi-turn conversation absorbed into ACP session
-  interface. `russell chat` no longer exists.
+  interface. `russell chat` no longer exists. (Reverted in Unreleased — see ADR-0049.)
 - **Workshop REPL removed**: Skill workshop functionality absorbed into skill
   lifecycle commands (`skill-install`, `skill-prune`).
 - **Kask → hKask migration**: Environment variables renamed from `KASK_*` to
@@ -45,7 +65,6 @@ status: "Active"
   `russell-okapi` units. Added `russell-acp-server.service`.
 
 ### Removed
-- `russell chat` command (use ACP sessions)
 - `russell workshop` command (use `skill-install`/`skill-prune`)
 - `russell mcp-tools` command (use ACP capabilities)
 - `russell-reflex` crate (zero consumers)

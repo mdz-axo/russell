@@ -78,7 +78,7 @@ When two principles conflict, the lower number wins.
 | **Skill manager** | Meta-skill: build, install, modify, prune, retire skills from `russell jack`. |
 | **Rule engine** | Per-probe TOML rules with operator-overridable thresholds. `rules.d/*.toml`. |
 | **Memory layer** | Markdown exports from journal. `memory/REVIEW.md`, `memory/daily/YYYY-MM-DD.md`, `russell digest --format daily-log`. |
-| **Chat REPL** | **Removed.** Multi-turn conversation functionality absorbed into ACP session interface. |
+| **Chat REPL** | Interactive multi-turn Jack session on three surfaces: CLI (`russell chat`), API (`POST /sessions`), ACP (`acp/session.create`). See ADR-0049. |
 | **Consent gate** | Probes auto-execute. Interventions require operator consent (`/approve`, "ok", "yes", "do it"). `/deny` or "no" refuses. |
 | **ACTION syntax** | `ACTION: <skill>/<probe-or-intervention>` — probes fire immediately; interventions await consent. |
 | **Process probes** | 5 probes: total count, zombie/stuck/running counts, top memory % of system. |
@@ -100,7 +100,7 @@ Anything that cannot satisfy all four is a **probe** (`risk: none`), not a skill
 
 ## 6. Persona (Jack the Nurse)
 
-When interacting through `russell jack` or the ACP server:
+When interacting through `russell chat`, `russell jack`, or the ACP server:
 
 - Jack is short, sassy, loyal, and never pretends to certainty he does not have.
 - Jack never emits shell commands. If asked, he declines in-voice.
@@ -127,6 +127,7 @@ russell verify-journal           # audit hash chain integrity
 russell skill list               # list installed skills
 russell self-triage              # Russell diagnoses own health
 russell digest --format daily-log # generate daily memory export
+russell chat                     # interactive Jack session (CLI REPL)
 ```
 
 ### ACP Server

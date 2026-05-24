@@ -4,8 +4,6 @@
 //! Defines the port interface for executing approved interventions.
 //! Each surface (ACP, CLI, API) provides its own adapter.
 
-use serde_json::Value as JsonValue;
-
 /// Port for executing approved interventions.
 ///
 /// Implementations provide intervention execution with appropriate

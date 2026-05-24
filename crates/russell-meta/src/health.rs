@@ -11,10 +11,6 @@
 
 /// Default Okapi base URL.
 pub const DEFAULT_BASE_URL: &str = "http://127.0.0.1:11435/v1";
-//! 4. Returns whether Okapi is ready.
-//!
-//! Design note: this is the *only* place that knows how to wake Okapi.
-//! All call-sites go through [`ensure_ready`].
 
 use russell_core::config::RuntimeConfig;
 use tracing::{info, warn};

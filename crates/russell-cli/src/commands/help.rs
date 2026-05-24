@@ -8,13 +8,11 @@
 //! Both modes exercise the same `SessionEngine` from `russell-session`,
 //! ensuring functional equivalence with the ACP and API surfaces.
 
-use std::io::{self, Write};
-
 use anyhow::{Context, Result};
 use russell_core::journal::JournalWriter;
 use russell_core::paths::Paths;
 use russell_meta::JACK_PERSONA;
-use russell_session::{ConsentDecision, SessionEngine, TurnRole};
+use russell_session::{ConsentDecision, SessionEngine};
 
 pub async fn run(paths: &Paths, note: Option<&str>) -> Result<()> {
     if let Some(note_text) = note {
@@ -36,7 +34,7 @@ async fn run_single_shot(paths: &Paths, note: &str) -> Result<()> {
     Ok(())
 }
 
-async fn run_interactive(paths: &Paths) -> Result<()> {
+async fn run_interactive(_paths: &Paths) -> Result<()> {
     let system_prompt = format!(
         "You are Jack, Russell's nurse persona.\n\n\
          {}\n\n\
@@ -107,7 +105,10 @@ async fn run_interactive(paths: &Paths) -> Result<()> {
         }
 
         if trimmed.starts_with('/') {
-            println!("Unknown command: {}. Type /help for available commands.", trimmed);
+            println!(
+                "Unknown command: {}. Type /help for available commands.",
+                trimmed
+            );
             continue;
         }
 

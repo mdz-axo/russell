@@ -823,7 +823,7 @@ fn append_skill_knowledge_scored(
         }
     }
 
-    let selected = select_knowledge(&mut slots, KNOWLEDGE_BUDGET_TOKENS);
+    let selected = select_knowledge(&slots, KNOWLEDGE_BUDGET_TOKENS);
     for slot in selected {
         system.push_str("\n\n---\n\n");
         system.push_str("# Knowledge: ");

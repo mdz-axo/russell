@@ -67,8 +67,7 @@ done
 if [ "$ACTION" = "uninstall" ]; then
     echo "==> Stopping and disabling Russell timers and services…"
     for unit in russell-sentinel.timer russell-digest.timer \
-                russell-acp-server.service \
-                russell-okapi.service russell-okapi.timer; do
+                russell-acp-server.service; do
         systemctl --user stop "$unit" 2>/dev/null || true
         systemctl --user disable "$unit" 2>/dev/null || true
     done
@@ -80,8 +79,6 @@ if [ "$ACTION" = "uninstall" ]; then
     rm -f "${SYSTEMD_USER_DIR}/russell-digest.timer"
     rm -f "${SYSTEMD_USER_DIR}/russell-failure@.service"
     rm -f "${SYSTEMD_USER_DIR}/russell-acp-server.service"
-    rm -f "${SYSTEMD_USER_DIR}/russell-okapi.service"
-    rm -f "${SYSTEMD_USER_DIR}/russell-okapi.timer"
 
     echo "==> Removing binaries…"
     rm -f "${BIN_DIR}/${BINARY_NAME}"

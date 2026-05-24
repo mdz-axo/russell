@@ -17,7 +17,7 @@ use crate::port::SkillDispatchPort;
 use crate::rate_limit::RateLimiter;
 use crate::types::*;
 use russell_session::{
-    ConsentDecision, ConsentRequest, SessionEngine, SessionState, Turn, TurnRole,
+    ConsentDecision, ConsentRequest, CreateSessionRequest, SessionEngine, SessionMessageRequest,
 };
 
 /// ACP-specific intervention port adapter.
@@ -34,11 +34,11 @@ impl russell_session::InterventionPort for AcpInterventionAdapter {
         skill_id: &str,
         _intervention_id: &str,
         args: &serde_json::Value,
-    ) -> Result<String, String> {
+    ) -> std::result::Result<String, String> {
         self.dispatch
             .dispatch_skill(skill_id, args)
             .await
-            .map_err(|e| e.to_string())
+            .map_err(|e| format!("{e}"))
     }
 }
 
@@ -71,8 +71,7 @@ impl AcpHandler {
         auth: MacaroonAuth,
         rate_limiter: RateLimiter,
     ) -> Self {
-        let dispatch_arc: std::sync::Arc<dyn SkillDispatchPort> =
-            std::sync::Arc::new(dispatch);
+        let dispatch_arc: std::sync::Arc<dyn SkillDispatchPort> = std::sync::Arc::new(dispatch);
         let intervention_adapter: Box<dyn russell_session::InterventionPort> =
             Box::new(AcpInterventionAdapter {
                 dispatch: std::sync::Arc::clone(&dispatch_arc),
@@ -286,9 +285,7 @@ impl AcpHandler {
             .engine
             .send_message(&req.session_id, &req.message)
             .map_err(|e| match e {
-                russell_session::SessionError::SessionNotFound(id) => {
-                    AcpError::SessionNotFound(id)
-                }
+                russell_session::SessionError::SessionNotFound(id) => AcpError::SessionNotFound(id),
                 russell_session::SessionError::SessionClosed(id) => AcpError::SessionClosed(id),
                 _ => AcpError::InvalidRequest(e.to_string()),
             })?;
@@ -374,10 +371,10 @@ impl AcpHandler {
                     .map_err(|e| AcpError::InvalidRequest(format!("invalid params: {}", e)))
             })?;
 
-        if !self.engine.verify_session_ownership(
-            &raw_req.session_id,
-            token.map(|t| t.token_id.as_str()),
-        ) {
+        if !self
+            .engine
+            .verify_session_ownership(&raw_req.session_id, token.map(|t| t.token_id.as_str()))
+        {
             return Err(AcpError::CapabilityNotGranted(format!(
                 "session '{}' not owned by this token",
                 raw_req.session_id
@@ -391,25 +388,28 @@ impl AcpHandler {
             reason: raw_req.reason,
         };
 
-        let resp = self.engine.respond_consent(consent_req).map_err(|e| match e {
-            russell_session::SessionError::SessionNotFound(id) => AcpError::SessionNotFound(id),
-            russell_session::SessionError::NotWaitingForConsent(id, state) => {
-                AcpError::InvalidRequest(format!(
-                    "session '{}' is not waiting for consent (state: {:?})",
-                    id, state
-                ))
-            }
-            russell_session::SessionError::NoPendingAction => {
-                AcpError::InvalidRequest("no pending action in session".to_string())
-            }
-            russell_session::SessionError::ActionIdMismatch(got, expected) => {
-                AcpError::InvalidRequest(format!(
-                    "action_id '{}' does not match pending action '{}'",
-                    got, expected
-                ))
-            }
-            _ => AcpError::InvalidRequest(e.to_string()),
-        })?;
+        let resp = self
+            .engine
+            .respond_consent(consent_req)
+            .map_err(|e| match e {
+                russell_session::SessionError::SessionNotFound(id) => AcpError::SessionNotFound(id),
+                russell_session::SessionError::NotWaitingForConsent(id, state) => {
+                    AcpError::InvalidRequest(format!(
+                        "session '{}' is not waiting for consent (state: {:?})",
+                        id, state
+                    ))
+                }
+                russell_session::SessionError::NoPendingAction => {
+                    AcpError::InvalidRequest("no pending action in session".to_string())
+                }
+                russell_session::SessionError::ActionIdMismatch(got, expected) => {
+                    AcpError::InvalidRequest(format!(
+                        "action_id '{}' does not match pending action '{}'",
+                        got, expected
+                    ))
+                }
+                _ => AcpError::InvalidRequest(e.to_string()),
+            })?;
 
         if let Some(ref cns) = self.cns {
             let decision_text = match resp.decision {

@@ -14,8 +14,8 @@ use crate::error::{SessionError, SessionResult};
 use crate::port::InterventionPort;
 use crate::session::{ConsentDecision, Session, SessionManager, SessionState, Turn, TurnRole};
 use crate::types::{
-    ConsentRequest, ConsentResponse, CreateSessionResponse, SessionMessageResponse, TurnInfo,
-    ToolCallSummary,
+    ConsentRequest, ConsentResponse, CreateSessionResponse, SessionMessageResponse,
+    ToolCallSummary, TurnInfo,
 };
 
 /// Session engine — shared across CLI, API, and ACP surfaces.
@@ -59,7 +59,10 @@ impl SessionEngine {
     }
 
     /// Create a new session.
-    pub fn create_session(&mut self, persona: impl Into<String>) -> SessionResult<CreateSessionResponse> {
+    pub fn create_session(
+        &mut self,
+        persona: impl Into<String>,
+    ) -> SessionResult<CreateSessionResponse> {
         let session_id = self.sessions.create_session(persona);
         info!(session_id = %session_id, "Created session");
         Ok(CreateSessionResponse {
@@ -143,10 +146,7 @@ impl SessionEngine {
     }
 
     /// Respond to a consent request.
-    pub fn respond_consent(
-        &mut self,
-        request: ConsentRequest,
-    ) -> SessionResult<ConsentResponse> {
+    pub fn respond_consent(&mut self, request: ConsentRequest) -> SessionResult<ConsentResponse> {
         let session = self
             .sessions
             .get_session_mut(&request.session_id)
@@ -221,7 +221,8 @@ impl SessionEngine {
             decision_text,
             skill_id,
             intervention_id,
-            request.reason
+            request
+                .reason
                 .as_ref()
                 .map(|r| format!(" (reason: {})", r))
                 .unwrap_or_default()
@@ -266,9 +267,8 @@ impl SessionEngine {
             );
             let soap = SoapBundle::new(&prompt);
             match tokio::task::block_in_place(|| {
-                tokio::runtime::Handle::current().block_on(async {
-                    inference.infer(&prompt, Some(&soap)).await
-                })
+                tokio::runtime::Handle::current()
+                    .block_on(async { inference.infer(&prompt, Some(&soap)).await })
             }) {
                 Ok(resp) => resp.text,
                 Err(e) => {
@@ -292,9 +292,8 @@ impl SessionEngine {
     ) -> Result<String, String> {
         if let Some(ref port) = self.intervention_port {
             match tokio::task::block_in_place(|| {
-                tokio::runtime::Handle::current().block_on(async {
-                    port.execute(skill_id, intervention_id, args).await
-                })
+                tokio::runtime::Handle::current()
+                    .block_on(async { port.execute(skill_id, intervention_id, args).await })
             }) {
                 Ok(res) => Ok(res),
                 Err(e) => Err(e),

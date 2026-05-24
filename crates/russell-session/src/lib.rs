@@ -31,5 +31,5 @@ pub use session::{
 };
 pub use types::{
     ConsentRequest, ConsentResponse, CreateSessionRequest, CreateSessionResponse,
-    SessionMessageRequest, SessionMessageResponse, TurnInfo, ToolCallSummary,
+    SessionMessageRequest, SessionMessageResponse, ToolCallSummary, TurnInfo,
 };

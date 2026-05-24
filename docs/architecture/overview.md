@@ -51,8 +51,10 @@ flowchart LR
   SKILLS[russell-skills]
   MCP[russell-mcp]
   PROPRIO[russell-proprio]
+  SESSION[russell-session]
   CLI[russell-cli]
   ACP[russell-acp-server]
+  API[russell-api-server]
   AGENT[russell-agent]
   TESTING[russell-testing]
 
@@ -61,9 +63,11 @@ flowchart LR
   META --> CORE & SKILLS
   PROPRIO --> CORE
   MCP --> CORE & SENTINEL & META & SKILLS & PROPRIO
-  ACP --> CORE & SKILLS & META
+  SESSION --> CORE & META
+  ACP --> CORE & SKILLS & META & SESSION
+  API --> CORE & META
   AGENT --> CORE & SENTINEL & PROPRIO & META
-  CLI --> CORE & SENTINEL & META & SKILLS & PROPRIO & MCP
+  CLI --> CORE & SENTINEL & META & SKILLS & PROPRIO & MCP & SESSION
   TESTING --> CORE
 ```
 
@@ -71,7 +75,7 @@ flowchart LR
 id: DIAG-OVERVIEW-002
 type: flowchart
 verified_date: 2026-05-24
-verified_against: ADR-0013 (rust-workspace-layout); Cargo.toml dependency declarations; CHANGELOG v0.20.0 (russell-reflex removed)
+verified_against: ADR-0013 (rust-workspace-layout); Cargo.toml dependency declarations; CHANGELOG v0.20.0 (russell-reflex removed, russell-session and russell-api-server added)
 reference_sources: PRINCIPLES_CATALOG.md JR-6 (reuse over dependency)
 status: VERIFIED
 -->
@@ -129,16 +133,27 @@ Russell runs under user-scoped systemd with one exception:
 declare `Persistent=true` + `RandomizedDelaySec=` so a sleeping
 laptop catches up without thundering herd.
 
-### 4.2 CLI and ACP, two views of the same actions
+### 4.2 CLI, API, and ACP — three surfaces, one Jack
+
+The interactive Jack session is available on three functionally
+equivalent surfaces (see ADR-0049):
+
+| Surface | Entry point | Primary user |
+|---|---|---|
+| CLI | `russell chat` | Operator (direct REPL) |
+| API | `russell-api-server` (HTTP REST) | Web frontends, scripts |
+| ACP | `russell-acp-server` (JSON-RPC) | hKask agents |
+
+All three surfaces support session creation, multi-turn conversation,
+consent flow for interventions, and session closure. They exercise
+the same logical operations: probes auto-execute; interventions
+require operator consent.
 
 Every CLI subcommand has a corresponding ACP session capability
-unless an ADR explicitly justifies the asymmetry. The ACP server
-provides the primary agent interface; the CLI provides the primary
-operator interface. Both exercise the same underlying code paths.
-The MCP client surface (ADR-0025) is read-only: Russell consumes
-hKask tools but does not expose its own MCP server. The former
-MCP server feature stands deprecated; use `russell-acp-server` for
-agent integration.
+unless an ADR explicitly justifies the asymmetry. The MCP client
+surface (ADR-0025) is read-only: Russell consumes hKask tools but
+does not expose its own MCP server. The former MCP server feature
+stands deprecated; use `russell-acp-server` for agent integration.
 
 ### 4.3 The Nurse (Metacognitive Layer)
 
@@ -199,7 +214,8 @@ aggressive intervention.
 | New probe | `russell-sentinel::probes` | `overview.md` §3.2 if schema changes; ADR if new hardware class |
 | New skill | `skills/<id>/` | `AGENTS.md` §6; `skill-self-management-strategy.md` for meta-skills |
 | New ACP capability | `russell-acp-server::handler` | [`../adr/0027-acp-integration.md`](../adr/0027-acp-integration.md); ADR |
-| New CLI subcommand | `russell-cli::commands` | `CONTRIBUTING.md` §9; add ACP session method if user-facing |
+| New API endpoint | `russell-api-server::routes` | [`../adr/0049-three-surface-interaction.md`](../adr/0049-three-surface-interaction.md); ADR |
+| New CLI subcommand | `russell-cli::commands` | `CONTRIBUTING.md` §9; add ACP session method and API endpoint if user-facing |
 | New self-health vital | `russell-proprio::probes` | [`../adr/0015-proprioception-self-health.md`](../adr/0015-proprioception-self-health.md); ADR if new failure class |
 
 ## 8. hKask integration surface

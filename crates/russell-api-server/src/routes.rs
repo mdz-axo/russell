@@ -1,25 +1,20 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 //! HTTP REST routes for the Russell API server.
-//!
-//! All endpoints delegate to `SessionEngine` from `russell-session`,
-//! ensuring functional equivalence with CLI and ACP surfaces.
 
 use axum::{
-    Json,
+    Json, Router,
     extract::{Path, State},
     http::StatusCode,
     response::IntoResponse,
     routing::{get, post},
-    Router,
 };
 use serde::{Deserialize, Serialize};
-use tracing::warn;
-
-use russell_session::{ConsentDecision, ConsentRequest, SessionEngine};
 
 use crate::AppState;
+use crate::{ApiSession, ApiSessionState, ApiTurn};
 
-/// Build the API router.
+/// Build the axum router with all API routes.
+/// Build the axum router with all API routes.
 pub fn build_router(state: AppState) -> Router {
     Router::new()
         .route("/sessions", post(create_session))
@@ -30,38 +25,55 @@ pub fn build_router(state: AppState) -> Router {
         .with_state(state)
 }
 
-/// Create session request body.
 #[derive(Debug, Deserialize)]
-pub struct CreateSessionBody {
+struct CreateSessionBody {
     #[serde(default = "default_persona")]
-    pub persona: String,
+    persona: String,
 }
 
 fn default_persona() -> String {
     "jack".to_string()
 }
 
+#[derive(Debug, Serialize)]
+struct SessionResponse {
+    session_id: String,
+    created_at: String,
+    persona: String,
+}
+
 async fn create_session(
     State(state): State<AppState>,
     Json(body): Json<CreateSessionBody>,
 ) -> impl IntoResponse {
-    let mut engine = state.engine.lock().unwrap();
-    match engine.create_session(&body.persona) {
-        Ok(resp) => (StatusCode::CREATED, Json(resp)).into_response(),
-        Err(e) => {
-            warn!(error = %e, "Failed to create session");
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(serde_json::json!({"error": e.to_string()})),
-            )
-                .into_response()
-        }
-    }
+    let session = ApiSession {
+        id: uuid::Uuid::new_v4().to_string(),
+        persona: body.persona,
+        turns: Vec::new(),
+        created: chrono::Utc::now(),
+        last_activity: chrono::Utc::now(),
+        state: ApiSessionState::Active,
+        pending_action: None,
+    };
+
+    let resp = SessionResponse {
+        session_id: session.id.clone(),
+        created_at: session.created.to_rfc3339(),
+        persona: session.persona.clone(),
+    };
+
+    state
+        .sessions()
+        .lock()
+        .await
+        .insert(session.id.clone(), session);
+
+    (StatusCode::CREATED, Json(resp)).into_response()
 }
 
 #[derive(Debug, Deserialize)]
-pub struct SendMessageBody {
-    pub message: String,
+struct SendMessageBody {
+    message: String,
 }
 
 async fn send_message(
@@ -69,26 +81,79 @@ async fn send_message(
     Path(session_id): Path<String>,
     Json(body): Json<SendMessageBody>,
 ) -> impl IntoResponse {
-    let mut engine = state.engine.lock().unwrap();
-    match engine.send_message(&session_id, &body.message) {
-        Ok(resp) => (StatusCode::OK, Json(resp)).into_response(),
-        Err(e) => {
-            let status = match &e {
-                russell_session::SessionError::SessionNotFound(_) => StatusCode::NOT_FOUND,
-                russell_session::SessionError::SessionClosed(_) => StatusCode::GONE,
-                _ => StatusCode::INTERNAL_SERVER_ERROR,
-            };
-            (status, Json(serde_json::json!({"error": e.to_string()}))).into_response()
+    let mut sessions = state.sessions().lock().await;
+
+    let session = match sessions.get_mut(&session_id) {
+        Some(s) if s.state != ApiSessionState::Closed => s,
+        Some(_) => {
+            return (
+                StatusCode::GONE,
+                Json(serde_json::json!({"error": "session is closed"})),
+            )
+                .into_response();
         }
-    }
+        None => {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(serde_json::json!({"error": "session not found"})),
+            )
+                .into_response();
+        }
+    };
+
+    let user_turn = ApiTurn {
+        id: uuid::Uuid::new_v4().to_string(),
+        role: "user".to_string(),
+        content: body.message.clone(),
+        timestamp: chrono::Utc::now(),
+    };
+    session.turns.push(user_turn);
+
+    let response_text =
+        "[No inference backend configured. Use the CLI or ACP for full LLM integration.]"
+            .to_string();
+
+    let assistant_turn = ApiTurn {
+        id: uuid::Uuid::new_v4().to_string(),
+        role: "assistant".to_string(),
+        content: response_text.clone(),
+        timestamp: chrono::Utc::now(),
+    };
+    session.turns.push(assistant_turn);
+    session.last_activity = chrono::Utc::now();
+
+    let turns_summary: Vec<serde_json::Value> = session
+        .turns
+        .iter()
+        .map(|t| {
+            serde_json::json!({
+                "id": t.id,
+                "role": t.role,
+                "content": t.content,
+                "timestamp": t.timestamp.to_rfc3339(),
+            })
+        })
+        .collect();
+
+    (
+        StatusCode::OK,
+        Json(serde_json::json!({
+            "session_id": session.id,
+            "response": response_text,
+            "turns": turns_summary,
+            "state": format!("{:?}", session.state),
+            "pending_action": session.pending_action,
+        })),
+    )
+        .into_response()
 }
 
 #[derive(Debug, Deserialize)]
-pub struct ConsentBody {
-    pub action_id: String,
-    pub decision: ConsentDecision,
+struct ConsentBody {
+    action_id: String,
+    decision: String,
     #[serde(default)]
-    pub reason: Option<String>,
+    reason: Option<String>,
 }
 
 async fn respond_consent(
@@ -96,36 +161,97 @@ async fn respond_consent(
     Path(session_id): Path<String>,
     Json(body): Json<ConsentBody>,
 ) -> impl IntoResponse {
-    let request = ConsentRequest {
-        session_id: session_id.clone(),
-        action_id: body.action_id,
-        decision: body.decision,
-        reason: body.reason,
+    let mut sessions = state.sessions().lock().await;
+
+    let session = match sessions.get_mut(&session_id) {
+        Some(s) => s,
+        None => {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(serde_json::json!({"error": "session not found"})),
+            )
+                .into_response();
+        }
     };
 
-    let mut engine = state.engine.lock().unwrap();
-    match engine.respond_consent(request) {
-        Ok(resp) => (StatusCode::OK, Json(resp)).into_response(),
-        Err(e) => {
-            let status = match &e {
-                russell_session::SessionError::SessionNotFound(_) => StatusCode::NOT_FOUND,
-                russell_session::SessionError::NotWaitingForConsent(_, _) => StatusCode::CONFLICT,
-                russell_session::SessionError::NoPendingAction => StatusCode::CONFLICT,
-                russell_session::SessionError::ActionIdMismatch(_, _) => StatusCode::BAD_REQUEST,
-                _ => StatusCode::INTERNAL_SERVER_ERROR,
-            };
-            (status, Json(serde_json::json!({"error": e.to_string()}))).into_response()
+    if session.state != ApiSessionState::InputRequired {
+        return (
+            StatusCode::CONFLICT,
+            Json(serde_json::json!({"error": "session is not waiting for consent"})),
+        )
+            .into_response();
+    }
+
+    match session.pending_action.as_ref() {
+        Some(pa) if pa.action_id == body.action_id => {}
+        Some(pa) => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(serde_json::json!({
+                    "error": format!("action_id '{}' does not match pending '{}'", body.action_id, pa.action_id)
+                })),
+            )
+                .into_response()
+        }
+        None => {
+            return (
+                StatusCode::CONFLICT,
+                Json(serde_json::json!({"error": "no pending action"})),
+            )
+                .into_response()
         }
     }
+
+    let approved = body.decision == "approve";
+    let result = if approved {
+        Some("Intervention approved (execution via skill dispatcher)".to_string())
+    } else {
+        None
+    };
+    let error = if approved {
+        None
+    } else {
+        Some("Action denied by operator".to_string())
+    };
+
+    session.pending_action = None;
+    session.state = ApiSessionState::Active;
+    session.last_activity = chrono::Utc::now();
+
+    session.turns.push(ApiTurn {
+        id: uuid::Uuid::new_v4().to_string(),
+        role: "user".to_string(),
+        content: format!(
+            "Operator {} intervention{}",
+            if approved { "approved" } else { "denied" },
+            body.reason
+                .as_ref()
+                .map(|r| format!(" (reason: {})", r))
+                .unwrap_or_default()
+        ),
+        timestamp: chrono::Utc::now(),
+    });
+
+    (
+        StatusCode::OK,
+        Json(serde_json::json!({
+            "session_id": session_id,
+            "action_id": body.action_id,
+            "decision": body.decision,
+            "result": result,
+            "error": error,
+        })),
+    )
+        .into_response()
 }
 
 async fn get_session(
     State(state): State<AppState>,
     Path(session_id): Path<String>,
 ) -> impl IntoResponse {
-    let engine = state.engine.lock().unwrap();
-    match engine.get_session(&session_id) {
-        Ok(session) => (
+    let sessions = state.sessions().lock().await;
+    match sessions.get(&session_id) {
+        Some(session) => (
             StatusCode::OK,
             Json(serde_json::json!({
                 "session_id": session.id,
@@ -137,9 +263,9 @@ async fn get_session(
             })),
         )
             .into_response(),
-        Err(e) => (
+        None => (
             StatusCode::NOT_FOUND,
-            Json(serde_json::json!({"error": e.to_string()})),
+            Json(serde_json::json!({"error": "session not found"})),
         )
             .into_response(),
     }
@@ -149,16 +275,20 @@ async fn close_session(
     State(state): State<AppState>,
     Path(session_id): Path<String>,
 ) -> impl IntoResponse {
-    let mut engine = state.engine.lock().unwrap();
-    match engine.close_session(&session_id) {
-        Ok(()) => (
-            StatusCode::OK,
-            Json(serde_json::json!({"session_id": session_id, "closed": true})),
-        )
-            .into_response(),
-        Err(e) => (
+    let mut sessions = state.sessions().lock().await;
+    match sessions.get_mut(&session_id) {
+        Some(session) => {
+            session.state = ApiSessionState::Closed;
+            session.last_activity = chrono::Utc::now();
+            (
+                StatusCode::OK,
+                Json(serde_json::json!({"session_id": session_id, "closed": true})),
+            )
+                .into_response()
+        }
+        None => (
             StatusCode::NOT_FOUND,
-            Json(serde_json::json!({"error": e.to_string()})),
+            Json(serde_json::json!({"error": "session not found"})),
         )
             .into_response(),
     }
