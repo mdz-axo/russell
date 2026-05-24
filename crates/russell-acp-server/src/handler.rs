@@ -6,7 +6,9 @@ use serde_json::json;
 use tracing::{debug, info, warn};
 
 use crate::CapabilityToken;
+use crate::SessionState;
 use crate::auth::MacaroonAuth;
+use crate::cns::AcpCnsEmitter;
 use crate::dispatch::AcpDispatch;
 use crate::error::{AcpError, Result};
 use crate::persona::JackPersonaProjection;
@@ -31,6 +33,10 @@ pub struct AcpHandler {
     require_auth: bool,
     /// Inference backend for LLM responses (T6).
     inference: Option<std::sync::Arc<dyn russell_core::inference::InferencePort>>,
+    /// Journal reader for proprioception notifications (T2-2).
+    journal_reader: Option<russell_core::journal::JournalReader>,
+    /// CNS span emitter for observability (T2-3).
+    cns: Option<AcpCnsEmitter>,
 }
 
 impl AcpHandler {
@@ -49,6 +55,8 @@ impl AcpHandler {
             rate_limiter,
             require_auth: false,
             inference: None,
+            journal_reader: None,
+            cns: None,
         }
     }
 
@@ -58,6 +66,18 @@ impl AcpHandler {
         inference: std::sync::Arc<dyn russell_core::inference::InferencePort>,
     ) -> Self {
         self.inference = Some(inference);
+        self
+    }
+
+    /// Set the journal reader for proprioception notifications (T2-2).
+    pub fn with_journal_reader(mut self, reader: russell_core::journal::JournalReader) -> Self {
+        self.journal_reader = Some(reader);
+        self
+    }
+
+    /// Set the CNS span emitter for observability (T2-3).
+    pub fn with_cns(mut self, cns: AcpCnsEmitter) -> Self {
+        self.cns = Some(cns);
         self
     }
 
@@ -139,6 +159,7 @@ impl AcpHandler {
                     .await
             }
             "acp/capabilities" => self.get_capabilities(request.params).await,
+            "acp/notifications.list" => self.list_notifications(request.params).await,
             "acp/skill/info" => self.get_skill_info(request.params).await,
             "acp/skill/run" => self.run_skill(request.params).await,
             "acp/probe/run" => self.run_probe(request.params).await,
@@ -202,6 +223,11 @@ impl AcpHandler {
             .create_session_with_token(&req.persona, token_id);
         info!(session_id = %session_id, "Created ACP session");
 
+        // Emit CNS span for session creation (T2-3)
+        if let Some(ref cns) = self.cns {
+            cns.emit_session_created(&session_id, &req.persona);
+        }
+
         Ok(json!(CreateSessionResponse {
             session_id: session_id.clone(),
             created_at: Utc::now().to_rfc3339(),
@@ -264,7 +290,17 @@ impl AcpHandler {
             );
             let soap = russell_core::inference::SoapBundle::new(&prompt);
             match inference.infer(&prompt, Some(&soap)).await {
-                Ok(resp) => resp.text,
+                Ok(resp) => {
+                    // Emit CNS span for LLM escalation (T2-3)
+                    if let Some(ref cns) = self.cns {
+                        cns.emit_llm_escalation(
+                            &resp.backend,
+                            resp.model.as_deref(),
+                            resp.latency_ms.unwrap_or(0),
+                        );
+                    }
+                    resp.text
+                }
                 Err(e) => {
                     warn!(error = %e, "inference failed, using fallback");
                     format!("[Inference unavailable: {}]", e)
@@ -398,6 +434,12 @@ impl AcpHandler {
             })?;
 
         let result = self.dispatch.dispatch_skill(&skill_id, &args).await?;
+
+        // Emit CNS span for skill dispatch (T2-3)
+        if let Some(ref cns) = self.cns {
+            cns.emit_skill_dispatched(&skill_id, "run");
+        }
+
         Ok(json!({"result": result}))
     }
 
@@ -422,6 +464,196 @@ impl AcpHandler {
 
         let result = self.dispatch.run_probe(&skill_id, &probe_id, &args).await?;
         Ok(json!({"result": result}))
+    }
+
+    /// Respond to a consent request (approve/deny pending action).
+    async fn consent_respond(
+        &mut self,
+        params: Option<serde_json::Value>,
+        token: Option<&CapabilityToken>,
+    ) -> Result<serde_json::Value> {
+        let req: ConsentRequest = params
+            .ok_or_else(|| AcpError::InvalidRequest("missing params".to_string()))
+            .and_then(|p| {
+                serde_json::from_value(p)
+                    .map_err(|e| AcpError::InvalidRequest(format!("invalid params: {}", e)))
+            })?;
+
+        // Verify session ownership
+        if !self
+            .sessions
+            .verify_session_ownership(&req.session_id, token.map(|t| t.token_id.as_str()))
+        {
+            return Err(AcpError::CapabilityNotGranted(format!(
+                "session '{}' not owned by this token",
+                req.session_id
+            )));
+        }
+
+        // Get session and verify it's waiting for consent
+        let session = self
+            .sessions
+            .get_session_mut(&req.session_id)
+            .ok_or_else(|| AcpError::SessionNotFound(req.session_id.clone()))?;
+
+        if session.state != SessionState::InputRequired {
+            return Err(AcpError::InvalidRequest(format!(
+                "session '{}' is not waiting for consent (state: {:?})",
+                req.session_id, session.state
+            )));
+        }
+
+        // Verify action_id matches pending action
+        let pending = session
+            .pending_action
+            .as_ref()
+            .ok_or_else(|| AcpError::InvalidRequest("no pending action in session".to_string()))?;
+
+        if pending.action_id != req.action_id {
+            return Err(AcpError::InvalidRequest(format!(
+                "action_id '{}' does not match pending action '{}'",
+                req.action_id, pending.action_id
+            )));
+        }
+
+        // Extract action details before consuming pending
+        let skill_id = pending.skill_id.clone();
+        let intervention_id = pending.intervention_id.clone();
+        let args = pending.args.clone();
+
+        // Process decision
+        let (result, error) = match req.decision {
+            ConsentDecision::Approve => {
+                info!(
+                    session_id = %req.session_id,
+                    action_id = %req.action_id,
+                    skill_id = %skill_id,
+                    intervention_id = %intervention_id,
+                    "Consent approved, executing intervention"
+                );
+
+                match self.dispatch.dispatch_skill(&skill_id, &args).await {
+                    Ok(res) => (Some(res), None),
+                    Err(e) => {
+                        warn!(error = %e, "Intervention execution failed after approval");
+                        (None, Some(e.to_string()))
+                    }
+                }
+            }
+            ConsentDecision::Deny => {
+                info!(
+                    session_id = %req.session_id,
+                    action_id = %req.action_id,
+                    reason = ?req.reason,
+                    "Consent denied"
+                );
+                (None, Some("Action denied by operator".to_string()))
+            }
+        };
+
+        // Clear pending action and return to active state
+        session.pending_action = None;
+        session.state = SessionState::Active;
+        session.last_activity = Utc::now();
+
+        // Add turn recording the consent decision
+        let decision_text = match req.decision {
+            ConsentDecision::Approve => "approved",
+            ConsentDecision::Deny => "denied",
+        };
+        let turn_content = format!(
+            "Operator {} intervention {}/{}{}",
+            decision_text,
+            skill_id,
+            intervention_id,
+            req.reason
+                .as_ref()
+                .map(|r| format!(" (reason: {})", r))
+                .unwrap_or_default()
+        );
+        session.add_turn(Turn::new(TurnRole::User, turn_content));
+
+        // Emit CNS span for consent decision (T2-3)
+        if let Some(ref cns) = self.cns {
+            cns.emit_consent_decision(&req.action_id, decision_text);
+        }
+
+        Ok(json!(ConsentResponse {
+            session_id: req.session_id,
+            action_id: req.action_id,
+            decision: req.decision,
+            result,
+            error,
+        }))
+    }
+
+    /// List recent proprioception notifications (T2-2).
+    ///
+    /// Queries the journal for `self_vital_breach` events in the last N hours
+    /// (default: 24h, max: 168h/7 days). Returns structured notifications
+    /// that hKask agents can surface to the operator.
+    async fn list_notifications(
+        &self,
+        params: Option<serde_json::Value>,
+    ) -> Result<serde_json::Value> {
+        let hours = params
+            .as_ref()
+            .and_then(|p| p.get("hours"))
+            .and_then(|v| v.as_i64())
+            .unwrap_or(24)
+            .min(168); // Cap at 7 days
+
+        let reader = self
+            .journal_reader
+            .as_ref()
+            .ok_or_else(|| AcpError::Internal("journal reader not configured".into()))?;
+
+        let since_unix = russell_core::time::now_unix() - (hours * 3600);
+
+        // Query self_vital_breach events from the journal
+        let events = reader
+            .list_events_by_action("self_vital_breach", since_unix, i64::MAX)
+            .map_err(|e| AcpError::Internal(format!("journal query failed: {e}")))?;
+
+        let notifications: Vec<ProprioNotification> = events
+            .iter()
+            .filter_map(|row| {
+                let summary = row.summary.as_deref()?;
+                // Parse the summary to extract vital name and value
+                // Format: "<vital> = <value> (threshold: <threshold>)"
+                let parts: Vec<&str> = summary.splitn(2, " = ").collect();
+                if parts.len() < 2 {
+                    return None;
+                }
+                let vital = parts[0].trim().to_string();
+                let value_str = parts[1].split(" (threshold: ").next().unwrap_or("?");
+                let threshold_str = parts[1]
+                    .split("threshold: ")
+                    .nth(1)
+                    .and_then(|s| s.strip_suffix(')'))
+                    .unwrap_or("?");
+
+                let value = serde_json::Value::String(value_str.to_string());
+                let threshold = serde_json::Value::String(threshold_str.to_string());
+
+                Some(ProprioNotification {
+                    id: row.id.clone(),
+                    vital,
+                    severity: format!("{:?}", row.severity).to_lowercase(),
+                    value,
+                    threshold,
+                    summary: summary.to_string(),
+                    timestamp: row.ts.clone(),
+                })
+            })
+            .collect();
+
+        let total = notifications.len();
+
+        Ok(json!(NotificationsResponse {
+            notifications,
+            total,
+        }))
     }
 }
 

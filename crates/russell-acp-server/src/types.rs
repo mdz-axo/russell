@@ -194,6 +194,8 @@ pub struct PendingAction {
     pub requires_consent: bool,
     /// Action ID for consent response (UUID v4).
     pub action_id: String,
+    /// Arguments to pass to the intervention when executed.
+    pub args: serde_json::Value,
 }
 
 /// Consent request (from hKask agent).
@@ -235,6 +237,35 @@ pub struct ConsentResponse {
     /// Error (if approved but execution failed).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
+}
+
+/// Proprioception notification — pushed to hKask agents when Russell detects
+/// degradation in its own health (T2-2).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProprioNotification {
+    /// Notification ID (UUID v4).
+    pub id: String,
+    /// Vital that breached threshold (e.g., "hkask_mcp_reachable_ms").
+    pub vital: String,
+    /// Severity ("warn", "alert", "critical").
+    pub severity: String,
+    /// Current value of the vital.
+    pub value: serde_json::Value,
+    /// Threshold that was breached.
+    pub threshold: serde_json::Value,
+    /// Human-readable summary.
+    pub summary: String,
+    /// Timestamp (ISO 8601).
+    pub timestamp: String,
+}
+
+/// Notifications list response.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NotificationsResponse {
+    /// Recent proprioception notifications.
+    pub notifications: Vec<ProprioNotification>,
+    /// Total count of notifications in the time window.
+    pub total: usize,
 }
 
 /// Capabilities response.

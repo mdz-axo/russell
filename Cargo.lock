@@ -2245,6 +2245,7 @@ dependencies = [
  "hmac",
  "macaroon",
  "rand 0.8.6",
+ "reqwest",
  "russell-core",
  "russell-meta",
  "russell-skills",
@@ -2362,6 +2363,7 @@ version = "0.20.0"
 dependencies = [
  "async-trait",
  "base64 0.22.1",
+ "chrono",
  "hex",
  "hmac",
  "insta",

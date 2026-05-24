@@ -62,6 +62,9 @@ hex = "0.4"
 age = { version = "0.11", features = ["armor"] }
 async-trait.workspace = true
 
+# HTTP client for CNS emission (T2-3)
+reqwest = { workspace = true, features = ["json"] }
+
 [dev-dependencies]
 tokio = { workspace = true, features = ["test-util"] }
 tempfile = { workspace = true }

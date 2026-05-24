@@ -46,12 +46,10 @@ impl InferencePort for FallbackInferenceAdapter {
                         info!(backend = %response.backend, "inference succeeded via secondary backend");
                         Ok(response)
                     }
-                    Err(secondary_err) => {
-                        Err(russell_core::error::CoreError::Invariant(format!(
-                            "both backends failed: primary={}, secondary={}",
-                            primary_err, secondary_err
-                        )))
-                    }
+                    Err(secondary_err) => Err(russell_core::error::CoreError::Invariant(format!(
+                        "both backends failed: primary={}, secondary={}",
+                        primary_err, secondary_err
+                    ))),
                 }
             }
         }
@@ -81,9 +79,15 @@ mod tests {
 
     #[async_trait]
     impl InferencePort for MockAdapter {
-        async fn infer(&self, prompt: &str, _context: Option<&SoapBundle>) -> Result<InferenceResponse> {
+        async fn infer(
+            &self,
+            prompt: &str,
+            _context: Option<&SoapBundle>,
+        ) -> Result<InferenceResponse> {
             if self.should_fail {
-                Err(russell_core::error::CoreError::Invariant("mock failure".to_string()))
+                Err(russell_core::error::CoreError::Invariant(
+                    "mock failure".to_string(),
+                ))
             } else {
                 Ok(InferenceResponse {
                     text: format!("mock response to: {}", prompt),

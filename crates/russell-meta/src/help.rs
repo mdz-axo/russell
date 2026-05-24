@@ -431,6 +431,18 @@ fn generate_service_token() -> String {
 /// The token is encrypted at rest using age encryption (T10).
 ///
 /// Returns `None` if the token cannot be loaded or generated.
+/// Token rotation interval in hours (Schneier: limit token lifetime).
+const TOKEN_ROTATION_HOURS: i64 = 24;
+
+/// Load or generate a hKask-format capability token for SOAP inference.
+///
+/// The token is stored at `~/.local/state/harness/russell.capability_token`
+/// as base64-encoded JSON matching hKask's `CapabilityToken` schema.
+/// The token is encrypted at rest using age encryption (T10).
+/// Tokens expire after [`TOKEN_ROTATION_HOURS`] and are automatically
+/// regenerated on load if expired (T2-1).
+///
+/// Returns `None` if the token cannot be loaded or generated.
 pub fn load_capability_token() -> Option<String> {
     use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
     use hmac::{Hmac, Mac};
@@ -472,18 +484,24 @@ pub fn load_capability_token() -> Option<String> {
         key
     };
 
-    // Try to load and decrypt existing token
+    // Try to load and decrypt existing token, checking expiration
     if let Ok(encrypted_token) = std::fs::read_to_string(&token_path) {
         let trimmed = encrypted_token.trim();
         if !trimmed.is_empty() {
-            // Try to decrypt
-            if let Ok(plaintext) = encryption_key.decrypt(trimmed)
-                && let Ok(token_str) = String::from_utf8(plaintext)
-            {
-                return Some(token_str);
+            let token_str = if let Ok(plaintext) = encryption_key.decrypt(trimmed) {
+                String::from_utf8(plaintext).ok()
+            } else {
+                // Fallback: token might be unencrypted (legacy format)
+                Some(trimmed.to_owned())
+            };
+
+            if let Some(ref token_str) = token_str {
+                // Check expiration — rotate if expired
+                if !is_token_expired(token_str) {
+                    return Some(token_str.clone());
+                }
+                tracing::info!("capability token expired, rotating");
             }
-            // Fallback: token might be unencrypted (legacy format)
-            return Some(trimmed.to_owned());
         }
     }
 
@@ -492,13 +510,15 @@ pub fn load_capability_token() -> Option<String> {
     let russell_webid = "russell-agent";
     let hkask_webid = "hkask-inference";
 
-    // Compute token ID: SHA-256(resource || resource_id || action || from || to)
+    // Compute token ID: SHA-256(resource || resource_id || action || from || to || timestamp)
+    let now = chrono::Utc::now();
     let mut id_hasher = Sha256::new();
     id_hasher.update(b"Tool");
     id_hasher.update(b"inference");
     id_hasher.update(b"Execute");
     id_hasher.update(russell_webid.as_bytes());
     id_hasher.update(hkask_webid.as_bytes());
+    id_hasher.update(now.timestamp().to_le_bytes());
     let token_id = hex::encode(id_hasher.finalize());
 
     // Compute signature: HMAC-SHA256(secret, id || resource || resource_id || action || from || to)
@@ -512,6 +532,8 @@ pub fn load_capability_token() -> Option<String> {
     mac.update(hkask_webid.as_bytes());
     let signature = hex::encode(mac.finalize().into_bytes());
 
+    let expires_at = now + chrono::Duration::hours(TOKEN_ROTATION_HOURS);
+
     let token_json = json!({
         "id": token_id,
         "resource": "Tool",
@@ -520,7 +542,7 @@ pub fn load_capability_token() -> Option<String> {
         "delegated_from": russell_webid,
         "delegated_to": hkask_webid,
         "signature": signature,
-        "expires_at": null,
+        "expires_at": expires_at.to_rfc3339(),
         "attenuation_level": 0,
         "max_attenuation": 7,
         "context_nonce": format!("root-{}", russell_webid)
@@ -551,4 +573,37 @@ pub fn load_capability_token() -> Option<String> {
     }
 
     Some(token_b64)
+}
+
+/// Check if a base64-encoded capability token is expired.
+///
+/// Returns `true` if the token has an `expires_at` field that is in the past,
+/// or if the token cannot be parsed (treat unparseable tokens as expired).
+fn is_token_expired(token_b64: &str) -> bool {
+    use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
+
+    let decoded = match BASE64.decode(token_b64) {
+        Ok(d) => d,
+        Err(_) => return true,
+    };
+
+    let json_str = match String::from_utf8(decoded) {
+        Ok(s) => s,
+        Err(_) => return true,
+    };
+
+    let token_json: serde_json::Value = match serde_json::from_str(&json_str) {
+        Ok(v) => v,
+        Err(_) => return true,
+    };
+
+    match token_json.get("expires_at").and_then(|v| v.as_str()) {
+        None | Some("null") => false, // No expiration = never expires (legacy)
+        Some(expires_str) => {
+            match chrono::DateTime::parse_from_rfc3339(expires_str) {
+                Ok(expires) => chrono::Utc::now() > expires,
+                Err(_) => true, // Unparseable = treat as expired
+            }
+        }
+    }
 }

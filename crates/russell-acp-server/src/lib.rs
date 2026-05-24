@@ -69,6 +69,7 @@
 #![warn(rustdoc::missing_crate_level_docs)]
 
 pub mod auth;
+pub mod cns;
 pub mod dispatch;
 pub mod encryption;
 pub mod error;
@@ -82,6 +83,7 @@ pub mod types;
 
 // Re-export main types for convenience.
 pub use auth::{CapabilityToken, MacaroonAuth};
+pub use cns::AcpCnsEmitter;
 pub use dispatch::AcpDispatch;
 pub use encryption::{EncryptionKey, decrypt_token, encrypt_token};
 pub use error::{AcpError, Result};

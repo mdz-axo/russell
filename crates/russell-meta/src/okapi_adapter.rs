@@ -95,17 +95,20 @@ impl InferencePort for OkapiInferenceAdapter {
         let latency_ms = start.elapsed().as_millis() as u64;
 
         // Parse token usage from Ollama response
-        let token_usage = okapi_response.get("eval_count").and_then(|v| v.as_u64()).map(|output_tokens| {
-            let input_tokens = okapi_response
-                .get("prompt_eval_count")
-                .and_then(|v| v.as_u64())
-                .unwrap_or(0);
-            TokenUsage {
-                input_tokens,
-                output_tokens,
-                total_tokens: input_tokens + output_tokens,
-            }
-        });
+        let token_usage = okapi_response
+            .get("eval_count")
+            .and_then(|v| v.as_u64())
+            .map(|output_tokens| {
+                let input_tokens = okapi_response
+                    .get("prompt_eval_count")
+                    .and_then(|v| v.as_u64())
+                    .unwrap_or(0);
+                TokenUsage {
+                    input_tokens,
+                    output_tokens,
+                    total_tokens: input_tokens + output_tokens,
+                }
+            });
 
         Ok(InferenceResponse {
             text,

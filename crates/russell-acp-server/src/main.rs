@@ -5,9 +5,10 @@ use std::path::PathBuf;
 use tracing_subscriber::{fmt, prelude::*};
 
 use russell_acp_server::{
-    AcpDispatch, AcpHandler, AcpServer, JackPersonaProjection, MacaroonAuth, RateLimiter,
+    AcpCnsEmitter, AcpDispatch, AcpHandler, AcpServer, JackPersonaProjection, MacaroonAuth,
+    RateLimiter,
 };
-use russell_core::journal::JournalWriter;
+use russell_core::journal::{JournalReader, JournalWriter};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -43,6 +44,13 @@ async fn main() -> anyhow::Result<()> {
         None
     };
 
+    // Initialize journal reader for proprioception notifications (T2-2).
+    let journal_reader = if journal_path.exists() {
+        Some(JournalReader::new(&journal_path))
+    } else {
+        None
+    };
+
     // Initialize ACP dispatch with loaded skills.
     let dispatch = AcpDispatch::new(skills, skills_dir);
     let dispatch = if let Some(ref journal) = journal {
@@ -74,17 +82,22 @@ async fn main() -> anyhow::Result<()> {
     let okapi = russell_meta::OkapiInferenceAdapter::new(&okapi_endpoint).with_model(&okapi_model);
     let okapi = std::sync::Arc::new(okapi);
 
-    let inference = std::sync::Arc::new(russell_meta::FallbackInferenceAdapter::new(
-        hkask, okapi,
-    ));
+    let inference = std::sync::Arc::new(russell_meta::FallbackInferenceAdapter::new(hkask, okapi));
 
     // Initialize rate limiter.
     let rate_limiter = RateLimiter::default();
 
+    // Initialize CNS emitter for observability (T2-3).
+    let cns = AcpCnsEmitter::new("russell-acp-server");
+
     // Create handler and server.
-    let handler = AcpHandler::new(persona, dispatch, auth, rate_limiter)
+    let mut handler = AcpHandler::new(persona, dispatch, auth, rate_limiter)
         .with_require_auth(require_auth)
-        .with_inference(inference);
+        .with_inference(inference)
+        .with_cns(cns);
+    if let Some(reader) = journal_reader {
+        handler = handler.with_journal_reader(reader);
+    }
     let server = AcpServer::new(handler);
 
     // Serve over stdio.
