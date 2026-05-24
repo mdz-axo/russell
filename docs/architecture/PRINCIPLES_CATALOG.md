@@ -39,12 +39,12 @@ He is **small**. That is the most important thing about him.
 
 ## 2. How to read this catalog
 
-Principles are numbered `JR-N` (Jack Russell). Each has:
+Principles carry numbers `JR-N` (Jack Russell). Each has:
 
 - **Statement** — the rule.
 - **Rationale** — why.
 - **Consequence** — what the rule costs and what it buys.
-- **Linked ADRs** — where the rule is mechanised.
+- **Linked ADRs** — where the rule takes mechanical effect.
 
 When two principles conflict, the lower number wins. JR-1 is the
 top rule. Nothing overrides JR-1 except an explicit ADR that
@@ -100,8 +100,7 @@ Russell will not magically break things.
 rank a differential, compose a summary, or explain a symptom. It
 may not generate shell commands the dispatcher executes. When
 skills land (post-MVP), the LLM will select from **known IDs
-registered in loaded manifests**; an unknown ID is rejected at the
-boundary.
+registered in loaded manifests**; the boundary rejects unknown IDs.
 
 **Rationale.** A single hallucinated `rm -rf` is a career-ending
 event for a health harness. The way to prevent it is structural,
@@ -155,7 +154,7 @@ extra check per Sentinel cycle. Buy: no silent Russell failure.
 
 **Statement.** Russell **copies** code from upstream workspaces
 (`peripheral`, `slate/stack`, `arsenal`) rather than depending on
-them. Every copy is registered in
+them. Every copy registers in
 [`docs/operations/REUSE_MANIFEST.md`](../operations/REUSE_MANIFEST.md)
 with its source path, upstream commit at copy time, local
 modifications, and sync policy.
@@ -266,6 +265,6 @@ follows from it.
 ## 7. Amending the Catalog
 
 Adding or altering a principle requires a superseding ADR that
-cites this catalog and the specific JR-N being changed. Principles
+cites this catalog and the specific JR-N under change. Principles
 are never deleted silently; they move to an archive block at the
 bottom of this file with the superseding ADR referenced.

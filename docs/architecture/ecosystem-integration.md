@@ -152,7 +152,7 @@ Russell skills declare hLexicon terms (WordAct/FlowDef/KnowAct) in their `hlexic
 - **Governance:** `hKask/registry/registries/hlexicon-governance.yaml` defines the `term_allocation` section
 - **Expansion:** When hKask extends hLexicon (e.g., spec-curation terms), Russell skills may adopt new terms without code changes
 
-**Key distinction:** Vocabulary terms are allocated, not consumed. A term like `curate` is not depleted by use — it is deliberately placed and reused infinitely. This differs from consumable resources like `reflex_budget` or `token_budget`, which are depleted by use.
+**Key distinction:** Vocabulary terms carry allocation, not consumption. A term like `curate` does not deplete with use — operators deliberately place and reuse it infinitely. This differs from consumable resources like `reflex_budget` or `token_budget`, which deplete with use.
 
 **Reference:** hKask `docs/architecture/hKask-hLexicon.md` and `docs/plans/LEXICON_TERMINOLOGY_CHANGE.md`
 
@@ -255,7 +255,7 @@ X-Knowledge-Tokens: 1847
 
 ### OpenRouter / Remote Backend Support
 
-When using OpenRouter instead of local Okapi, the `skill_hint` block is forwarded
+When using OpenRouter instead of local Okapi, Russell forwards the `skill_hint` block
 as a custom header to Russell's prompt assembler. The `PromptAssembler` port
 handles knowledge injection before the prompt leaves the machine — OpenRouter
 never sees raw skill data.
@@ -315,7 +315,7 @@ skill written for Russell. This includes:
 
 ### Span Namespace
 
-Russell's OKH spans are emitted via the same `tracing` layer hKask uses:
+Russell emits OKH spans via the same `tracing` layer hKask uses:
 
 ```
 okh.<layer>.<module>.<signal>

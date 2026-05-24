@@ -138,7 +138,7 @@ status: VERIFIED
 -->
 
 See [ADR-0013](../adr/0013-rust-workspace-layout.md). No crate
-depends on `russell-cli`. The dependency DAG is rooted at
+depends on `russell-cli`. The dependency DAG roots at
 `russell-core`.
 
 ## 3. Data plane
@@ -198,7 +198,7 @@ provides the primary agent interface; the CLI provides the primary
 operator interface. Both exercise the same underlying code paths.
 The MCP client surface (ADR-0025) is read-only: Russell consumes
 hKask tools but does not expose its own MCP server. The former
-MCP server feature is deprecated; use `russell-acp-server` for
+MCP server feature stands deprecated; use `russell-acp-server` for
 agent integration.
 
 ### 4.3 The Nurse (Metacognitive Layer)
@@ -245,7 +245,7 @@ and [ADR-0021](../adr/0021-proprioception-phase2-reflex-arcs.md).
 ## 6. Honeymoon and first 30 days
 
 Russell is deliberately cautious for the first 30 days after
-bootstrap. Effective `max_auto_risk` is clamped to `low` for any
+bootstrap. Russell clamps effective `max_auto_risk` to `low` for any
 skill with `risk: high` interventions, regardless of manifest
 settings. Rationale: baselines need data to be meaningful;
 without them the Nurse lacks the evidence to justify an

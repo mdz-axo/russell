@@ -14,7 +14,7 @@ status: "Active"
 
 # Subsystem Entity Relationship Diagrams
 
-Eight Mermaid ER diagrams mapping Russell's domain model to its Rust
+Nine Mermaid ER diagrams mapping Russell's domain model to its Rust
 type system and SQLite schema. Each diagram satisfies the
 `DIAGRAM_ALIGNMENT` contract defined in
 [`../standards/DOCUMENTATION_STANDARDS.md`](../standards/DOCUMENTATION_STANDARDS.md) §4.
@@ -147,8 +147,18 @@ erDiagram
         i64 timer_drift_s
         f64 help_error_rate_pct
         u64 hkask_mcp_reachable_ms
+        i64 remote_discovery_latency_s
         bool journal_chain_intact
         bool evidence_integrity_ok
+    }
+    ProprioReflex {
+        int action_count
+    }
+    ReflexAction {
+        string action_id PK
+        string description
+        string risk "none|low|medium|high|critical"
+        string trigger
     }
     SentinelRun {
         string run_id PK
@@ -156,18 +166,24 @@ erDiagram
         int breach_count
         u64 duration_ms
     }
+    AutoimmuneGuard {
+        string state "locked|unlocked"
+    }
 
     ProbeRegistry ||--o{ ProbeDescriptor : "registers"
     ProbeDescriptor ||--o{ Sample : "produces"
     SentinelRun ||--o{ Sample : "collects"
     ProprioResult ||--|| SentinelRun : "evaluates"
+    ProprioReflex ||--o{ ReflexAction : "queues"
+    ProprioResult ||--|| ProprioReflex : "triggers"
+    ProprioReflex ||--|| AutoimmuneGuard : "protected by"
 ```
 
 <!-- DIAGRAM_ALIGNMENT
 id: DIAG-OBS-ER-002
 type: erDiagram
 verified_date: 2026-05-24
-verified_against: crates/russell-sentinel/src/probes/mod.rs, crates/russell-proprio/src/lib.rs
+verified_against: crates/russell-sentinel/src/probes/mod.rs, crates/russell-proprio/src/lib.rs, crates/russell-proprio/src/reflex.rs
 reference_sources: Ashby (1956) Law of Requisite Variety; Beer (1972) VSM
 status: VERIFIED
 -->
@@ -516,9 +532,10 @@ erDiagram
         TEXT summary
         TEXT evidence_ref
         INTEGER duration_ms
+        TEXT outputs "structured JSON (0005)"
         TEXT payload "full JSON"
-        TEXT prev_hash FK "hash chain"
-        TEXT hash
+        TEXT prev_hash FK "hash chain (0006)"
+        TEXT hash "(0006)"
     }
     baselines {
         TEXT probe PK
@@ -571,6 +588,108 @@ type: erDiagram
 verified_date: 2026-05-24
 verified_against: crates/russell-core/src/journal/migrations.rs
 reference_sources: SQLite documentation; ADR-0004; PERSISTENCE_CATALOG.md
+status: VERIFIED
+-->
+
+---
+
+## 9. CLI Dispatch Layer
+
+```mermaid
+erDiagram
+    Cli {
+        string name "russell"
+        string version
+    }
+    Command {
+        int variant_count "20"
+    }
+    Paths {
+        string base "from_env()"
+    }
+    HandlerStatus {
+        string function "status::run"
+        string crate_dep "russell-core"
+        string async "no"
+    }
+    HandlerPod {
+        string functions "status, activate, deactivate, persona_show, artifacts_list, artifacts_export"
+        string crate_dep "russell-agent, russell-core"
+        string async "activate, deactivate"
+    }
+    HandlerList {
+        string function "list::run"
+        string crate_dep "russell-core"
+        string async "no"
+    }
+    HandlerDigest {
+        string function "digest::run"
+        string crate_dep "russell-core"
+        string async "no"
+    }
+    HandlerSentinel {
+        string function "sentinel_once::run"
+        string crate_dep "russell-sentinel, russell-core"
+        string async "no"
+    }
+    HandlerHelp {
+        string function "help::run"
+        string crate_dep "russell-meta, russell-core"
+        string async "yes"
+    }
+    HandlerSkill {
+        string functions "skill::list, skill::run"
+        string crate_dep "russell-skills, russell-core"
+        string async "run only"
+    }
+    HandlerSkillLifecycle {
+        string functions "install_skill, prune_skill"
+        string crate_dep "russell-skills, russell-core"
+        string async "no"
+    }
+    HandlerProprio {
+        string function "proprio::run"
+        string crate_dep "russell-proprio, russell-core"
+        string async "yes"
+    }
+    HandlerSelfTriage {
+        string function "self_triage::run"
+        string crate_dep "russell-meta, russell-proprio, russell-core"
+        string async "yes"
+    }
+    HandlerDocs {
+        string function "docs::run"
+        string crate_dep "russell-core"
+        string async "no"
+    }
+    HandlerVerify {
+        string function "verify::run"
+        string crate_dep "russell-core"
+        string async "no"
+    }
+
+    Cli ||--|| Command : "parses via clap"
+    Cli ||--|| Paths : "resolves"
+    Command ||--o| HandlerStatus : "Status"
+    Command ||--o| HandlerPod : "6 pod subcommands"
+    Command ||--o| HandlerList : "List"
+    Command ||--o| HandlerDigest : "Digest"
+    Command ||--o| HandlerSentinel : "SentinelOnce"
+    Command ||--o| HandlerHelp : "Jack"
+    Command ||--o| HandlerSkill : "SkillList, SkillRun"
+    Command ||--o| HandlerSkillLifecycle : "SkillInstall, SkillPrune"
+    Command ||--o| HandlerProprio : "Proprio"
+    Command ||--o| HandlerSelfTriage : "SelfTriage"
+    Command ||--o| HandlerDocs : "Docs"
+    Command ||--o| HandlerVerify : "VerifyJournal"
+```
+
+<!-- DIAGRAM_ALIGNMENT
+id: DIAG-CLI-ER-009
+type: erDiagram
+verified_date: 2026-05-24
+verified_against: crates/russell-cli/src/main.rs, crates/russell-cli/src/commands/mod.rs
+reference_sources: Clap Parser/Subcommand derive macros; ADR-0003 (lift paths)
 status: VERIFIED
 -->
 

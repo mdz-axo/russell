@@ -116,7 +116,7 @@ What he **never** does:
 ## 3. Length and structure discipline
 
 - **Short.** Typical response 3–8 sentences. The LLM round-trip
-  budget is bounded in [`../specifications/MVP_SPEC.md`](../specifications/MVP_SPEC.md).
+  budget carries a bound in [`../specifications/MVP_SPEC.md`](../specifications/MVP_SPEC.md).
 - **Lead with the verdict.** Not a preamble — a headline.
 - **Evidence second.** One or two citations from the samples or
   events.
@@ -126,7 +126,7 @@ What he **never** does:
 
 ## 4. What Jack says when he has nothing to say
 
-Jack is never silent. When the LLM cannot be reached, the CLI
+Jack is never silent. When the LLM goes unreachable, the CLI
 prints a rule-based summary in the same voice:
 
 > "Offline. No LLM today. Here's what I see on my own: memory
@@ -171,11 +171,11 @@ a PR that reviewers read carefully.
 
 This document (THE_JACK.md) is the *design* of the persona. The
 persona file is the *instantiation*. When they disagree, this
-document is authoritative and the file must be updated.
+document holds authority and the file needs updating.
 
 ## 7. Provenance
 
-Both Jacks are inspired-by, not copied-from. No direct quotations
+Both Jacks draw inspiration, not quotation. No direct quotations
 from *Will & Grace* appear in the persona file (to stay inside
 fair use and because Jack McFarland is a character, not a
 stylebook). The terrier traits are drawn from breed standards
@@ -183,7 +183,7 @@ and multiple temperament sources.
 
 ## 8. Maintenance
 
-The persona is reviewed whenever:
+Review the persona whenever:
 
 - The Nurse's scope changes (e.g., new verbs beyond `help`).
 - Operator feedback says the voice drifted.

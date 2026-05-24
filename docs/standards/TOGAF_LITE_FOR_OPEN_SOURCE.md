@@ -70,7 +70,7 @@ This pattern applies when:
 
 - The project has grown beyond what a single README can document (typically >10 documentation files)
 - Multiple audiences need different information (developers, operators, architects, contributors)
-- The system has enough architectural complexity that decisions need to be recorded and traced
+- The system has enough architectural complexity that decisions need recording and tracing
 - The project lacks the resources for full enterprise architecture governance
 - Documentation maintainers (human or AI) need a predictable structure to navigate and update
 
@@ -157,7 +157,7 @@ status: VERIFIED
 
 TOGAF itself authorizes pragmatic adaptation. The key insight is that TOGAF's *taxonomy* (how it classifies content) is valuable independently of TOGAF's *process* (how it governs that content). The taxonomy provides:
 
-- A principled decomposition of "what needs to be documented" into domains
+- A principled decomposition of what requires documentation into domains
 - A natural ordering of documentation from vision → architecture → implementation → operations
 - A vocabulary for document types that readers can learn once and apply to any TOGAF-Lite project
 - A framework for traceability: requirements → architecture → decisions → implementation
@@ -170,7 +170,7 @@ TOGAF's four architecture domains map naturally to software projects:
 |-------------|------------------------|-------------------|
 | **Business Architecture** (Phase B) | What the system *does* — business logic, workflows, use cases | Business rules, workflow descriptions, domain models |
 | **Data Architecture** (Phase C) | What the system *stores and represents* — data models, storage | Schema documentation, data flow diagrams, persistence design |
-| **Application Architecture** (Phase C) | How the system *is structured* — components, interfaces, APIs | Component maps, API documentation, interface contracts |
+| **Application Architecture** (Phase C) | How the system *structures itself* — components, interfaces, APIs | Component maps, API documentation, interface contracts |
 | **Technology Architecture** (Phase D) | What the system *runs on* — infrastructure, tooling, deployment | Deployment guides, CI/CD configuration, dependency management |
 
 This decomposition works because any software system — from a browser extension to a distributed database — has business logic, data management, component structure, and infrastructure concerns.
@@ -196,7 +196,7 @@ Peripheral maps each documentation directory to one or more TOGAF ADM phases:[^p
 | `docs/status/` | Phase G | Consolidated project status (single source of truth for crate and documentation status) |
 | `docs/reviews/` | Phase G | 2 adversarial architecture reviews (world-building coherence, Cockburn/Fowler lens) |
 | `docs/research/` | Supporting corpus | 1 research document (improv orchestration protocol) |
-| Git history | Architecture Repository | Canonical archive of record. Recover retired docs via `git log --all --diff-filter=D -- <path>` + `git show <sha>:<path>`. A local `docs/archive/` directory is gitignored and may be used by maintainers for personal reference. |
+| Git history | Architecture Repository | Canonical archive of record. Recover retired docs via `git log --all --diff-filter=D -- <path>` + `git show <sha>:<path>`. A local `docs/archive/` directory has gitignore status; maintainers may use it for personal reference. |
 
 ### 6.2 Audience-Based Navigation Paths
 
@@ -210,7 +210,7 @@ Peripheral's documentation portal (`docs/README.md` v2.0.0) defines five navigat
 | **Operators** | Deployment Guide → User Guide → Technology Architecture |
 | **Researchers** | Reference Models → Research Documents → Architecture Vision → Business Architecture |
 
-Each path provides a curated reading order that matches the reader's information needs, preventing the "wall of links" problem where all documents are presented equally.
+Each path provides a curated reading order that matches the reader's information needs, preventing the "wall of links" problem where the project presents all documents equally.
 
 ### 6.3 ADR Convention
 
@@ -218,7 +218,7 @@ Peripheral uses Architecture Decision Records (ADRs) as lightweight replacements
 
 - **Status** — Proposed, Accepted, Deprecated, Superseded
 - **Context** — The situation that motivated the decision
-- **Decision** — What was decided and why
+- **Decision** — The decision and its rationale
 - **Consequences** — Trade-offs accepted
 - **TOGAF Phase** — Which ADM phase this decision relates to
 
@@ -287,7 +287,7 @@ Dr. JoAnne Hackos's Information Process Maturity Model (IPMM)[^hackos-ipmm] and 
 | Principle | Application in Peripheral |
 |-----------|-------------------------|
 | **Aspire to IPMM Level 3 (Organized/Repeatable)** | The TOGAF-Lite structure, metadata standards, and archive policy establish repeatable processes. The CI validation pipeline (`docs-check.yml`) enforces them mechanically. Level 4 (Managed) infrastructure exists in the metrics tracking and freshness validation. |
-| **Every document must serve a defined audience with analyzed needs** | The `audience` field in document metadata is mandatory, not decorative. Reading paths (§6.2) are designed from audience task analysis, not organizational convenience. |
+| **Every document must serve a defined audience with analyzed needs** | The `audience` field in document metadata is mandatory, not decorative. Reading paths (§6.2) draw from audience task analysis, not organizational convenience. |
 | **Lifecycle management is non-negotiable** | Creation → review → approval → update → deprecation → archival. The document lifecycle state machine in DOC-ARCHITECTURE §10 implements this directly. |
 | **Metrics matter** | Track document freshness (`last_updated` fields), cross-reference integrity (link checking), audience coverage (reading path completeness), and archive hygiene. |
 | **Quality gates before publication** | No document ships without audience identification and implementation status markers. The mandatory metadata header (§8.3) is the quality gate. |
@@ -368,7 +368,7 @@ docs/
 │   │                              TOGAF Phase: B — Business Architecture
 │   ├── DATA.md                  ← What the system stores (data models, persistence)
 │   │                              TOGAF Phase: C — Data Architecture
-│   ├── APPLICATION.md           ← How the system is structured (components, APIs)
+│   ├── APPLICATION.md           ← How the system structures itself (components, APIs)
 │   │                              TOGAF Phase: C — Application Architecture
 │   ├── TECHNOLOGY.md            ← What the system runs on (infrastructure, tooling)
 │   │                              TOGAF Phase: D — Technology Architecture
@@ -437,11 +437,11 @@ governance overhead. See [TOGAF-Lite for Open Source] for details.
 
 ## Decision
 
-[What was decided and why?]
+[The decision and its rationale]
 
 ## Consequences
 
-[What trade-offs were accepted? What are the risks?]
+[What trade-offs did the team accept? What are the risks?]
 
 ## References
 
@@ -479,7 +479,7 @@ The Peripheral project applies the TOGAF-Lite pattern to a corpus of **~35 activ
 - **Adversarial review process** — 2 pre-implementation adversarial reviews (world-building coherence, Cockburn/Fowler anti-pattern analysis) with findings incorporated into architecture revisions
 - **Reference Models** document with 50+ academic citations (APA 7th) and 8 Mermaid diagrams tracing intellectual ancestry across 14 topic sections
 
-The project demonstrates TOGAF-Lite at the "Standard" tier (30–75 docs per §8.3), with ~35 active documents maintaining structural coherence. The TOGAF-Lite adoption was applied retroactively to a project that had grown beyond a single README, validating that the pattern can be adopted incrementally. The integration of Gentle's documentation-as-conversation philosophy and Hackos's lifecycle management methodology (§7) provides the complementary governance that structural taxonomy alone cannot deliver.
+The project demonstrates TOGAF-Lite at the "Standard" tier (30–75 docs per §8.3), with ~35 active documents maintaining structural coherence. The team applied TOGAF-Lite retroactively to a project that had grown beyond a single README, validating that the pattern supports incremental adoption. The integration of Gentle's documentation-as-conversation philosophy and Hackos's lifecycle management methodology (§7) provides the complementary governance that structural taxonomy alone cannot deliver.
 
 ### 10.2 Kask (Agent-native container platform)
 
@@ -507,11 +507,11 @@ The project demonstrates TOGAF-Lite at the "Standard" tier (30–75 docs per §8
 | Benefit | Description |
 |---------|-------------|
 | **Immediate navigability** | Readers find documents via domain structure and reading paths, not by searching a flat directory |
-| **Scalable growth** | New documents have a natural home based on their TOGAF domain; the structure doesn't need to be redesigned as the corpus grows |
+| **Scalable growth** | New documents have a natural home based on their TOGAF domain; the structure doesn't need redesign as the corpus grows |
 | **Decision traceability** | ADRs create an audit trail of architectural decisions that new contributors can follow |
 | **AI agent compatibility** | Predictable directory structure and metadata headers enable AI coding assistants to navigate documentation effectively |
 | **Cross-project vocabulary** | Projects using TOGAF-Lite share a common vocabulary for document types (ADR, Architecture Vision, etc.) |
-| **Low adoption cost** | A basic TOGAF-Lite structure can be created in under an hour |
+| **Low adoption cost** | Anyone can create a basic TOGAF-Lite structure in under an hour |
 
 ### 11.2 Liabilities
 

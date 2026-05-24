@@ -35,7 +35,7 @@ status: "Active"
 
 | Gap | Impact |
 |---|---|
-| **No telemetry feedback** | `probe_runs` and `recent_probe_failures` fields exist in `RegistryEntry` but are **never updated**. The dispatch path writes journal events but does not touch the registry cache. Jack has no way to know which skills are used or failing. |
+| **No telemetry feedback** | `probe_runs` and `recent_probe_failures` fields exist in `RegistryEntry` but the dispatch path never updates them. The dispatch path writes journal events but does not touch the registry cache. Jack has no way to know which skills see use or failure. |
 | **No quality scoring** | `coverage_score` field exists but `compute_score()` is not implemented. The scoring rubric from `skill-maintenance/KNOWLEDGE.md` has no backing code. |
 | **Registry only written on workshop exit** | Chat sessions don't read or write the registry cache. When Jack runs a probe in chat, the counter doesn't increment. |
 
@@ -80,7 +80,7 @@ status: "Active"
 
 4. **Load registry on session start, save periodically.** Currently the ACP server loads the hKask tool registry but not the skill registry. Add skill registry load on startup and save on exit (or on a 5-minute periodic flush).
 
-5. **Show metrics in Jack's context.** Add a "Skill Performance" table to the Objective section of Jack's SOAP prompt when the skill-maintenance knowledge skill is loaded:
+5. **Show metrics in Jack's context.** Add a "Skill Performance" table to the Objective section of Jack's SOAP prompt when the skill-maintenance knowledge skill loads:
 
    ```
    ## Skill Performance (past 24h)
@@ -99,7 +99,7 @@ status: "Active"
 
 #### The `skill-manager` manifest
 
-**Implementation note (2026-05-21):** The `skill-manager` skill is installed and operational at `~/.local/share/harness/skills/skill-manager/`. All commands use wrapper scripts (`scripts/*.sh`) with the `RUSSELL_BIN` environment variable pattern to handle development builds not in PATH.
+**Implementation note (2026-05-21):** The `skill-manager` skill stands installed and operational at `~/.local/share/harness/skills/skill-manager/`. All commands use wrapper scripts (`scripts/*.sh`) with the `RUSSELL_BIN` environment variable pattern to handle development builds not in PATH.
 
 ```yaml
 id: skill-manager
@@ -178,7 +178,7 @@ RUSSELL_BIN="${RUSSELL_BIN:-/home/user/Clones/russell/target/debug/russell}"
 
 #### New CLI verbs required
 
-**Status (2026-05-21):** All CLI verbs are implemented in `crates/russell-cli/src/commands/skill.rs`:
+**Status (2026-05-21):** All CLI verbs have implementations in `crates/russell-cli/src/commands/skill.rs`:
 
 | Verb | Status | Purpose |
 |---|---|---|
@@ -264,7 +264,7 @@ Jack: I'll adapt it now to add the probe...
 - Absolute paths: `["/usr/bin/systemctl", "..."]`
 - Allowed interpreters: `sh`, `bash`, `dash`, `python3`, `python`, `perl`, `ruby`
 
-Bare command names like `["russell", "skill", "list"]` are rejected. The `skill-manager` skill was updated to use wrapper scripts.
+Bare command names like `["russell", "skill", "list"]` fall to the dispatcher's rejection rule. The `skill-manager` skill now uses wrapper scripts.
 
 ### Phase D: Quality scoring (1 hour) — DEFERRED
 
@@ -332,7 +332,7 @@ This pattern:
 
 ## 6. What This Does NOT Do (Out of Scope)
 
-- **Auto-build:** Jack won't autonomously decide to create a skill. He can recommend it, but operator consent is required for interventions (per risk-band rules).
+- **Auto-build:** Jack won't autonomously decide to create a skill. He can recommend it, but interventions require operator consent (per risk-band rules).
 - **Remote skill push:** No mechanism to publish Jack-built skills to a remote registry. That's a future Phase 5 feature.
 - **Skill signing:** No cryptographic verification of manifests. Only the safety scanner (prompt injection, pipe-to-shell, secret exfiltration checks).
 - **Automated skill optimization:** Jack won't modify scripts inside installed skills. He can suggest changes; the operator adapts them.
@@ -341,7 +341,7 @@ This pattern:
 
 | Risk | Severity | Mitigation |
 |---|---|---|
-| `prune`/`retire` removes the `skill-manager` skill itself | Medium | `skill-manager` is marked `max_auto_risk: none` for self-targeting operations. Jack's prompt explicitly forbids pruning bundled skills. |
+| `prune`/`retire` removes the `skill-manager` skill itself | Medium | `skill-manager` carries `max_auto_risk: none` for self-targeting operations. Jack's prompt explicitly forbids pruning bundled skills. |
 | Registry corruption from concurrent writes | Low | Registry is single-writer (only chat CLI process touches it). Sentinel is read-only on skills. |
 | Telemetry flooding (287 samples/day × many skills) | Low | Counters are integers, not arrays. The `RegistryEntry` struct grows by ~40 bytes total. |
 | Operator confusion between CLI skill verbs and Jack's skill management | Low | Both paths exist: CLI verbs (`skill-install`, `skill-prune`, etc.) for operators, ACTION syntax through ACP for Jack. The `skill-manager` skill wraps the same underlying operations. |
