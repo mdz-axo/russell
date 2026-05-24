@@ -49,6 +49,7 @@ uuid = { workspace = true, features = ["v4", "serde"] }
 
 # Rate limiting
 governor = { version = "0.7", default-features = false, features = ["std", "dashmap"] }
+dashmap = "6"
 
 # Macaroon-based OCAP (capability security)
 macaroon = "0.3"

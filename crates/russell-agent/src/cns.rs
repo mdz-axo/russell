@@ -1,10 +1,20 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 //! CNS span emission for Russell agent.
+//!
+//! Spans are sent to hKask's CNS endpoint at `POST /api/v1/cns/span`.
+//! The span is mapped to hKask's NuEvent schema for compatibility.
+//! When no endpoint is configured, spans are logged locally (graceful degradation).
 
 use crate::persona::AgentPersona;
 use crate::pod::PodID;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+
+/// Default hKask CNS endpoint.
+pub const DEFAULT_CNS_ENDPOINT: &str = "http://127.0.0.1:8080/api/v1/cns/span";
+
+/// Environment variable for overriding the CNS endpoint.
+const ENV_CNS_ENDPOINT: &str = "HKASK_CNS_ENDPOINT";
 
 /// CNS span — structured event for observability.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -37,6 +47,54 @@ impl CnsSpan {
             attributes,
         }
     }
+
+    /// Convert to hKask NuEvent-compatible JSON for the CNS bridge.
+    ///
+    /// Maps Russell's flat span to hKask's tagged schema:
+    /// - `span` → `{ category, path }` extracted from the span name
+    /// - `observer_webid` → pod_id
+    /// - `phase` → "Observe" (Russell is always observing)
+    /// - `observation` → attributes
+    pub fn to_nu_event(&self) -> serde_json::Value {
+        let (category, path) = self.parse_span_name();
+
+        serde_json::json!({
+            "id": format!("russell-{}", self.pod_id),
+            "timestamp": self.timestamp.to_rfc3339(),
+            "observer_webid": self.pod_id,
+            "span": {
+                "category": category,
+                "path": path,
+            },
+            "phase": "Observe",
+            "observation": self.attributes,
+            "visibility": "private",
+        })
+    }
+
+    /// Parse span name into (category, path).
+    ///
+    /// E.g., "cns.russell.activated" → ("AgentPod", "russell/activated")
+    fn parse_span_name(&self) -> (String, String) {
+        let parts: Vec<&str> = self.name.splitn(4, '.').collect();
+        match parts.as_slice() {
+            ["cns", agent, domain, action] => {
+                let category = capitalize_first(domain);
+                (category, format!("{agent}/{domain}/{action}"))
+            }
+            ["cns", agent, action] => ("AgentPod".into(), format!("{agent}/{action}")),
+            _ => ("AgentPod".into(), self.name.clone()),
+        }
+    }
+}
+
+/// Capitalize the first character of a string.
+fn capitalize_first(s: &str) -> String {
+    let mut c = s.chars();
+    match c.next() {
+        None => String::new(),
+        Some(f) => f.to_uppercase().collect::<String>() + c.as_str(),
+    }
 }
 
 /// CNS span emitter — sends spans to hKask CNS.
@@ -55,7 +113,7 @@ pub struct CnsEmitter {
 impl CnsEmitter {
     /// Create a new CNS emitter.
     pub fn new(pod_id: &PodID, persona: &AgentPersona) -> Self {
-        let cns_endpoint = std::env::var("HKASK_CNS_ENDPOINT").ok();
+        let cns_endpoint = std::env::var(ENV_CNS_ENDPOINT).ok();
         let http_client = cns_endpoint
             .as_ref()
             .and_then(|_| reqwest::Client::builder().build().ok());
@@ -96,7 +154,7 @@ impl CnsEmitter {
             &self.agent_name,
             serde_json::json!({
                 "state": "populated",
-                "persona_version": "0.20.0"
+                "persona_version": env!("CARGO_PKG_VERSION")
             }),
         );
         self.emit(span);
@@ -194,9 +252,10 @@ async fn send_to_cns(
     endpoint: &str,
     span: CnsSpan,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    let nu_event = span.to_nu_event();
     let response = client
         .post(endpoint)
-        .json(&span)
+        .json(&nu_event)
         .timeout(std::time::Duration::from_secs(5))
         .send()
         .await?;

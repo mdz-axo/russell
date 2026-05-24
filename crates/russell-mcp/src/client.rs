@@ -5,9 +5,11 @@
 //! loopback constraint (ADR-0025 §4) at connect time.
 //!
 //! Uses hKask's REST API endpoints:
-//! - `GET /health` — health check
-//! - `GET /api/v1/tools` — list all MCP tools
-//! - `POST /api/v1/tools/{name}` — invoke a tool
+//! - `GET /api/mcp/tools` — list all MCP tools
+//! - `GET /api/mcp/tools/{name}` — get tool definition
+//! - `POST /api/mcp/tools/{name}` — invoke a tool
+//!
+//! Paths are configurable via `HKASK_MCP_API_PATH` (default: `/api/mcp`).
 
 use serde::Deserialize;
 use serde_json::json;
@@ -212,7 +214,11 @@ impl HKaskMcpClient {
     /// # Errors
     /// Transport or authentication errors.
     pub async fn connect(&mut self) -> Result<()> {
-        let health_url = format!("{}/health", self.config.endpoint.trim_end_matches('/'));
+        let health_url = format!(
+            "{}{}/tools",
+            self.config.endpoint.trim_end_matches('/'),
+            self.config.api_path.trim_end_matches('/')
+        );
 
         let mut req = self
             .http
@@ -278,8 +284,9 @@ impl HKaskMcpClient {
         }
 
         let tools_url = format!(
-            "{}/api/v1/tools",
-            self.config.endpoint.trim_end_matches('/')
+            "{}{}/tools",
+            self.config.endpoint.trim_end_matches('/'),
+            self.config.api_path.trim_end_matches('/')
         );
 
         let mut req = self
@@ -313,9 +320,9 @@ impl HKaskMcpClient {
             name: String,
             #[serde(default)]
             description: Option<String>,
-            #[serde(default, rename = "inputSchema")]
+            #[serde(default, alias = "inputSchema")]
             input_schema: Option<serde_json::Value>,
-            #[serde(default)]
+            #[serde(default, alias = "server_id", alias = "serverId")]
             server: Option<String>,
         }
 
@@ -358,9 +365,16 @@ impl HKaskMcpClient {
         }
 
         let tool_name = name.into();
+
+        if !self.config.allowed_tools.is_empty() && !self.config.allowed_tools.contains(&tool_name)
+        {
+            return Err(McpError::Forbidden);
+        }
+
         let call_url = format!(
-            "{}/api/v1/tools/{}",
+            "{}{}/tools/{}",
             self.config.endpoint.trim_end_matches('/'),
+            self.config.api_path.trim_end_matches('/'),
             urlencoding::encode(&tool_name)
         );
 
@@ -443,7 +457,11 @@ impl HKaskMcpClient {
     ///
     /// Returns `Ok(())` if the server responds.
     pub async fn ping(&self) -> Result<()> {
-        let health_url = format!("{}/health", self.config.endpoint.trim_end_matches('/'));
+        let health_url = format!(
+            "{}{}/tools",
+            self.config.endpoint.trim_end_matches('/'),
+            self.config.api_path.trim_end_matches('/')
+        );
 
         let mut req = self
             .http
@@ -551,6 +569,8 @@ mod tests {
             token: None,
             tool_ttl: std::time::Duration::from_secs(300),
             timeout: std::time::Duration::from_secs(30),
+            api_path: crate::config::DEFAULT_API_PATH.to_owned(),
+            allowed_tools: std::collections::HashSet::new(),
         };
         assert!(HKaskMcpClient::new(cfg).is_err());
     }
@@ -558,13 +578,15 @@ mod tests {
     #[test]
     fn client_construction_succeeds_for_loopback() {
         let cfg = HKaskMcpConfig {
-            endpoint: "http://127.0.0.1:18100".into(),
+            endpoint: "http://127.0.0.1:8080".into(),
             token: Some("test-token".into()),
             tool_ttl: std::time::Duration::from_secs(300),
             timeout: std::time::Duration::from_secs(30),
+            api_path: crate::config::DEFAULT_API_PATH.to_owned(),
+            allowed_tools: std::collections::HashSet::new(),
         };
         let client = HKaskMcpClient::new(cfg).unwrap();
         assert!(!client.is_initialized());
-        assert_eq!(client.endpoint(), "http://127.0.0.1:18100");
+        assert_eq!(client.endpoint(), "http://127.0.0.1:8080");
     }
 }

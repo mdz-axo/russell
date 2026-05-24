@@ -23,9 +23,8 @@ pub struct AcpDispatch {
     journal: Option<std::sync::Arc<JournalWriter>>,
     /// Evidence base directory.
     evidence_base: PathBuf,
-    /// Dispatcher pool — cached dispatchers keyed by skill ID (T12).
-    dispatcher_pool:
-        std::sync::Mutex<std::collections::HashMap<String, std::sync::Arc<Dispatcher>>>,
+    /// Dispatcher pool — cached dispatchers keyed by skill ID.
+    dispatcher_pool: dashmap::DashMap<String, std::sync::Arc<Dispatcher>>,
 }
 
 impl AcpDispatch {
@@ -37,19 +36,19 @@ impl AcpDispatch {
             skills_dir,
             journal: None,
             evidence_base,
-            dispatcher_pool: std::sync::Mutex::new(std::collections::HashMap::new()),
+            dispatcher_pool: dashmap::DashMap::new(),
         }
     }
 
-    /// Get or create a dispatcher for a skill (pooled).
+    /// Get or create a dispatcher for a skill (pooled, lock-free reads).
     fn get_dispatcher(&self, skill_id: &str) -> std::sync::Arc<Dispatcher> {
-        let mut pool = self.dispatcher_pool.lock().unwrap();
-        if let Some(dispatcher) = pool.get(skill_id) {
-            return std::sync::Arc::clone(dispatcher);
+        if let Some(dispatcher) = self.dispatcher_pool.get(skill_id) {
+            return std::sync::Arc::clone(dispatcher.value());
         }
         let skill_dir = self.skills_dir.join(skill_id);
         let dispatcher = std::sync::Arc::new(Dispatcher::new(&skill_dir));
-        pool.insert(skill_id.to_string(), std::sync::Arc::clone(&dispatcher));
+        self.dispatcher_pool
+            .insert(skill_id.to_string(), std::sync::Arc::clone(&dispatcher));
         dispatcher
     }
 

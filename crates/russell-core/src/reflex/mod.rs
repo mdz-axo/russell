@@ -287,12 +287,23 @@ impl ReflexBudget {
         // Sort by timestamp (oldest first) for efficient eviction.
         recent_firings.make_contiguous().sort();
 
+        // Restore circuit breaker state by checking for recent breaker-open events.
+        let breaker_open = reader
+            .list_events_by_action("reflex_breaker_open", now_unix - 3600, now_unix)
+            .unwrap_or_default()
+            .iter()
+            .any(|e| {
+                time::OffsetDateTime::parse(&e.ts, &time::format_description::well_known::Rfc3339)
+                    .map(|odt| odt.unix_timestamp() > now_unix - 3600)
+                    .unwrap_or(false)
+            });
+
         Self {
             max_per_hour: DEFAULT_BUDGET_PER_HOUR,
             recent_firings,
             consecutive_failures: 0,
             breaker_threshold: DEFAULT_BREAKER_THRESHOLD,
-            breaker_open: false,
+            breaker_open,
         }
     }
 

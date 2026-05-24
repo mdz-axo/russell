@@ -172,7 +172,8 @@ impl RussellPod {
         let cns_emitter = CnsEmitter::new(&id, &persona);
 
         // Initialize artifact store
-        let artifacts = ArtifactStore::new(template_crate_path.join("artifacts"));
+        let artifacts = ArtifactStore::new(template_crate_path.join("artifacts"))
+            .map_err(|e| LifecycleError::SentinelError(e.to_string()))?;
 
         // Initialize journal writer
         let journal_path = template_crate_path.join("journal.db");

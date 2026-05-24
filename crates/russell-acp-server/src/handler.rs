@@ -53,7 +53,7 @@ impl AcpHandler {
             dispatch,
             auth,
             rate_limiter,
-            require_auth: false,
+            require_auth: true,
             inference: None,
             journal_reader: None,
             cns: None,

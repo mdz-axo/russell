@@ -116,6 +116,7 @@ impl InferencePort for OkapiInferenceAdapter {
             model: Some(self.model.clone()),
             latency_ms: Some(latency_ms),
             token_usage,
+            actions: Vec::new(),
         })
     }
 

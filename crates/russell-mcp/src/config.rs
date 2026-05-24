@@ -5,6 +5,7 @@
 //! `russell-core::env` from `russell.env`). Existing env vars
 //! always win over file values.
 
+use std::collections::HashSet;
 use std::time::Duration;
 
 use crate::error::Result;
@@ -46,7 +47,7 @@ impl McpConfig for HKaskMcpConfig {
 }
 
 /// Default hKask API endpoint (stack-api default bind).
-pub const DEFAULT_ENDPOINT: &str = "http://127.0.0.1:18100";
+pub const DEFAULT_ENDPOINT: &str = "http://127.0.0.1:8080";
 
 /// Default tools/list cache TTL in seconds.
 pub const DEFAULT_TOOL_TTL_SECS: u64 = 300;
@@ -66,6 +67,17 @@ pub const ENV_HKASK_MCP_TOOL_TTL_SECS: &str = "HKASK_MCP_TOOL_TTL_SECS";
 /// Environment variable: HTTP timeout in seconds.
 pub const ENV_HKASK_MCP_TIMEOUT_SECS: &str = "HKASK_MCP_TIMEOUT_SECS";
 
+/// Environment variable: hKask API base path (default: `/api/mcp`).
+pub const ENV_HKASK_MCP_API_PATH: &str = "HKASK_MCP_API_PATH";
+
+/// Environment variable: comma-separated list of allowed tool names.
+/// If set, only these tools may be invoked via `call_tool`.
+/// If unset, all tools are allowed (backward compatible).
+pub const ENV_HKASK_MCP_ALLOWED_TOOLS: &str = "HKASK_MCP_ALLOWED_TOOLS";
+
+/// Default hKask API base path.
+pub const DEFAULT_API_PATH: &str = "/api/mcp";
+
 /// Configuration for the hKask MCP client.
 ///
 /// Constructed from environment variables. The only required value
@@ -81,6 +93,10 @@ pub struct HKaskMcpConfig {
     pub tool_ttl: Duration,
     /// HTTP request timeout.
     pub timeout: Duration,
+    /// API base path (default: `/api/mcp`).
+    pub api_path: String,
+    /// Allowed tool names (capability scoping). Empty = all allowed.
+    pub allowed_tools: HashSet<String>,
 }
 
 impl HKaskMcpConfig {
@@ -108,11 +124,23 @@ impl HKaskMcpConfig {
             .map(Duration::from_secs)
             .unwrap_or(Duration::from_secs(DEFAULT_TIMEOUT_SECS));
 
+        let api_path =
+            std::env::var(ENV_HKASK_MCP_API_PATH).unwrap_or_else(|_| DEFAULT_API_PATH.to_owned());
+
+        let allowed_tools: HashSet<String> = std::env::var(ENV_HKASK_MCP_ALLOWED_TOOLS)
+            .unwrap_or_default()
+            .split(',')
+            .map(|s| s.trim().to_owned())
+            .filter(|s| !s.is_empty())
+            .collect();
+
         Self {
             endpoint,
             token,
             tool_ttl,
             timeout,
+            api_path,
+            allowed_tools,
         }
     }
 
@@ -141,6 +169,8 @@ mod tests {
             token: Some("test-token".into()),
             tool_ttl: Duration::from_secs(DEFAULT_TOOL_TTL_SECS),
             timeout: Duration::from_secs(DEFAULT_TIMEOUT_SECS),
+            api_path: DEFAULT_API_PATH.to_owned(),
+            allowed_tools: HashSet::new(),
         };
         assert!(cfg.validate().is_ok());
     }
@@ -152,6 +182,8 @@ mod tests {
             token: Some("test-token".into()),
             tool_ttl: Duration::from_secs(300),
             timeout: Duration::from_secs(30),
+            api_path: DEFAULT_API_PATH.to_owned(),
+            allowed_tools: HashSet::new(),
         };
         assert!(cfg.validate().is_err());
     }

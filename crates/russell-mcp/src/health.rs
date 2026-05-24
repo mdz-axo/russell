@@ -50,7 +50,11 @@ pub async fn probe_reachability() -> HKaskHealthResult {
     };
 
     // Build health endpoint URL (REST API, not JSON-RPC).
-    let health_url = format!("{}/health", config.endpoint.trim_end_matches('/'));
+    let health_url = format!(
+        "{}{}/tools",
+        config.endpoint.trim_end_matches('/'),
+        config.api_path.trim_end_matches('/')
+    );
 
     let start = Instant::now();
 

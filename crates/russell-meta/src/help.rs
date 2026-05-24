@@ -44,9 +44,14 @@ pub enum SkipReason {
 
 #[derive(Serialize)]
 struct HKaskInferRequest {
+    /// Nested request envelope matching hKask's `SoapInferAuthRequest`.
+    request: HKaskInferInner,
     /// Capability token (base64-encoded hKask CapabilityToken JSON).
-    /// Required by hKask's `/api/llm/infer` endpoint for OCAP verification.
     capability_token: String,
+}
+
+#[derive(Serialize)]
+struct HKaskInferInner {
     subjective: Option<String>,
     objective: ObjectiveData,
     assessment: String,
@@ -80,6 +85,8 @@ struct HKaskInferResponse {
     response: String,
     model: String,
     latency_ms: u64,
+    #[serde(default)]
+    actions: Vec<String>,
 }
 
 /// Run the Nurse pipeline using the hKask endpoint from [`RuntimeConfig`].
@@ -144,11 +151,13 @@ pub async fn run_help_with_endpoint(
 
     let capability_token = load_capability_token().unwrap_or_default();
     let request = HKaskInferRequest {
+        request: HKaskInferInner {
+            subjective: note.map(String::from),
+            objective,
+            assessment: String::new(),
+            plan: String::new(),
+        },
         capability_token,
-        subjective: note.map(String::from),
-        objective,
-        assessment: String::new(),
-        plan: String::new(),
     };
 
     let response = match call_hkask(endpoint, &request).await {
@@ -350,13 +359,10 @@ async fn call_hkask(endpoint: &str, request: &HKaskInferRequest) -> Result<HKask
         .build()
         .map_err(|e| DoctorError::Config(format!("HTTP client: {e}")))?;
 
-    let mut req = client.post(endpoint).json(request);
-
-    if let Some(token) = load_service_token() {
-        req = req.bearer_auth(&token);
-    }
-
-    let response = req
+    let response = client
+        .post(endpoint)
+        .header("Content-Type", "application/json")
+        .json(request)
         .send()
         .await
         .map_err(|e| DoctorError::Config(format!("hKask request: {e}")))?;
@@ -372,56 +378,6 @@ async fn call_hkask(endpoint: &str, request: &HKaskInferRequest) -> Result<HKask
         .json()
         .await
         .map_err(|e| DoctorError::Config(format!("hKask response: {e}")))
-}
-
-fn load_service_token() -> Option<String> {
-    let token_path = russell_core::paths::Paths::from_env()
-        .ok()?
-        .state
-        .join("russell.token");
-
-    if let Ok(token) = std::fs::read_to_string(&token_path) {
-        let trimmed = token.trim();
-        if !trimmed.is_empty() {
-            return Some(trimmed.to_owned());
-        }
-    }
-
-    let token = generate_service_token();
-    if let Some(parent) = token_path.parent() {
-        let _ = std::fs::create_dir_all(parent);
-    }
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::OpenOptionsExt;
-        let _ = std::fs::OpenOptions::new()
-            .write(true)
-            .create(true)
-            .truncate(true)
-            .mode(0o600)
-            .open(&token_path)
-            .and_then(|mut f| std::io::Write::write_all(&mut f, token.as_bytes()));
-    }
-    #[cfg(not(unix))]
-    {
-        let _ = std::fs::write(&token_path, &token);
-    }
-    Some(token)
-}
-
-fn generate_service_token() -> String {
-    use sha2::{Digest, Sha256};
-    let mut hasher = Sha256::new();
-    hasher.update(
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_nanos()
-            .to_le_bytes(),
-    );
-    hasher.update(std::process::id().to_le_bytes());
-    hasher.update(b"russell-service-principal");
-    hex::encode(hasher.finalize())
 }
 
 /// Load or generate a hKask-format capability token for SOAP inference.
@@ -510,15 +466,14 @@ pub fn load_capability_token() -> Option<String> {
     let russell_webid = "russell-agent";
     let hkask_webid = "hkask-inference";
 
-    // Compute token ID: SHA-256(resource || resource_id || action || from || to || timestamp)
-    let now = chrono::Utc::now();
+    // Compute token ID: SHA-256(resource || resource_id || action || from || to)
+    // Aligned with hKask's CapabilityToken::generate_id() — no timestamp component.
     let mut id_hasher = Sha256::new();
     id_hasher.update(b"Tool");
     id_hasher.update(b"inference");
     id_hasher.update(b"Execute");
     id_hasher.update(russell_webid.as_bytes());
     id_hasher.update(hkask_webid.as_bytes());
-    id_hasher.update(now.timestamp().to_le_bytes());
     let token_id = hex::encode(id_hasher.finalize());
 
     // Compute signature: HMAC-SHA256(secret, id || resource || resource_id || action || from || to)
@@ -532,7 +487,8 @@ pub fn load_capability_token() -> Option<String> {
     mac.update(hkask_webid.as_bytes());
     let signature = hex::encode(mac.finalize().into_bytes());
 
-    let expires_at = now + chrono::Duration::hours(TOKEN_ROTATION_HOURS);
+    let now = chrono::Utc::now();
+    let expires_at_unix = (now + chrono::Duration::hours(TOKEN_ROTATION_HOURS)).timestamp();
 
     let token_json = json!({
         "id": token_id,
@@ -542,7 +498,7 @@ pub fn load_capability_token() -> Option<String> {
         "delegated_from": russell_webid,
         "delegated_to": hkask_webid,
         "signature": signature,
-        "expires_at": expires_at.to_rfc3339(),
+        "expires_at": expires_at_unix,
         "attenuation_level": 0,
         "max_attenuation": 7,
         "context_nonce": format!("root-{}", russell_webid)
@@ -597,12 +553,18 @@ fn is_token_expired(token_b64: &str) -> bool {
         Err(_) => return true,
     };
 
-    match token_json.get("expires_at").and_then(|v| v.as_str()) {
-        None | Some("null") => false, // No expiration = never expires (legacy)
-        Some(expires_str) => {
-            match chrono::DateTime::parse_from_rfc3339(expires_str) {
-                Ok(expires) => chrono::Utc::now() > expires,
-                Err(_) => true, // Unparseable = treat as expired
+    match token_json.get("expires_at") {
+        None | Some(serde_json::Value::Null) => false,
+        Some(v) => {
+            if let Some(expires_unix) = v.as_i64() {
+                chrono::Utc::now().timestamp() > expires_unix
+            } else if let Some(expires_str) = v.as_str() {
+                match chrono::DateTime::parse_from_rfc3339(expires_str) {
+                    Ok(expires) => chrono::Utc::now() > expires,
+                    Err(_) => true,
+                }
+            } else {
+                true
             }
         }
     }

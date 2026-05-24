@@ -18,26 +18,11 @@
 
 /// Macro to generate ProbeDescriptor impls, reducing boilerplate.
 ///
-/// Usage: `impl_probe!(StructName, "probe_name", "unit", function_name);`
+/// Usage: `impl_probe!(StructName, "probe_name", "MiB", function_name);`
 ///
 /// For unitless probes: `impl_probe!(StructName, "probe_name", none, function_name);`
 #[macro_export]
 macro_rules! impl_probe {
-    ($struct_name:ident, $name:literal, "unit", $func:ident) => {
-        impl $crate::probes::descriptor::ProbeMetadata for $struct_name {
-            fn name(&self) -> &'static str {
-                $name
-            }
-            fn unit(&self) -> Option<&'static str> {
-                Some("unit")
-            }
-        }
-        impl $crate::probes::descriptor::ProbeCollector for $struct_name {
-            fn collect(&self) -> Option<f64> {
-                $func()
-            }
-        }
-    };
     ($struct_name:ident, $name:literal, $unit:literal, $func:ident) => {
         impl $crate::probes::descriptor::ProbeMetadata for $struct_name {
             fn name(&self) -> &'static str {
@@ -221,6 +206,15 @@ pub fn evaluate_samples_with_rates(
 ) -> Vec<Event> {
     let now = russell_core::time::now_unix();
 
+    // Batch-fetch previous samples to avoid N+1 queries.
+    let probe_names: Vec<&str> = samples
+        .iter()
+        .filter_map(|s| s.value_num.map(|_| s.name.as_str()))
+        .collect();
+    let prev_map = reader
+        .previous_samples_batch(&probe_names, now)
+        .unwrap_or_default();
+
     let mut events = Vec::new();
     for s in samples {
         let Some(v) = s.value_num else {
@@ -233,10 +227,8 @@ pub fn evaluate_samples_with_rates(
             events.push(build_breach_event(&s.name, v, s.unit, sev_abs));
         }
 
-        // Rate-of-change check: compare against previous sample.
-        if let Ok(Some((prev_val, prev_ts))) =
-            <dyn JournalReadPort>::previous_sample(reader, &s.name, now)
-        {
+        // Rate-of-change check: compare against previous sample from batch.
+        if let Some((prev_val, prev_ts)) = prev_map.get(&s.name) {
             let dt = ((now - prev_ts).max(1)) as f64;
             let rate = (v - prev_val).abs() / dt;
             let sev_rate = rules.evaluate_rate(&s.name, rate);

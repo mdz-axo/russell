@@ -48,15 +48,16 @@ pub struct ArtifactStore {
 
 impl ArtifactStore {
     /// Create a new artifact store.
-    pub fn new(base_dir: PathBuf) -> Self {
-        // Create base directory and subdirectories
-        let _ = std::fs::create_dir_all(&base_dir);
-        let _ = std::fs::create_dir_all(base_dir.join("semantic"));
-        let _ = std::fs::create_dir_all(base_dir.join("episodic"));
-        let _ = std::fs::create_dir_all(base_dir.join("evidence"));
-        let _ = std::fs::create_dir_all(base_dir.join("skills"));
+    ///
+    /// Returns an error if the base directory or any subdirectory cannot be created.
+    pub fn new(base_dir: PathBuf) -> std::io::Result<Self> {
+        std::fs::create_dir_all(&base_dir)?;
+        std::fs::create_dir_all(base_dir.join("semantic"))?;
+        std::fs::create_dir_all(base_dir.join("episodic"))?;
+        std::fs::create_dir_all(base_dir.join("evidence"))?;
+        std::fs::create_dir_all(base_dir.join("skills"))?;
 
-        Self { base_dir }
+        Ok(Self { base_dir })
     }
 
     /// Get the semantic memory directory.
@@ -189,15 +190,28 @@ impl ArtifactStore {
             std::fs::create_dir_all(parent)?;
         }
 
-        // For now, just copy relevant files based on visibility
-        let source_dir = match visibility {
-            ArtifactVisibility::Public => self.semantic_dir(),
-            ArtifactVisibility::Private => self.episodic_dir(),
-            ArtifactVisibility::OperatorOnly => self.evidence_dir(),
+        let source_dirs: Vec<PathBuf> = match visibility {
+            ArtifactVisibility::Public => vec![self.semantic_dir(), self.skill_dir("_shared")],
+            ArtifactVisibility::Private => {
+                vec![
+                    self.semantic_dir(),
+                    self.episodic_dir(),
+                    self.skill_dir("_shared"),
+                ]
+            }
+            ArtifactVisibility::OperatorOnly => vec![
+                self.semantic_dir(),
+                self.episodic_dir(),
+                self.evidence_dir(),
+                self.skill_dir("_shared"),
+            ],
         };
 
-        if source_dir.exists() {
-            for entry in std::fs::read_dir(&source_dir)? {
+        for source_dir in &source_dirs {
+            if !source_dir.exists() {
+                continue;
+            }
+            for entry in std::fs::read_dir(source_dir)? {
                 let entry = entry?;
                 let src = entry.path();
                 let dst = output_path.join(entry.file_name());
@@ -205,7 +219,6 @@ impl ArtifactStore {
                 if src.is_file() {
                     std::fs::copy(&src, &dst)?;
                 } else if src.is_dir() {
-                    // Copy directory recursively
                     self.copy_dir(&src, &dst)?;
                 }
             }
@@ -242,7 +255,7 @@ mod tests {
     #[test]
     fn test_artifact_store_creation() {
         let temp_dir = TempDir::new().unwrap();
-        let store = ArtifactStore::new(temp_dir.path().to_path_buf());
+        let store = ArtifactStore::new(temp_dir.path().to_path_buf()).unwrap();
 
         assert!(store.semantic_dir().exists());
         assert!(store.episodic_dir().exists());
@@ -252,7 +265,7 @@ mod tests {
     #[test]
     fn test_store_semantic() {
         let temp_dir = TempDir::new().unwrap();
-        let store = ArtifactStore::new(temp_dir.path().to_path_buf());
+        let store = ArtifactStore::new(temp_dir.path().to_path_buf()).unwrap();
 
         let path = store
             .store_semantic("2026-05-22", "subject predicate object")

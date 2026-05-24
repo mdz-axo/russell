@@ -50,27 +50,30 @@ impl InferencePort for HkaskInferenceAdapter {
 
         let url = format!("{}/api/llm/infer", self.endpoint.trim_end_matches('/'));
 
-        let mut request = self
-            .client
-            .post(&url)
-            .header("Content-Type", "application/json");
-
-        if let Some(ref token) = self.capability_token {
-            request = request.header("Authorization", format!("Bearer {}", token));
-        }
-
-        let body = serde_json::json!({
+        let inner_request = serde_json::json!({
             "subjective": prompt,
             "objective": context.map(|c| &c.objective).unwrap_or(&Vec::new()),
             "assessment": context.and_then(|c| c.assessment.as_deref()).unwrap_or(""),
             "plan": context.and_then(|c| c.plan.as_deref()).unwrap_or(&[]),
         });
 
+        let body = serde_json::json!({
+            "request": inner_request,
+            "capability_token": self.capability_token.as_deref().unwrap_or(""),
+        });
+
         debug!(url = %url, "sending inference request to hKask");
 
-        let response = request.json(&body).send().await.map_err(|e| {
-            russell_core::error::CoreError::Invariant(format!("HTTP request failed: {e}"))
-        })?;
+        let response = self
+            .client
+            .post(&url)
+            .header("Content-Type", "application/json")
+            .json(&body)
+            .send()
+            .await
+            .map_err(|e| {
+                russell_core::error::CoreError::Invariant(format!("HTTP request failed: {e}"))
+            })?;
 
         if !response.status().is_success() {
             let status = response.status();
@@ -92,6 +95,16 @@ impl InferencePort for HkaskInferenceAdapter {
             .unwrap_or("No response from hKask")
             .to_string();
 
+        let actions: Vec<String> = infer_response
+            .get("actions")
+            .and_then(|v| v.as_array())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|v| v.as_str().map(String::from))
+                    .collect()
+            })
+            .unwrap_or_default();
+
         let latency_ms = start.elapsed().as_millis() as u64;
 
         Ok(InferenceResponse {
@@ -109,11 +122,12 @@ impl InferencePort for HkaskInferenceAdapter {
                     total_tokens: v.get("total_tokens")?.as_u64()?,
                 })
             }),
+            actions,
         })
     }
 
     async fn health_check(&self) -> Result<bool> {
-        let url = format!("{}/health", self.endpoint.trim_end_matches('/'));
+        let url = format!("{}/api/mcp/tools", self.endpoint.trim_end_matches('/'));
         match self.client.get(&url).send().await {
             Ok(resp) => Ok(resp.status().is_success()),
             Err(_) => Ok(false),

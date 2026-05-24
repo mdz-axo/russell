@@ -76,6 +76,15 @@ pub trait HostTelemetryPort: Send + Sync {
 
     /// Get previous sample value for rate-of-change calculation.
     fn previous_sample(&self, probe: &str, now: i64) -> Result<Option<(f64, i64)>>;
+
+    /// Batch-fetch previous sample values for multiple probes.
+    ///
+    /// Avoids N+1 query pattern — single connection/query instead of one per probe.
+    fn previous_samples_batch(
+        &self,
+        probes: &[&str],
+        before_ts: i64,
+    ) -> Result<std::collections::HashMap<String, (f64, i64)>>;
 }
 
 /// Event query port — meta/ACP needs for SOAP objective composition.
@@ -182,6 +191,14 @@ impl HostTelemetryPort for super::JournalReader {
 
     fn previous_sample(&self, probe: &str, now: i64) -> Result<Option<(f64, i64)>> {
         Ok(super::JournalReader::previous_sample(self, probe, now))
+    }
+
+    fn previous_samples_batch(
+        &self,
+        probes: &[&str],
+        before_ts: i64,
+    ) -> Result<std::collections::HashMap<String, (f64, i64)>> {
+        super::JournalReader::previous_samples_batch(self, probes, before_ts)
     }
 }
 
@@ -298,6 +315,14 @@ impl HostTelemetryPort for InMemoryJournal {
 
     fn previous_sample(&self, _probe: &str, _now: i64) -> Result<Option<(f64, i64)>> {
         Ok(None)
+    }
+
+    fn previous_samples_batch(
+        &self,
+        _probes: &[&str],
+        _before_ts: i64,
+    ) -> Result<std::collections::HashMap<String, (f64, i64)>> {
+        Ok(std::collections::HashMap::new())
     }
 }
 

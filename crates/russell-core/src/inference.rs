@@ -138,6 +138,9 @@ pub struct InferenceResponse {
     pub latency_ms: Option<u64>,
     /// Token usage statistics, if available.
     pub token_usage: Option<TokenUsage>,
+    /// Extracted ACTION: proposals from LLM output (hKask returns these).
+    #[serde(default)]
+    pub actions: Vec<String>,
 }
 
 /// Token usage statistics from an inference call.
