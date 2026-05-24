@@ -1,18 +1,18 @@
 ---
 title: "Russell CLI Reference"
 audience: [operators, developers, contributors, agents]
-last_updated: 2026-05-14
+last_updated: 2026-05-24
 togaf_phase: "D"
-version: "1.0.0"
+version: "1.1.0"
 status: "Active"
 ---
 
 # Russell CLI Reference
 
 <!-- TOGAF_DOMAIN: Technology -->
-<!-- VERSION: 1.0.0 -->
+<!-- VERSION: 1.1.0 -->
 <!-- STATUS: Active -->
-<!-- LAST_UPDATED: 2026-05-14 -->
+<!-- LAST_UPDATED: 2026-05-24 -->
 
 Complete reference for every `russell` CLI command. Run `russell --help`
 for the auto-generated usage summary; this document is the authoritative
@@ -86,32 +86,6 @@ default). Prints Jack's response.
 
 ```
 russell jack
-```
-
-### `russell chat`
-
-Interactive multi-turn conversation with Jack. Each turn sends the
-latest journal state to the LLM. Probes execute immediately;
-interventions await consent (`/approve`, "yes", "ok", "go ahead").
-
-```
-russell chat
-```
-
-Commands during chat: `/help`, `/exit`, `/quit`, `/skills`, `/models`,
-`/refresh`, `/reload`, `/history`, `/approve`, `/deny`.
-
-Skill management during chat: `ACTION: skill-manager/list-skills`,
-`ACTION: skill-manager/stats`, `ACTION: skill-manager/check`,
-`ACTION: skill-manager/install`, `ACTION: skill-manager/prune`,
-`ACTION: skill-manager/restore`, `ACTION: skill-manager/delete`.
-
-### `russell okapi-probe`
-
-Probe Okapi health: model list, GPU memory, adapter count.
-
-```
-russell okapi-probe
 ```
 
 ### `russell proprio`
@@ -205,50 +179,34 @@ deletes the skill directory from disk. Irreversible.
 russell skill retire swap-watcher
 ```
 
-### `russell workshop`
+## 3. Skill Lifecycle
 
-Interactive skill lifecycle REPL. Jack helps the operator discover,
-evaluate, build, adapt, and maintain skills. See [Workshop Commands](#3-workshop-commands) below.
-
-```
-russell workshop
-```
-
-## 3. Workshop Commands
-
-Built-in commands available inside the `russell workshop` REPL:
-
-| Command | Description |
-|---|---|
-| `help` | Show the command guide |
-| `/list` | List all skills with lifecycle status markers (✓ active, ⚠ stale, ✗ deprecated, • installed) |
-| `/gaps` | Show symptom catalog entries with no installed skill |
-| `/lookup <symptom>` | Which installed skills address this symptom? |
-| `search <query>` | Search the local registry cache by name or symptom |
-| `search --remote` | Search via Brave Search API (requires `BRAVE_API_KEY` env var). Falls back to local cache. |
-| `fetch <url> <name>` | Download a skill manifest from URL, safety-scan it, and save to the skills directory |
-| `evaluate <name>` | Show manifest, safety scan (manifest.yaml + KNOWLEDGE.md), and script listing |
-| `build <name>` | Create a new skill skeleton (manifest.yaml) on disk at `~/.local/share/harness/skills/<name>/` |
-| `adapt <name>` | Open the skill's manifest in `$EDITOR` (defaults to `vim`), re-scan on save |
-| `check` | Audit all installed skills: staleness (>180 days, `valid_until` expiry), coverage gaps, score reporting |
-| `prune <name>` | Deprecate a stale skill — marks as `deprecated`, files remain on disk |
-| `restore <name>` | Move a deprecated skill back to `active` (alias: `unprune`) |
-| `install <name>` | Move a discovered/evaluated skill to installed/active status |
-| `/quit` | Exit the workshop (saves registry cache) |
-
-Free-form text is routed to Jack (via Okapi) for interactive skill
-design conversations.
-
-### Lifecycle States
+Skills follow a defined lifecycle:
 
 ```
 discovered → evaluated → installed → active → stale_warning → deprecated → retired
 ```
+
 Skills in `deprecated` or `retired` state are not loaded by the
 harness. Files remain on disk until manually deleted (JR-7:
-persistence is auditable).
+persistence is auditable). Lifecycle management is available via
+`russell skill` subcommands and the ACP session interface.
 
-## 4. Skill Catalogue
+## 4. ACP Server
+
+The ACP (Agent Client Protocol) server is Russell's primary interface
+for hKask integration. It runs as a separate binary:
+
+```
+russell-acp-server
+```
+
+The server implements JSON-RPC 2.0 over stdio with macaroon OCAP
+authentication. hKask agents create sessions, query Russell's health
+data, dispatch skills (filtered by visibility), and provide consent
+for interventions. See [`../deployment/acp-integration.md`](../deployment/acp-integration.md).
+
+## 5. Skill Catalogue
 
 ### Actionable Skills (with probes/interventions)
 
@@ -256,14 +214,15 @@ persistence is auditable).
 |---|---|---|---|
 | `okapi-watcher` | 3 (health, models, gpu-libs) | 1 (restart-okapi) | Low |
 | `sysadmin` | 8 (systemd-failed, degraded, clock, zombies, journal, coredumps, swap, stale-mounts) | 8 (reset-failed, force-clock-sync, reap-zombies, journal-vacuum, etc.) | Low–Medium |
-| `scenario-tester` | 7 (run-okapi, run-chat, run-sentinel, evaluate, report, journal, full) | 0 | None |
+| `scenario-tester` | 9 (run-okapi, run-acp, run-sentinel, evaluate, report, journal, full, test-capability-attenuation, test-prompt-sanitization) | 0 | None |
 | `oom-watcher` | 1 (check-oom-kills) | 0 | None |
 | `skill-manager` | 3 (list-skills, stats, check) | 4 (install, prune, restore, delete) | Low |
 
 ### Knowledge Skills (data interpretation only, no probes)
 
-`web-search`, `skill-discovery`, `skill-workshop`, `skill-maintenance`,
-`pragmatic-cybernetics`, `pragmatic-semantics`, `ubuntu-jack`
+`web-search`, `skill-discovery`, `skill-maintenance`,
+`pragmatic-cybernetics`, `pragmatic-semantics`, `ubuntu-jack`,
+`package-checker`, `journal-compactor`
 
 ## 5. Systemd Integration
 
@@ -275,8 +234,7 @@ russell-sentinel.service
 russell-digest.timer    — Sunday 09:00
 russell-digest.service
 russell-failure@.service — templated failure capture
-russell-okapi-probe.timer — once per minute
-russell-okapi-probe.service
+russell-acp-server.service — ACP server for hKask
 ```
 
 Manage with: `systemctl --user {enable,disable,start,stop} russell-*.{timer,service}`.

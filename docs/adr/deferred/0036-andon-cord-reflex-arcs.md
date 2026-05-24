@@ -1,9 +1,18 @@
-# ADR-0036: Andon Cord for Reflex Arcs
+---
+title: "ADR-0036: Andon Cord for Reflex Arcs"
+audience: [developers, architects, operators]
+last_updated: 2026-05-19
+togaf_phase: "H"
+version: "1.0.0"
+status: "Deferred"
+---
 
-- **Status:** Deferred (implementation removed; consent absorbed into ACP session interface)
-- **Date:** 2026-05-19
-- **Deciders:** Project founders
-- **Tags:** `reflex-arcs`, `andon-cord`, `operator-consent`, `JR-2`
+<!-- TOGAF_DOMAIN: Change Management — Operator Consent -->
+<!-- VERSION: 1.0.0 -->
+<!-- STATUS: Deferred -->
+<!-- LAST_UPDATED: 2026-05-19 -->
+
+# ADR-0036: Andon Cord for Reflex Arcs
 
 ## Context
 

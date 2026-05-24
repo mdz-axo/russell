@@ -1,12 +1,18 @@
-# ADR-0041: ACP Consent Protocol
-
-**Date:** 2026-05-23  
-**Status:** Implemented  
-**Author:** Russell Team  
-**Deciders:** Operator  
-**Technical Story:** Tier 1 recommendation — Consent protocol over ACP
-
 ---
+title: "ADR-0041: ACP Consent Protocol"
+audience: [developers, architects, operators]
+last_updated: 2026-05-23
+togaf_phase: "H"
+version: "1.0.0"
+status: "Implemented"
+---
+
+<!-- TOGAF_DOMAIN: Change Management — ACP Protocol -->
+<!-- VERSION: 1.0.0 -->
+<!-- STATUS: Implemented -->
+<!-- LAST_UPDATED: 2026-05-23 -->
+
+# ADR-0041: ACP Consent Protocol
 
 ## Context
 

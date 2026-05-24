@@ -1,12 +1,18 @@
-# ADR-0044: CNS Span Emission in ACP Server
-
-**Date:** 2026-05-24  
-**Status:** Implemented  
-**Author:** Russell Team  
-**Deciders:** Operator  
-**Technical Story:** Tier 2 recommendation — CNS span emission wiring
-
 ---
+title: "ADR-0044: CNS Span Emission in ACP Server"
+audience: [developers, architects]
+last_updated: 2026-05-24
+togaf_phase: "H"
+version: "1.0.0"
+status: "Implemented"
+---
+
+<!-- TOGAF_DOMAIN: Change Management — Observability -->
+<!-- VERSION: 1.0.0 -->
+<!-- STATUS: Implemented -->
+<!-- LAST_UPDATED: 2026-05-24 -->
+
+# ADR-0044: CNS Span Emission in ACP Server
 
 ## Context
 

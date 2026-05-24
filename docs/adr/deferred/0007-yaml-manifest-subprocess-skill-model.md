@@ -4,7 +4,7 @@ audience: [developers, architects]
 last_updated: 2026-04-18
 togaf_phase: "H"
 version: "1.0.0"
-status: "Deprecated"
+status: "Deferred"
 ---
 
 <!-- TOGAF_DOMAIN: Change Management -->

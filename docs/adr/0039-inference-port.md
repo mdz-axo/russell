@@ -1,31 +1,32 @@
+---
+title: "ADR-0039: Inference Port — Unified LLM Backend Abstraction"
+audience: [developers, architects]
+last_updated: 2026-05-23
+togaf_phase: "D"
+version: "1.0.0"
+status: "Implemented"
+---
+
+<!-- TOGAF_DOMAIN: Technology — Hexagonal Architecture -->
+<!-- VERSION: 1.0.0 -->
+<!-- STATUS: Implemented -->
+<!-- LAST_UPDATED: 2026-05-23 -->
+
+---
+title: "ADR-0039: Inference Port — Unified LLM Backend Abstraction"
+audience: [developers, architects]
+last_updated: 2026-05-23
+togaf_phase: "D"
+version: "1.0.0"
+status: "Implemented"
+---
+
+<!-- TOGAF_DOMAIN: Technology — Hexagonal Architecture -->
+<!-- VERSION: 1.0.0 -->
+<!-- STATUS: Implemented -->
+<!-- LAST_UPDATED: 2026-05-23 -->
+
 # ADR-0039: Inference Port — Unified LLM Backend Abstraction
-
-**Date:** 2026-05-23  
-**Status:** Implemented  
-**Author:** Russell Team  
-**Deciders:** Operator  
-**Technical Story:** Adversarial review Task T14 (Define Inference Port Trait)
-
----
-
-## Context
-
-Russell's Nurse pipeline (`russell-meta`) requests LLM inference for health assessments. The adversarial review (2026-05-23) identified weakness W16: "No Okapi integration path" — the Nurse called `call_hkask()` directly with no abstraction for different LLM backends.
-
-This created several problems:
-
-1. **Single point of failure** — If hKask is unreachable, the Nurse has no fallback
-2. **No local inference** — Okapi (local LLM) cannot be used as a first-class backend
-3. **Testing friction** — Integration tests require a live hKask instance
-4. **Architectural coupling** — The Nurse depends on hKask's REST API format
-
-Per hexagonal architecture principles, LLM inference is a **port** — the Nurse should depend on an abstraction, not a specific backend implementation. This enables:
-
-- **Resilience** — Fallback to local Okapi when hKask is unavailable
-- **Testability** — Mock inference in unit tests
-- **Extensibility** — Add new backends (Claude, GPT-4, local models) without changing the Nurse
-
----
 
 ## Decision
 

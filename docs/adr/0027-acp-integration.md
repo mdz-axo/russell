@@ -1,12 +1,18 @@
-# ADR-0027: hKask ACP Integration
-
-**Date:** 2026-05-22  
-**Status:** Implemented  
-**Author:** Russell Team  
-**Deciders:** Operator  
-**Technical Story:** [GitHub Issue #XXX](https://github.com/russell/russell/issues/XXX)
-
 ---
+title: "ADR-0027: hKask ACP Integration"
+audience: [developers, architects, operators]
+last_updated: 2026-05-22
+togaf_phase: "H"
+version: "1.0.0"
+status: "Implemented"
+---
+
+<!-- TOGAF_DOMAIN: Change Management -->
+<!-- VERSION: 1.0.0 -->
+<!-- STATUS: Implemented -->
+<!-- LAST_UPDATED: 2026-05-22 -->
+
+# ADR-0027: hKask ACP Integration
 
 ## Context
 

@@ -1,25 +1,32 @@
+---
+title: "ADR-0043: Proprioception ACP Notification Protocol"
+audience: [developers, architects]
+last_updated: 2026-05-24
+togaf_phase: "H"
+version: "1.0.0"
+status: "Implemented"
+---
+
+<!-- TOGAF_DOMAIN: Change Management — ACP Protocol -->
+<!-- VERSION: 1.0.0 -->
+<!-- STATUS: Implemented -->
+<!-- LAST_UPDATED: 2026-05-24 -->
+
+---
+title: "ADR-0043: Proprioception ACP Notification Protocol"
+audience: [developers, architects]
+last_updated: 2026-05-24
+togaf_phase: "H"
+version: "1.0.0"
+status: "Implemented"
+---
+
+<!-- TOGAF_DOMAIN: Change Management — ACP Protocol -->
+<!-- VERSION: 1.0.0 -->
+<!-- STATUS: Implemented -->
+<!-- LAST_UPDATED: 2026-05-24 -->
+
 # ADR-0043: Proprioception ACP Notification Protocol
-
-**Date:** 2026-05-24  
-**Status:** Implemented  
-**Author:** Russell Team  
-**Deciders:** Operator  
-**Technical Story:** Tier 2 recommendation — Proprioception → ACP feedback loop
-
----
-
-## Context
-
-Russell's proprioception system detects degradation in its own health (sentinel age, journal stall, LLM latency, timer drift, help error rate, hKask MCP reachability). However, this information was only available via CLI (`russell proprio`, `russell self-triage`), not via ACP.
-
-The adversarial review (2026-05-23) identified this gap:
-- hKask agents cannot proactively monitor Russell's health
-- Degradation events are journaled but not pushed to agents
-- No mechanism for agents to query recent proprioception breaches
-
-This violated the "proprioception → ACP feedback loop" principle: Russell should notify hKask when it detects problems with itself.
-
----
 
 ## Decision
 

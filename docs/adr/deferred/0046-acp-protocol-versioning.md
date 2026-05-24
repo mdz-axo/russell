@@ -1,24 +1,32 @@
+---
+title: "ADR-0046: ACP Protocol Versioning"
+audience: [developers, architects]
+last_updated: 2026-05-24
+togaf_phase: "Requirements Management"
+version: "1.0.0"
+status: "Deferred"
+---
+
+<!-- TOGAF_DOMAIN: Requirements Management — Protocol Compatibility -->
+<!-- VERSION: 1.0.0 -->
+<!-- STATUS: Deferred -->
+<!-- LAST_UPDATED: 2026-05-24 -->
+
+---
+title: "ADR-0046: ACP Protocol Versioning"
+audience: [developers, architects]
+last_updated: 2026-05-24
+togaf_phase: "Requirements Management"
+version: "1.0.0"
+status: "Deferred"
+---
+
+<!-- TOGAF_DOMAIN: Requirements Management — Protocol Compatibility -->
+<!-- VERSION: 1.0.0 -->
+<!-- STATUS: Deferred -->
+<!-- LAST_UPDATED: 2026-05-24 -->
+
 # ADR-0046: ACP Protocol Versioning (Deferred)
-
-**Date:** 2026-05-24  
-**Status:** Deferred  
-**Author:** Russell Team  
-**Deciders:** Operator  
-**Technical Story:** Tier 3 recommendation — ACP protocol versioning
-
----
-
-## Context
-
-Russell's ACP server implements JSON-RPC 2.0 over stdio, but has no protocol version negotiation. If hKask evolves the ACP protocol (adds new methods, changes request/response formats), Russell has no fallback mechanism.
-
-The adversarial review (2026-05-23) identified this as a compatibility risk:
-- No `acp/version` handshake
-- No capability advertisement beyond `acp/capabilities`
-- No graceful degradation if protocol versions mismatch
-- Breaking changes would require coordinated deployment
-
----
 
 ## Decision
 

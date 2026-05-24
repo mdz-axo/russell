@@ -1,16 +1,16 @@
 ---
 title: "Russell Changelog"
 audience: [operators, developers, contributors]
-last_updated: 2026-05-14
+last_updated: 2026-05-24
 togaf_phase: "G"
-version: "1.0.0"
+version: "1.1.0"
 status: "Active"
 ---
 
 <!-- TOGAF_DOMAIN: Governance -->
-<!-- VERSION: 1.0.0 -->
+<!-- VERSION: 1.1.0 -->
 <!-- STATUS: Active -->
-<!-- LAST_UPDATED: 2026-05-14 -->
+<!-- LAST_UPDATED: 2026-05-24 -->
 
 # Changelog
 

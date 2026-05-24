@@ -1,16 +1,16 @@
 ---
 title: "Russell — Your Machine's Terrier"
 audience: [operators, developers, contributors, agents]
-last_updated: 2026-05-14
+last_updated: 2026-05-24
 togaf_phase: "Preliminary"
-version: "1.0.0"
+version: "1.1.0"
 status: "Active"
 ---
 
 <!-- TOGAF_DOMAIN: Business Architecture -->
-<!-- VERSION: 1.0.0 -->
+<!-- VERSION: 1.1.0 -->
 <!-- STATUS: Active -->
-<!-- LAST_UPDATED: 2026-05-14 -->
+<!-- LAST_UPDATED: 2026-05-24 -->
 
 # Russell — Your Machine's Terrier
 
@@ -76,9 +76,9 @@ russell list --limit 20                # recent events
 russell sentinel-once                  # one full observation cycle
 russell digest --since-hours 168       # Markdown health report
 russell jack --note "ollama hangs"     # ask Jack (LLM-assisted)
-russell chat                           # multi-turn REPL with Jack
 russell skill list                     # registered skills
 russell skill run <id>                 # run a skill by ID
+russell-acp-server                     # ACP server for hKask integration
 ```
 
 ## The attitude
@@ -125,8 +125,8 @@ See [`docs/status/CONSOLIDATED-STATUS.md`](docs/status/CONSOLIDATED-STATUS.md).
 - [x] Phase 2 — Rules engine, EWMA baselines, proprioception.
       Self-vitals, autoimmune guard, memory layer.
 - [x] Phase 3 — Skills framework. Manifest parser, dispatcher,
-      risk-band enforcement, rollback, `russell chat` REPL.
-- [ ] Phase 4 — MCP surface, real skills, operational depth.
+      risk-band enforcement, rollback. ACP server for hKask.
+- [ ] Phase 4 — Real skills, operational depth.
 
 ## The four-question contract
 

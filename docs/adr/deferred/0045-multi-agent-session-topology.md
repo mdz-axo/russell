@@ -1,12 +1,18 @@
-# ADR-0045: Multi-Agent Session Topology (Deferred)
-
-**Date:** 2026-05-24  
-**Status:** Deferred  
-**Author:** Russell Team  
-**Deciders:** Operator  
-**Technical Story:** Tier 3 recommendation — Multi-agent session topology
-
 ---
+title: "ADR-0045: Multi-Agent Session Topology"
+audience: [developers, architects]
+last_updated: 2026-05-24
+togaf_phase: "Requirements Management"
+version: "1.0.0"
+status: "Deferred"
+---
+
+<!-- TOGAF_DOMAIN: Requirements Management — Session Model -->
+<!-- VERSION: 1.0.0 -->
+<!-- STATUS: Deferred -->
+<!-- LAST_UPDATED: 2026-05-24 -->
+
+# ADR-0045: Multi-Agent Session Topology (Deferred)
 
 ## Context
 

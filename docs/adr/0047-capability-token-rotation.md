@@ -1,12 +1,18 @@
-# ADR-0042: Capability Token Rotation
-
-**Date:** 2026-05-24  
-**Status:** Implemented  
-**Author:** Russell Team  
-**Deciders:** Operator  
-**Technical Story:** Tier 2 recommendation — Capability token rotation (security)
-
 ---
+title: "ADR-0047: Capability Token Rotation"
+audience: [developers, architects, security reviewers]
+last_updated: 2026-05-24
+togaf_phase: "H"
+version: "1.0.0"
+status: "Implemented"
+---
+
+<!-- TOGAF_DOMAIN: Security — Token Management -->
+<!-- VERSION: 1.0.0 -->
+<!-- STATUS: Implemented -->
+<!-- LAST_UPDATED: 2026-05-24 -->
+
+# ADR-0047: Capability Token Rotation
 
 ## Context
 

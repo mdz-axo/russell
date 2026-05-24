@@ -1,8 +1,8 @@
 # ADR-0030: Adversarial Review — Open Architectural Questions
 
-**Status:** Active (tasks complete)  
-**Date:** 2026-05-19  
-**Last Updated:** 2026-05-20  
+**Status:** Superseded by [ADR-0042](0042-adversarial-review-remediation-plan.md)
+**Date:** 2026-05-19
+**Last Updated:** 2026-05-24
 **Context:** Multi-perspective adversarial review (T16)
 
 ## Completed Tasks

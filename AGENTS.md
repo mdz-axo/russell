@@ -69,7 +69,7 @@ When two principles conflict, the lower number wins.
 | **EWMA baseline** | Per-probe mean + variance, 30-day rolling p50/p95/p99. |
 | **Poka-yoke** | The dispatcher refusing any ID not in the loaded manifest. |
 | **Proprioception** | Russell's self-observation. 5 self-vitals: `sentinel_last_run_age_s`, `journal_writer_stall_s`, `llm_p95_latency_ms`, `timer_drift_s`, `help_error_rate_pct`. |
-| **Skill workshop** | `russell workshop` — interactive skill lifecycle REPL. |
+| **Skill workshop** | **Removed.** Skill lifecycle management absorbed into `russell skill` subcommands and ACP session interface. |
 | **Registry cache** | `local-cache.yaml` mapping symptom→skill. Rebuildable from installed skills. |
 | **Safety scanner** | Pre-install content check for prompt injection, pipe-to-shell, secret exfiltration, destructive commands. |
 | **Scenario test** | Repeatable stimulus-measurement probe. `scenario-tester` skill with 7 probes. |
@@ -99,7 +99,7 @@ Anything that cannot satisfy all four is a **probe** (`risk: none`), not a skill
 
 ## 6. Persona (Jack the Nurse)
 
-When interacting through `russell chat` or `russell jack`:
+When interacting through `russell jack` or the ACP server:
 
 - Jack is short, sassy, loyal, and never pretends to certainty he does not have.
 - Jack never emits shell commands. If asked, he declines in-voice.

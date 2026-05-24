@@ -1,31 +1,32 @@
+---
+title: "ADR-0040: Skill Dispatch Port — Hexagonal Architecture Abstraction"
+audience: [developers, architects]
+last_updated: 2026-05-23
+togaf_phase: "D"
+version: "1.0.0"
+status: "Implemented"
+---
+
+<!-- TOGAF_DOMAIN: Technology — Hexagonal Architecture -->
+<!-- VERSION: 1.0.0 -->
+<!-- STATUS: Implemented -->
+<!-- LAST_UPDATED: 2026-05-23 -->
+
+---
+title: "ADR-0040: Skill Dispatch Port — Hexagonal Architecture Abstraction"
+audience: [developers, architects]
+last_updated: 2026-05-23
+togaf_phase: "D"
+version: "1.0.0"
+status: "Implemented"
+---
+
+<!-- TOGAF_DOMAIN: Technology — Hexagonal Architecture -->
+<!-- VERSION: 1.0.0 -->
+<!-- STATUS: Implemented -->
+<!-- LAST_UPDATED: 2026-05-23 -->
+
 # ADR-0040: Skill Dispatch Port — Hexagonal Architecture Abstraction
-
-**Date:** 2026-05-23  
-**Status:** Implemented  
-**Author:** Russell Team  
-**Deciders:** Operator  
-**Technical Story:** Adversarial review Task T20 (Add AcpDispatch Port Trait)
-
----
-
-## Context
-
-Russell's ACP server dispatches skill execution requests from hKask agents. The adversarial review (2026-05-23) identified that the ACP handler depended directly on `AcpDispatch`, a concrete implementation that:
-
-1. Executes skills via local subprocess
-2. Filters skills by visibility (public/private)
-3. Manages evidence bundles and journal writes
-
-This created architectural coupling:
-
-- **Testing friction** — Integration tests required real skill directories and subprocess execution
-- **No remote dispatch** — Cannot delegate skill execution to a remote Russell instance
-- **No mock dispatch** — Cannot test ACP handler logic without executing real skills
-- **Violation of hexagonal architecture** — The handler (core) depends on a concrete adapter, not a port
-
-Per Alastair Cockburn's hexagonal architecture, skill dispatch is a **port** — the ACP handler should depend on an abstraction. Adapters provide concrete implementations (local subprocess, remote RPC, mock for testing).
-
----
 
 ## Decision
 

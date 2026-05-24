@@ -1,12 +1,18 @@
-# ADR-0038: Identity Port — Unified Authentication Abstraction
-
-**Date:** 2026-05-23  
-**Status:** Implemented  
-**Author:** Russell Team  
-**Deciders:** Operator  
-**Technical Story:** Adversarial review Task T7 (Unify Auth Identity)
-
 ---
+title: "ADR-0038: Identity Port — Unified Authentication Abstraction"
+audience: [developers, architects]
+last_updated: 2026-05-23
+togaf_phase: "D"
+version: "1.0.0"
+status: "Implemented"
+---
+
+<!-- TOGAF_DOMAIN: Technology — Hexagonal Architecture -->
+<!-- VERSION: 1.0.0 -->
+<!-- STATUS: Implemented -->
+<!-- LAST_UPDATED: 2026-05-23 -->
+
+# ADR-0038: Identity Port — Unified Authentication Abstraction
 
 ## Context
 

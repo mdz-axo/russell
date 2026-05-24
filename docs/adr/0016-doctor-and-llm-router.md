@@ -9,7 +9,7 @@ status: "Superseded (naming)"
 
 <!-- TOGAF_DOMAIN: Change Management -->
 <!-- VERSION: 2.0.0 -->
-<!-- STATUS: Active -->
+<!-- STATUS: Superseded (naming) -->
 <!-- LAST_UPDATED: 2026-05-09 -->
 
 # ADR-0016: MVP Doctor — Local-First Ollama with Opt-In OpenRouter
