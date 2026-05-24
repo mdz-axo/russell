@@ -15,7 +15,7 @@ status: "Active"
 # Skill Self-Management Strategy
 
 > How Jack builds, loads, modifies, deletes, and measures skills
-> — without the operator touching the workshop REPL.
+> — through the ACP session interface and `skill-manager` skill.
 
 ## 1. Current State
 
@@ -344,4 +344,4 @@ This pattern:
 | `prune`/`retire` removes the `skill-manager` skill itself | Medium | `skill-manager` is marked `max_auto_risk: none` for self-targeting operations. Jack's prompt explicitly forbids pruning bundled skills. |
 | Registry corruption from concurrent writes | Low | Registry is single-writer (only chat CLI process touches it). Sentinel is read-only on skills. |
 | Telemetry flooding (287 samples/day × many skills) | Low | Counters are integers, not arrays. The `RegistryEntry` struct grows by ~40 bytes total. |
-| Operator confusion between workshop REPL and Jack's skill management | Low | Workshop remains available. Jack's approach is the "nurse doing it for you" — the REPL is the "DIY" path. |
+| Operator confusion between CLI skill verbs and Jack's skill management | Low | Both paths exist: CLI verbs (`skill-install`, `skill-prune`, etc.) for operators, ACTION syntax through ACP for Jack. The `skill-manager` skill wraps the same underlying operations. |

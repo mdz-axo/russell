@@ -115,26 +115,24 @@ flowchart LR
   CLI[russell-cli]
   ACP[russell-acp-server]
   AGENT[russell-agent]
-  REFLEX[russell-reflex]
   TESTING[russell-testing]
 
   SENTINEL --> CORE
   SKILLS --> CORE
   META --> CORE & SKILLS
   PROPRIO --> CORE
-  REFLEX --> CORE & PROPRIO
   MCP --> CORE & SENTINEL & META & SKILLS & PROPRIO
   ACP --> CORE & SKILLS & META
-  AGENT --> CORE & SENTINEL & PROPRIO & REFLEX & META
-  CLI --> CORE & SENTINEL & META & SKILLS & PROPRIO & MCP & REFLEX
+  AGENT --> CORE & SENTINEL & PROPRIO & META
+  CLI --> CORE & SENTINEL & META & SKILLS & PROPRIO & MCP
   TESTING --> CORE
 ```
 
 <!-- DIAGRAM_ALIGNMENT
 id: DIAG-OVERVIEW-002
 type: flowchart
-verified_date: 2026-05-13
-verified_against: ADR-0013 (rust-workspace-layout); cargo.toml dependency declarations
+verified_date: 2026-05-24
+verified_against: ADR-0013 (rust-workspace-layout); Cargo.toml dependency declarations; CHANGELOG v0.20.0 (russell-reflex removed)
 reference_sources: PRINCIPLES_CATALOG.md JR-6 (reuse over dependency)
 status: VERIFIED
 -->
@@ -192,13 +190,16 @@ Russell runs under user-scoped systemd with one exception:
 declare `Persistent=true` + `RandomizedDelaySec=` so a sleeping
 laptop catches up without thundering herd.
 
-### 4.2 CLI and MCP, two views of the same actions
+### 4.2 CLI and ACP, two views of the same actions
 
-Every CLI subcommand has a matching MCP tool unless an ADR
-explicitly justifies the asymmetry. This is a hard rule so
-agents and humans never diverge in capability. The MCP surface
-is catalogued in
-[`../archive/mcp-surface.md`](../archive/mcp-surface.md).
+Every CLI subcommand has a corresponding ACP session capability
+unless an ADR explicitly justifies the asymmetry. The ACP server
+provides the primary agent interface; the CLI provides the primary
+operator interface. Both exercise the same underlying code paths.
+The MCP client surface (ADR-0025) is read-only: Russell consumes
+hKask tools but does not expose its own MCP server. The former
+MCP server feature is deprecated; use `russell-acp-server` for
+agent integration.
 
 ### 4.3 The Nurse (Metacognitive Layer)
 
@@ -228,14 +229,18 @@ probe's value against the EWMA baseline. Samples and any
 generated events land in the journal.
 
 The Meta-Sentinel (`russell-proprio`) observes Russell himself.
-Five self-vitals are active (per JR-5):
+Nine self-observation points are active (per JR-5):
 `sentinel_last_run_age_s`, `journal_writer_stall_s`,
-`llm_p95_latency_ms`, `timer_drift_s`, `help_error_rate_pct`.
+`llm_p95_latency_ms`, `timer_drift_s`, `help_error_rate_pct`,
+`hkask_mcp_reachable_ms`, `remote_discovery_latency_s`,
+`journal_chain_intact` (boolean), `evidence_integrity_ok` (boolean).
 It runs BEFORE host probes in each cycle so the measurement is
-never stale-by-one. Full meta-Sentinel (additional vitals) is
-deferred to Phase 4. See
-[`../archive/proprioception.md`](../archive/proprioception.md)
-for the aspirational design.
+never stale-by-one. Reflex arcs (`russell-proprio::reflex`,
+consolidated from the former `russell-reflex` crate) evaluate
+threshold and rate breaches to propose interventions with cooldown
+enforcement. See
+[`../adr/0015-proprioception-self-health.md`](../adr/0015-proprioception-self-health.md)
+and [ADR-0021](../adr/0021-proprioception-phase2-reflex-arcs.md).
 
 ## 6. Honeymoon and first 30 days
 
@@ -252,9 +257,9 @@ aggressive intervention.
 |---|---|---|
 | New probe | `russell-sentinel::probes` | `overview.md` §3.2 if schema changes; ADR if new hardware class |
 | New skill | `skills/<id>/` | `AGENTS.md` §6; `skill-self-management-strategy.md` for meta-skills |
-| New MCP tool | `russell-mcp::tools` | [`../archive/mcp-surface.md`](../archive/mcp-surface.md); ADR |
-| New CLI subcommand | `russell-cli::commands` | `CONTRIBUTING.md` §9; mirror in MCP if user-facing |
-| New self-health vital | `russell-proprio::probes` | [`../archive/proprioception.md`](../archive/proprioception.md); ADR if new failure class |
+| New ACP capability | `russell-acp-server::handler` | [`../adr/0027-acp-integration.md`](../adr/0027-acp-integration.md); ADR |
+| New CLI subcommand | `russell-cli::commands` | `CONTRIBUTING.md` §9; add ACP session method if user-facing |
+| New self-health vital | `russell-proprio::probes` | [`../adr/0015-proprioception-self-health.md`](../adr/0015-proprioception-self-health.md); ADR if new failure class |
 
 ## 8. hKask integration surface
 
@@ -319,8 +324,9 @@ specific reference models:
 | Subsystem | Reference Model | Source |
 |---|---|---|
 | **Hexagonal architecture** | Ports and Adapters | Cockburn, A. (2005). *Hexagonal Architecture*. |
-| **Reflex engine** | Subsumption architecture | Brooks, R. (1991). "Intelligence without representation." *Artificial Intelligence* 47(1–3). |
+| **Reflex engine** | Subsumption architecture | Brooks, R. (1991). "Intelligence without representation." *Artificial Intelligence* 47(1–3). Implemented in `russell-proprio::reflex`. |
 | **EWMA baselines** | Exponentially Weighted Moving Average | Roberts, S.W. (1959). "Control Chart Tests Based on Geometric Moving Averages." *Technometrics* 1(3). |
+| **Baseline freshness guard** | Statistical process control | ADR-0028. Extends EWMA with freshness validity window. |
 | **Proprioception** | Viable System Model (VSM) | Beer, S. (1972). *Brain of the Firm*. Wiley. |
 | **Proprioception** | Law of Requisite Variety | Ashby, W.R. (1956). *An Introduction to Cybernetics*. Chapman & Hall. |
 | **IDRS contract** | Let-it-crash + declarative config | Armstrong, J. (2003). *Making reliable distributed systems in the presence of software errors*. Erlang thesis. |
@@ -330,6 +336,8 @@ specific reference models:
 | **Landlock sandbox** | Landlock LSM | Landlock project. <https://landlock.io>. Linux kernel security module. |
 | **ACP protocol** | Agent Client Protocol | hKask ACP specification. See [ADR-0027](../adr/0027-acp-integration.md). |
 | **Skill manifests** | Nix derivations + Ansible playbooks | Declarative package specification patterns. |
+| **Agent Pod** | VSM S1/S2 identity; Kubernetes Pod lifecycle | Beer, S. (1972). *Brain of the Firm*; Kubernetes Pod spec (container lifecycle). See `russell-agent`. |
+| **MCP Client** | JSON-RPC 2.0; MCP Specification | JSON-RPC Working Group (2010). "JSON-RPC 2.0 Specification."; Anthropic (2024). "Model Context Protocol." |
 
 ## 10. What this document is not
 

@@ -69,7 +69,7 @@ When two principles conflict, the lower number wins.
 | **Risk band** | `none` / `low` / `medium` / `high` / `critical`. Enforced by dispatcher's `max_auto_risk` cap. |
 | **EWMA baseline** | Per-probe mean + variance, 30-day rolling p50/p95/p99. |
 | **Poka-yoke** | The dispatcher refusing any ID not in the loaded manifest. |
-| **Proprioception** | Russell's self-observation. 5 self-vitals: `sentinel_last_run_age_s`, `journal_writer_stall_s`, `llm_p95_latency_ms`, `timer_drift_s`, `help_error_rate_pct`. |
+| **Proprioception** | Russell's self-observation. 9 self-observation points: 7 numeric vitals (`sentinel_last_run_age_s`, `journal_writer_stall_s`, `llm_p95_latency_ms`, `timer_drift_s`, `help_error_rate_pct`, `hkask_mcp_reachable_ms`, `remote_discovery_latency_s`) + 2 boolean integrity checks (`journal_chain_intact`, `evidence_integrity_ok`). |
 | **Skill workshop** | **Removed.** Skill lifecycle management absorbed into `russell skill` subcommands and ACP session interface. |
 | **Registry cache** | `local-cache.yaml` mapping symptom→skill. Rebuildable from installed skills. |
 | **Safety scanner** | Pre-install content check for prompt injection, pipe-to-shell, secret exfiltration, destructive commands. |

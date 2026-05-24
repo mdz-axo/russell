@@ -49,7 +49,7 @@ fn render_stdout(paths: &Paths, since_hours: u32) -> Result<()> {
             Err(e) => writeln!(out, "- load error: {e}")?,
         }
     } else {
-        writeln!(out, "- no profile.json — run `russell profile --init`")?;
+        writeln!(out, "- no profile.json — see docs/deployment/QUICKSTART.md")?;
     }
 
     // Journal summary.

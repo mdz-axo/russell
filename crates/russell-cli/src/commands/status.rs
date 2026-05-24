@@ -28,7 +28,7 @@ pub fn run(paths: &Paths) -> Result<()> {
             ),
         }
     } else {
-        println!("  profile:      <absent — run `russell profile --init`>");
+        println!("  profile:      <absent — see docs/deployment/QUICKSTART.md>");
     }
 
     let journal_path = paths.journal();

@@ -26,7 +26,7 @@ of every meaningful development session.
 - **Phase 1b (install artifacts + systemd units) — SHIPPED + installed.**
 - **Phase 1c (20-day unattended soak) — CLOSED.**
 - **Phase 2 (observation sharpened) — COMPLETE.** Self-vitals (5), rule engine, EWMA baselines, process probes (7), GPU probes (5), disk probes (2), systemd probes (3). Baseline deviation integrated into Jack's SOAP objective.
-- **Phase 3 (skills and dispatch) — COMPLETE.** Extended with skill lifecycle management: registry cache (`local-cache.yaml`), safety scanner (7 rules for manifest + KNOWLEDGE.md), skill discovery pipeline, and scenario testing skill (`scenario-tester`). 13 skills loaded (5 actionable with probes, 8 knowledge). ACP server for hKask integration. `russell skill run` respects manifest `timeout:` field.
+- **Phase 3 (skills and dispatch) — COMPLETE.** Extended with skill lifecycle management: registry cache (`local-cache.yaml`), safety scanner (7 rules for manifest + KNOWLEDGE.md), skill discovery pipeline, and scenario testing skill (`scenario-tester`). 11 skills loaded (5 actionable with probes, 6 knowledge). ACP server for hKask integration. `russell skill run` respects manifest `timeout:` field.
 - **Phase 4 (MCP surface, real skills, operational depth) — COMPLETE.** All skill lifecycle gaps closed (2026-05-20): `fetch <url> <name>` downloads skills from URLs with safety scanning, `build <name>` creates skill skeletons on disk, `adapt <name>` modifies manifests via LLM + editor, `search --remote` loads `~/.config/harness/registry-sources.yaml` and queries Brave Search API, batch operations (`prune --all-stale`, `install --all-evaluated`). `skill-manager` bundled meta-skill enables Jack to build, install, prune, restore, and delete skills from chat via ACTION syntax. Registry telemetry wired: `probe_runs`, `intervention_runs`, `avg_probe_duration_ms`, and `last_probe_run_at` updated on every execution. Quality scoring (`compute_score()`) operational. End-to-end scenario pipeline: `scenario-full` probe chains run-okapi → evaluate → journal. 288 tests pass. 21 scenario tests pass.
 - **Architecture:** JR-1 austerity maintained throughout. Seven ADRs deferred.
 
@@ -69,11 +69,11 @@ of every meaningful development session.
   `docs`, `verify-journal`.
 - 288 tests passing.
 - 21 scenario tests passing (`scenario-tests.sh`).
-- 12 skills loaded (okapi-watcher, web-search, skill-discovery,
-  skill-workshop, skill-maintenance, scenario-tester, sysadmin,
+- 11 skills loaded (okapi-watcher, web-search, skill-discovery,
+  skill-maintenance, scenario-tester, sysadmin,
   pragmatic-cybernetics, pragmatic-semantics, ubuntu-jack,
   oom-watcher, **skill-manager**). 5 actionable (okapi-watcher,
-  sysadmin, scenario-tester, oom-watcher, skill-manager), 7 knowledge.
+  sysadmin, scenario-tester, oom-watcher, skill-manager), 6 knowledge.
 - Skill registry telemetry active: `probe_runs`,
   `intervention_runs`, `avg_probe_duration_ms` (EWMA), and
   `last_probe_run_at` updated on every execution in chat and CLI.

@@ -3,7 +3,7 @@
 //!
 //! This module consolidates skill lifecycle operations to avoid C7 violations
 //! (divergent implementations). Both `russell skill` CLI commands and the
-//! workshop REPL use these shared functions.
+//! ACP session interface use these shared functions.
 
 use anyhow::{Context, Result};
 use russell_core::journal::JournalWriter;
@@ -19,7 +19,7 @@ pub fn install_skill(paths: &Paths, name: &str, verbose: bool) -> Result<()> {
     let skill_dir = skills_dir.join(name);
     if !skill_dir.exists() || !skill_dir.join("manifest.yaml").exists() {
         anyhow::bail!(
-            "Skill '{name}' not found on disk. Use 'russell workshop build {name}' to create it."
+            "Skill '{name}' not found on disk. Use 'russell skill-install {name}' to install it."
         );
     }
 
