@@ -1,0 +1,25 @@
+# SPDX-License-Identifier: MIT OR Apache-2.0
+[package]
+name = "russell-session"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+description = "Shared session engine for Russell — multi-turn interactive Jack sessions with consent, used by CLI, API, and ACP surfaces"
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+russell-core = { workspace = true }
+russell-meta = { workspace = true }
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+chrono = { workspace = true }
+uuid = { workspace = true, features = ["v4", "serde"] }
+tracing = { workspace = true }
+async-trait = { workspace = true }
+thiserror = { workspace = true }

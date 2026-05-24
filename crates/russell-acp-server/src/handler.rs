@@ -1,38 +1,60 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 //! ACP handler — processes JSON-RPC requests.
+//!
+//! Delegates session logic to `russell_session::SessionEngine` so that
+//! ACP, CLI, and API surfaces are functionally equivalent.
 
 use chrono::Utc;
 use serde_json::json;
 use tracing::{debug, info, warn};
 
 use crate::CapabilityToken;
-use crate::SessionState;
 use crate::auth::MacaroonAuth;
 use crate::cns::CnsPort;
 use crate::error::{AcpError, Result};
 use crate::persona::JackPersonaProjection;
 use crate::port::SkillDispatchPort;
 use crate::rate_limit::RateLimiter;
-use crate::session::{SessionManager, Turn, TurnRole};
 use crate::types::*;
+use russell_session::{
+    ConsentDecision, ConsentRequest, SessionEngine, SessionState, Turn, TurnRole,
+};
+
+/// ACP-specific intervention port adapter.
+struct AcpInterventionAdapter {
+    dispatch: std::sync::Arc<dyn SkillDispatchPort + Send + Sync>,
+}
+
+#[async_trait::async_trait]
+impl russell_session::InterventionPort for AcpInterventionAdapter {
+    async fn execute(
+        &self,
+        skill_id: &str,
+        _intervention_id: &str,
+        args: &serde_json::Value,
+    ) -> Result<String, String> {
+        self.dispatch
+            .dispatch_skill(skill_id, args)
+            .await
+            .map_err(|e| e.to_string())
+    }
+}
 
 /// ACP handler — processes JSON-RPC requests.
 pub struct AcpHandler {
-    /// Session manager.
-    sessions: SessionManager,
-    /// Jack persona.
+    /// Session engine (shared logic across all surfaces).
+    engine: SessionEngine,
+    /// Jack persona (for system prompt).
     #[allow(dead_code)]
     persona: JackPersonaProjection,
     /// Skill dispatch port (hexagonal).
-    dispatch: Box<dyn SkillDispatchPort>,
+    dispatch: std::sync::Arc<dyn SkillDispatchPort + Send + Sync>,
     /// Macaroon auth.
     auth: MacaroonAuth,
     /// Rate limiter.
     rate_limiter: RateLimiter,
     /// Whether authentication is required for all requests.
     require_auth: bool,
-    /// Inference backend for LLM responses (T6).
-    inference: Option<std::sync::Arc<dyn russell_core::inference::InferencePort>>,
     /// Journal reader for proprioception notifications (T2-2).
     journal_reader: Option<russell_core::journal::JournalReader>,
     /// CNS span emitter for observability (T2-3).
@@ -47,14 +69,23 @@ impl AcpHandler {
         auth: MacaroonAuth,
         rate_limiter: RateLimiter,
     ) -> Self {
+        let dispatch_arc: std::sync::Arc<dyn SkillDispatchPort + Send + Sync> =
+            std::sync::Arc::new(dispatch);
+        let intervention_adapter: Box<dyn russell_session::InterventionPort + Send> =
+            Box::new(AcpInterventionAdapter {
+                dispatch: std::sync::Arc::clone(&dispatch_arc),
+            });
+
+        let engine = SessionEngine::new(persona.system_prompt())
+            .with_intervention_port(intervention_adapter);
+
         Self {
-            sessions: SessionManager::new(),
+            engine,
             persona,
-            dispatch: Box::new(dispatch),
+            dispatch: dispatch_arc,
             auth,
             rate_limiter,
             require_auth: true,
-            inference: None,
             journal_reader: None,
             cns: None,
         }
@@ -65,7 +96,7 @@ impl AcpHandler {
         mut self,
         inference: std::sync::Arc<dyn russell_core::inference::InferencePort>,
     ) -> Self {
-        self.inference = Some(inference);
+        self.engine = self.engine.with_inference(inference);
         self
     }
 
@@ -88,8 +119,8 @@ impl AcpHandler {
     }
 
     /// Access the session manager (for GC from transport layer).
-    pub fn sessions_mut(&mut self) -> &mut SessionManager {
-        &mut self.sessions
+    pub fn sessions_mut(&mut self) -> &mut russell_session::SessionManager {
+        self.engine.sessions_mut()
     }
 
     /// Handle a JSON-RPC request.
@@ -107,7 +138,6 @@ impl AcpHandler {
             };
         }
 
-        // Check rate limit (if auth provided).
         if let Some(ref auth) = request.auth
             && let Err(e) = self.rate_limiter.check(&auth.token)
         {
@@ -119,7 +149,6 @@ impl AcpHandler {
             };
         }
 
-        // Validate auth (if provided).
         let validated_token = if let Some(ref auth_info) = request.auth {
             match self.validate_auth(auth_info) {
                 Ok(token) => Some(token),
@@ -136,7 +165,6 @@ impl AcpHandler {
             None
         };
 
-        // Dispatch to method handler.
         let result = match request.method.as_str() {
             "acp/session.create" => {
                 self.create_session(request.params, validated_token.as_ref())
@@ -161,8 +189,8 @@ impl AcpHandler {
             "acp/capabilities" => self.get_capabilities(request.params).await,
             "acp/notifications.list" => self.list_notifications(request.params).await,
             "acp/skill/info" => self.get_skill_info(request.params).await,
-            "acp/skill/run" => self.run_skill(request.params).await,
-            "acp/probe/run" => self.run_probe(request.params).await,
+            "acp/skill.run" => self.run_skill(request.params).await,
+            "acp/probe.run" => self.run_probe(request.params).await,
             _ => Err(AcpError::InvalidRequest(format!(
                 "unknown method: {}",
                 request.method
@@ -188,8 +216,7 @@ impl AcpHandler {
         }
     }
 
-    /// Validate authentication info and return the validated token.
-    fn validate_auth(&self, auth_info: &AuthInfo) -> Result<CapabilityToken> {
+    fn validate_auth(&self, auth_info: &AuthInfo) -> crate::error::Result<CapabilityToken> {
         if auth_info.auth_type != "macaroon" {
             return Err(AcpError::AuthFailed(format!(
                 "unknown auth type: {}",
@@ -202,7 +229,6 @@ impl AcpHandler {
         Ok(token)
     }
 
-    /// Create a new session.
     async fn create_session(
         &mut self,
         params: Option<serde_json::Value>,
@@ -218,24 +244,20 @@ impl AcpHandler {
             .map_err(|e| AcpError::InvalidRequest(format!("invalid params: {}", e)))?;
 
         let token_id = token.map(|t| t.token_id.clone());
-        let session_id = self
-            .sessions
-            .create_session_with_token(&req.persona, token_id);
-        info!(session_id = %session_id, "Created ACP session");
+        let resp = self
+            .engine
+            .create_session_with_token(&req.persona, token_id)
+            .map_err(|e| AcpError::InvalidRequest(e.to_string()))?;
 
-        // Emit CNS span for session creation (T2-3)
+        info!(session_id = %resp.session_id, "Created ACP session");
+
         if let Some(ref cns) = self.cns {
-            cns.emit_session_created(&session_id, &req.persona);
+            cns.emit_session_created(&resp.session_id, &req.persona);
         }
 
-        Ok(json!(CreateSessionResponse {
-            session_id: session_id.clone(),
-            created_at: Utc::now().to_rfc3339(),
-            persona: req.persona,
-        }))
+        Ok(json!(resp))
     }
 
-    /// Send a message in a session.
     async fn session_message(
         &mut self,
         params: Option<serde_json::Value>,
@@ -248,85 +270,30 @@ impl AcpHandler {
                     .map_err(|e| AcpError::InvalidRequest(format!("invalid params: {}", e)))
             })?;
 
-        let session_id = req.session_id.clone();
-
         if !self
-            .sessions
-            .verify_session_ownership(&session_id, token.map(|t| t.token_id.as_str()))
+            .engine
+            .verify_session_ownership(&req.session_id, token.map(|t| t.token_id.as_str()))
         {
             return Err(AcpError::CapabilityNotGranted(format!(
-                "session '{session_id}' not owned by this token"
+                "session '{}' not owned by this token",
+                req.session_id
             )));
         }
 
-        let session = self
-            .sessions
-            .get_session_mut(&session_id)
-            .ok_or_else(|| AcpError::SessionNotFound(session_id.clone()))?;
-
-        if !session.is_active() {
-            return Err(AcpError::SessionClosed(req.session_id.clone()));
-        }
-
-        // Add user turn.
-        let user_turn = Turn::new(TurnRole::User, &req.message);
-        session.add_turn(user_turn);
-
-        // Build conversation context from recent turns.
-        let conversation_history = session
-            .recent_turns(10)
-            .iter()
-            .map(|t| format!("{}: {}", role_label(t.role), t.content))
-            .collect::<Vec<_>>()
-            .join("\n");
-
-        // Generate Jack's response using inference backend if available.
-        let response = if let Some(ref inference) = self.inference {
-            let prompt = format!(
-                "{}\n\nConversation History:\n{}\n\nUser: {}",
-                self.persona.system_prompt(),
-                conversation_history,
-                req.message
-            );
-            let soap = russell_core::inference::SoapBundle::new(&prompt);
-            match inference.infer(&prompt, Some(&soap)).await {
-                Ok(resp) => {
-                    // Emit CNS span for LLM escalation (T2-3)
-                    if let Some(ref cns) = self.cns {
-                        cns.emit_llm_escalation(
-                            &resp.backend,
-                            resp.model.as_deref(),
-                            resp.latency_ms.unwrap_or(0),
-                        );
-                    }
-                    resp.text
+        let resp = self
+            .engine
+            .send_message(&req.session_id, &req.message)
+            .map_err(|e| match e {
+                russell_session::SessionError::SessionNotFound(id) => {
+                    AcpError::SessionNotFound(id)
                 }
-                Err(e) => {
-                    warn!(error = %e, "inference failed, using fallback");
-                    format!("[Inference unavailable: {}]", e)
-                }
-            }
-        } else {
-            format!(
-                "[No inference backend configured. Message: {}]",
-                req.message
-            )
-        };
+                russell_session::SessionError::SessionClosed(id) => AcpError::SessionClosed(id),
+                _ => AcpError::InvalidRequest(e.to_string()),
+            })?;
 
-        // Add assistant turn.
-        let assistant_turn = Turn::new(TurnRole::Assistant, &response);
-        session.add_turn(assistant_turn);
-
-        Ok(json!(SessionMessageResponse {
-            session_id: session.id.clone(),
-            response,
-            turns: session.recent_turns(10).iter().map(turn_to_info).collect(),
-            state: format!("{:?}", session.state),
-            pending_action: None, // Interventions require consent via upstream hKask workflow
-        }))
+        Ok(json!(resp))
     }
 
-    /// Close a session.
     async fn close_session(
         &mut self,
         params: Option<serde_json::Value>,
@@ -341,7 +308,7 @@ impl AcpHandler {
             .ok_or_else(|| AcpError::InvalidRequest("missing session_id".to_string()))?;
 
         if !self
-            .sessions
+            .engine
             .verify_session_ownership(&session_id, token.map(|t| t.token_id.as_str()))
         {
             return Err(AcpError::CapabilityNotGranted(format!(
@@ -349,15 +316,14 @@ impl AcpHandler {
             )));
         }
 
-        if !self.sessions.close_session(&session_id) {
-            return Err(AcpError::SessionNotFound(session_id.clone()));
-        }
+        self.engine
+            .close_session(&session_id)
+            .map_err(|e| AcpError::InvalidRequest(e.to_string()))?;
 
         info!(session_id = %session_id, "Closed ACP session");
         Ok(json!({"session_id": session_id, "closed_at": Utc::now().to_rfc3339()}))
     }
 
-    /// Get session status.
     async fn session_status(
         &mut self,
         params: Option<serde_json::Value>,
@@ -372,7 +338,7 @@ impl AcpHandler {
             .ok_or_else(|| AcpError::InvalidRequest("missing session_id".to_string()))?;
 
         if !self
-            .sessions
+            .engine
             .verify_session_ownership(&session_id, token.map(|t| t.token_id.as_str()))
         {
             return Err(AcpError::CapabilityNotGranted(format!(
@@ -381,9 +347,9 @@ impl AcpHandler {
         }
 
         let session = self
-            .sessions
+            .engine
             .get_session(&session_id)
-            .ok_or_else(|| AcpError::SessionNotFound(session_id.clone()))?;
+            .map_err(|e| AcpError::InvalidRequest(e.to_string()))?;
 
         Ok(json!({
             "session_id": session.id,
@@ -394,18 +360,75 @@ impl AcpHandler {
         }))
     }
 
-    /// Get capabilities (public skills + probes).
+    async fn consent_respond(
+        &mut self,
+        params: Option<serde_json::Value>,
+        token: Option<&CapabilityToken>,
+    ) -> Result<serde_json::Value> {
+        let raw_req: ConsentRequest = params
+            .ok_or_else(|| AcpError::InvalidRequest("missing params".to_string()))
+            .and_then(|p| {
+                serde_json::from_value(p)
+                    .map_err(|e| AcpError::InvalidRequest(format!("invalid params: {}", e)))
+            })?;
+
+        if !self.engine.verify_session_ownership(
+            &raw_req.session_id,
+            token.map(|t| t.token_id.as_str()),
+        ) {
+            return Err(AcpError::CapabilityNotGranted(format!(
+                "session '{}' not owned by this token",
+                raw_req.session_id
+            )));
+        }
+
+        let consent_req = russell_session::ConsentRequest {
+            session_id: raw_req.session_id,
+            action_id: raw_req.action_id,
+            decision: raw_req.decision,
+            reason: raw_req.reason,
+        };
+
+        let resp = self.engine.respond_consent(consent_req).map_err(|e| match e {
+            russell_session::SessionError::SessionNotFound(id) => AcpError::SessionNotFound(id),
+            russell_session::SessionError::NotWaitingForConsent(id, state) => {
+                AcpError::InvalidRequest(format!(
+                    "session '{}' is not waiting for consent (state: {:?})",
+                    id, state
+                ))
+            }
+            russell_session::SessionError::NoPendingAction => {
+                AcpError::InvalidRequest("no pending action in session".to_string())
+            }
+            russell_session::SessionError::ActionIdMismatch(got, expected) => {
+                AcpError::InvalidRequest(format!(
+                    "action_id '{}' does not match pending action '{}'",
+                    got, expected
+                ))
+            }
+            _ => AcpError::InvalidRequest(e.to_string()),
+        })?;
+
+        if let Some(ref cns) = self.cns {
+            let decision_text = match resp.decision {
+                ConsentDecision::Approve => "approved",
+                ConsentDecision::Deny => "denied",
+            };
+            cns.emit_consent_decision(&resp.action_id, decision_text);
+        }
+
+        Ok(json!(resp))
+    }
+
     async fn get_capabilities(
         &self,
         _params: Option<serde_json::Value>,
     ) -> Result<serde_json::Value> {
         let skills = self.dispatch.load_public_skills();
         let probes = self.dispatch.list_probes();
-
         Ok(json!(CapabilitiesResponse { skills, probes }))
     }
 
-    /// Get skill info.
     async fn get_skill_info(&self, params: Option<serde_json::Value>) -> Result<serde_json::Value> {
         let skill_id = params
             .and_then(|p| p.get("skill_id").and_then(|v| v.as_str()).map(String::from))
@@ -419,7 +442,6 @@ impl AcpHandler {
         Ok(json!(skill))
     }
 
-    /// Run a skill.
     async fn run_skill(&self, params: Option<serde_json::Value>) -> Result<serde_json::Value> {
         let (skill_id, args) = params
             .ok_or_else(|| AcpError::InvalidRequest("missing params".to_string()))
@@ -435,7 +457,6 @@ impl AcpHandler {
 
         let result = self.dispatch.dispatch_skill(&skill_id, &args).await?;
 
-        // Emit CNS span for skill dispatch (T2-3)
         if let Some(ref cns) = self.cns {
             cns.emit_skill_dispatched(&skill_id, "run");
         }
@@ -443,7 +464,6 @@ impl AcpHandler {
         Ok(json!({"result": result}))
     }
 
-    /// Run a probe.
     async fn run_probe(&self, params: Option<serde_json::Value>) -> Result<serde_json::Value> {
         let (skill_id, probe_id, args) = params
             .ok_or_else(|| AcpError::InvalidRequest("missing params".to_string()))
@@ -466,132 +486,6 @@ impl AcpHandler {
         Ok(json!({"result": result}))
     }
 
-    /// Respond to a consent request (approve/deny pending action).
-    async fn consent_respond(
-        &mut self,
-        params: Option<serde_json::Value>,
-        token: Option<&CapabilityToken>,
-    ) -> Result<serde_json::Value> {
-        let req: ConsentRequest = params
-            .ok_or_else(|| AcpError::InvalidRequest("missing params".to_string()))
-            .and_then(|p| {
-                serde_json::from_value(p)
-                    .map_err(|e| AcpError::InvalidRequest(format!("invalid params: {}", e)))
-            })?;
-
-        // Verify session ownership
-        if !self
-            .sessions
-            .verify_session_ownership(&req.session_id, token.map(|t| t.token_id.as_str()))
-        {
-            return Err(AcpError::CapabilityNotGranted(format!(
-                "session '{}' not owned by this token",
-                req.session_id
-            )));
-        }
-
-        // Get session and verify it's waiting for consent
-        let session = self
-            .sessions
-            .get_session_mut(&req.session_id)
-            .ok_or_else(|| AcpError::SessionNotFound(req.session_id.clone()))?;
-
-        if session.state != SessionState::InputRequired {
-            return Err(AcpError::InvalidRequest(format!(
-                "session '{}' is not waiting for consent (state: {:?})",
-                req.session_id, session.state
-            )));
-        }
-
-        // Verify action_id matches pending action
-        let pending = session
-            .pending_action
-            .as_ref()
-            .ok_or_else(|| AcpError::InvalidRequest("no pending action in session".to_string()))?;
-
-        if pending.action_id != req.action_id {
-            return Err(AcpError::InvalidRequest(format!(
-                "action_id '{}' does not match pending action '{}'",
-                req.action_id, pending.action_id
-            )));
-        }
-
-        // Extract action details before consuming pending
-        let skill_id = pending.skill_id.clone();
-        let intervention_id = pending.intervention_id.clone();
-        let args = pending.args.clone();
-
-        // Process decision
-        let (result, error) = match req.decision {
-            ConsentDecision::Approve => {
-                info!(
-                    session_id = %req.session_id,
-                    action_id = %req.action_id,
-                    skill_id = %skill_id,
-                    intervention_id = %intervention_id,
-                    "Consent approved, executing intervention"
-                );
-
-                match self.dispatch.dispatch_skill(&skill_id, &args).await {
-                    Ok(res) => (Some(res), None),
-                    Err(e) => {
-                        warn!(error = %e, "Intervention execution failed after approval");
-                        (None, Some(e.to_string()))
-                    }
-                }
-            }
-            ConsentDecision::Deny => {
-                info!(
-                    session_id = %req.session_id,
-                    action_id = %req.action_id,
-                    reason = ?req.reason,
-                    "Consent denied"
-                );
-                (None, Some("Action denied by operator".to_string()))
-            }
-        };
-
-        // Clear pending action and return to active state
-        session.pending_action = None;
-        session.state = SessionState::Active;
-        session.last_activity = Utc::now();
-
-        // Add turn recording the consent decision
-        let decision_text = match req.decision {
-            ConsentDecision::Approve => "approved",
-            ConsentDecision::Deny => "denied",
-        };
-        let turn_content = format!(
-            "Operator {} intervention {}/{}{}",
-            decision_text,
-            skill_id,
-            intervention_id,
-            req.reason
-                .as_ref()
-                .map(|r| format!(" (reason: {})", r))
-                .unwrap_or_default()
-        );
-        session.add_turn(Turn::new(TurnRole::User, turn_content));
-
-        // Emit CNS span for consent decision (T2-3)
-        if let Some(ref cns) = self.cns {
-            cns.emit_consent_decision(&req.action_id, decision_text);
-        }
-
-        Ok(json!(ConsentResponse {
-            session_id: req.session_id,
-            action_id: req.action_id,
-            decision: req.decision,
-            result,
-            error,
-        }))
-    }
-
-    /// List recent proprioception notifications (T2-2).
-    ///
-    /// Queries the journal for `self_vital_breach` events in the last N hours
-    /// (default: 24h, max: 168h/7 days). Returns structured notifications
-    /// that hKask agents can surface to the operator.
     async fn list_notifications(
         &self,
         params: Option<serde_json::Value>,
@@ -601,7 +495,7 @@ impl AcpHandler {
             .and_then(|p| p.get("hours"))
             .and_then(|v| v.as_i64())
             .unwrap_or(24)
-            .min(168); // Cap at 7 days
+            .min(168);
 
         let reader = self
             .journal_reader
@@ -610,7 +504,6 @@ impl AcpHandler {
 
         let since_unix = russell_core::time::now_unix() - (hours * 3600);
 
-        // Query self_vital_breach events from the journal
         let events = reader
             .list_events_by_action("self_vital_breach", since_unix, i64::MAX)
             .map_err(|e| AcpError::Internal(format!("journal query failed: {e}")))?;
@@ -619,8 +512,6 @@ impl AcpHandler {
             .iter()
             .filter_map(|row| {
                 let summary = row.summary.as_deref()?;
-                // Parse the summary to extract vital name and value
-                // Format: "<vital> = <value> (threshold: <threshold>)"
                 let parts: Vec<&str> = summary.splitn(2, " = ").collect();
                 if parts.len() < 2 {
                     return None;
@@ -654,34 +545,6 @@ impl AcpHandler {
             notifications,
             total,
         }))
-    }
-}
-
-fn role_label(role: TurnRole) -> &'static str {
-    match role {
-        TurnRole::User => "User",
-        TurnRole::Assistant => "Jack",
-        TurnRole::Tool => "Tool",
-    }
-}
-
-fn turn_to_info(turn: &Turn) -> TurnInfo {
-    TurnInfo {
-        id: turn.id.clone(),
-        role: format!("{:?}", turn.role),
-        content: turn.content.clone(),
-        timestamp: turn.timestamp.to_rfc3339(),
-        tool_calls: turn
-            .tool_calls
-            .iter()
-            .map(|tc| ToolCallSummary {
-                skill_id: tc.skill_id.clone(),
-                probe_id: tc.probe_id.clone(),
-                intervention_id: tc.intervention_id.clone(),
-                args: tc.args.clone(),
-                result: tc.result.clone(),
-            })
-            .collect(),
     }
 }
 

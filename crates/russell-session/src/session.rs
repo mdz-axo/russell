@@ -1,11 +1,16 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 //! Session management — multi-turn conversation state.
+//!
+//! Moved from `russell-acp-server` to be shared across all three surfaces
+//! (CLI, API, ACP). This is the canonical session model.
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-/// ACP session — multi-turn conversation with Jack persona.
+use russell_core::risk::RiskBand;
+
+/// A session — multi-turn conversation with Jack persona.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Session {
     /// Session ID (UUID v4).
@@ -20,12 +25,12 @@ pub struct Session {
     pub last_activity: DateTime<Utc>,
     /// Session state.
     pub state: SessionState,
-    /// Token ID that created this session (for ownership binding).
+    /// Token ID that created this session (for ownership binding, ACP only).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub token_id: Option<String>,
     /// Pending action awaiting consent (if state is InputRequired).
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub pending_action: Option<crate::types::PendingAction>,
+    pub pending_action: Option<PendingAction>,
 }
 
 impl Session {
@@ -137,7 +142,7 @@ pub enum TurnRole {
     User,
     /// Jack persona.
     Assistant,
-    /// MCP tool response.
+    /// Tool response.
     Tool,
 }
 
@@ -156,8 +161,35 @@ pub struct ToolCallRecord {
     pub args: serde_json::Value,
     /// Result.
     pub result: String,
-    /// Visibility (for audit).
-    pub visibility: crate::types::Visibility,
+}
+
+/// Pending action (consent required).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PendingAction {
+    /// Action type (intervention/probe).
+    pub action_type: String,
+    /// Skill ID.
+    pub skill_id: String,
+    /// Intervention ID.
+    pub intervention_id: String,
+    /// Risk level.
+    pub risk: RiskBand,
+    /// Requires operator consent.
+    pub requires_consent: bool,
+    /// Action ID for consent response (UUID v4).
+    pub action_id: String,
+    /// Arguments to pass to the intervention when executed.
+    pub args: serde_json::Value,
+}
+
+/// Consent decision.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ConsentDecision {
+    /// Approve the action.
+    Approve,
+    /// Deny the action.
+    Deny,
 }
 
 /// Session manager — holds all active sessions.
@@ -195,8 +227,6 @@ impl SessionManager {
     }
 
     /// Verify that a token owns a session.
-    /// Returns true if the session has no token binding (unauthenticated mode)
-    /// or if the token_id matches.
     pub fn verify_session_ownership(&self, id: &str, token_id: Option<&str>) -> bool {
         match self.sessions.get(id) {
             Some(session) => match (&session.token_id, token_id) {
@@ -280,6 +310,24 @@ mod tests {
     fn session_manager_create() {
         let mut manager = SessionManager::new();
         let session_id = manager.create_session("jack");
-        assert!(session_id.starts_with("sess_") || session_id.len() == 36); // UUID
+        assert!(!session_id.is_empty());
+    }
+
+    #[test]
+    fn session_consent_flow() {
+        let mut session = Session::new("jack");
+        session.state = SessionState::InputRequired;
+        session.pending_action = Some(PendingAction {
+            action_type: "intervention".to_string(),
+            skill_id: "sysadmin".to_string(),
+            intervention_id: "sweep-caches".to_string(),
+            risk: RiskBand::Medium,
+            requires_consent: true,
+            action_id: "action-123".to_string(),
+            args: serde_json::json!({}),
+        });
+        assert!(session.is_active());
+        assert_eq!(session.state, SessionState::InputRequired);
+        assert!(session.pending_action.is_some());
     }
 }

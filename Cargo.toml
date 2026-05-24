@@ -12,6 +12,8 @@ members = [
     "crates/russell-cli",
     "crates/russell-testing",
     "crates/russell-acp-server",
+    "crates/russell-session",
+    "crates/russell-api-server",
     "crates/russell-agent",
     "crates/russell-mcp",
 ]
@@ -34,7 +36,9 @@ russell-proprio  = { path = "crates/russell-proprio" }
 russell-mcp      = { path = "crates/russell-mcp" }
 russell-cli      = { path = "crates/russell-cli" }
 russell-testing  = { path = "crates/russell-testing" }
+russell-session   = { path = "crates/russell-session" }
 russell-acp-server = { path = "crates/russell-acp-server" }
+russell-api-server = { path = "crates/russell-api-server" }
 russell-agent    = { path = "crates/russell-agent" }
 
 # Third-party (see ADRs 0004, 0009, 0010, 0012)

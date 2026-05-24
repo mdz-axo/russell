@@ -1,0 +1,31 @@
+# SPDX-License-Identifier: MIT OR Apache-2.0
+[package]
+name = "russell-api-server"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+description = "HTTP REST API server for Russell — functionally equivalent to CLI and ACP surfaces"
+
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+name = "russell-api-server"
+path = "src/main.rs"
+
+[dependencies]
+russell-core = { workspace = true }
+russell-meta = { workspace = true }
+russell-session = { workspace = true }
+tokio = { workspace = true, features = ["net"] }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+chrono = { workspace = true }
+axum = { version = "0.8", features = ["json"] }
+tower = "0.5"
+tower-http = { version = "0.6", features = ["cors", "trace"] }
