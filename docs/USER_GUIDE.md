@@ -1,10 +1,16 @@
 ---
 title: "Russell User Guide"
 audience: [operators]
-last_updated: 2026-05-22
-version: "1.1.0"
+last_updated: 2026-05-24
+togaf_phase: "H"
+version: "1.2.0"
 status: "Active"
 ---
+
+<!-- TOGAF_DOMAIN: Technology — User Guide -->
+<!-- VERSION: 1.2.0 -->
+<!-- STATUS: Active -->
+<!-- LAST_UPDATED: 2026-05-24 -->
 
 # Russell User Guide
 

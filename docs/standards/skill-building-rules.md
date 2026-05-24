@@ -2,7 +2,7 @@
 title: "Skill Building Rules"
 audience: [jack, agents, operators]
 last_updated: 2026-05-21
-togaf_phase: "Phase 3"
+togaf_phase: "D"
 version: "1.0.0"
 status: "Active"
 ---

@@ -46,9 +46,9 @@ echo "  ✓ Installed to ${HOME_DIR}/.local/bin/russell-acp-server"
 echo ""
 echo "[4/6] Installing systemd units..."
 mkdir -p "${HOME_DIR}/.config/systemd/user"
-cp "${SCRIPT_DIR}/russell-acp-server.service" "${HOME_DIR}/.config/systemd/user/"
-cp "${SCRIPT_DIR}/russell-sentinel.service" "${HOME_DIR}/.config/systemd/user/"
-cp "${SCRIPT_DIR}/russell-sentinel.timer" "${HOME_DIR}/.config/systemd/user/"
+cp "${SCRIPT_DIR}/../../packaging/systemd/russell-acp-server.service" "${HOME_DIR}/.config/systemd/user/"
+cp "${SCRIPT_DIR}/../../packaging/systemd/russell-sentinel.service" "${HOME_DIR}/.config/systemd/user/"
+cp "${SCRIPT_DIR}/../../packaging/systemd/russell-sentinel.timer" "${HOME_DIR}/.config/systemd/user/"
 echo "  ✓ systemd units installed"
 
 # Reload systemd

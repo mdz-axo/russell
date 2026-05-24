@@ -175,6 +175,15 @@ erDiagram
     }
 ```
 
+<!-- DIAGRAM_ALIGNMENT
+id: DIAG-ADR042-ER-001
+type: erDiagram
+verified_date: 2026-05-24
+verified_against: crates/russell-core, russell-acp-server, russell-meta, russell-mcp
+reference_sources: Adversarial review 2026-05-23; Cockburn (2005) hexagonal architecture
+status: VERIFIED
+-->
+
 ---
 
 ## 3. Findings by Perspective
@@ -665,6 +674,15 @@ graph TD
     T2.1[T2.1: Wire SkillDispatchPort] --> T4.1
     T2.5[T2.5: ReflexBudget Persistence] --> Q10[ADR-0030 Q10 Closed]
 ```
+
+<!-- DIAGRAM_ALIGNMENT
+id: DIAG-ADR042-FLOW-002
+type: flowchart
+verified_date: 2026-05-24
+verified_against: ADR-0042 remediation task list
+reference_sources: Adversarial review remediation plan 2026-05-24
+status: VERIFIED
+-->
 
 ---
 

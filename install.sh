@@ -183,11 +183,8 @@ cp "${REPO_ROOT}/packaging/systemd/russell-sentinel.timer" "$SYSTEMD_USER_DIR"
 cp "${REPO_ROOT}/packaging/systemd/russell-digest.service" "$SYSTEMD_USER_DIR"
 cp "${REPO_ROOT}/packaging/systemd/russell-digest.timer" "$SYSTEMD_USER_DIR"
 cp "${REPO_ROOT}/packaging/systemd/russell-failure@.service" "$SYSTEMD_USER_DIR"
-# ACP server unit for hKask integration
-if [ -f "${REPO_ROOT}/docs/deployment/russell-acp-server.service" ]; then
-    cp "${REPO_ROOT}/docs/deployment/russell-acp-server.service" "$SYSTEMD_USER_DIR"
-    echo "  → russell-acp-server.service installed"
-fi
+cp "${REPO_ROOT}/packaging/systemd/russell-acp-server.service" "$SYSTEMD_USER_DIR"
+echo "  → russell-acp-server.service installed"
 
 echo "==> Installing default rules…"
 # Ship default rules only if the target doesn't already have rules
@@ -250,13 +247,13 @@ fi
 echo "==> Reloading systemd and enabling timers…"
 systemctl --user daemon-reload
 
-# Enable the timers (they start on next boot or immediately if activated).
 systemctl --user enable russell-sentinel.timer
 systemctl --user enable russell-digest.timer
+systemctl --user enable russell-acp-server.service
 
-# Start them now.
 systemctl --user start russell-sentinel.timer
 systemctl --user start russell-digest.timer 2>/dev/null || true
+systemctl --user start russell-acp-server.service 2>/dev/null || true
 
 echo ""
 echo "====================="

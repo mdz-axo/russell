@@ -1,23 +1,26 @@
 # SPDX-License-Identifier: MIT OR Apache-2.0
+# NOTE: The canonical systemd units live in packaging/systemd/.
+# This file is retained for the docs/deployment/install.sh reference.
 [Unit]
 Description=Russell Sentinel — Host probe collection
-Documentation=file:///home/mdz-axolotl/Clones/russell/docs/README.md
+Documentation=https://github.com/Replicant-Partners/russell
 After=network.target
 
 [Service]
 Type=oneshot
-ExecStart=%h/.local/bin/russell sentinel-once
-Environment=RUSSELL_DOCTOR_BACKEND=okapi
-# Security hardening
+TimeoutStartSec=120
+Nice=15
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
 NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=read-only
+ReadWritePaths=%h/.local/state/harness %h/.local/share/harness
 PrivateTmp=true
-ReadWritePaths=%h/.local/state/harness
-# Logging
+ExecStart=%h/.local/bin/russell sentinel-once
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=russell-sentinel
 
 [Install]
-WantedBy=multi-user.target
+WantedBy=default.target

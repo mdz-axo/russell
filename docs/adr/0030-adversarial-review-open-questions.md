@@ -1,3 +1,31 @@
+---
+title: "ADR-0030: Adversarial Review — Open Architectural Questions"
+audience: [architects, developers]
+last_updated: 2026-05-24
+togaf_phase: "G"
+version: "1.0.0"
+status: "Superseded"
+---
+
+<!-- TOGAF_DOMAIN: Governance — Adversarial Review -->
+<!-- VERSION: 1.0.0 -->
+<!-- STATUS: Superseded by ADR-0042 -->
+<!-- LAST_UPDATED: 2026-05-24 -->
+
+---
+title: "ADR-0030: Adversarial Review — Open Architectural Questions"
+audience: [architects, developers]
+last_updated: 2026-05-24
+togaf_phase: "G"
+version: "1.0.0"
+status: "Superseded"
+---
+
+<!-- TOGAF_DOMAIN: Governance — Adversarial Review -->
+<!-- VERSION: 1.0.0 -->
+<!-- STATUS: Superseded by ADR-0042 -->
+<!-- LAST_UPDATED: 2026-05-24 -->
+
 # ADR-0030: Adversarial Review — Open Architectural Questions
 
 **Status:** Superseded by [ADR-0042](0042-adversarial-review-remediation-plan.md)

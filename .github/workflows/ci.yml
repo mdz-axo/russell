@@ -37,8 +37,25 @@ jobs:
       - name: cargo test
         run: cargo test --workspace
 
+      - name: Verify ACP server builds
+        run: cargo build -p russell-acp-server
+
       - name: Install cargo-deny
         run: cargo install cargo-deny --locked
 
       - name: cargo deny check
         run: cargo deny check
+
+  msrv:
+    name: MSRV check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install MSRV toolchain
+        uses: dtolnay/rust-toolchain@1.94.0
+        with:
+          components: rustfmt, clippy
+
+      - name: cargo check (MSRV)
+        run: cargo check --workspace

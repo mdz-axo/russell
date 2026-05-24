@@ -1,9 +1,18 @@
-# Russell — Cybernetic Health Harness for hKask
+---
+title: "Russell — Cybernetic Health Harness for hKask"
+audience: [operators, developers, contributors, architects, agents]
+last_updated: 2026-05-24
+togaf_phase: "G"
+version: "1.1.0"
+status: "Active"
+---
 
-**Version:** 1.0.0  
-**Status:** Active — Documentation Refresh Complete  
-**Last Updated:** 2026-05-22  
-**TOGAF Phase:** G — Governance
+<!-- TOGAF_DOMAIN: Governance — Architecture Portal -->
+<!-- VERSION: 1.1.0 -->
+<!-- STATUS: Active -->
+<!-- LAST_UPDATED: 2026-05-24 -->
+
+# Russell — Cybernetic Health Harness for hKask
 
 ---
 

@@ -59,11 +59,6 @@ if [ -f "$ACP_BIN" ]; then
   install -m 0755 "$ACP_BIN" "$HOME/.local/bin/russell-acp-server"
 fi
 
-if [ -f "$ACP_BIN" ]; then
-  say "Installing ACP server → ~/.local/bin/russell-acp-server"
-  install -m 0755 "$ACP_BIN" "$HOME/.local/bin/russell-acp-server"
-fi
-
 say "Installing systemd user units → ~/.config/systemd/user/"
 mkdir -p "$HOME/.config/systemd/user"
 for u in "$REPO"/packaging/systemd/*.service "$REPO"/packaging/systemd/*.timer; do
@@ -88,66 +83,6 @@ for skill_dir in "$REPO"/skills/*/; do
   fi
 done
 chmod +x "$HOME/.local/share/harness/skills/"*/scripts/*.sh 2>/dev/null || true
-
-# Build and install arsenal-mcp-russell if Kask repo is available
-KASK_REPO="${HOME}/Clones/kask"
-if [ -d "$KASK_REPO" ] && [ -f "$KASK_REPO/Cargo.toml" ]; then
-  say "Building arsenal-mcp-russell from Kask repo…"
-  (cd "$KASK_REPO" && cargo build -p arsenal-mcp-russell)
-  MCP_BIN="$KASK_REPO/target/debug/arsenal-mcp-russell"
-  if [ -x "$MCP_BIN" ]; then
-    say "Installing arsenal-mcp-russell → ~/.local/bin/"
-    mkdir -p "$HOME/.local/bin"
-    install -m 0755 "$MCP_BIN" "$HOME/.local/bin/arsenal-mcp-russell"
-
-    say "Updating MCP registry…"
-    mkdir -p "$HOME/.config/stack"
-    cat > "$HOME/.config/stack/mcp-registry.json" <<MCPREG
-{
-  "version": "1.0",
-  "native_servers": {
-    "russell": {
-      "name": "russell",
-      "transport": {
-        "type": "stdio",
-        "command": "${HOME}/.local/bin/arsenal-mcp-russell",
-        "args": []
-      },
-      "enabled": true,
-      "auto_start": true,
-      "tier": 2,
-      "priority": 1,
-      "tags": ["infrastructure", "health", "host"],
-      "description": "Russell host-health bridge"
-    },
-    "okapi-metrics": {
-      "name": "okapi-metrics",
-      "transport": {
-        "type": "stdio",
-        "command": "${HOME}/.local/bin/arsenal-mcp-okapi-metrics",
-        "args": []
-      },
-      "enabled": true,
-      "auto_start": true,
-      "tier": 2,
-      "priority": 2,
-      "tags": ["okapi", "inference", "metrics"],
-      "description": "Okapi inference metrics"
-    }
-  },
-  "external_servers": {},
-  "default_timeout_ms": 30000,
-  "auto_start_all": true
-}
-MCPREG
-    say "✓ MCP registry updated"
-  else
-    say "WARNING: arsenal-mcp-russell build failed, MCP tools unavailable"
-  fi
-else
-  say "Kask repo not found at $KASK_REPO — skipping MCP server build"
-  say "Note: Russell's MCP client requires Kask for advanced tool access"
-fi
 
 if [ ! -f "$HOME/.config/harness/russell.env" ]; then
   # Prefer the repo .env if it's populated (convenience during dev).
