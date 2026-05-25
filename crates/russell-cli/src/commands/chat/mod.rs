@@ -72,9 +72,9 @@ fn save_history(chat_path: &std::path::Path, history: &ChatHistory) -> Result<()
 // ─── Consent handling (from consent.rs) ─────────────────────────────────────
 
 /// Pending actions expire after this many seconds without operator
-/// input. Prevents a stale intervention from executing long after
-/// context has shifted.
-const CONSENT_EXPIRY_SECS: u64 = 300;
+/// Default consent expiry in seconds. Can be overridden via
+/// `[harness] consent_ttl_secs` in `rules.d/*.toml`.
+const DEFAULT_CONSENT_EXPIRY_SECS: u64 = 300;
 
 /// A pending action (probe or intervention) awaiting operator consent.
 #[derive(Debug, Clone)]
@@ -93,8 +93,8 @@ impl PendingAction {
         }
     }
 
-    fn is_expired(&self) -> bool {
-        self.proposed_at.elapsed().as_secs() >= CONSENT_EXPIRY_SECS
+    fn is_expired(&self, ttl_secs: u64) -> bool {
+        self.proposed_at.elapsed().as_secs() >= ttl_secs
     }
 
     fn describe(&self) -> String {
@@ -491,10 +491,10 @@ pub async fn run(paths: &Paths) -> Result<()> {
                 if let Some(ref pa) = pending_action {
                     // T5: Expiry guard — stale pending actions are
                     // discarded to prevent delayed approvals.
-                    if pa.is_expired() {
+                    if pa.is_expired(DEFAULT_CONSENT_EXPIRY_SECS) {
                         println!(
                             "  → Pending action expired ({}s). Please re-propose.",
-                            CONSENT_EXPIRY_SECS
+                            DEFAULT_CONSENT_EXPIRY_SECS
                         );
                         pending_action = None;
                         continue;

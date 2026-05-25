@@ -103,6 +103,64 @@ struct RulesFile {
     /// One or more rules.
     #[serde(default)]
     rule: Vec<Rule>,
+
+    /// Harness-level settings (consent TTL, confidence threshold, etc.).
+    #[serde(default)]
+    harness: Option<HarnessSettings>,
+}
+
+/// Harness-level settings configurable via `rules.d/*.toml`.
+///
+/// These control runtime behavior that isn't per-probe.
+///
+/// ```toml
+/// schema = "russell.rule.v1"
+///
+/// [harness]
+/// consent_ttl_secs = 300
+/// llm_confidence_threshold = 0.6
+/// baseline_min_samples = 30
+/// ```
+#[derive(Debug, Clone, Deserialize)]
+pub struct HarnessSettings {
+    /// Seconds before a pending consent action expires.
+    /// Default: 300 (5 minutes).
+    #[serde(default = "default_consent_ttl_secs")]
+    pub consent_ttl_secs: u64,
+
+    /// Minimum LLM confidence to auto-accept an action (0.0–1.0).
+    /// Below this threshold, the action is escalated to the operator.
+    /// Default: 0.6.
+    #[serde(default = "default_llm_confidence_threshold")]
+    pub llm_confidence_threshold: f64,
+
+    /// Minimum number of baseline samples required before citing
+    /// baselines as authoritative in SOAP assessments.
+    /// Default: 30.
+    #[serde(default = "default_baseline_min_samples")]
+    pub baseline_min_samples: u32,
+}
+
+fn default_consent_ttl_secs() -> u64 {
+    300
+}
+
+fn default_llm_confidence_threshold() -> f64 {
+    0.6
+}
+
+fn default_baseline_min_samples() -> u32 {
+    30
+}
+
+impl Default for HarnessSettings {
+    fn default() -> Self {
+        Self {
+            consent_ttl_secs: default_consent_ttl_secs(),
+            llm_confidence_threshold: default_llm_confidence_threshold(),
+            baseline_min_samples: default_baseline_min_samples(),
+        }
+    }
 }
 
 /// A structured warning from configuration file loading.
@@ -131,6 +189,8 @@ impl std::fmt::Display for ConfigWarning {
 #[derive(Debug, Clone, Default)]
 pub struct RuleSet {
     rules: Vec<Rule>,
+    /// Harness-level settings (consent TTL, etc.).
+    harness: HarnessSettings,
 }
 
 impl RuleSet {
@@ -138,7 +198,7 @@ impl RuleSet {
     #[cfg(test)]
     #[must_use]
     pub fn new() -> Self {
-        Self { rules: Vec::new() }
+        Self { rules: Vec::new(), harness: HarnessSettings::default() }
     }
 
     /// Load the built-in default rules. These are the factory thresholds
@@ -147,7 +207,14 @@ impl RuleSet {
     pub fn with_defaults() -> Self {
         Self {
             rules: default_rules(),
+            harness: HarnessSettings::default(),
         }
+    }
+
+    /// Access the harness-level settings.
+    #[must_use]
+    pub fn harness(&self) -> &HarnessSettings {
+        &self.harness
     }
 
     /// Load rules from a directory of `*.toml` files. Files that fail
@@ -221,6 +288,13 @@ impl RuleSet {
                     self.rules.push(rule);
                 }
             }
+
+            // Merge harness-level settings (last file wins).
+            if let Some(hs) = file.harness {
+                self.harness = hs;
+                debug!(path = %path.display(), "applied harness settings override");
+            }
+
             debug!(path = %path.display(), count, "loaded rules from file");
         }
     }

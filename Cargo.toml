@@ -4,7 +4,7 @@
 [workspace]
 resolver = "2"
 members = [
-    "crates/russell-core",
+    "crates/russell-protocol",
     "crates/russell-sentinel",
     "crates/russell-proprio",
     "crates/russell-meta",
@@ -29,6 +29,7 @@ authors = ["Russell contributors"]
 [workspace.dependencies]
 # Internal
 russell-core     = { path = "crates/russell-core" }
+russell-protocol = { path = "crates/russell-protocol" }
 russell-sentinel = { path = "crates/russell-sentinel" }
 russell-skills   = { path = "crates/russell-skills" }
 russell-meta     = { path = "crates/russell-meta" }
@@ -46,12 +47,12 @@ thiserror = "2"
 anyhow = "1"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-rusqlite = { version = "0.39", features = ["bundled"] }
+rusqlite = { version = "0.39", features = ["bundled-sqlcipher"] }
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "process", "signal", "sync", "time", "fs", "io-util"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
 ulid = { version = "1", features = ["serde"] }
-uuid = { version = "1", features = ["v4", "serde"] }
+uuid = { version = "1", features = ["v4", "v5", "serde"] }
 time = { version = "0.3", features = ["serde", "serde-human-readable", "macros"] }
 chrono = { version = "0.4", features = ["serde"] }
 clap = { version = "4", features = ["derive"] }
@@ -71,6 +72,7 @@ hex = "0.4"
 base64 = "0.22"
 age = { version = "0.11", features = ["armor"] }
 async-trait = "0.1"
+getrandom = "0.3"
 
 [profile.dev]
 opt-level = 0

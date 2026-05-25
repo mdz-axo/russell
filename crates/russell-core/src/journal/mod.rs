@@ -1340,7 +1340,6 @@ pub struct BaselineRow {
     pub count: i64,
     /// Unix timestamp when this baseline was last computed.
     /// Used for freshness checks (Task 4.1).
-    /// Used for freshness checks (Task 4.1).
     pub updated_ts: Option<i64>,
 }
 

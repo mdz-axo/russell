@@ -269,17 +269,42 @@ impl EventDetailPort for super::JournalReader {
 /// requiring a real SQLite database.
 ///
 /// Available to all crates in the workspace for integration testing.
-/// Implements [`JournalWritePort`] with simple `Mutex<Vec<_>>` storage.
+/// Implements all port traits with meaningful in-memory semantics so
+/// that tests exercising read paths don't silently pass with stubs.
 #[derive(Default)]
 pub struct InMemoryJournal {
     /// Captured events.
     pub events: std::sync::Mutex<Vec<Event>>,
-    /// Captured samples as (ts, probe_name, value).
-    pub samples: std::sync::Mutex<Vec<(i64, String, Option<f64>)>>,
+    /// Hash chain data per event: (prev_hash, hash), same index as `events`.
+    hash_chain: std::sync::Mutex<Vec<(String, String)>>,
+    /// Captured samples as (ts, scope, probe_name, value_num, value_text, unit).
+    pub samples: std::sync::Mutex<Vec<(i64, Scope, String, Option<f64>, Option<String>, Option<String>)>>,
+    /// Help sessions: (ts_unix, status) where status is "ok", "error", "fallback", "threshold_skip".
+    help_sessions: std::sync::Mutex<Vec<(i64, String)>>,
+    /// Stored baselines for `read_baselines()`.
+    baselines: std::sync::Mutex<Vec<super::BaselineRow>>,
+}
+
+impl InMemoryJournal {
+    /// Insert a baseline row for `read_baselines()` queries.
+    pub fn add_baseline(&self, row: super::BaselineRow) {
+        self.baselines.lock().unwrap().push(row);
+    }
 }
 
 impl JournalWritePort for InMemoryJournal {
     fn append(&self, event: &Event) -> Result<()> {
+        let prev_hash = self
+            .hash_chain
+            .lock()
+            .unwrap()
+            .last()
+            .map(|(_, h)| h.clone())
+            .unwrap_or_else(crate::hash_chain::genesis_hash);
+        let payload = serde_json::to_string(event)
+            .map_err(|e| crate::error::CoreError::Json(e))?;
+        let hash = crate::hash_chain::compute_event_hash(&prev_hash, &payload);
+        self.hash_chain.lock().unwrap().push((prev_hash, hash));
         self.events.lock().unwrap().push(event.clone());
         Ok(())
     }
@@ -287,20 +312,29 @@ impl JournalWritePort for InMemoryJournal {
     fn append_sample(
         &self,
         ts: i64,
-        _scope: Scope,
+        scope: Scope,
         probe: &str,
         value_num: Option<f64>,
-        _value_text: Option<&str>,
-        _unit: Option<&str>,
+        value_text: Option<&str>,
+        unit: Option<&str>,
     ) -> Result<()> {
-        self.samples
-            .lock()
-            .unwrap()
-            .push((ts, probe.to_string(), value_num));
+        self.samples.lock().unwrap().push((
+            ts,
+            scope,
+            probe.to_string(),
+            value_num,
+            value_text.map(|s| s.to_string()),
+            unit.map(|s| s.to_string()),
+        ));
         Ok(())
     }
 
-    fn append_help_session(&self, _input: &super::HelpSessionInput<'_>) -> Result<()> {
+    fn append_help_session(&self, input: &super::HelpSessionInput<'_>) -> Result<()> {
+        let status = input.status.as_str().to_string();
+        self.help_sessions
+            .lock()
+            .unwrap()
+            .push((input.ts_unix, status));
         Ok(())
     }
 }
@@ -310,19 +344,43 @@ impl JournalReadPort for InMemoryJournal {}
 impl HostTelemetryPort for InMemoryJournal {
     fn last_host_sample_ts(&self) -> Result<Option<i64>> {
         let samples = self.samples.lock().unwrap();
-        Ok(samples.last().map(|(ts, _, _)| *ts))
+        Ok(samples
+            .iter()
+            .rev()
+            .find(|(_, scope, _, _, _, _)| *scope == Scope::Host)
+            .map(|(ts, _, _, _, _, _)| *ts))
     }
 
-    fn previous_sample(&self, _probe: &str, _now: i64) -> Result<Option<(f64, i64)>> {
-        Ok(None)
+    fn previous_sample(&self, probe: &str, now: i64) -> Result<Option<(f64, i64)>> {
+        let samples = self.samples.lock().unwrap();
+        Ok(samples
+            .iter()
+            .rev()
+            .find(|(ts, _, name, val, _, _)| *name == probe && *ts < now && val.is_some())
+            .map(|(ts, _, _, val, _, _)| (val.unwrap(), *ts)))
     }
 
     fn previous_samples_batch(
         &self,
-        _probes: &[&str],
-        _before_ts: i64,
+        probes: &[&str],
+        before_ts: i64,
     ) -> Result<std::collections::HashMap<String, (f64, i64)>> {
-        Ok(std::collections::HashMap::new())
+        let mut result = std::collections::HashMap::new();
+        let samples = self.samples.lock().unwrap();
+        for (ts, _, name, val, _, _) in samples.iter().rev() {
+            if *ts >= before_ts {
+                continue;
+            }
+            if result.contains_key(name) {
+                continue;
+            }
+            if probes.contains(&name.as_str()) {
+                if let Some(v) = val {
+                    result.insert(name.clone(), (*v, *ts));
+                }
+            }
+        }
+        Ok(result)
     }
 }
 
@@ -333,14 +391,15 @@ impl EventQueryPort for InMemoryJournal {
             .iter()
             .rev()
             .take(limit)
-            .map(|e| EventRow {
-                id: String::new(),
-                ts: String::new(),
+            .enumerate()
+            .map(|(i, e)| EventRow {
+                id: format!("mem-{i}"),
+                ts: e.ts.clone(),
                 scope: e.scope,
                 severity: e.severity,
                 tier: e.tier.clone(),
                 module: e.module.clone(),
-                action: String::new(),
+                action: e.action.clone(),
                 summary: e.summary.clone(),
                 evidence_ref: e.evidence_ref.clone(),
             })
@@ -348,68 +407,192 @@ impl EventQueryPort for InMemoryJournal {
     }
 
     fn recent_with_evidence(&self, limit: usize) -> Result<Vec<EventRow>> {
-        self.recent(limit)
+        let events = self.events.lock().unwrap();
+        let filtered: Vec<_> = events
+            .iter()
+            .rev()
+            .filter(|e| e.evidence_ref.is_some())
+            .take(limit)
+            .enumerate()
+            .map(|(i, e)| EventRow {
+                id: format!("mem-{i}"),
+                ts: e.ts.clone(),
+                scope: e.scope,
+                severity: e.severity,
+                tier: e.tier.clone(),
+                module: e.module.clone(),
+                action: e.action.clone(),
+                summary: e.summary.clone(),
+                evidence_ref: e.evidence_ref.clone(),
+            })
+            .collect();
+        Ok(filtered)
     }
 
-    fn severity_counts(&self, _since: i64, _until: i64) -> Result<super::SeverityCounts> {
+    fn severity_counts(&self, since: i64, until: i64) -> Result<super::SeverityCounts> {
         let events = self.events.lock().unwrap();
         let mut counts = super::SeverityCounts::default();
         for event in events.iter() {
-            match event.severity {
-                crate::event::Severity::Crit => counts.crit += 1,
-                crate::event::Severity::Alert => counts.alert += 1,
-                crate::event::Severity::Warn => counts.warn += 1,
-                crate::event::Severity::Info => counts.info += 1,
+            if event.ts_unix >= since && event.ts_unix <= until {
+                match event.severity {
+                    crate::event::Severity::Crit => counts.crit += 1,
+                    crate::event::Severity::Alert => counts.alert += 1,
+                    crate::event::Severity::Warn => counts.warn += 1,
+                    crate::event::Severity::Info => counts.info += 1,
+                }
             }
         }
         Ok(counts)
     }
 
-    fn host_samples_summary(&self, _since: i64, _until: i64) -> Result<Vec<super::SampleSummary>> {
-        Ok(Vec::new())
+    fn host_samples_summary(&self, since: i64, until: i64) -> Result<Vec<super::SampleSummary>> {
+        let samples = self.samples.lock().unwrap();
+        let mut by_probe: std::collections::HashMap<String, Vec<(f64, i64)>> = std::collections::HashMap::new();
+        for (ts, _, name, val, _, _) in samples.iter() {
+            if *ts >= since && *ts <= until {
+                if let Some(v) = val {
+                    by_probe.entry(name.clone()).or_default().push((*v, *ts));
+                }
+            }
+        }
+        let mut result = Vec::new();
+        for (probe, values) in by_probe {
+            if values.is_empty() {
+                continue;
+            }
+            let count = values.len() as i64;
+            let min = values.iter().map(|(v, _)| *v).fold(f64::INFINITY, f64::min);
+            let max = values.iter().map(|(v, _)| *v).fold(f64::NEG_INFINITY, f64::max);
+            let sum: f64 = values.iter().map(|(v, _)| *v).sum();
+            let avg = sum / count as f64;
+            let last = values.last().unwrap();
+            result.push(super::SampleSummary {
+                probe,
+                unit: None,
+                min: Some(min),
+                avg: Some(avg),
+                max: Some(max),
+                last: Some(last.0),
+                last_ts: Some(last.1),
+                count,
+            });
+        }
+        Ok(result)
     }
 
     fn read_baselines(&self) -> Result<Vec<super::BaselineRow>> {
-        Ok(Vec::new())
+        Ok(self.baselines.lock().unwrap().clone())
     }
 
     fn list_events_by_action(
         &self,
-        _action: &str,
-        _since_unix: i64,
-        _until_unix: i64,
+        action: &str,
+        since_unix: i64,
+        until_unix: i64,
     ) -> Result<Vec<EventRow>> {
-        Ok(Vec::new())
+        let events = self.events.lock().unwrap();
+        Ok(events
+            .iter()
+            .rev()
+            .filter(|e| e.action == action && e.ts_unix >= since_unix && e.ts_unix <= until_unix)
+            .enumerate()
+            .map(|(i, e)| EventRow {
+                id: format!("mem-{i}"),
+                ts: e.ts.clone(),
+                scope: e.scope,
+                severity: e.severity,
+                tier: e.tier.clone(),
+                module: e.module.clone(),
+                action: e.action.clone(),
+                summary: e.summary.clone(),
+                evidence_ref: e.evidence_ref.clone(),
+            })
+            .collect())
     }
 }
 
 impl SelfTelemetryPort for InMemoryJournal {
     fn last_host_sample_ts(&self) -> Result<Option<i64>> {
         let samples = self.samples.lock().unwrap();
-        Ok(samples.last().map(|(ts, _, _)| *ts))
+        Ok(samples
+            .iter()
+            .rev()
+            .find(|(_, scope, _, _, _, _)| *scope == Scope::Host)
+            .map(|(ts, _, _, _, _, _)| *ts))
     }
 
-    fn count_reflex_events(&self, _probe: &str, _since: i64, _until: i64) -> Result<usize> {
-        Ok(0)
+    fn count_reflex_events(&self, probe: &str, since: i64, until: i64) -> Result<usize> {
+        let events = self.events.lock().unwrap();
+        Ok(events
+            .iter()
+            .filter(|e| {
+                e.action == "reflex_proposed"
+                    && e.module.as_deref() == Some(probe)
+                    && e.ts_unix >= since
+                    && e.ts_unix <= until
+            })
+            .count())
     }
 
     fn help_error_rate_pct(&self) -> Result<Option<f64>> {
-        Ok(None)
+        let sessions = self.help_sessions.lock().unwrap();
+        if sessions.is_empty() {
+            return Ok(None);
+        }
+        let errors = sessions.iter().filter(|(_, s)| s == "error").count();
+        Ok(Some((errors as f64 / sessions.len() as f64) * 100.0))
     }
 
     fn llm_latency_p95_ms(&self) -> Result<Option<f64>> {
-        Ok(None)
+        let events = self.events.lock().unwrap();
+        let mut latencies: Vec<u64> = events
+            .iter()
+            .filter(|e| e.module.as_deref() == Some("llm"))
+            .filter_map(|e| e.duration_ms)
+            .collect();
+        if latencies.is_empty() {
+            return Ok(None);
+        }
+        latencies.sort_unstable();
+        let idx = ((latencies.len() as f64) * 0.95).ceil() as usize;
+        let idx = idx.saturating_sub(1).min(latencies.len() - 1);
+        Ok(Some(latencies[idx] as f64))
     }
 
     fn check_chain_integrity(&self) -> Option<bool> {
-        Some(true)
+        let chain = self.hash_chain.lock().unwrap();
+        if chain.is_empty() {
+            return Some(true);
+        }
+        let events = self.events.lock().unwrap();
+        let start = chain.len().saturating_sub(10);
+        let links: Vec<(String, String, String)> = (start..chain.len())
+            .filter_map(|i| {
+                let (prev_hash, stored_hash) = &chain[i];
+                let payload = serde_json::to_string(&events[i]).ok()?;
+                Some((prev_hash.clone(), payload, stored_hash.clone()))
+            })
+            .collect();
+        if links.is_empty() {
+            return Some(true);
+        }
+        match crate::hash_chain::verify_chain(&links) {
+            crate::hash_chain::ChainVerdict::Intact { .. } => Some(true),
+            crate::hash_chain::ChainVerdict::Empty => Some(true),
+            crate::hash_chain::ChainVerdict::Broken { .. } => Some(false),
+        }
     }
 }
 
 impl EventDetailPort for InMemoryJournal {
-    fn get_event(&self, _id: i64) -> Result<Event> {
-        Err(crate::error::CoreError::Invariant(
-            "event not found in InMemoryJournal".into(),
-        ))
+    fn get_event(&self, id: i64) -> Result<Event> {
+        let events = self.events.lock().unwrap();
+        let idx = (id - 1) as usize;
+        events
+            .get(idx)
+            .cloned()
+            .ok_or(crate::error::CoreError::Invariant(
+                "event not found in InMemoryJournal".into(),
+            ))
     }
 }

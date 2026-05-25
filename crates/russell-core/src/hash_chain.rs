@@ -98,12 +98,28 @@ fn seed_file_path() -> std::path::PathBuf {
 }
 
 fn generate_random_seed() -> String {
-    use std::collections::hash_map::DefaultHasher;
-    use std::hash::{Hash, Hasher};
-    let mut hasher = DefaultHasher::new();
-    std::time::SystemTime::now().hash(&mut hasher);
-    std::process::id().hash(&mut hasher);
-    format!("{:016x}{:016x}", hasher.finish(), hasher.finish())
+    let mut buf = [0u8; 32];
+    match getrandom::fill(&mut buf) {
+        Ok(()) => hex::encode(buf),
+        Err(_) => {
+            tracing::warn!("getrandom failed; falling back to /etc/machine-id + timestamp mix");
+            let mut fallback = String::new();
+            if let Ok(mid) = std::fs::read_to_string("/etc/machine-id") {
+                fallback.push_str(mid.trim());
+            }
+            fallback.push_str(&format!(
+                ":{}:{}",
+                std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap_or_default()
+                    .as_nanos(),
+                std::process::id()
+            ));
+            let mut hasher = Sha256::new();
+            hasher.update(fallback.as_bytes());
+            hex::encode(hasher.finalize())
+        }
+    }
 }
 
 /// Compute the hash of an event given the previous hash and the

@@ -26,6 +26,7 @@ russell-skills = { workspace = true }
 russell-meta = { workspace = true }
 russell-core = { workspace = true }
 russell-session = { workspace = true }
+russell-protocol = { workspace = true }
 
 # Async runtime
 tokio = { workspace = true, features = ["sync", "time", "macros", "io-util", "io-std"] }

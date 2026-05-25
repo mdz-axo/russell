@@ -18,9 +18,13 @@ use russell_sentinel::probes;
 pub struct PodID(pub String);
 
 impl PodID {
-    /// Generate a new pod ID.
+    /// Generate a deterministic pod ID from the host machine-id (UUID v5).
+    ///
+    /// Uses UUID v5 derived from the DNS namespace and `/etc/machine-id`,
+    /// ensuring the same host always produces the same pod identity.
+    /// Falls back to UUID v4 if machine-id is unavailable.
     pub fn new() -> Self {
-        Self(Uuid::new_v4().to_string())
+        Self(deterministic_uuid().to_string())
     }
 
     /// Parse from string.
@@ -31,6 +35,18 @@ impl PodID {
             None
         }
     }
+}
+
+fn deterministic_uuid() -> Uuid {
+    let namespace = Uuid::new_v5(&Uuid::NAMESPACE_DNS, b"russell-agent.replicant.partners");
+    if let Ok(machine_id) = std::fs::read_to_string("/etc/machine-id") {
+        let trimmed = machine_id.trim();
+        if !trimmed.is_empty() {
+            return Uuid::new_v5(&namespace, trimmed.as_bytes());
+        }
+    }
+    tracing::warn!("machine-id unavailable; falling back to random UUID v4 for PodID");
+    Uuid::new_v4()
 }
 
 impl Default for PodID {

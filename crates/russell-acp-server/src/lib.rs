@@ -67,3 +67,12 @@ pub use types::{
     InterventionInfo, LexiconCategorization, LexiconDomain, ProbeInfo, SafetyInfo, SkillInfo,
     Visibility,
 };
+
+// Re-export protocol types from russell-protocol for cross-project alignment.
+pub use russell_protocol::{
+    auth::CapabilityToken as ProtocolCapabilityToken,
+    jsonrpc::{JsonRpcError, JsonRpcRequest, JsonRpcResponse},
+    notification::{NotificationsResponse, ProprioNotification},
+    skill::CapabilitiesResponse as ProtocolCapabilitiesResponse,
+    ACP_VERSION,
+};
