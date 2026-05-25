@@ -272,6 +272,7 @@ impl EventDetailPort for super::JournalReader {
 /// Implements all port traits with meaningful in-memory semantics so
 /// that tests exercising read paths don't silently pass with stubs.
 #[derive(Default)]
+#[allow(clippy::type_complexity)]
 pub struct InMemoryJournal {
     /// Captured events.
     pub events: std::sync::Mutex<Vec<Event>>,
@@ -302,7 +303,7 @@ impl JournalWritePort for InMemoryJournal {
             .map(|(_, h)| h.clone())
             .unwrap_or_else(crate::hash_chain::genesis_hash);
         let payload = serde_json::to_string(event)
-            .map_err(|e| crate::error::CoreError::Json(e))?;
+            .map_err(crate::error::CoreError::Json)?;
         let hash = crate::hash_chain::compute_event_hash(&prev_hash, &payload);
         self.hash_chain.lock().unwrap().push((prev_hash, hash));
         self.events.lock().unwrap().push(event.clone());
@@ -374,10 +375,10 @@ impl HostTelemetryPort for InMemoryJournal {
             if result.contains_key(name) {
                 continue;
             }
-            if probes.contains(&name.as_str()) {
-                if let Some(v) = val {
-                    result.insert(name.clone(), (*v, *ts));
-                }
+            if probes.contains(&name.as_str())
+                && let Some(v) = val
+            {
+                result.insert(name.clone(), (*v, *ts));
             }
         }
         Ok(result)
@@ -449,10 +450,10 @@ impl EventQueryPort for InMemoryJournal {
         let samples = self.samples.lock().unwrap();
         let mut by_probe: std::collections::HashMap<String, Vec<(f64, i64)>> = std::collections::HashMap::new();
         for (ts, _, name, val, _, _) in samples.iter() {
-            if *ts >= since && *ts <= until {
-                if let Some(v) = val {
-                    by_probe.entry(name.clone()).or_default().push((*v, *ts));
-                }
+            if *ts >= since && *ts <= until
+                && let Some(v) = val
+            {
+                by_probe.entry(name.clone()).or_default().push((*v, *ts));
             }
         }
         let mut result = Vec::new();

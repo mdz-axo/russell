@@ -266,14 +266,23 @@ impl SessionEngine {
                 self.system_prompt, conversation_history, message
             );
             let soap = SoapBundle::new(&prompt);
-            match tokio::task::block_in_place(|| {
-                tokio::runtime::Handle::current()
-                    .block_on(async { inference.infer(&prompt, Some(&soap)).await })
-            }) {
-                Ok(resp) => resp.text,
-                Err(e) => {
+            let inference = inference.clone();
+
+            let (tx, rx) = tokio::sync::oneshot::channel();
+            tokio::runtime::Handle::current().spawn(async move {
+                let result = inference.infer(&prompt, Some(&soap)).await;
+                let _ = tx.send(result);
+            });
+
+            match tokio::task::block_in_place(|| rx.blocking_recv()) {
+                Ok(Ok(resp)) => resp.text,
+                Ok(Err(e)) => {
                     warn!(error = %e, "inference failed, using fallback");
                     format!("[Inference unavailable: {}]", e)
+                }
+                Err(_) => {
+                    warn!("inference oneshot channel closed unexpectedly");
+                    "[Inference unavailable: channel closed]".to_string()
                 }
             }
         } else {

@@ -1057,7 +1057,8 @@ async fn call_jack(
                 if content.trim().is_empty() {
                     continue;
                 }
-                let relevance = score_knowledge_relevance(&skill.symptoms, &active_symptoms);
+                let skill_symptom_names: Vec<String> = skill.symptoms.iter().map(|s| s.name().to_string()).collect();
+                let relevance = score_knowledge_relevance(&skill_symptom_names, &active_symptoms);
                 let token_estimate = content.len() / 4;
                 slots.push(KnowledgeSlot {
                     skill_id: skill.id.clone(),

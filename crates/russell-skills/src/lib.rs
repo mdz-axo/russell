@@ -40,7 +40,7 @@ pub mod registry;
 /// Jinja2 template support for skill prompts.
 pub mod templates;
 
-pub use symptom_catalog::SYMPTOMS;
+pub use symptom_catalog::{Symptom, SymptomCategory, SeverityHint, SYMPTOMS};
 
 /// Errors that can occur during manifest loading.
 #[derive(Debug, thiserror::Error)]
@@ -213,7 +213,7 @@ pub struct Skill {
     /// Minimum Russell version required.
     pub min_harness_version: String,
     /// Symptom classes this skill addresses.
-    pub symptoms: Vec<String>,
+    pub symptoms: Vec<Symptom>,
     /// Profile preconditions (ANDed).
     pub applies_when: Vec<AppliesWhen>,
     /// Read-only probes.
@@ -722,15 +722,19 @@ pub fn parse_manifest(yaml: &str, dir_name: &str) -> std::result::Result<Skill, 
         ));
     }
 
-    // Validate symptoms.
-    for symptom in &raw.symptoms {
-        if !SYMPTOMS.contains(&symptom.as_str()) {
-            return Err(format!(
-                "skill '{}' references unknown symptom '{}'",
-                dir_name, symptom
-            ));
-        }
-    }
+    // Validate and parse symptoms.
+    let symptoms: Vec<Symptom> = raw
+        .symptoms
+        .iter()
+        .map(|s| {
+            s.parse::<Symptom>().map_err(|_| {
+                format!(
+                    "skill '{}' references unknown symptom '{}'",
+                    dir_name, s
+                )
+            })
+        })
+        .collect::<std::result::Result<Vec<_>, _>>()?;
 
     // Validate rollback strategies.
     for iv in &raw.interventions {
@@ -770,7 +774,7 @@ pub fn parse_manifest(yaml: &str, dir_name: &str) -> std::result::Result<Skill, 
         version: raw.version.unwrap_or_else(|| "0.0.0".into()),
         authored: raw.authored.unwrap_or_else(|| "unknown".into()),
         min_harness_version: raw.min_harness_version.unwrap_or_else(|| "0.1.0".into()),
-        symptoms: raw.symptoms,
+        symptoms,
         applies_when: raw.applies_when,
         probes: raw.probes,
         interventions: raw.interventions,
@@ -830,7 +834,8 @@ safety:
         assert_eq!(skills[0].id, id);
         assert_eq!(skills[0].probes.len(), 1);
         assert_eq!(skills[0].interventions.len(), 1);
-        assert_eq!(skills[0].symptoms, vec!["vram_oom"]);
+        assert_eq!(skills[0].symptoms.len(), 1);
+        assert_eq!(skills[0].symptoms[0].name(), "vram_oom");
     }
 
     #[test]
@@ -1016,8 +1021,8 @@ safety:
         let gpu = skills.iter().find(|s| s.id == "gpu-doctor").unwrap();
         assert_eq!(gpu.probes.len(), 3);
         assert_eq!(gpu.interventions.len(), 1);
-        assert!(gpu.symptoms.contains(&"vram_oom".into()));
-        assert!(gpu.symptoms.contains(&"amdgpu_ring_hang".into()));
+        assert!(gpu.symptoms.iter().any(|s| s.name() == "vram_oom"));
+        assert!(gpu.symptoms.iter().any(|s| s.name() == "amdgpu_ring_hang"));
         let reset = &gpu.interventions[0];
         assert_eq!(reset.id, "reset-gpu");
         assert!(matches!(reset.risk, RiskBand::Medium));
@@ -1025,19 +1030,20 @@ safety:
         let okapi = skills.iter().find(|s| s.id == "okapi-watcher").unwrap();
         assert_eq!(okapi.probes.len(), 3);
         assert_eq!(okapi.interventions.len(), 1);
-        assert!(okapi.symptoms.contains(&"llm_slow".into()));
-        assert!(okapi.symptoms.contains(&"gpu_fallback_to_cpu".into()));
+        assert!(okapi.symptoms.iter().any(|s| s.name() == "llm_slow"));
+        assert!(okapi.symptoms.iter().any(|s| s.name() == "gpu_fallback_to_cpu"));
         assert_eq!(okapi.interventions[0].id, "restart-okapi");
 
         let sysadmin = skills.iter().find(|s| s.id == "sysadmin").unwrap();
         assert_eq!(sysadmin.probes.len(), 2);
         assert_eq!(sysadmin.interventions.len(), 3);
-        assert!(sysadmin.symptoms.contains(&"zombie_accumulation".into()));
-        assert!(sysadmin.symptoms.contains(&"clock_skew".into()));
+        assert!(sysadmin.symptoms.iter().any(|s| s.name() == "zombie_accumulation"));
+        assert!(sysadmin.symptoms.iter().any(|s| s.name() == "clock_skew"));
         assert!(
             sysadmin
                 .symptoms
-                .contains(&"systemd_service_degraded".into())
+                .iter()
+                .any(|s| s.name() == "systemd_service_degraded")
         );
         assert!(matches!(sysadmin.safety.max_auto_risk, RiskBand::Medium));
     }

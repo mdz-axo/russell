@@ -265,7 +265,19 @@ impl ReflexBudget {
     /// * `reader` - Journal reader to query for recent reflex events
     /// * `now_unix` - Current unix timestamp for window calculation
     pub fn from_journal(reader: &crate::journal::JournalReader, now_unix: i64) -> Self {
-        let window_start = now_unix - 3600; // 1 hour ago
+        Self::from_event_query(reader, now_unix)
+    }
+
+    /// Create a budget initialized from any `EventQueryPort` implementation.
+    ///
+    /// This is the trait-based version of [`from_journal`] — it accepts
+    /// any implementation of [`crate::journal::port::EventQueryPort`],
+    /// enabling test doubles like [`crate::journal::port::InMemoryJournal`].
+    pub fn from_event_query(
+        reader: &dyn crate::journal::port::EventQueryPort,
+        now_unix: i64,
+    ) -> Self {
+        let window_start = now_unix - 3600;
 
         // Query reflex_proposed events in the last hour.
         let recent_events = reader
