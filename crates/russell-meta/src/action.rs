@@ -76,8 +76,6 @@ pub enum ResolvedAction {
         rollback_cmd: Option<Vec<String>>,
         /// Whether rollback requires a reboot.
         rollback_is_reboot: bool,
-        /// Post-intervention evaluation checks from the skill manifest.
-        eval_checks: Vec<EvalCheckInfo>,
     },
     /// hKask MCP tool call (ADR-0025). Executed via the MCP client,
     /// not the local skill dispatcher.
@@ -268,19 +266,6 @@ impl std::fmt::Display for ActionError {
     }
 }
 
-/// A post-intervention evaluation check, resolved from the skill manifest.
-#[derive(Debug, Clone)]
-pub struct EvalCheckInfo {
-    /// Unique ID within the evaluation checks.
-    pub id: String,
-    /// Argv to execute.
-    pub cmd: Vec<String>,
-    /// Expected exit code (default 0).
-    pub expect_exit: i32,
-    /// Timeout duration.
-    pub timeout: String,
-}
-
 /// Parse the last `ACTION:` line from a response and resolve it
 pub fn resolve(
     response: &str,
@@ -384,21 +369,6 @@ pub fn resolve_with_hkask(
             Rollback::NoneNeeded { .. } => (None, None, false),
             Rollback::Reboot { .. } => (None, None, true),
         };
-        let eval_checks: Vec<EvalCheckInfo> = skill
-            .evaluation
-            .as_ref()
-            .map(|ev| {
-                ev.after_intervention
-                    .iter()
-                    .map(|c| EvalCheckInfo {
-                        id: c.id.clone(),
-                        cmd: c.cmd.clone(),
-                        expect_exit: c.expect_exit,
-                        timeout: c.timeout.clone(),
-                    })
-                    .collect()
-            })
-            .unwrap_or_default();
         return Some(Ok(ResolvedAction::Intervention {
             skill_id: skill_id.to_string(),
             action_id: action_id.to_string(),
@@ -410,7 +380,6 @@ pub fn resolve_with_hkask(
             rollback_id,
             rollback_cmd,
             rollback_is_reboot,
-            eval_checks,
         }));
     }
 
@@ -665,7 +634,6 @@ mod tests {
                 allowed_env_keys: vec![],
                 needs_network: false,
             },
-            evaluation: None,
             lexicon: None,
             visibility: russell_skills::Visibility::Private,
         }

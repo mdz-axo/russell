@@ -75,13 +75,6 @@ safety:
     - retire
     - restore-from-archive
 
-evaluation:
-  after_intervention:
-    - id: verify-skill-exists
-      cmd: ["bash", "./scripts/verify-skill.sh"]
-      timeout: 5s
-      expect_exit: 0
-
 references:
   - docs/adr/0024-skill-self-management.md
   - docs/architecture/skill-self-management-strategy.md

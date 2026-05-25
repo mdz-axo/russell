@@ -140,87 +140,23 @@ fn process_text_samples_from(stats: &[ProcessStat]) -> Vec<super::Sample> {
 
 // -- ProbeDescriptor impls (T13 split form) --
 
-use super::descriptor::{ProbeCollector, ProbeMetadata};
 
 /// Probe descriptor.
 pub struct ProcTotalCount;
-impl ProbeMetadata for ProcTotalCount {
-    fn name(&self) -> &'static str {
-        "proc_total_count"
-    }
-    fn unit(&self) -> Option<&'static str> {
-        Some("count")
-    }
-}
-impl ProbeCollector for ProcTotalCount {
-    fn collect(&self) -> Option<f64> {
-        proc_total_count()
-    }
-}
-
 /// Probe descriptor.
 pub struct ProcZombieCount;
-impl ProbeMetadata for ProcZombieCount {
-    fn name(&self) -> &'static str {
-        "proc_zombie_count"
-    }
-    fn unit(&self) -> Option<&'static str> {
-        Some("count")
-    }
-}
-impl ProbeCollector for ProcZombieCount {
-    fn collect(&self) -> Option<f64> {
-        proc_zombie_count()
-    }
-}
-
 /// Probe descriptor.
 pub struct ProcStuckCount;
-impl ProbeMetadata for ProcStuckCount {
-    fn name(&self) -> &'static str {
-        "proc_stuck_count"
-    }
-    fn unit(&self) -> Option<&'static str> {
-        Some("count")
-    }
-}
-impl ProbeCollector for ProcStuckCount {
-    fn collect(&self) -> Option<f64> {
-        proc_stuck_count()
-    }
-}
-
 /// Probe descriptor.
 pub struct ProcRunningCount;
-impl ProbeMetadata for ProcRunningCount {
-    fn name(&self) -> &'static str {
-        "proc_running_count"
-    }
-    fn unit(&self) -> Option<&'static str> {
-        Some("count")
-    }
-}
-impl ProbeCollector for ProcRunningCount {
-    fn collect(&self) -> Option<f64> {
-        proc_running_count()
-    }
-}
-
 /// Probe descriptor.
 pub struct ProcTopMemPct;
-impl ProbeMetadata for ProcTopMemPct {
-    fn name(&self) -> &'static str {
-        "proc_top_mem_pct"
-    }
-    fn unit(&self) -> Option<&'static str> {
-        Some("%")
-    }
-}
-impl ProbeCollector for ProcTopMemPct {
-    fn collect(&self) -> Option<f64> {
-        proc_top_mem_pct()
-    }
-}
+
+impl_probe!(ProcTotalCount, "proc_total_count", "count", proc_total_count);
+impl_probe!(ProcZombieCount, "proc_zombie_count", "count", proc_zombie_count);
+impl_probe!(ProcStuckCount, "proc_stuck_count", "count", proc_stuck_count);
+impl_probe!(ProcRunningCount, "proc_running_count", "count", proc_running_count);
+impl_probe!(ProcTopMemPct, "proc_top_mem_pct", "%", proc_top_mem_pct);
 
 #[cfg(test)]
 mod tests {

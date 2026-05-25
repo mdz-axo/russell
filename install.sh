@@ -11,6 +11,7 @@
 #
 # Installs:
 #   ~/.local/bin/russell             — the binary
+#   ~/.local/bin/russell-acp-server  — ACP server for hKask
 #   ~/.local/state/harness/          — journal, evidence, memory
 #   ~/.local/share/harness/skills/   — skill manifests + scripts
 #   ~/.local/share/harness/rules.d/  — default threshold rules
@@ -34,6 +35,7 @@ REPO_ROOT="$(cd "$(dirname "$0")" && pwd)"
 
 MODE="release"
 ACTION="install"
+NO_SYSTEMD=0
 
 #######################
 # Argument parsing
@@ -61,24 +63,48 @@ for arg in "$@"; do
 done
 
 #######################
+# Prerequisites
+#######################
+
+if [ "$ACTION" != "uninstall" ]; then
+    if ! command -v cargo &>/dev/null; then
+        echo "ERROR: cargo not found. Install Rust: https://rustup.rs"
+        exit 1
+    fi
+fi
+
+if ! command -v systemctl &>/dev/null; then
+    if [ "$ACTION" = "uninstall" ]; then
+        echo "WARNING: systemctl not found. Skipping systemd teardown."
+    else
+        echo "WARNING: systemctl not found. Systemd units will not be installed."
+    fi
+    NO_SYSTEMD=1
+fi
+
+#######################
 # Uninstall
 #######################
 
 if [ "$ACTION" = "uninstall" ]; then
-    echo "==> Stopping and disabling Russell timers and services…"
-    for unit in russell-sentinel.timer russell-digest.timer \
-                russell-acp-server.service; do
-        systemctl --user stop "$unit" 2>/dev/null || true
-        systemctl --user disable "$unit" 2>/dev/null || true
-    done
+    if [ "$NO_SYSTEMD" = "0" ]; then
+        echo "==> Stopping and disabling Russell timers and services…"
+        for unit in russell-sentinel.timer russell-digest.timer \
+                    russell-acp-server.service; do
+            systemctl --user stop "$unit" 2>/dev/null || true
+            systemctl --user disable "$unit" 2>/dev/null || true
+        done
 
-    echo "==> Removing systemd units…"
-    rm -f "${SYSTEMD_USER_DIR}/russell-sentinel.service"
-    rm -f "${SYSTEMD_USER_DIR}/russell-sentinel.timer"
-    rm -f "${SYSTEMD_USER_DIR}/russell-digest.service"
-    rm -f "${SYSTEMD_USER_DIR}/russell-digest.timer"
-    rm -f "${SYSTEMD_USER_DIR}/russell-failure@.service"
-    rm -f "${SYSTEMD_USER_DIR}/russell-acp-server.service"
+        echo "==> Removing systemd units…"
+        rm -f "${SYSTEMD_USER_DIR}/russell-sentinel.service"
+        rm -f "${SYSTEMD_USER_DIR}/russell-sentinel.timer"
+        rm -f "${SYSTEMD_USER_DIR}/russell-digest.service"
+        rm -f "${SYSTEMD_USER_DIR}/russell-digest.timer"
+        rm -f "${SYSTEMD_USER_DIR}/russell-failure@.service"
+        rm -f "${SYSTEMD_USER_DIR}/russell-acp-server.service"
+    else
+        echo "==> Skipping systemd teardown (systemd not available)"
+    fi
 
     echo "==> Removing binaries…"
     rm -f "${BIN_DIR}/${BINARY_NAME}"
@@ -118,6 +144,10 @@ if [ ! -f "$BINARY_SRC" ]; then
     exit 1
 fi
 
+if [ ! -f "$ACP_SERVER_SRC" ]; then
+    echo "WARNING: russell-acp-server binary not found at ${ACP_SERVER_SRC}"
+fi
+
 #######################
 # Check mode
 #######################
@@ -126,15 +156,20 @@ if [ "$ACTION" = "check" ]; then
     echo ""
     echo "Would install to:"
     echo "  binary:    ${BIN_DIR}/${BINARY_NAME}"
+    echo "  acp:       ${BIN_DIR}/russell-acp-server"
     echo "  state:     ${STATE_DIR}"
     echo "  data:      ${SHARE_DIR}"
     echo "  config:    ${CONFIG_DIR}"
     echo "  units:     ${SYSTEMD_USER_DIR}"
     echo ""
-    echo "Would enable timers:"
-    echo "  russell-sentinel.timer"
-    echo "  russell-digest.timer"
-    echo "  russell-acp-server.service"
+    if [ "$NO_SYSTEMD" = "0" ]; then
+        echo "Would enable timers:"
+        echo "  russell-sentinel.timer"
+        echo "  russell-digest.timer"
+        echo "  russell-acp-server.service"
+    else
+        echo "Systemd units: SKIPPED (systemd not available)"
+    fi
     exit 0
 fi
 
@@ -148,13 +183,11 @@ mkdir -p "${STATE_DIR}/runs"
 mkdir -p "${SHARE_DIR}/skills"
 mkdir -p "${SHARE_DIR}/rules.d"
 mkdir -p "$CONFIG_DIR"
-mkdir -p "$SYSTEMD_USER_DIR"
 
 echo "==> Installing binaries…"
 cp "$BINARY_SRC" "${BIN_DIR}/${BINARY_NAME}"
 chmod +x "${BIN_DIR}/${BINARY_NAME}"
 
-# Also install russell-acp-server for hKask integration
 if [ -f "$ACP_SERVER_SRC" ]; then
     cp "$ACP_SERVER_SRC" "${BIN_DIR}/russell-acp-server"
     chmod +x "${BIN_DIR}/russell-acp-server"
@@ -163,37 +196,32 @@ else
     echo "  → Warning: russell-acp-server not built, skipping"
 fi
 
-# Remove any stale cargo-installed copy to prevent PATH shadowing.
-# The canonical install location is ~/.local/bin (this script).
 CARGO_BIN="${HOME}/.cargo/bin/${BINARY_NAME}"
 if [ -f "$CARGO_BIN" ] && [ "$CARGO_BIN" != "${BIN_DIR}/${BINARY_NAME}" ]; then
     echo "  → Removing stale ${CARGO_BIN} (canonical is ${BIN_DIR}/${BINARY_NAME})"
     rm -f "$CARGO_BIN"
 fi
 
-# Also remove stale ACP server from cargo bin
 ACP_CARGO_BIN="${HOME}/.cargo/bin/russell-acp-server"
 if [ -f "$ACP_CARGO_BIN" ]; then
     echo "  → Removing stale ${ACP_CARGO_BIN} (canonical is ${BIN_DIR}/russell-acp-server)"
     rm -f "$ACP_CARGO_BIN"
 fi
 
-echo "==> Installing systemd units…"
-cp "${REPO_ROOT}/packaging/systemd/russell-sentinel.service" "$SYSTEMD_USER_DIR"
-cp "${REPO_ROOT}/packaging/systemd/russell-sentinel.timer" "$SYSTEMD_USER_DIR"
-cp "${REPO_ROOT}/packaging/systemd/russell-digest.service" "$SYSTEMD_USER_DIR"
-cp "${REPO_ROOT}/packaging/systemd/russell-digest.timer" "$SYSTEMD_USER_DIR"
-cp "${REPO_ROOT}/packaging/systemd/russell-failure@.service" "$SYSTEMD_USER_DIR"
-cp "${REPO_ROOT}/packaging/systemd/russell-acp-server.service" "$SYSTEMD_USER_DIR"
-echo "  → russell-acp-server.service installed"
+if [ "$NO_SYSTEMD" = "0" ]; then
+    echo "==> Installing systemd units…"
+    mkdir -p "$SYSTEMD_USER_DIR"
+    cp "${REPO_ROOT}/packaging/systemd/russell-sentinel.service" "$SYSTEMD_USER_DIR"
+    cp "${REPO_ROOT}/packaging/systemd/russell-sentinel.timer" "$SYSTEMD_USER_DIR"
+    cp "${REPO_ROOT}/packaging/systemd/russell-digest.service" "$SYSTEMD_USER_DIR"
+    cp "${REPO_ROOT}/packaging/systemd/russell-digest.timer" "$SYSTEMD_USER_DIR"
+    cp "${REPO_ROOT}/packaging/systemd/russell-failure@.service" "$SYSTEMD_USER_DIR"
+    cp "${REPO_ROOT}/packaging/systemd/russell-acp-server.service" "$SYSTEMD_USER_DIR"
+    echo "  → 6 systemd units installed"
+fi
 
 echo "==> Installing default rules…"
-# Ship default rules only if the target doesn't already have rules
-# (the operator may have customised them).
 if [ ! -f "${SHARE_DIR}/rules.d/memory.toml" ]; then
-    # Rules are compiled into the binary via RuleSet::defaults().
-    # We create empty marker files so the operator knows where to
-    # place overrides. The defaults come from the binary.
     cat > "${SHARE_DIR}/rules.d/README.md" <<'RULES_README'
 # Russell Rules
 
@@ -219,7 +247,6 @@ echo "==> Installing default skills…"
 if [ -d "${REPO_ROOT}/skills" ]; then
     for skill_dir in "${REPO_ROOT}/skills"/*/; do
         skill_name=$(basename "$skill_dir")
-        # Skip hidden/underscore-prefixed dirs
         [[ "$skill_name" =~ ^[_\.] ]] && continue
         if [ ! -d "${SHARE_DIR}/skills/${skill_name}" ]; then
             cp -r "$skill_dir" "${SHARE_DIR}/skills/"
@@ -245,16 +272,18 @@ ENV_EOF
     echo "  → ${CONFIG_DIR}/russell.env created (edit to configure)"
 fi
 
-echo "==> Reloading systemd and enabling timers…"
-systemctl --user daemon-reload
+if [ "$NO_SYSTEMD" = "0" ]; then
+    echo "==> Reloading systemd and enabling timers…"
+    systemctl --user daemon-reload
 
-systemctl --user enable russell-sentinel.timer
-systemctl --user enable russell-digest.timer
-systemctl --user enable russell-acp-server.service
+    systemctl --user enable russell-sentinel.timer
+    systemctl --user enable russell-digest.timer
+    systemctl --user enable russell-acp-server.service
 
-systemctl --user start russell-sentinel.timer
-systemctl --user start russell-digest.timer 2>/dev/null || true
-systemctl --user start russell-acp-server.service 2>/dev/null || true
+    systemctl --user start russell-sentinel.timer
+    systemctl --user start russell-digest.timer 2>/dev/null || true
+    systemctl --user start russell-acp-server.service 2>/dev/null || true
+fi
 
 echo ""
 echo "====================="
@@ -270,9 +299,14 @@ echo ""
 echo "  Try:  russell status"
 echo "        russell jack"
 echo ""
-echo "  Timers:"
-echo "    russell-sentinel.timer  — every 5 min"
-echo "    russell-digest.timer    — weekly"
-echo ""
-echo "  Check:  systemctl --user list-timers russell-*"
-echo "          journalctl --user -u russell-sentinel -f"
+if [ "$NO_SYSTEMD" = "0" ]; then
+    echo "  Timers:"
+    echo "    russell-sentinel.timer  — every 5 min"
+    echo "    russell-digest.timer    — weekly"
+    echo ""
+    echo "  Check:  systemctl --user list-timers russell-*"
+    echo "          journalctl --user -u russell-sentinel -f"
+else
+    echo "  Note: systemd not detected. Timers not installed."
+    echo "  You can run the sentinel manually: russell sentinel-once"
+fi

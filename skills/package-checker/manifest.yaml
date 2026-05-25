@@ -49,12 +49,5 @@ safety:
   require_human_for:
     - update-all
 
-evaluation:
-  after_intervention:
-    - id: verify-update
-      cmd: ["bash", "./scripts/verify-update.sh"]
-      timeout: 5s
-      expect_exit: 0
-
 references:
   - docs/reviews/jack-sovereignty-analysis.md

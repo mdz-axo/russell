@@ -1356,16 +1356,6 @@ impl BaselineRow {
     /// now have a freshness guard. When stale, Jack's SOAP shows
     /// "baselines stale (last updated X days ago)" instead of
     /// citing potentially obsolete statistics.
-    /// This implements D1 from the adversarial review: baselines
-    /// now have a freshness guard. When stale, Jack's SOAP shows
-    /// "baselines stale (last updated X days ago)" instead of
-    /// citing potentially obsolete statistics.
-    /// now have a freshness guard. When stale, Jack's SOAP shows
-    /// "baselines stale (last updated X days ago)" instead of
-    /// citing potentially obsolete statistics.
-    /// "baselines stale (last updated X days ago)" instead of
-    /// citing potentially obsolete statistics.
-    /// citing potentially obsolete statistics.
     #[must_use]
     pub fn is_stale(&self, max_age_hours: u32) -> bool {
         let Some(updated) = self.updated_ts else {
@@ -1405,16 +1395,6 @@ fn percentile(sorted: &[f64], pct: f64) -> Option<f64> {
 /// over a time-ordered series of (value, unix_timestamp) pairs.
 ///
 /// Uses an exponential decay kernel with the given half-life in seconds.
-/// Returns `(None, None)` if the series has fewer than 2 data points.
-/// over a time-ordered series of (value, unix_timestamp) pairs.
-///
-/// Uses an exponential decay kernel with the given half-life in seconds.
-/// Returns `(None, None)` if the series has fewer than 2 data points.
-///
-/// Uses an exponential decay kernel with the given half-life in seconds.
-/// Returns `(None, None)` if the series has fewer than 2 data points.
-/// Uses an exponential decay kernel with the given half-life in seconds.
-/// Returns `(None, None)` if the series has fewer than 2 data points.
 /// Returns `(None, None)` if the series has fewer than 2 data points.
 fn compute_ewma(series: &[(f64, i64)], half_life_s: f64) -> (Option<f64>, Option<f64>) {
     if series.len() < 2 {

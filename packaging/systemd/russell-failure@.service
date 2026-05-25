@@ -10,4 +10,5 @@ ProtectSystem=strict
 ProtectHome=read-only
 ReadWritePaths=%h/.local/state/harness
 NoNewPrivileges=yes
+ExecStartPre=/bin/mkdir -p %h/.local/state/harness/runs
 ExecStart=/bin/sh -c 'journalctl --user -u %i -n 50 --no-pager > %h/.local/state/harness/runs/failure-%i-$(date -u +%%Y%%m%%dT%%H%%M%%SZ).log 2>&1'

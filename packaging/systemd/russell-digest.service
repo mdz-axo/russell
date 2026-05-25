@@ -3,7 +3,7 @@
 
 [Unit]
 Description=Russell weekly digest
-OnFailure=russell-failure@%n.service
+OnFailure=russell-failure@%p.service
 
 [Service]
 Type=oneshot
@@ -13,7 +13,7 @@ ProtectHome=read-only
 ReadWritePaths=%h/.local/state/harness
 PrivateTmp=yes
 NoNewPrivileges=yes
-# Render into ~/.local/state/harness/digest/YYYY-WNN.md
+ExecStartPre=/bin/mkdir -p %h/.local/state/harness/digest
 ExecStart=/bin/sh -c '%h/.local/bin/russell digest --since-hours 168 > %h/.local/state/harness/digest/$(date -u +%%Y-W%%V).md'
 StandardOutput=journal
 StandardError=journal

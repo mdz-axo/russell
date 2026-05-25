@@ -32,13 +32,6 @@ system configuration (Dolstra 2006), and SRE error budgets
 O'Reilly). The risk-band model follows the defence-in-depth principle
 from NIST SP 800-53.
 
-**Reference models:** The IDRS contract synthesises patterns from
-Erlang's let-it-crash philosophy (Armstrong 2003), NixOS declarative
-system configuration (Dolstra 2006), and SRE error budgets
-(Beyer, Jones, Petoff, Murphy 2016, *Site Reliability Engineering*,
-O'Reilly). The risk-band model follows the defence-in-depth principle
-from NIST SP 800-53.
-
 ## 1. The IDRS contract
 
 Every mutating action — a skill intervention, a CLI subcommand, an
@@ -333,7 +326,7 @@ waiting for the next cadence, but it still emits
 still triggers the autoimmune check to prevent self-triage
 from invoking itself in a loop.
 
-## 10. Not-yet-automated safety
+## 11. Not-yet-automated safety
 
 Things on the roadmap that are deliberately **not** automated
 yet and will require a dedicated ADR before they are:

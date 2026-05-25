@@ -3,7 +3,7 @@
 
 [Unit]
 Description=Russell Sentinel — observe the host
-OnFailure=russell-failure@%n.service
+OnFailure=russell-failure@%p.service
 
 [Service]
 Type=oneshot

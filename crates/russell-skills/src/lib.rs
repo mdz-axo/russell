@@ -166,16 +166,12 @@ pub enum SkillKind {
     Actionable,
     /// Knowledge-only — KNOWLEDGE.md injected into system prompt.
     /// No probes, no interventions.
-    /// No probes, no interventions.
     Lens,
 }
 
 impl Default for SkillKind {
     /// Default is `Actionable` — process skills (probes + interventions)
     /// are the primary case. Knowledge-only lenses must be explicitly
-    /// declared or inferred from empty probes/interventions.
-    /// are the primary case. Knowledge-only lenses must be explicitly
-    /// declared or inferred from empty probes/interventions.
     /// declared or inferred from empty probes/interventions.
     fn default() -> Self {
         Self::Actionable
@@ -226,8 +222,6 @@ pub struct Skill {
     pub interventions: Vec<Intervention>,
     /// Safety constraints.
     pub safety: Safety,
-    /// Post-intervention evaluation checks.
-    pub evaluation: Option<Evaluation>,
     /// Visibility for ACP exposure (ADR-0026).
     pub visibility: Visibility,
     /// hLexicon categorization (ADR-0026).
@@ -323,12 +317,6 @@ impl Step {
     ///
     /// Probes never require consent. Interventions require consent
     /// when their risk exceeds `max_auto_risk`.
-    ///
-    /// Probes never require consent. Interventions require consent
-    /// when their risk exceeds `max_auto_risk`.
-    /// Probes never require consent. Interventions require consent
-    /// when their risk exceeds `max_auto_risk`.
-    /// when their risk exceeds `max_auto_risk`.
     #[must_use]
     pub fn consent_required(&self, max_auto_risk: RiskBand) -> bool {
         self.risk > RiskBand::None && self.risk > max_auto_risk
@@ -391,9 +379,6 @@ pub struct Intervention {
     pub timeout: String,
     /// Whether this intervention requires root privileges.
     /// The operator will be prompted for their sudo password
-    /// when consenting to execution.
-    /// The operator will be prompted for their sudo password
-    /// when consenting to execution.
     /// when consenting to execution.
     #[serde(default)]
     pub needs_sudo: bool,
@@ -468,28 +453,6 @@ pub struct Safety {
     pub needs_network: bool,
 }
 
-/// Post-intervention evaluation checks.
-#[derive(Debug, Clone, Deserialize)]
-pub struct Evaluation {
-    /// Checks to run after an intervention.
-    pub after_intervention: Vec<EvalCheck>,
-}
-
-/// A post-intervention check.
-#[derive(Debug, Clone, Deserialize)]
-pub struct EvalCheck {
-    /// Unique ID.
-    pub id: String,
-    /// Argv list.
-    pub cmd: Vec<String>,
-    /// Timeout.
-    #[serde(default = "timeout_default")]
-    pub timeout: String,
-    /// Expected exit code (default 0).
-    #[serde(default = "expected_exit_default")]
-    pub expect_exit: i32,
-}
-
 /// The raw YAML manifest as parsed from disk, before validation.
 #[derive(Debug, Deserialize)]
 #[allow(missing_docs)]
@@ -516,8 +479,6 @@ pub struct RawManifest {
     pub interventions: Vec<Intervention>,
     #[serde(default)]
     pub safety: Option<RawSafety>,
-    #[serde(default)]
-    pub evaluation: Option<Evaluation>,
     /// Visibility for ACP exposure (ADR-0026).
     #[serde(default)]
     pub visibility: Option<Visibility>,
@@ -561,10 +522,6 @@ const fn bool_true() -> bool {
 
 fn max_auto_risk_default() -> RiskBand {
     RiskBand::Low
-}
-
-const fn expected_exit_default() -> i32 {
-    0
 }
 
 // --- Loading -------------------------------------------------------------
@@ -650,7 +607,6 @@ fn load_one(skill_dir: &Path, dir_name: &str) -> Result<Skill, LoadError> {
 
 /// Check that every executable file in `scripts/` is referenced by
 /// at least one probe or intervention `cmd`.
-/// at least one probe or intervention `cmd`.
 fn check_unreferenced_scripts(
     skill_dir: &Path,
     skill: &Skill,
@@ -669,11 +625,6 @@ fn check_unreferenced_scripts(
     }
     for iv in &skill.interventions {
         collect_script_names(&iv.cmd, &mut referenced);
-    }
-    if let Some(ref eval) = skill.evaluation {
-        for check in &eval.after_intervention {
-            collect_script_names(&check.cmd, &mut referenced);
-        }
     }
 
     let entries = std::fs::read_dir(&scripts_dir).map_err(|e| LoadError::SkillDir {
@@ -829,7 +780,6 @@ pub fn parse_manifest(yaml: &str, dir_name: &str) -> std::result::Result<Skill, 
             allowed_env_keys: safety_raw.allowed_env_keys,
             needs_network: safety_raw.needs_network,
         },
-        evaluation: raw.evaluation,
         visibility: raw.visibility.unwrap_or_default(),
         lexicon: raw.lexicon,
     })

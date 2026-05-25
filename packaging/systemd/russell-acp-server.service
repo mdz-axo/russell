@@ -2,8 +2,7 @@
 [Unit]
 Description=Russell ACP Server — hKask integration
 Documentation=https://github.com/Replicant-Partners/russell
-After=network.target okapi.service
-Wants=okapi.service
+After=network.target
 ConditionPathExists=%h/.local/share/harness/skills
 
 [Service]

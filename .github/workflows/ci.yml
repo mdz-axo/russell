@@ -37,8 +37,15 @@ jobs:
       - name: cargo test
         run: cargo test --workspace
 
-      - name: Verify ACP server builds
-        run: cargo build -p russell-acp-server
+      - name: Verify release build
+        run: cargo build --release -p russell-cli -p russell-acp-server
+
+      - name: Verify install script is valid
+        run: |
+          bash -n install.sh
+          bash -n docs/deployment/install.sh
+          grep -q 'russell-cli' install.sh
+          grep -q 'russell-acp-server' install.sh
 
       - name: Install cargo-deny
         run: cargo install cargo-deny --locked
@@ -54,8 +61,9 @@ jobs:
 
       - name: Install MSRV toolchain
         uses: dtolnay/rust-toolchain@1.94.0
-        with:
-          components: rustfmt, clippy
+
+      - name: Cache cargo registry & build
+        uses: Swatinem/rust-cache@v2
 
       - name: cargo check (MSRV)
         run: cargo check --workspace

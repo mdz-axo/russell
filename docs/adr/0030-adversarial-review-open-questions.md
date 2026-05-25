@@ -12,20 +12,6 @@ status: "Superseded"
 <!-- STATUS: Superseded by ADR-0042 -->
 <!-- LAST_UPDATED: 2026-05-24 -->
 
----
-title: "ADR-0030: Adversarial Review — Open Architectural Questions"
-audience: [architects, developers]
-last_updated: 2026-05-24
-togaf_phase: "G"
-version: "1.0.0"
-status: "Superseded"
----
-
-<!-- TOGAF_DOMAIN: Governance — Adversarial Review -->
-<!-- VERSION: 1.0.0 -->
-<!-- STATUS: Superseded by ADR-0042 -->
-<!-- LAST_UPDATED: 2026-05-24 -->
-
 # ADR-0030: Adversarial Review — Open Architectural Questions
 
 **Status:** Superseded by [ADR-0042](0042-adversarial-review-remediation-plan.md)
@@ -140,7 +126,7 @@ Jack explicitly acknowledge "I don't have enough history to assess this"
 in his SOAP output?
 
 **Current:** `baseline_samples_present` precondition exists but is not
-surfaced in the persona. The `BasenelineRow::is_stale()` method (Task 4.1)
+surfaced in the persona. The `BaselineRow::is_stale()` method (Task 4.1)
 provides the freshness check.
 
 **Recommendation:** Add to Jack's prompt template: "If baselines show

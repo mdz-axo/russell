@@ -122,6 +122,8 @@ interventions:               # Empty array [] if none
 
 safety:
   max_auto_risk: low         # Cap for auto-execution
+  allowed_env_keys: ["HOME", "LANG", "PATH"]  # Only declared env vars propagated (ADR-0031)
+  needs_network: false                       # Set true only if skill requires network access (ADR-0031)
 ```
 
 ## 4. Script Guidelines

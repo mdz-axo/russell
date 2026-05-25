@@ -150,87 +150,23 @@ fn find_gpu_hwmon(gpu_device: &str) -> Option<String> {
 
 // -- ProbeDescriptor impls (T13 split form) --
 
-use super::descriptor::{ProbeCollector, ProbeMetadata};
 
 /// GPU VRAM usage percentage probe marker.
 pub struct GpuVramUsedPct;
-impl ProbeMetadata for GpuVramUsedPct {
-    fn name(&self) -> &'static str {
-        "gpu_vram_used_pct"
-    }
-    fn unit(&self) -> Option<&'static str> {
-        Some("%")
-    }
-}
-impl ProbeCollector for GpuVramUsedPct {
-    fn collect(&self) -> Option<f64> {
-        gpu_vram_used_pct()
-    }
-}
-
 /// GPU VRAM usage in MiB probe marker.
 pub struct GpuVramUsedMib;
-impl ProbeMetadata for GpuVramUsedMib {
-    fn name(&self) -> &'static str {
-        "gpu_vram_used_mib"
-    }
-    fn unit(&self) -> Option<&'static str> {
-        Some("MiB")
-    }
-}
-impl ProbeCollector for GpuVramUsedMib {
-    fn collect(&self) -> Option<f64> {
-        gpu_vram_used_mib()
-    }
-}
-
 /// GPU VRAM total in MiB probe marker.
 pub struct GpuVramTotalMib;
-impl ProbeMetadata for GpuVramTotalMib {
-    fn name(&self) -> &'static str {
-        "gpu_vram_total_mib"
-    }
-    fn unit(&self) -> Option<&'static str> {
-        Some("MiB")
-    }
-}
-impl ProbeCollector for GpuVramTotalMib {
-    fn collect(&self) -> Option<f64> {
-        gpu_vram_total_mib()
-    }
-}
-
 /// GPU temperature probe marker.
 pub struct GpuTempC;
-impl ProbeMetadata for GpuTempC {
-    fn name(&self) -> &'static str {
-        "gpu_temp_c"
-    }
-    fn unit(&self) -> Option<&'static str> {
-        Some("°C")
-    }
-}
-impl ProbeCollector for GpuTempC {
-    fn collect(&self) -> Option<f64> {
-        gpu_temp_c()
-    }
-}
-
 /// GPU utilization percentage probe marker.
 pub struct GpuUtilPct;
-impl ProbeMetadata for GpuUtilPct {
-    fn name(&self) -> &'static str {
-        "gpu_util_pct"
-    }
-    fn unit(&self) -> Option<&'static str> {
-        Some("%")
-    }
-}
-impl ProbeCollector for GpuUtilPct {
-    fn collect(&self) -> Option<f64> {
-        gpu_util_pct()
-    }
-}
+
+impl_probe!(GpuVramUsedPct, "gpu_vram_used_pct", "%", gpu_vram_used_pct);
+impl_probe!(GpuVramUsedMib, "gpu_vram_used_mib", "MiB", gpu_vram_used_mib);
+impl_probe!(GpuVramTotalMib, "gpu_vram_total_mib", "MiB", gpu_vram_total_mib);
+impl_probe!(GpuTempC, "gpu_temp_c", "°C", gpu_temp_c);
+impl_probe!(GpuUtilPct, "gpu_util_pct", "%", gpu_util_pct);
 
 #[cfg(test)]
 mod tests {

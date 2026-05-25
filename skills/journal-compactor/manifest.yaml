@@ -57,13 +57,6 @@ safety:
   require_human_for:
     - prune-old-samples
 
-evaluation:
-  after_intervention:
-    - id: verify-integrity
-      cmd: ["bash", "./scripts/verify-integrity.sh"]
-      timeout: 60s
-      expect_exit: 0
-
 references:
   - docs/plans/ADVERSARIAL-REVIEW-ACTION-PLAN.md
   - docs/specifications/PERSISTENCE_CATALOG.md
