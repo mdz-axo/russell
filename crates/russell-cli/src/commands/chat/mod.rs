@@ -56,8 +56,15 @@ impl ChatHistory {
 
 /// Persist the conversation history to disk.
 fn save_history(chat_path: &std::path::Path, history: &ChatHistory) -> Result<()> {
+    use std::os::unix::fs::OpenOptionsExt;
     let json = serde_json::to_string(history)?;
-    std::fs::write(chat_path.with_extension("json"), &json)
+    std::fs::OpenOptions::new()
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .mode(0o664)
+        .open(chat_path.with_extension("json"))
+        .and_then(|mut f| f.write_all(json.as_bytes()))
         .with_context(|| format!("writing {}", chat_path.display()))?;
     Ok(())
 }
