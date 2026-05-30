@@ -4,6 +4,7 @@
 [workspace]
 resolver = "2"
 members = [
+    "crates/russell-core",
     "crates/russell-protocol",
     "crates/russell-sentinel",
     "crates/russell-proprio",

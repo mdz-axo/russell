@@ -211,10 +211,10 @@ pub enum ActionError {
     /// Nested ACTION: detected in LLM output (prompt injection attempt).
     /// Task 3.4: Security hardening against LLM action injection.
     NestedActionDetected {
-        /// The raw response containing nested ACTION: patterns.
-        raw_response: String,
         /// Count of ACTION: occurrences found.
         count: usize,
+        /// The first ACTION: line found (used for deduplication fallback).
+        first_action: String,
     },
 }
 
@@ -254,12 +254,12 @@ impl std::fmt::Display for ActionError {
                 )
             }
             Self::NestedActionDetected {
-                raw_response,
                 count,
+                first_action,
             } => {
                 write!(
                     f,
-                    "Security violation: detected {count} ACTION: patterns in LLM output (prompt injection attempt). Only one ACTION: per response is allowed. Raw response: `{raw_response}`"
+                    "Jack proposed {count} actions in one response (only one is allowed). Using the first: {first_action}"
                 )
             }
         }
@@ -280,22 +280,32 @@ pub fn resolve_with_hkask(
     skills: &[Skill],
     hkask_tools: &[HKaskToolInfo],
 ) -> Option<std::result::Result<ResolvedAction, ActionError>> {
-    // Task 3.4: Detect nested ACTION: patterns (prompt injection attempt).
-    let action_count = response
+    // Task 3.4: Detect nested ACTION: patterns.
+    // ADR-0029 §4: "Only the first ACTION: line is considered valid."
+    // When multiple ACTION lines appear (LLM confusion, not injection),
+    // take the first one and proceed rather than rejecting the entire response.
+    let action_lines: Vec<&str> = response
         .lines()
         .filter(|line| line.trim().starts_with("ACTION:"))
-        .count();
-    if action_count > 1 {
-        return Some(Err(ActionError::NestedActionDetected {
-            raw_response: response.to_string(),
-            count: action_count,
-        }));
+        .collect();
+    if action_lines.is_empty() {
+        return None;
+    }
+    if action_lines.len() > 1 {
+        // Log the deduplication but continue with the first ACTION line.
+        // This avoids the "repeating itself" bug where rejecting the response
+        // caused the full text to be re-echoed in the error message.
+        tracing::warn!(
+            count = action_lines.len(),
+            first = %action_lines[0].trim(),
+            "LLM produced multiple ACTION lines; using the first"
+        );
     }
 
-    let action_line = response
-        .lines()
-        .rev()
-        .find(|line| line.trim().starts_with("ACTION:"))?;
+    // Use the FIRST ACTION line (ADR-0029 §4), not the last.
+    // The last-line heuristic was for single-ACTION responses;
+    // with deduplication, the first line is the intended one.
+    let action_line = action_lines[0];
 
     let raw = action_line.trim();
     let spec = match raw.strip_prefix("ACTION:") {
@@ -865,16 +875,16 @@ mod tests {
     // ── Task 3.4: Nested ACTION: Detection tests ──────────────────
 
     #[test]
-    fn nested_action_detected() {
+    fn nested_action_deduplicated_to_first() {
+        // ADR-0029 §4: "Only the first ACTION: line is considered valid."
+        // When the LLM produces multiple ACTION lines, the first one wins.
         let skills = [make_skill()];
         let response = "Let me check.\nACTION: test-skill/probe-1\n\nActually, also do this:\nACTION: test-skill/iv-1";
-        let err = resolve(response, &skills).unwrap().unwrap_err();
-        match err {
-            ActionError::NestedActionDetected { count, .. } => {
-                assert_eq!(count, 2);
-            }
-            _ => panic!("expected NestedActionDetected"),
-        }
+        let result = resolve(response, &skills).unwrap().unwrap();
+        // Should resolve to the FIRST action (probe-1), not the last (iv-1).
+        assert!(result.is_probe());
+        assert_eq!(result.skill_id(), "test-skill");
+        assert_eq!(result.action_id(), "probe-1");
     }
 
     #[test]
@@ -886,29 +896,27 @@ mod tests {
     }
 
     #[test]
-    fn nested_action_in_hkask_context() {
+    fn nested_hkask_action_deduplicated_to_first() {
+        // Multiple hKask ACTION lines: first one wins.
         let skills = [make_skill()];
         let hkask_tools = make_hkask_tools();
         let response = "Checking hKask.\nACTION: hkask/russell_host_snapshot\n\nAlso query:\nACTION: hkask/paradigm_shift_query";
-        let err = resolve_with_hkask(response, &skills, &hkask_tools)
+        let result = resolve_with_hkask(response, &skills, &hkask_tools)
             .unwrap()
-            .unwrap_err();
-        match err {
-            ActionError::NestedActionDetected { count, .. } => {
-                assert_eq!(count, 2);
-            }
-            _ => panic!("expected NestedActionDetected"),
-        }
+            .unwrap();
+        // Should resolve to the FIRST hKask tool.
+        assert!(result.is_hkask_tool());
+        assert_eq!(result.action_id(), "russell_host_snapshot");
     }
 
     #[test]
-    fn nested_action_error_message() {
+    fn triple_action_deduplicated_to_first() {
+        // Three ACTION lines: first one wins.
         let skills = [make_skill()];
-        let response = "First action\nACTION: test-skill/probe-1\nSecond action\nACTION: test-skill/iv-1\nThird action\nACTION: hkask/tool";
-        let err = resolve(response, &skills).unwrap().unwrap_err();
-        let msg = err.to_string();
-        assert!(msg.contains("3 ACTION: patterns"));
-        assert!(msg.contains("prompt injection attempt"));
+        let response = "First action\nACTION: test-skill/probe-1\nSecond action\nACTION: test-skill/iv-1\nThird action\nACTION: test-skill/probe-1";
+        let result = resolve(response, &skills).unwrap().unwrap();
+        assert!(result.is_probe());
+        assert_eq!(result.action_id(), "probe-1");
     }
 
     #[test]

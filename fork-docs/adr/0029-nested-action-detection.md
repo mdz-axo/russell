@@ -4,7 +4,7 @@ audience: [developers, architects, security reviewers]
 last_updated: 2026-05-19
 ddmvss_context: "jack"
 ddmvss_artifact: "adr"
-version: "1.0.0"
+version: "1.1.0"
 status: "Active"
 ---
 
@@ -41,48 +41,45 @@ uses the last one. This could lead to:
 
 Implement nested ACTION: detection:
 
-1. **Count ACTION: occurrences** — Before parsing, count lines starting with
-   `ACTION:`. If count > 1, reject with `ActionError::NestedActionDetected`.
+1. **Collect ACTION: occurrences** — Before parsing, collect all lines starting
+   with `ACTION:`. If more than one is found, log a warning and proceed with the
+   first line (deduplication). The response is not rejected.
 
-2. **Error variant** — Add new error type:
-   ```rust
-   NestedActionDetected {
-       raw_response: String,
-       count: usize,
-   }
-   ```
+2. **Error variant** — `NestedActionDetected` variant preserved for
+   diagnostic use; no longer returned by `resolve_with_hkask()` in the
+   multi-ACTION case (first-line wins instead).
 
-3. **Security logging** — When detected, log as `llm.action_injection_attempt`
-   event (future enhancement — currently surfaces to operator via error message).
+3. **Security logging** — When multiple ACTION lines are detected, emit a
+   `tracing::warn` with the count and the first ACTION line.
 
-4. **Single-action enforcement** — Only the first `ACTION:` line is considered
-   valid. Multiple `ACTION:` patterns indicate protocol violation.
+4. **Single-action enforcement** — Only the first `ACTION:` line is used.
+   Multiple `ACTION:` patterns trigger a warning log but do not reject the
+   response. This avoids the UX bug where rejecting caused the entire LLM
+   response to be re-echoed in the error message.
 
 ## Consequences
 
 ### Positive
 
-- **Prompt injection defense** — Detects and rejects attempts to inject
-  multiple actions via prompt manipulation.
+- **Prompt injection defense** — Detects multiple ACTION lines and uses only
+  the first. Only one action ever executes per response.
 
 - **Protocol clarity** — Enforces "one ACTION: per response" contract, making
   Jack's proposals unambiguous.
 
 - **Schneier principle** — Defense in depth: even if the LLM is compromised
-  or confused, the parser refuses to execute multiple actions.
+  or confused, only the first action is ever executed.
 
 - **Miller capability separation** — The parser (capability boundary) enforces
   protocol rules independent of the LLM (intelligence layer).
 
 ### Negative
 
-- **False positives** — Jack might legitimately want to propose multiple
-  actions (e.g., "run probe X, then intervention Y"). This ADR forces
-  single-action proposals, requiring multi-turn dialogue for multi-step
-  remediation.
-
-- **LLM training impact** — Jack's persona must be trained to propose only
-  one action per response. Multi-action proposals will be rejected.
+- **False positives mitigated** — Previously, LLM confusion (not malicious
+  injection) caused multi-ACTION responses to be fully rejected, wasting
+  the LLM's valid intent and re-echoing the entire response in an error
+  message (the "repeating itself" bug). Now the first ACTION line is used,
+  which handles LLM confusion gracefully while still only executing one action.
 
 ### Neutral
 
@@ -102,10 +99,10 @@ Implement nested ACTION: detection:
 
 ### Test Coverage
 
-- `nested_action_detected` — Two ACTION: patterns in response
+- `nested_action_deduplicated_to_first` — Two ACTION: patterns resolve to the first
 - `single_action_is_ok` — One ACTION: pattern (expected case)
-- `nested_action_in_hkask_context` — Two ACTION: with hkask tools
-- `nested_action_error_message` — Verify error message mentions "prompt injection attempt"
+- `nested_hkask_action_deduplicated_to_first` — Two hKask ACTION: patterns resolve to the first
+- `triple_action_deduplicated_to_first` — Three ACTION: patterns resolve to the first
 
 All 22 action parser tests pass.
 
@@ -113,7 +110,7 @@ All 22 action parser tests pass.
 
 | Principle | Compliance |
 |---|---|
-| **JR-3** (LLM never emits shell) | Poka-yoke: parser rejects malformed multi-action proposals |
+| **JR-3** (LLM never emits shell) | Poka-yoke: parser uses first ACTION line, ignoring duplicates |
 | **JR-6** (Reuse over dependency) | Pattern borrowed from hKask capability boundaries |
 | **Schneier** (Defense in depth) | Layered security: parser enforces protocol even if LLM fails |
 | **Miller** (Capability separation) | Parser (port) enforces rules on LLM (adapter) output |

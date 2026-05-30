@@ -40,10 +40,11 @@ jobs:
       - name: Verify release build
         run: cargo build --release -p russell-cli -p russell-acp-server
 
-      - name: Verify install script is valid
+      - name: Verify install scripts are valid
         run: |
           bash -n install.sh
-          bash -n docs/deployment/install.sh
+          bash -n packaging/bin/install.sh
+          bash -n packaging/bin/uninstall.sh
           grep -q 'russell-cli' install.sh
           grep -q 'russell-acp-server' install.sh
 
