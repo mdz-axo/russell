@@ -20,8 +20,8 @@
 //! ## Security Model
 //!
 //! Skills are confined to:
-//! - Read access: skill directory, /usr, /lib, /etc (read-only)
-//! - Write access: skill directory, /tmp (if configured)
+//! - Read access: skill directory, /usr, /lib, /etc, /proc (read-only)
+//! - Write access: skill directory, /tmp (if configured), /dev (for /dev/null redirects)
 //! - Network: disabled by default (opt-in per skill)
 
 use std::path::{Path, PathBuf};
@@ -52,8 +52,9 @@ impl Default for SandboxConfig {
                 PathBuf::from("/lib"),
                 PathBuf::from("/lib64"),
                 PathBuf::from("/etc"),
+                PathBuf::from("/proc"),
             ],
-            write_paths: Vec::new(),
+            write_paths: vec![PathBuf::from("/dev")],
             allow_network: false,
             allow_tmp: true,
         }
@@ -201,6 +202,8 @@ mod tests {
         let config = SandboxConfig::default();
         assert!(config.read_paths.iter().any(|p| p == Path::new("/usr")));
         assert!(config.read_paths.iter().any(|p| p == Path::new("/lib")));
+        assert!(config.read_paths.iter().any(|p| p == Path::new("/proc")));
+        assert!(config.write_paths.iter().any(|p| p == Path::new("/dev")));
         assert!(!config.allow_network);
         assert!(config.allow_tmp);
     }
