@@ -40,7 +40,7 @@ pub mod registry;
 /// Jinja2 template support for skill prompts.
 pub mod templates;
 
-pub use symptom_catalog::{Symptom, SymptomCategory, SeverityHint, SYMPTOMS};
+pub use symptom_catalog::{SYMPTOMS, SeverityHint, Symptom, SymptomCategory};
 
 /// Errors that can occur during manifest loading.
 #[derive(Debug, thiserror::Error)]
@@ -146,9 +146,8 @@ pub enum LoadError {
         symptom: String,
     },
 
-    /// A script file in `scripts/` is not referenced by any probe or
-    /// intervention `cmd:` entry.
-    /// intervention `cmd:` entry.
+    /// A script file in `scripts/` is not referenced by any probe,
+    /// intervention, or evaluation `cmd:` entry.
     #[error("skill '{skill_id}' has unreferenced script: {script}")]
     UnreferencedScript {
         /// Skill ID.
@@ -199,6 +198,28 @@ pub struct Lexicon {
     pub terms: Vec<String>,
 }
 
+/// A post-intervention verification step.
+#[derive(Debug, Clone, Deserialize)]
+pub struct EvaluationStep {
+    /// Unique ID within the skill.
+    pub id: String,
+    /// Argv list to execute.
+    pub cmd: Vec<String>,
+    /// Timeout (e.g. "30s").
+    #[serde(default = "timeout_default")]
+    pub timeout: String,
+    /// Expected exit code (default 0).
+    #[serde(default)]
+    pub expect_exit: Option<i32>,
+}
+
+/// Evaluation block — post-intervention verification.
+#[derive(Debug, Clone, Deserialize)]
+pub struct Evaluation {
+    /// Verification steps to run after an intervention.
+    pub after_intervention: Vec<EvaluationStep>,
+}
+
 /// A single skill, fully loaded and validated.
 #[derive(Debug, Clone)]
 pub struct Skill {
@@ -220,6 +241,8 @@ pub struct Skill {
     pub probes: Vec<Probe>,
     /// Mutating interventions.
     pub interventions: Vec<Intervention>,
+    /// Post-intervention verification steps.
+    pub evaluation: Option<Evaluation>,
     /// Safety constraints.
     pub safety: Safety,
     /// Visibility for ACP exposure (ADR-0026).
@@ -477,6 +500,9 @@ pub struct RawManifest {
     pub probes: Vec<Probe>,
     #[serde(default)]
     pub interventions: Vec<Intervention>,
+    /// Post-intervention verification steps.
+    #[serde(default)]
+    pub evaluation: Option<Evaluation>,
     #[serde(default)]
     pub safety: Option<RawSafety>,
     /// Visibility for ACP exposure (ADR-0026).
@@ -606,7 +632,7 @@ fn load_one(skill_dir: &Path, dir_name: &str) -> Result<Skill, LoadError> {
 }
 
 /// Check that every executable file in `scripts/` is referenced by
-/// at least one probe or intervention `cmd`.
+/// at least one probe, intervention, or evaluation `cmd`.
 fn check_unreferenced_scripts(
     skill_dir: &Path,
     skill: &Skill,
@@ -625,6 +651,11 @@ fn check_unreferenced_scripts(
     }
     for iv in &skill.interventions {
         collect_script_names(&iv.cmd, &mut referenced);
+    }
+    if let Some(eval) = &skill.evaluation {
+        for step in &eval.after_intervention {
+            collect_script_names(&step.cmd, &mut referenced);
+        }
     }
 
     let entries = std::fs::read_dir(&scripts_dir).map_err(|e| LoadError::SkillDir {
@@ -727,12 +758,8 @@ pub fn parse_manifest(yaml: &str, dir_name: &str) -> std::result::Result<Skill, 
         .symptoms
         .iter()
         .map(|s| {
-            s.parse::<Symptom>().map_err(|_| {
-                format!(
-                    "skill '{}' references unknown symptom '{}'",
-                    dir_name, s
-                )
-            })
+            s.parse::<Symptom>()
+                .map_err(|_| format!("skill '{}' references unknown symptom '{}'", dir_name, s))
         })
         .collect::<std::result::Result<Vec<_>, _>>()?;
 
@@ -778,6 +805,7 @@ pub fn parse_manifest(yaml: &str, dir_name: &str) -> std::result::Result<Skill, 
         applies_when: raw.applies_when,
         probes: raw.probes,
         interventions: raw.interventions,
+        evaluation: raw.evaluation,
         safety: Safety {
             max_auto_risk: safety_raw.max_auto_risk,
             require_human_for: safety_raw.require_human_for,
@@ -1031,13 +1059,23 @@ safety:
         assert_eq!(okapi.probes.len(), 3);
         assert_eq!(okapi.interventions.len(), 1);
         assert!(okapi.symptoms.iter().any(|s| s.name() == "llm_slow"));
-        assert!(okapi.symptoms.iter().any(|s| s.name() == "gpu_fallback_to_cpu"));
+        assert!(
+            okapi
+                .symptoms
+                .iter()
+                .any(|s| s.name() == "gpu_fallback_to_cpu")
+        );
         assert_eq!(okapi.interventions[0].id, "restart-okapi");
 
         let sysadmin = skills.iter().find(|s| s.id == "sysadmin").unwrap();
         assert_eq!(sysadmin.probes.len(), 2);
         assert_eq!(sysadmin.interventions.len(), 3);
-        assert!(sysadmin.symptoms.iter().any(|s| s.name() == "zombie_accumulation"));
+        assert!(
+            sysadmin
+                .symptoms
+                .iter()
+                .any(|s| s.name() == "zombie_accumulation")
+        );
         assert!(sysadmin.symptoms.iter().any(|s| s.name() == "clock_skew"));
         assert!(
             sysadmin
@@ -1046,5 +1084,58 @@ safety:
                 .any(|s| s.name() == "systemd_service_degraded")
         );
         assert!(matches!(sysadmin.safety.max_auto_risk, RiskBand::Medium));
+    }
+
+    #[test]
+    fn allows_evaluation_scripts() {
+        let tmp = tempfile::tempdir().unwrap();
+        let skill_dir = tmp.path().join("gpu-doctor");
+        std::fs::create_dir_all(skill_dir.join("scripts")).unwrap();
+        std::fs::write(skill_dir.join("scripts/probe.sh"), "#!/bin/bash\necho ok\n").unwrap();
+        std::fs::write(
+            skill_dir.join("scripts/verify.sh"),
+            "#!/bin/bash\necho verified\n",
+        )
+        .unwrap();
+        let yaml = r#"
+id: gpu-doctor
+version: 0.1.0
+authored: 2026-05-09
+min_harness_version: 0.1.0
+symptoms:
+  - vram_oom
+applies_when:
+  - os_family: linux
+probes:
+  - id: probe-gpu-doctor
+    cmd: ["bash", "./scripts/probe.sh"]
+interventions:
+  - id: iv-gpu-doctor
+    cmd: ["echo", "fix"]
+    risk: low
+    idempotent: true
+    rollback: none_needed
+evaluation:
+  after_intervention:
+    - id: verify-result
+      cmd: ["bash", "./scripts/verify.sh"]
+      timeout: 5s
+      expect_exit: 0
+safety:
+  max_auto_risk: low
+"#;
+        std::fs::write(skill_dir.join("manifest.yaml"), yaml).unwrap();
+        let skills = load_all(tmp.path()).unwrap();
+        assert_eq!(
+            skills.len(),
+            1,
+            "evaluation script should be recognized as referenced"
+        );
+        let eval = skills[0]
+            .evaluation
+            .as_ref()
+            .expect("evaluation should be parsed");
+        assert_eq!(eval.after_intervention.len(), 1);
+        assert_eq!(eval.after_intervention[0].id, "verify-result");
     }
 }

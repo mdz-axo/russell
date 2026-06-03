@@ -638,6 +638,7 @@ mod tests {
                 timeout: "30s".into(),
                 needs_sudo: false,
             }],
+            evaluation: None,
             safety: Safety {
                 max_auto_risk: RiskBand::Low,
                 require_human_for: vec![],
