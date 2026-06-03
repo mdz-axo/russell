@@ -1285,11 +1285,11 @@ fn extract_inline_args(response: &str) -> Vec<String> {
         .lines()
         .find(|l| l.trim().starts_with("Arguments"))
         .map(|l| {
-            l.trim()
-                .strip_prefix("Arguments")
-                .unwrap_or(l)
-                .trim()
-                .to_string()
+            let trimmed = l.trim();
+            let after_prefix = trimmed.strip_prefix("Arguments").unwrap_or(trimmed);
+            // Strip an optional colon separator ("Arguments: foo" → "foo").
+            let after_colon = after_prefix.strip_prefix(':').unwrap_or(after_prefix);
+            after_colon.trim().to_string()
         });
 
     let line = match args_line {
@@ -1318,4 +1318,44 @@ fn extract_inline_args(response: &str) -> Vec<String> {
         args.push(current);
     }
     args
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn extract_inline_args_without_colon() {
+        let response = "ACTION: skill-manager/build\nArguments script-scan";
+        let args = extract_inline_args(response);
+        assert_eq!(args, vec!["script-scan"]);
+    }
+
+    #[test]
+    fn extract_inline_args_with_colon() {
+        let response = "ACTION: skill-manager/build\nArguments: script-scan";
+        let args = extract_inline_args(response);
+        assert_eq!(args, vec!["script-scan"]);
+    }
+
+    #[test]
+    fn extract_inline_args_with_multiple_args() {
+        let response = "Arguments: --name swap-watcher --flag value";
+        let args = extract_inline_args(response);
+        assert_eq!(args, vec!["--name", "swap-watcher", "--flag", "value"]);
+    }
+
+    #[test]
+    fn extract_inline_args_no_arguments_line() {
+        let response = "ACTION: skill-manager/build";
+        let args = extract_inline_args(response);
+        assert!(args.is_empty());
+    }
+
+    #[test]
+    fn extract_inline_args_quoted_values() {
+        let response = "Arguments \"multi word value\" --flag ok";
+        let args = extract_inline_args(response);
+        assert_eq!(args, vec!["multi word value", "--flag", "ok"]);
+    }
 }

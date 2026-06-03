@@ -17,7 +17,7 @@ fi
 
 # Validate skill name (kebab-case only, no path traversal)
 if ! [[ "$SKILL_NAME" =~ ^[a-z][a-z0-9-]*$ ]]; then
-    echo "Error: Skill name must be kebab-case (e.g., package-checker)" >&2
+    echo "Error: Skill name must be kebab-case (e.g., package-checker), got: '$SKILL_NAME'" >&2
     exit 1
 fi
 
