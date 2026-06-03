@@ -581,8 +581,8 @@ pub fn load_all(skills_dir: &Path) -> Result<Vec<Skill>, LoadError> {
             .and_then(|n| n.to_str())
             .unwrap_or_default();
 
-        // Skip non-skill directories (e.g. `.git`, `__pycache__`).
-        if dir_name.starts_with('.') || dir_name.starts_with("__") {
+        // Skip non-skill directories (e.g. `.git`, `__pycache__`, `templates`).
+        if dir_name.starts_with('.') || dir_name.starts_with("__") || dir_name == "templates" {
             continue;
         }
 
@@ -997,6 +997,7 @@ safety:
         let tmp = tempfile::tempdir().unwrap();
         std::fs::create_dir_all(tmp.path().join(".git")).unwrap();
         std::fs::create_dir_all(tmp.path().join("__pycache__")).unwrap();
+        std::fs::create_dir_all(tmp.path().join("templates")).unwrap();
         write_skill(tmp.path(), "gpu-doctor", &valid_manifest("gpu-doctor"));
         let skills = load_all(tmp.path()).unwrap();
         assert_eq!(skills.len(), 1);
