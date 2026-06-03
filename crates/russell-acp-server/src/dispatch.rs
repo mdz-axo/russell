@@ -248,7 +248,11 @@ fn skill_to_info(skill: &Skill) -> SkillInfo {
                 primary: LexiconDomain::KnowAct,
                 terms: Vec::new(),
             }),
-        symptoms: skill.symptoms.iter().map(|s| s.name().to_string()).collect(),
+        symptoms: skill
+            .symptoms
+            .iter()
+            .map(|s| s.name().to_string())
+            .collect(),
         probes: skill
             .probes
             .iter()

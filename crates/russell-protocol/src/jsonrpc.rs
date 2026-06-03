@@ -151,7 +151,11 @@ impl JsonRpcError {
 
     /// Rate limit exceeded (-32003).
     pub fn rate_limited(retry_after_secs: u64) -> Self {
-        Self::with_data(-32003, "Rate limit exceeded", serde_json::json!({ "retry_after_secs": retry_after_secs }))
+        Self::with_data(
+            -32003,
+            "Rate limit exceeded",
+            serde_json::json!({ "retry_after_secs": retry_after_secs }),
+        )
     }
 
     /// Consent required (-32004).

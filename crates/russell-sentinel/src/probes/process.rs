@@ -140,7 +140,6 @@ fn process_text_samples_from(stats: &[ProcessStat]) -> Vec<super::Sample> {
 
 // -- ProbeDescriptor impls (T13 split form) --
 
-
 /// Probe descriptor.
 pub struct ProcTotalCount;
 /// Probe descriptor.
@@ -152,10 +151,30 @@ pub struct ProcRunningCount;
 /// Probe descriptor.
 pub struct ProcTopMemPct;
 
-impl_probe!(ProcTotalCount, "proc_total_count", "count", proc_total_count);
-impl_probe!(ProcZombieCount, "proc_zombie_count", "count", proc_zombie_count);
-impl_probe!(ProcStuckCount, "proc_stuck_count", "count", proc_stuck_count);
-impl_probe!(ProcRunningCount, "proc_running_count", "count", proc_running_count);
+impl_probe!(
+    ProcTotalCount,
+    "proc_total_count",
+    "count",
+    proc_total_count
+);
+impl_probe!(
+    ProcZombieCount,
+    "proc_zombie_count",
+    "count",
+    proc_zombie_count
+);
+impl_probe!(
+    ProcStuckCount,
+    "proc_stuck_count",
+    "count",
+    proc_stuck_count
+);
+impl_probe!(
+    ProcRunningCount,
+    "proc_running_count",
+    "count",
+    proc_running_count
+);
 impl_probe!(ProcTopMemPct, "proc_top_mem_pct", "%", proc_top_mem_pct);
 
 #[cfg(test)]

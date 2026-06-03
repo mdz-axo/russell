@@ -67,7 +67,9 @@ impl std::fmt::Display for SymptomCategory {
 }
 
 /// Severity hint for a symptom — guides Jack's triage prioritization.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize, Default)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize, Default,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum SeverityHint {
     /// Informational; may warrant monitoring.
@@ -166,102 +168,417 @@ struct SymptomDef {
 
 const SYMPTOM_DEFS: &[SymptomDef] = &[
     // Hardware / GPU
-    SymptomDef { name: "amdgpu_ring_hang", category: SymptomCategory::Hardware, severity_hint: SeverityHint::Critical },
-    SymptomDef { name: "amdgpu_reset", category: SymptomCategory::Hardware, severity_hint: SeverityHint::High },
-    SymptomDef { name: "vram_oom", category: SymptomCategory::Hardware, severity_hint: SeverityHint::Critical },
-    SymptomDef { name: "gpu_temp_high", category: SymptomCategory::Hardware, severity_hint: SeverityHint::High },
-    SymptomDef { name: "gpu_fallback_to_cpu", category: SymptomCategory::Hardware, severity_hint: SeverityHint::High },
-    SymptomDef { name: "rocm_unreachable", category: SymptomCategory::Hardware, severity_hint: SeverityHint::Critical },
-    SymptomDef { name: "nvme_media_errors", category: SymptomCategory::Hardware, severity_hint: SeverityHint::Critical },
+    SymptomDef {
+        name: "amdgpu_ring_hang",
+        category: SymptomCategory::Hardware,
+        severity_hint: SeverityHint::Critical,
+    },
+    SymptomDef {
+        name: "amdgpu_reset",
+        category: SymptomCategory::Hardware,
+        severity_hint: SeverityHint::High,
+    },
+    SymptomDef {
+        name: "vram_oom",
+        category: SymptomCategory::Hardware,
+        severity_hint: SeverityHint::Critical,
+    },
+    SymptomDef {
+        name: "gpu_temp_high",
+        category: SymptomCategory::Hardware,
+        severity_hint: SeverityHint::High,
+    },
+    SymptomDef {
+        name: "gpu_fallback_to_cpu",
+        category: SymptomCategory::Hardware,
+        severity_hint: SeverityHint::High,
+    },
+    SymptomDef {
+        name: "rocm_unreachable",
+        category: SymptomCategory::Hardware,
+        severity_hint: SeverityHint::Critical,
+    },
+    SymptomDef {
+        name: "nvme_media_errors",
+        category: SymptomCategory::Hardware,
+        severity_hint: SeverityHint::Critical,
+    },
     // System
-    SymptomDef { name: "oom_killer_active", category: SymptomCategory::System, severity_hint: SeverityHint::Critical },
-    SymptomDef { name: "swap_pressure", category: SymptomCategory::System, severity_hint: SeverityHint::High },
-    SymptomDef { name: "loadavg_high", category: SymptomCategory::System, severity_hint: SeverityHint::Medium },
-    SymptomDef { name: "llm_slow", category: SymptomCategory::System, severity_hint: SeverityHint::Medium },
-    SymptomDef { name: "resource_exhaustion", category: SymptomCategory::System, severity_hint: SeverityHint::High },
+    SymptomDef {
+        name: "oom_killer_active",
+        category: SymptomCategory::System,
+        severity_hint: SeverityHint::Critical,
+    },
+    SymptomDef {
+        name: "swap_pressure",
+        category: SymptomCategory::System,
+        severity_hint: SeverityHint::High,
+    },
+    SymptomDef {
+        name: "loadavg_high",
+        category: SymptomCategory::System,
+        severity_hint: SeverityHint::Medium,
+    },
+    SymptomDef {
+        name: "llm_slow",
+        category: SymptomCategory::System,
+        severity_hint: SeverityHint::Medium,
+    },
+    SymptomDef {
+        name: "resource_exhaustion",
+        category: SymptomCategory::System,
+        severity_hint: SeverityHint::High,
+    },
     // Ubuntu-specific
-    SymptomDef { name: "systemd_service_degraded", category: SymptomCategory::Ubuntu, severity_hint: SeverityHint::Medium },
-    SymptomDef { name: "apt_stale", category: SymptomCategory::Ubuntu, severity_hint: SeverityHint::Low },
-    SymptomDef { name: "snap_autorefresh_stall", category: SymptomCategory::Ubuntu, severity_hint: SeverityHint::Low },
-    SymptomDef { name: "btrfs_fragmented", category: SymptomCategory::Ubuntu, severity_hint: SeverityHint::Medium },
-    SymptomDef { name: "zfs_scrub_overdue", category: SymptomCategory::Ubuntu, severity_hint: SeverityHint::Medium },
-    SymptomDef { name: "unattended_upgrades_failed", category: SymptomCategory::Ubuntu, severity_hint: SeverityHint::Medium },
-    SymptomDef { name: "kernel_livepatch_stale", category: SymptomCategory::Ubuntu, severity_hint: SeverityHint::Low },
-    SymptomDef { name: "fwupd_outdated", category: SymptomCategory::Ubuntu, severity_hint: SeverityHint::Low },
-    SymptomDef { name: "netplan_misconfigured", category: SymptomCategory::Ubuntu, severity_hint: SeverityHint::High },
-    SymptomDef { name: "apparmor_denial_spike", category: SymptomCategory::Ubuntu, severity_hint: SeverityHint::Medium },
-    SymptomDef { name: "journald_corruption", category: SymptomCategory::Ubuntu, severity_hint: SeverityHint::High },
-    SymptomDef { name: "tmp_mount_nosuid_missing", category: SymptomCategory::Ubuntu, severity_hint: SeverityHint::Low },
+    SymptomDef {
+        name: "systemd_service_degraded",
+        category: SymptomCategory::Ubuntu,
+        severity_hint: SeverityHint::Medium,
+    },
+    SymptomDef {
+        name: "apt_stale",
+        category: SymptomCategory::Ubuntu,
+        severity_hint: SeverityHint::Low,
+    },
+    SymptomDef {
+        name: "snap_autorefresh_stall",
+        category: SymptomCategory::Ubuntu,
+        severity_hint: SeverityHint::Low,
+    },
+    SymptomDef {
+        name: "btrfs_fragmented",
+        category: SymptomCategory::Ubuntu,
+        severity_hint: SeverityHint::Medium,
+    },
+    SymptomDef {
+        name: "zfs_scrub_overdue",
+        category: SymptomCategory::Ubuntu,
+        severity_hint: SeverityHint::Medium,
+    },
+    SymptomDef {
+        name: "unattended_upgrades_failed",
+        category: SymptomCategory::Ubuntu,
+        severity_hint: SeverityHint::Medium,
+    },
+    SymptomDef {
+        name: "kernel_livepatch_stale",
+        category: SymptomCategory::Ubuntu,
+        severity_hint: SeverityHint::Low,
+    },
+    SymptomDef {
+        name: "fwupd_outdated",
+        category: SymptomCategory::Ubuntu,
+        severity_hint: SeverityHint::Low,
+    },
+    SymptomDef {
+        name: "netplan_misconfigured",
+        category: SymptomCategory::Ubuntu,
+        severity_hint: SeverityHint::High,
+    },
+    SymptomDef {
+        name: "apparmor_denial_spike",
+        category: SymptomCategory::Ubuntu,
+        severity_hint: SeverityHint::Medium,
+    },
+    SymptomDef {
+        name: "journald_corruption",
+        category: SymptomCategory::Ubuntu,
+        severity_hint: SeverityHint::High,
+    },
+    SymptomDef {
+        name: "tmp_mount_nosuid_missing",
+        category: SymptomCategory::Ubuntu,
+        severity_hint: SeverityHint::Low,
+    },
     // Cybernetic
-    SymptomDef { name: "broken_feedback_loop", category: SymptomCategory::Cybernetic, severity_hint: SeverityHint::High },
-    SymptomDef { name: "alert_fatigue", category: SymptomCategory::Cybernetic, severity_hint: SeverityHint::Medium },
-    SymptomDef { name: "variety_deficit", category: SymptomCategory::Cybernetic, severity_hint: SeverityHint::Low },
-    SymptomDef { name: "model_reality_divergence", category: SymptomCategory::Cybernetic, severity_hint: SeverityHint::High },
-    SymptomDef { name: "observer_coupling", category: SymptomCategory::Cybernetic, severity_hint: SeverityHint::Medium },
-    SymptomDef { name: "missing_double_loop", category: SymptomCategory::Cybernetic, severity_hint: SeverityHint::Medium },
-    SymptomDef { name: "homeostatic_drift", category: SymptomCategory::Cybernetic, severity_hint: SeverityHint::Medium },
-    SymptomDef { name: "coordination_oscillation", category: SymptomCategory::Cybernetic, severity_hint: SeverityHint::Medium },
-    SymptomDef { name: "context_saturation", category: SymptomCategory::Cybernetic, severity_hint: SeverityHint::Low },
-    SymptomDef { name: "monitoring_independence_failure", category: SymptomCategory::Cybernetic, severity_hint: SeverityHint::High },
+    SymptomDef {
+        name: "broken_feedback_loop",
+        category: SymptomCategory::Cybernetic,
+        severity_hint: SeverityHint::High,
+    },
+    SymptomDef {
+        name: "alert_fatigue",
+        category: SymptomCategory::Cybernetic,
+        severity_hint: SeverityHint::Medium,
+    },
+    SymptomDef {
+        name: "variety_deficit",
+        category: SymptomCategory::Cybernetic,
+        severity_hint: SeverityHint::Low,
+    },
+    SymptomDef {
+        name: "model_reality_divergence",
+        category: SymptomCategory::Cybernetic,
+        severity_hint: SeverityHint::High,
+    },
+    SymptomDef {
+        name: "observer_coupling",
+        category: SymptomCategory::Cybernetic,
+        severity_hint: SeverityHint::Medium,
+    },
+    SymptomDef {
+        name: "missing_double_loop",
+        category: SymptomCategory::Cybernetic,
+        severity_hint: SeverityHint::Medium,
+    },
+    SymptomDef {
+        name: "homeostatic_drift",
+        category: SymptomCategory::Cybernetic,
+        severity_hint: SeverityHint::Medium,
+    },
+    SymptomDef {
+        name: "coordination_oscillation",
+        category: SymptomCategory::Cybernetic,
+        severity_hint: SeverityHint::Medium,
+    },
+    SymptomDef {
+        name: "context_saturation",
+        category: SymptomCategory::Cybernetic,
+        severity_hint: SeverityHint::Low,
+    },
+    SymptomDef {
+        name: "monitoring_independence_failure",
+        category: SymptomCategory::Cybernetic,
+        severity_hint: SeverityHint::High,
+    },
     // Semantic
-    SymptomDef { name: "provenance_gap", category: SymptomCategory::Semantic, severity_hint: SeverityHint::Medium },
-    SymptomDef { name: "confidence_decay", category: SymptomCategory::Semantic, severity_hint: SeverityHint::Medium },
-    SymptomDef { name: "classification_ambiguity", category: SymptomCategory::Semantic, severity_hint: SeverityHint::Low },
-    SymptomDef { name: "constraint_violation", category: SymptomCategory::Semantic, severity_hint: SeverityHint::High },
-    SymptomDef { name: "discourse_incoherence", category: SymptomCategory::Semantic, severity_hint: SeverityHint::Medium },
-    SymptomDef { name: "implicit_expectation_mismatch", category: SymptomCategory::Semantic, severity_hint: SeverityHint::Medium },
-    SymptomDef { name: "reference_implementation_drift", category: SymptomCategory::Semantic, severity_hint: SeverityHint::Medium },
+    SymptomDef {
+        name: "provenance_gap",
+        category: SymptomCategory::Semantic,
+        severity_hint: SeverityHint::Medium,
+    },
+    SymptomDef {
+        name: "confidence_decay",
+        category: SymptomCategory::Semantic,
+        severity_hint: SeverityHint::Medium,
+    },
+    SymptomDef {
+        name: "classification_ambiguity",
+        category: SymptomCategory::Semantic,
+        severity_hint: SeverityHint::Low,
+    },
+    SymptomDef {
+        name: "constraint_violation",
+        category: SymptomCategory::Semantic,
+        severity_hint: SeverityHint::High,
+    },
+    SymptomDef {
+        name: "discourse_incoherence",
+        category: SymptomCategory::Semantic,
+        severity_hint: SeverityHint::Medium,
+    },
+    SymptomDef {
+        name: "implicit_expectation_mismatch",
+        category: SymptomCategory::Semantic,
+        severity_hint: SeverityHint::Medium,
+    },
+    SymptomDef {
+        name: "reference_implementation_drift",
+        category: SymptomCategory::Semantic,
+        severity_hint: SeverityHint::Medium,
+    },
     // Sysadmin
-    SymptomDef { name: "zombie_accumulation", category: SymptomCategory::Sysadmin, severity_hint: SeverityHint::Medium },
-    SymptomDef { name: "clock_skew", category: SymptomCategory::Sysadmin, severity_hint: SeverityHint::High },
-    SymptomDef { name: "systemd_timer_misfire", category: SymptomCategory::Sysadmin, severity_hint: SeverityHint::Medium },
-    SymptomDef { name: "journal_bloat", category: SymptomCategory::Sysadmin, severity_hint: SeverityHint::Low },
-    SymptomDef { name: "process_table_bloat", category: SymptomCategory::Sysadmin, severity_hint: SeverityHint::Medium },
-    SymptomDef { name: "swap_retention", category: SymptomCategory::Sysadmin, severity_hint: SeverityHint::Medium },
-    SymptomDef { name: "coredump_accumulation", category: SymptomCategory::Sysadmin, severity_hint: SeverityHint::Low },
-    SymptomDef { name: "stale_mount", category: SymptomCategory::Sysadmin, severity_hint: SeverityHint::Medium },
+    SymptomDef {
+        name: "zombie_accumulation",
+        category: SymptomCategory::Sysadmin,
+        severity_hint: SeverityHint::Medium,
+    },
+    SymptomDef {
+        name: "clock_skew",
+        category: SymptomCategory::Sysadmin,
+        severity_hint: SeverityHint::High,
+    },
+    SymptomDef {
+        name: "systemd_timer_misfire",
+        category: SymptomCategory::Sysadmin,
+        severity_hint: SeverityHint::Medium,
+    },
+    SymptomDef {
+        name: "journal_bloat",
+        category: SymptomCategory::Sysadmin,
+        severity_hint: SeverityHint::Low,
+    },
+    SymptomDef {
+        name: "process_table_bloat",
+        category: SymptomCategory::Sysadmin,
+        severity_hint: SeverityHint::Medium,
+    },
+    SymptomDef {
+        name: "swap_retention",
+        category: SymptomCategory::Sysadmin,
+        severity_hint: SeverityHint::Medium,
+    },
+    SymptomDef {
+        name: "coredump_accumulation",
+        category: SymptomCategory::Sysadmin,
+        severity_hint: SeverityHint::Low,
+    },
+    SymptomDef {
+        name: "stale_mount",
+        category: SymptomCategory::Sysadmin,
+        severity_hint: SeverityHint::Medium,
+    },
     // Web search
-    SymptomDef { name: "search_capability_needed", category: SymptomCategory::WebSearch, severity_hint: SeverityHint::Low },
-    SymptomDef { name: "web_knowledge_gap", category: SymptomCategory::WebSearch, severity_hint: SeverityHint::Medium },
-    SymptomDef { name: "skill_source_unknown", category: SymptomCategory::WebSearch, severity_hint: SeverityHint::Low },
-    SymptomDef { name: "external_reference_needed", category: SymptomCategory::WebSearch, severity_hint: SeverityHint::Medium },
-    SymptomDef { name: "documentation_outdated", category: SymptomCategory::WebSearch, severity_hint: SeverityHint::Low },
-    SymptomDef { name: "upstream_version_check_needed", category: SymptomCategory::WebSearch, severity_hint: SeverityHint::Low },
-    SymptomDef { name: "api_status_check_needed", category: SymptomCategory::WebSearch, severity_hint: SeverityHint::Medium },
-    SymptomDef { name: "package_metadata_stale", category: SymptomCategory::WebSearch, severity_hint: SeverityHint::Low },
-    SymptomDef { name: "security_advisory_relevant", category: SymptomCategory::WebSearch, severity_hint: SeverityHint::High },
+    SymptomDef {
+        name: "search_capability_needed",
+        category: SymptomCategory::WebSearch,
+        severity_hint: SeverityHint::Low,
+    },
+    SymptomDef {
+        name: "web_knowledge_gap",
+        category: SymptomCategory::WebSearch,
+        severity_hint: SeverityHint::Medium,
+    },
+    SymptomDef {
+        name: "skill_source_unknown",
+        category: SymptomCategory::WebSearch,
+        severity_hint: SeverityHint::Low,
+    },
+    SymptomDef {
+        name: "external_reference_needed",
+        category: SymptomCategory::WebSearch,
+        severity_hint: SeverityHint::Medium,
+    },
+    SymptomDef {
+        name: "documentation_outdated",
+        category: SymptomCategory::WebSearch,
+        severity_hint: SeverityHint::Low,
+    },
+    SymptomDef {
+        name: "upstream_version_check_needed",
+        category: SymptomCategory::WebSearch,
+        severity_hint: SeverityHint::Low,
+    },
+    SymptomDef {
+        name: "api_status_check_needed",
+        category: SymptomCategory::WebSearch,
+        severity_hint: SeverityHint::Medium,
+    },
+    SymptomDef {
+        name: "package_metadata_stale",
+        category: SymptomCategory::WebSearch,
+        severity_hint: SeverityHint::Low,
+    },
+    SymptomDef {
+        name: "security_advisory_relevant",
+        category: SymptomCategory::WebSearch,
+        severity_hint: SeverityHint::High,
+    },
     // Skill discovery / management
-    SymptomDef { name: "skill_not_in_catalog", category: SymptomCategory::SkillDiscovery, severity_hint: SeverityHint::Low },
-    SymptomDef { name: "skill_manifest_invalid", category: SymptomCategory::SkillDiscovery, severity_hint: SeverityHint::Medium },
-    SymptomDef { name: "skill_install_failed", category: SymptomCategory::SkillDiscovery, severity_hint: SeverityHint::Medium },
-    SymptomDef { name: "skill_version_stale", category: SymptomCategory::SkillDiscovery, severity_hint: SeverityHint::Low },
-    SymptomDef { name: "skill_symptom_not_in_catalog", category: SymptomCategory::SkillDiscovery, severity_hint: SeverityHint::Medium },
-    SymptomDef { name: "skill_probe_script_missing", category: SymptomCategory::SkillDiscovery, severity_hint: SeverityHint::High },
-    SymptomDef { name: "skill_rollback_unresolvable", category: SymptomCategory::SkillDiscovery, severity_hint: SeverityHint::High },
-    SymptomDef { name: "skill_dependency_missing", category: SymptomCategory::SkillDiscovery, severity_hint: SeverityHint::Medium },
-    SymptomDef { name: "skill_hardware_incompatible", category: SymptomCategory::SkillDiscovery, severity_hint: SeverityHint::High },
-    SymptomDef { name: "skill_coverage_gap", category: SymptomCategory::SkillDiscovery, severity_hint: SeverityHint::Low },
+    SymptomDef {
+        name: "skill_not_in_catalog",
+        category: SymptomCategory::SkillDiscovery,
+        severity_hint: SeverityHint::Low,
+    },
+    SymptomDef {
+        name: "skill_manifest_invalid",
+        category: SymptomCategory::SkillDiscovery,
+        severity_hint: SeverityHint::Medium,
+    },
+    SymptomDef {
+        name: "skill_install_failed",
+        category: SymptomCategory::SkillDiscovery,
+        severity_hint: SeverityHint::Medium,
+    },
+    SymptomDef {
+        name: "skill_version_stale",
+        category: SymptomCategory::SkillDiscovery,
+        severity_hint: SeverityHint::Low,
+    },
+    SymptomDef {
+        name: "skill_symptom_not_in_catalog",
+        category: SymptomCategory::SkillDiscovery,
+        severity_hint: SeverityHint::Medium,
+    },
+    SymptomDef {
+        name: "skill_probe_script_missing",
+        category: SymptomCategory::SkillDiscovery,
+        severity_hint: SeverityHint::High,
+    },
+    SymptomDef {
+        name: "skill_rollback_unresolvable",
+        category: SymptomCategory::SkillDiscovery,
+        severity_hint: SeverityHint::High,
+    },
+    SymptomDef {
+        name: "skill_dependency_missing",
+        category: SymptomCategory::SkillDiscovery,
+        severity_hint: SeverityHint::Medium,
+    },
+    SymptomDef {
+        name: "skill_hardware_incompatible",
+        category: SymptomCategory::SkillDiscovery,
+        severity_hint: SeverityHint::High,
+    },
+    SymptomDef {
+        name: "skill_coverage_gap",
+        category: SymptomCategory::SkillDiscovery,
+        severity_hint: SeverityHint::Low,
+    },
     // Scenario testing
-    SymptomDef { name: "agent_latency_spike", category: SymptomCategory::ScenarioTesting, severity_hint: SeverityHint::Medium },
-    SymptomDef { name: "agent_throughput_degraded", category: SymptomCategory::ScenarioTesting, severity_hint: SeverityHint::Medium },
-    SymptomDef { name: "agent_model_loading_failure", category: SymptomCategory::ScenarioTesting, severity_hint: SeverityHint::High },
-    SymptomDef { name: "agent_error_rate_elevated", category: SymptomCategory::ScenarioTesting, severity_hint: SeverityHint::High },
-    SymptomDef { name: "agent_baseline_regression", category: SymptomCategory::ScenarioTesting, severity_hint: SeverityHint::Medium },
-    SymptomDef { name: "agent_test_scenario_failed", category: SymptomCategory::ScenarioTesting, severity_hint: SeverityHint::Medium },
-    SymptomDef { name: "agent_concurrent_load_timeout", category: SymptomCategory::ScenarioTesting, severity_hint: SeverityHint::High },
-    SymptomDef { name: "agent_resource_exhaustion_under_load", category: SymptomCategory::ScenarioTesting, severity_hint: SeverityHint::Critical },
-    SymptomDef { name: "capability_attenuation_failure", category: SymptomCategory::ScenarioTesting, severity_hint: SeverityHint::Critical },
-    SymptomDef { name: "prompt_sanitization_failure", category: SymptomCategory::ScenarioTesting, severity_hint: SeverityHint::Critical },
+    SymptomDef {
+        name: "agent_latency_spike",
+        category: SymptomCategory::ScenarioTesting,
+        severity_hint: SeverityHint::Medium,
+    },
+    SymptomDef {
+        name: "agent_throughput_degraded",
+        category: SymptomCategory::ScenarioTesting,
+        severity_hint: SeverityHint::Medium,
+    },
+    SymptomDef {
+        name: "agent_model_loading_failure",
+        category: SymptomCategory::ScenarioTesting,
+        severity_hint: SeverityHint::High,
+    },
+    SymptomDef {
+        name: "agent_error_rate_elevated",
+        category: SymptomCategory::ScenarioTesting,
+        severity_hint: SeverityHint::High,
+    },
+    SymptomDef {
+        name: "agent_baseline_regression",
+        category: SymptomCategory::ScenarioTesting,
+        severity_hint: SeverityHint::Medium,
+    },
+    SymptomDef {
+        name: "agent_test_scenario_failed",
+        category: SymptomCategory::ScenarioTesting,
+        severity_hint: SeverityHint::Medium,
+    },
+    SymptomDef {
+        name: "agent_concurrent_load_timeout",
+        category: SymptomCategory::ScenarioTesting,
+        severity_hint: SeverityHint::High,
+    },
+    SymptomDef {
+        name: "agent_resource_exhaustion_under_load",
+        category: SymptomCategory::ScenarioTesting,
+        severity_hint: SeverityHint::Critical,
+    },
+    SymptomDef {
+        name: "capability_attenuation_failure",
+        category: SymptomCategory::ScenarioTesting,
+        severity_hint: SeverityHint::Critical,
+    },
+    SymptomDef {
+        name: "prompt_sanitization_failure",
+        category: SymptomCategory::ScenarioTesting,
+        severity_hint: SeverityHint::Critical,
+    },
 ];
 
 /// Look up a symptom by name. Returns `None` if not in the catalog.
 #[must_use]
 pub fn lookup_symptom(name: &str) -> Option<Symptom> {
-    SYMPTOM_DEFS.iter().find(|d| d.name == name).map(|d| Symptom {
-        name: d.name.to_string(),
-        category: d.category,
-        severity_hint: d.severity_hint,
-    })
+    SYMPTOM_DEFS
+        .iter()
+        .find(|d| d.name == name)
+        .map(|d| Symptom {
+            name: d.name.to_string(),
+            category: d.category,
+            severity_hint: d.severity_hint,
+        })
 }
 
 /// The set of symptom class names that skills may reference.

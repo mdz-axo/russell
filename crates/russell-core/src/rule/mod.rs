@@ -198,7 +198,10 @@ impl RuleSet {
     #[cfg(test)]
     #[must_use]
     pub fn new() -> Self {
-        Self { rules: Vec::new(), harness: HarnessSettings::default() }
+        Self {
+            rules: Vec::new(),
+            harness: HarnessSettings::default(),
+        }
     }
 
     /// Load the built-in default rules. These are the factory thresholds

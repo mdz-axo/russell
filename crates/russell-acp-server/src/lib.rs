@@ -70,9 +70,9 @@ pub use types::{
 
 // Re-export protocol types from russell-protocol for cross-project alignment.
 pub use russell_protocol::{
+    ACP_VERSION,
     auth::CapabilityToken as ProtocolCapabilityToken,
     jsonrpc::{JsonRpcError, JsonRpcRequest, JsonRpcResponse},
     notification::{NotificationsResponse, ProprioNotification},
     skill::CapabilitiesResponse as ProtocolCapabilitiesResponse,
-    ACP_VERSION,
 };

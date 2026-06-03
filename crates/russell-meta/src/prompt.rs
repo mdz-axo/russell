@@ -402,7 +402,12 @@ pub fn compose_templated(
         .iter()
         .filter(|s| s.is_lens())
         .map(|s| {
-            let symptoms = s.symptoms.iter().map(|sy| sy.name()).collect::<Vec<_>>().join(", ");
+            let symptoms = s
+                .symptoms
+                .iter()
+                .map(|sy| sy.name())
+                .collect::<Vec<_>>()
+                .join(", ");
             serde_json::json!({"id": s.id, "symptoms": symptoms})
         })
         .collect();
@@ -804,8 +809,11 @@ fn append_skill_knowledge_scored(
                         intervention_runs: entry.intervention_runs,
                         recent_intervention_failures: entry.recent_intervention_failures,
                     };
-                    let skill_symptom_names: Vec<String> =
-                        skill.symptoms.iter().map(|s| s.name().to_string()).collect();
+                    let skill_symptom_names: Vec<String> = skill
+                        .symptoms
+                        .iter()
+                        .map(|s| s.name().to_string())
+                        .collect();
                     score_knowledge_relevance_with_telemetry(
                         &skill_symptom_names,
                         &active_symptoms,
@@ -813,8 +821,11 @@ fn append_skill_knowledge_scored(
                     )
                 }
                 None => {
-                    let skill_symptom_names: Vec<String> =
-                        skill.symptoms.iter().map(|s| s.name().to_string()).collect();
+                    let skill_symptom_names: Vec<String> = skill
+                        .symptoms
+                        .iter()
+                        .map(|s| s.name().to_string())
+                        .collect();
                     score_knowledge_relevance(&skill_symptom_names, &active_symptoms)
                 }
             };

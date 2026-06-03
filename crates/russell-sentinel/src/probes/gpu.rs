@@ -150,7 +150,6 @@ fn find_gpu_hwmon(gpu_device: &str) -> Option<String> {
 
 // -- ProbeDescriptor impls (T13 split form) --
 
-
 /// GPU VRAM usage percentage probe marker.
 pub struct GpuVramUsedPct;
 /// GPU VRAM usage in MiB probe marker.
@@ -163,8 +162,18 @@ pub struct GpuTempC;
 pub struct GpuUtilPct;
 
 impl_probe!(GpuVramUsedPct, "gpu_vram_used_pct", "%", gpu_vram_used_pct);
-impl_probe!(GpuVramUsedMib, "gpu_vram_used_mib", "MiB", gpu_vram_used_mib);
-impl_probe!(GpuVramTotalMib, "gpu_vram_total_mib", "MiB", gpu_vram_total_mib);
+impl_probe!(
+    GpuVramUsedMib,
+    "gpu_vram_used_mib",
+    "MiB",
+    gpu_vram_used_mib
+);
+impl_probe!(
+    GpuVramTotalMib,
+    "gpu_vram_total_mib",
+    "MiB",
+    gpu_vram_total_mib
+);
 impl_probe!(GpuTempC, "gpu_temp_c", "°C", gpu_temp_c);
 impl_probe!(GpuUtilPct, "gpu_util_pct", "%", gpu_util_pct);
 

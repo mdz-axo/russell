@@ -557,8 +557,11 @@ impl RegistryCache {
                         changed = true;
                     }
                     // Update symptoms if manifest changed.
-                    let skill_symptom_names: Vec<String> =
-                        skill.symptoms.iter().map(|s| s.name().to_string()).collect();
+                    let skill_symptom_names: Vec<String> = skill
+                        .symptoms
+                        .iter()
+                        .map(|s| s.name().to_string())
+                        .collect();
                     if entry.symptoms != skill_symptom_names {
                         entry.symptoms = skill_symptom_names;
                         changed = true;
@@ -586,7 +589,11 @@ impl RegistryCache {
                         LifecycleStatus::Active,
                         &skill.version,
                         &skill.authored,
-                        skill.symptoms.iter().map(|s| s.name().to_string()).collect(),
+                        skill
+                            .symptoms
+                            .iter()
+                            .map(|s| s.name().to_string())
+                            .collect(),
                         SkillSource::Manual,
                         &today,
                         false,

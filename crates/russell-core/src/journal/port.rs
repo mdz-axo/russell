@@ -279,7 +279,16 @@ pub struct InMemoryJournal {
     /// Hash chain data per event: (prev_hash, hash), same index as `events`.
     hash_chain: std::sync::Mutex<Vec<(String, String)>>,
     /// Captured samples as (ts, scope, probe_name, value_num, value_text, unit).
-    pub samples: std::sync::Mutex<Vec<(i64, Scope, String, Option<f64>, Option<String>, Option<String>)>>,
+    pub samples: std::sync::Mutex<
+        Vec<(
+            i64,
+            Scope,
+            String,
+            Option<f64>,
+            Option<String>,
+            Option<String>,
+        )>,
+    >,
     /// Help sessions: (ts_unix, status) where status is "ok", "error", "fallback", "threshold_skip".
     help_sessions: std::sync::Mutex<Vec<(i64, String)>>,
     /// Stored baselines for `read_baselines()`.
@@ -302,8 +311,7 @@ impl JournalWritePort for InMemoryJournal {
             .last()
             .map(|(_, h)| h.clone())
             .unwrap_or_else(crate::hash_chain::genesis_hash);
-        let payload = serde_json::to_string(event)
-            .map_err(crate::error::CoreError::Json)?;
+        let payload = serde_json::to_string(event).map_err(crate::error::CoreError::Json)?;
         let hash = crate::hash_chain::compute_event_hash(&prev_hash, &payload);
         self.hash_chain.lock().unwrap().push((prev_hash, hash));
         self.events.lock().unwrap().push(event.clone());
@@ -448,9 +456,11 @@ impl EventQueryPort for InMemoryJournal {
 
     fn host_samples_summary(&self, since: i64, until: i64) -> Result<Vec<super::SampleSummary>> {
         let samples = self.samples.lock().unwrap();
-        let mut by_probe: std::collections::HashMap<String, Vec<(f64, i64)>> = std::collections::HashMap::new();
+        let mut by_probe: std::collections::HashMap<String, Vec<(f64, i64)>> =
+            std::collections::HashMap::new();
         for (ts, _, name, val, _, _) in samples.iter() {
-            if *ts >= since && *ts <= until
+            if *ts >= since
+                && *ts <= until
                 && let Some(v) = val
             {
                 by_probe.entry(name.clone()).or_default().push((*v, *ts));
@@ -463,7 +473,10 @@ impl EventQueryPort for InMemoryJournal {
             }
             let count = values.len() as i64;
             let min = values.iter().map(|(v, _)| *v).fold(f64::INFINITY, f64::min);
-            let max = values.iter().map(|(v, _)| *v).fold(f64::NEG_INFINITY, f64::max);
+            let max = values
+                .iter()
+                .map(|(v, _)| *v)
+                .fold(f64::NEG_INFINITY, f64::max);
             let sum: f64 = values.iter().map(|(v, _)| *v).sum();
             let avg = sum / count as f64;
             let last = values.last().unwrap();
