@@ -35,7 +35,7 @@ use tracing::{debug, warn};
 use zeroize::Zeroize;
 
 use crate::RiskBand;
-use crate::sandbox::{SandboxConfig, apply_sandbox};
+use crate::sandbox::{SandboxConfig, apply_sandbox_in_child, close_sandbox_fd, prepare_sandbox};
 
 /// Errors that can occur during risk checking.
 #[derive(Debug, Clone, thiserror::Error)]
@@ -420,17 +420,46 @@ impl Dispatcher {
         // operator explicitly overrides via manifest `env:` (future).
         child_cmd.env("PATH", "/usr/local/bin:/usr/bin:/bin");
 
-        // Apply Landlock sandbox if configured (Task 8).
-        // Must be applied BEFORE spawning the subprocess so it inherits restrictions.
-        if let Some(ref sandbox_config) = self.sandbox
-            && let Err(e) = apply_sandbox(sandbox_config)
+        // --- Landlock sandbox (Task 8) ---
+        // Prepare sandbox ruleset in the parent process, then apply it
+        // in the child via pre_exec(). This avoids permanently restricting
+        // the parent (Tokio worker) thread.
+        let sandbox_fd: Option<std::os::unix::io::RawFd> = if let Some(ref sandbox_config) =
+            self.sandbox
         {
-            warn!(error = %e, "failed to apply Landlock sandbox — proceeding without sandbox");
+            match prepare_sandbox(sandbox_config) {
+                Ok(fd) => Some(fd),
+                Err(e) => {
+                    warn!(error = %e, "failed to prepare Landlock sandbox — proceeding without");
+                    None
+                }
+            }
+        } else {
+            None
+        };
+
+        // Apply sandbox in child process via pre_exec() if a ruleset was created.
+        // This runs between fork() and exec(), restricting only the child.
+        //
+        // Safety: pre_exec() runs between fork() and exec(). The closure
+        // only calls two syscalls (prctl + landlock_restrict_self) and
+        // closes the fd, all of which are async-signal-safe.
+        #[allow(unsafe_code)]
+        if let Some(fd) = sandbox_fd {
+            unsafe {
+                child_cmd.pre_exec(move || apply_sandbox_in_child(fd));
+            }
         }
 
         let mut child = child_cmd
             .spawn()
             .map_err(|e| russell_core::CoreError::io(&self.skill_dir, e))?;
+
+        // Clean up the sandbox fd in the parent process now that the child
+        // has been spawned. The child has its own copy of the fd after fork().
+        if let Some(fd) = sandbox_fd {
+            close_sandbox_fd(fd);
+        }
 
         // Pipe sudo password if present. The credential is borrowed
         // (not cloned) to avoid extra copies in memory.
@@ -972,7 +1001,17 @@ mod tests {
 
     #[tokio::test]
     async fn echo_produces_stdout() {
-        let d = Dispatcher::new("/tmp");
+        let d = Dispatcher {
+            skill_dir: "/tmp".into(),
+            dry_run: DryRun::Disabled,
+            probe_timeout: Duration::from_secs(30),
+            intervention_timeout: Duration::from_secs(120),
+            max_auto_risk: RiskBand::Low,
+            sudo_password: None,
+            stdin_content: None,
+            allowed_env_keys: Vec::new(),
+            sandbox: None,
+        };
         let outcome = d
             .run(&["/bin/echo".into(), "hello".into()], None)
             .await
@@ -984,7 +1023,17 @@ mod tests {
 
     #[tokio::test]
     async fn empty_cmd_returns_error() {
-        let d = Dispatcher::new("/tmp");
+        let d = Dispatcher {
+            skill_dir: "/tmp".into(),
+            dry_run: DryRun::Disabled,
+            probe_timeout: Duration::from_secs(30),
+            intervention_timeout: Duration::from_secs(120),
+            max_auto_risk: RiskBand::Low,
+            sudo_password: None,
+            stdin_content: None,
+            allowed_env_keys: Vec::new(),
+            sandbox: None,
+        };
         let outcome = d.run(&[], None).await.unwrap();
         assert_eq!(outcome.exit_code, Some(-1));
         assert!(outcome.stderr.contains("empty command"));
@@ -992,7 +1041,17 @@ mod tests {
 
     #[tokio::test]
     async fn bare_command_rejected() {
-        let d = Dispatcher::new("/tmp");
+        let d = Dispatcher {
+            skill_dir: "/tmp".into(),
+            dry_run: DryRun::Disabled,
+            probe_timeout: Duration::from_secs(30),
+            intervention_timeout: Duration::from_secs(120),
+            max_auto_risk: RiskBand::Low,
+            sudo_password: None,
+            stdin_content: None,
+            allowed_env_keys: Vec::new(),
+            sandbox: None,
+        };
         let outcome = d
             .run(&["curl".into(), "http://evil.com".into()], None)
             .await
@@ -1003,7 +1062,17 @@ mod tests {
 
     #[tokio::test]
     async fn path_traversal_rejected() {
-        let d = Dispatcher::new("/tmp");
+        let d = Dispatcher {
+            skill_dir: "/tmp".into(),
+            dry_run: DryRun::Disabled,
+            probe_timeout: Duration::from_secs(30),
+            intervention_timeout: Duration::from_secs(120),
+            max_auto_risk: RiskBand::Low,
+            sudo_password: None,
+            stdin_content: None,
+            allowed_env_keys: Vec::new(),
+            sandbox: None,
+        };
         let outcome = d
             .run(&["./scripts/../../../etc/passwd".into()], None)
             .await
@@ -1046,7 +1115,17 @@ mod tests {
         let journal = JournalWriter::open(&journal_path).unwrap();
         let evidence_base = tmp.path().join("evidence");
 
-        let d = Dispatcher::new("/tmp");
+        let d = Dispatcher {
+            skill_dir: "/tmp".into(),
+            dry_run: DryRun::Disabled,
+            probe_timeout: Duration::from_secs(30),
+            intervention_timeout: Duration::from_secs(120),
+            max_auto_risk: RiskBand::Low,
+            sudo_password: None,
+            stdin_content: None,
+            allowed_env_keys: Vec::new(),
+            sandbox: None,
+        };
         let outcome = d
             .run_and_journal(
                 &journal,
@@ -1210,7 +1289,17 @@ mod tests {
         let journal = JournalWriter::open(&journal_path).unwrap();
         let evidence_base = tmp.path().join("evidence");
 
-        let d = Dispatcher::new("/tmp");
+        let d = Dispatcher {
+            skill_dir: "/tmp".into(),
+            dry_run: DryRun::Disabled,
+            probe_timeout: Duration::from_secs(30),
+            intervention_timeout: Duration::from_secs(120),
+            max_auto_risk: RiskBand::Low,
+            sudo_password: None,
+            stdin_content: None,
+            allowed_env_keys: Vec::new(),
+            sandbox: None,
+        };
 
         // Forward: a command that exits non-zero.
         // Rollback: echo "rolled back".
@@ -1247,7 +1336,17 @@ mod tests {
         let journal = JournalWriter::open(&journal_path).unwrap();
         let evidence_base = tmp.path().join("evidence");
 
-        let d = Dispatcher::new("/tmp");
+        let d = Dispatcher {
+            skill_dir: "/tmp".into(),
+            dry_run: DryRun::Disabled,
+            probe_timeout: Duration::from_secs(30),
+            intervention_timeout: Duration::from_secs(120),
+            max_auto_risk: RiskBand::Low,
+            sudo_password: None,
+            stdin_content: None,
+            allowed_env_keys: Vec::new(),
+            sandbox: None,
+        };
 
         let outcome = d
             .run_intervention_with_rollback(
@@ -1277,7 +1376,17 @@ mod tests {
         let journal = JournalWriter::open(&journal_path).unwrap();
         let evidence_base = tmp.path().join("evidence");
 
-        let d = Dispatcher::new("/tmp");
+        let d = Dispatcher {
+            skill_dir: "/tmp".into(),
+            dry_run: DryRun::Disabled,
+            probe_timeout: Duration::from_secs(30),
+            intervention_timeout: Duration::from_secs(120),
+            max_auto_risk: RiskBand::Low,
+            sudo_password: None,
+            stdin_content: None,
+            allowed_env_keys: Vec::new(),
+            sandbox: None,
+        };
 
         let outcome = d
             .run_intervention_with_rollback(
@@ -1307,7 +1416,17 @@ mod tests {
         let journal = JournalWriter::open(&journal_path).unwrap();
         let evidence_base = tmp.path().join("evidence");
 
-        let d = Dispatcher::new("/tmp");
+        let d = Dispatcher {
+            skill_dir: "/tmp".into(),
+            dry_run: DryRun::Disabled,
+            probe_timeout: Duration::from_secs(30),
+            intervention_timeout: Duration::from_secs(120),
+            max_auto_risk: RiskBand::Low,
+            sudo_password: None,
+            stdin_content: None,
+            allowed_env_keys: Vec::new(),
+            sandbox: None,
+        };
 
         let outcome = d
             .run_intervention_with_rollback(

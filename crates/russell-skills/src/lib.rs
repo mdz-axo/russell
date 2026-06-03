@@ -18,7 +18,7 @@
 //! a warning logged via `eprintln!`) — one broken manifest must
 //! not prevent the rest of the skill set from loading.
 
-#![forbid(unsafe_code)]
+#![deny(unsafe_code)]
 #![deny(rust_2018_idioms)]
 #![warn(missing_docs)]
 
