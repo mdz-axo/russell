@@ -55,18 +55,29 @@ impl ChatHistory {
 }
 
 /// Persist the conversation history to disk.
-fn save_history(chat_path: &std::path::Path, history: &ChatHistory) -> Result<()> {
+///
+/// Failures are logged but do **not** terminate the session —
+/// losing chat history is annoying, not fatal.
+fn save_history(chat_path: &std::path::Path, history: &ChatHistory) {
     use std::os::unix::fs::OpenOptionsExt;
-    let json = serde_json::to_string(history)?;
-    std::fs::OpenOptions::new()
+    let dest = chat_path.with_extension("json");
+    let json = match serde_json::to_string(history) {
+        Ok(j) => j,
+        Err(e) => {
+            warn!("serializing chat history: {e}");
+            return;
+        }
+    };
+    if let Err(e) = std::fs::OpenOptions::new()
         .write(true)
         .create(true)
         .truncate(true)
         .mode(0o664)
-        .open(chat_path.with_extension("json"))
+        .open(&dest)
         .and_then(|mut f| f.write_all(json.as_bytes()))
-        .with_context(|| format!("writing {}", chat_path.display()))?;
-    Ok(())
+    {
+        warn!("writing {}: {e}", dest.display());
+    }
 }
 
 // ─── Consent handling (from consent.rs) ─────────────────────────────────────
@@ -521,7 +532,7 @@ pub async fn run(paths: &Paths) -> Result<()> {
                                 role: "user".into(),
                                 content: result_text,
                             });
-                            save_history(&chat_path, &history)?;
+                            save_history(&chat_path, &history);
                         }
                         if is_skill_mgr_mutation {
                             match russell_skills::load_all(&paths.skills()) {
@@ -564,7 +575,7 @@ pub async fn run(paths: &Paths) -> Result<()> {
                                 role: "user".into(),
                                 content: result_text,
                             });
-                            save_history(&chat_path, &history)?;
+                            save_history(&chat_path, &history);
                         }
                         if is_skill_mgr_mutation {
                             match russell_skills::load_all(&paths.skills()) {
@@ -604,7 +615,7 @@ pub async fn run(paths: &Paths) -> Result<()> {
                                 "The operator denied ACTION: {denied_action}. What else do you recommend?"
                             ),
                         });
-                        save_history(&chat_path, &history)?;
+                        save_history(&chat_path, &history);
 
                         // Rerun Jack with the denial context to get a new recommendation.
                         match call_jack(
@@ -761,7 +772,7 @@ async fn handle_action_proposal(
                     role: "user".into(),
                     content: result_text,
                 });
-                save_history(chat_path, history)?;
+                save_history(chat_path, history);
             }
         } else {
             // Requires consent.
@@ -788,7 +799,7 @@ async fn handle_action_proposal(
                 role: "user".into(),
                 content: result_text,
             });
-            save_history(chat_path, history)?;
+            save_history(chat_path, history);
         }
     } else {
         match &action {
@@ -1057,7 +1068,11 @@ async fn call_jack(
                 if content.trim().is_empty() {
                     continue;
                 }
-                let skill_symptom_names: Vec<String> = skill.symptoms.iter().map(|s| s.name().to_string()).collect();
+                let skill_symptom_names: Vec<String> = skill
+                    .symptoms
+                    .iter()
+                    .map(|s| s.name().to_string())
+                    .collect();
                 let relevance = score_knowledge_relevance(&skill_symptom_names, &active_symptoms);
                 let token_estimate = content.len() / 4;
                 slots.push(KnowledgeSlot {
@@ -1132,7 +1147,7 @@ async fn call_jack(
     }
 
     // Persist history before calling LLM.
-    save_history(chat_path, history)?;
+    save_history(chat_path, history);
 
     // Call the LLM with an animated thinking spinner.
     let cfg = russell_meta::client::ClientConfig::from_env();
@@ -1148,7 +1163,7 @@ async fn call_jack(
                 role: "assistant".into(),
                 content: content.clone(),
             });
-            save_history(chat_path, history)?;
+            save_history(chat_path, history);
 
             // Journal the chat turn as a help-session event.
             journal_chat_turn(journal, session_id, current_model, "(chat turn)", &content);
@@ -1194,7 +1209,7 @@ async fn call_jack(
                 role: "assistant".into(),
                 content: msg.clone(),
             });
-            save_history(chat_path, history)?;
+            save_history(chat_path, history);
         }
     }
     Ok(())
