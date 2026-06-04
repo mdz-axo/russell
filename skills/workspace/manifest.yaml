@@ -1,0 +1,113 @@
+# SPDX-License-Identifier: MIT
+# workspace — file operations skill for Russell.
+#
+# Enables Jack to read, write, edit, create, move, and delete files on
+# the host machine. Every intervention satisfies IDRS:
+#   I — Idempotent: second run = first run's end state
+#   D — Dry-run: RUSSELL_DRY_RUN=1 shows what would happen, no side effects
+#   R — Rollback: original files backed up to .bak before mutation
+#   S — Structured log: every mutation emits a structured event record
+#
+# This skill is the foundation for Jack's ability to manage the machine.
+# The consent gate ensures operator approval before every mutation.
+# JR-3 is preserved: Jack proposes; the operator consents; the script executes.
+# Jack never composes shell commands — he triggers pre-approved interventions.
+#
+# Install: copy this directory to ~/.local/share/harness/skills/workspace/
+
+id: workspace
+version: 1.0.0
+authored: 2026-06-03
+min_harness_version: 0.20.0
+
+kind: actionable
+
+symptoms:
+  - file_needs_creation
+  - file_needs_update
+  - file_needs_deletion
+  - directory_needs_creation
+  - config_drift
+  - skill_manifest_invalid
+  - skill_needs_conversion
+
+applies_when:
+  - os_family: linux
+
+probes:
+  - id: read-file
+    cmd: ["bash", "./scripts/read-file.sh"]
+    capture: stdout
+    timeout: 10s
+  - id: stat-file
+    cmd: ["bash", "./scripts/stat-file.sh"]
+    capture: stdout
+    timeout: 5s
+  - id: list-dir
+    cmd: ["bash", "./scripts/list-dir.sh"]
+    capture: stdout
+    timeout: 5s
+  - id: diff-file
+    cmd: ["bash", "./scripts/diff-file.sh"]
+    capture: stdout
+    timeout: 10s
+
+interventions:
+  - id: write-file
+    cmd: ["bash", "./scripts/write-file.sh"]
+    risk: low
+    idempotent: true
+    rollback: restore-backup
+    timeout: 15s
+    needs_sudo: false
+
+  - id: append-file
+    cmd: ["bash", "./scripts/append-file.sh"]
+    risk: low
+    idempotent: false
+    rollback: restore-backup
+    timeout: 15s
+    needs_sudo: false
+
+  - id: patch-file
+    cmd: ["bash", "./scripts/patch-file.sh"]
+    risk: medium
+    idempotent: true
+    rollback: restore-backup
+    timeout: 15s
+    needs_sudo: false
+
+  - id: create-directory
+    cmd: ["bash", "./scripts/create-directory.sh"]
+    risk: low
+    idempotent: true
+    rollback: delete-if-created
+    timeout: 10s
+    needs_sudo: false
+
+  - id: delete-path
+    cmd: ["bash", "./scripts/delete-path.sh"]
+    risk: medium
+    idempotent: true
+    rollback: restore-backup
+    timeout: 15s
+    needs_sudo: false
+
+  - id: move-path
+    cmd: ["bash", "./scripts/move-path.sh"]
+    risk: low
+    idempotent: false
+    rollback: move-back
+    timeout: 15s
+    needs_sudo: false
+
+safety:
+  max_auto_risk: low
+  require_human_for:
+    - delete-path
+    - patch-file
+  allowed_env_keys:
+    - RUSSELL_DRY_RUN
+    - RUSSELL_SKILLS_DIR
+    - RUSSELL_BACKUP_DIR
+    - HOME

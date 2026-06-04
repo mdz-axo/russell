@@ -1,0 +1,74 @@
+# SPDX-License-Identifier: MIT
+# flowdef-converter — convert hKask FlowDef skills to Russell's modality.
+#
+# Reads hKask FlowDef process manifests (multi-step orchestrated flows
+# with Jinja2 templates, energy caps, CNS spans) and converts them into
+# Russell skill format (manifest.yaml + KNOWLEDGE.md + probe/intervention
+# scripts). The conversion preserves the methodology while adapting the
+# execution model:
+#
+#   FlowDef step (ordinal, template_ref, model_tier, mcp)
+#     → KNOWLEDGE.md section (methodology + prompt content)
+#     or probe/intervention script (if the step is deterministic)
+#
+#   FlowDef template (Jinja2 .j2)
+#     → KNOWLEDGE.md embedded prompt content
+#
+#   FlowDef inputs → skill symptoms + env vars
+#   FlowDef escalation → KNOWLEDGE.md decision rules
+#   FlowDef error_handling → script error handling
+#
+# This skill is the bridge between hKask's process-orchestrated paradigm
+# and Russell's knowledge-injection + chat REPL paradigm.
+#
+# Install: copy this directory to ~/.local/share/harness/skills/flowdef-converter/
+
+id: flowdef-converter
+version: 1.0.0
+authored: 2026-06-03
+min_harness_version: 0.20.0
+
+kind: actionable
+
+symptoms:
+  - skill_needs_conversion
+  - flowdef_skill_detected
+  - skill_manifest_invalid
+
+applies_when:
+  - os_family: linux
+
+probes:
+  - id: analyze
+    cmd: ["bash", "./scripts/analyze.sh"]
+    capture: stdout
+    timeout: 15s
+  - id: check-templates
+    cmd: ["bash", "./scripts/check-templates.sh"]
+    capture: stdout
+    timeout: 15s
+  - id: list-convertible
+    cmd: ["bash", "./scripts/list-convertible.sh"]
+    capture: stdout
+    timeout: 15s
+  - id: dry-run
+    cmd: ["bash", "./scripts/convert.sh"]
+    capture: stdout
+    timeout: 30s
+
+interventions:
+  - id: convert
+    cmd: ["bash", "./scripts/convert.sh"]
+    risk: low
+    idempotent: true
+    rollback: delete-output
+    timeout: 60s
+    needs_sudo: false
+
+safety:
+  max_auto_risk: low
+  allowed_env_keys:
+    - RUSSELL_DRY_RUN
+    - RUSSELL_SKILLS_DIR
+    - HKASK_REGISTRY_DIR
+    - HOME
