@@ -1,0 +1,54 @@
+# SPDX-License-Identifier: MIT
+# grill-me — Socratic interrogation skill for knowledge stress-testing.
+#
+# A knowledge + actionable skill: KNOWLEDGE.md teaches Jack the full
+# interrogation methodology (5-level taxonomy, escalation logic, gap analysis).
+# Probe scripts verify preconditions (LLM availability, skill integrity).
+# The actual grilling happens through `russell chat` — multi-turn REPL
+# where Jack uses this knowledge to conduct oral examinations.
+#
+# Adapted from hKask FlowDef grill-me v0.21.0 for Russell's skill paradigm.
+# The hKask version uses orchestrated process steps; Russell uses knowledge
+# injection + chat REPL. The methodology is identical.
+#
+# Install: copy this directory to ~/.local/share/harness/skills/grill-me/
+
+id: grill-me
+version: 1.0.0
+authored: 2026-06-03
+min_harness_version: 0.20.0
+
+kind: actionable
+
+symptoms:
+  - operator_requests_interrogation
+  - knowledge_assessment_needed
+  - learning_goal_identified
+  - skill_manifest_invalid
+
+applies_when:
+  - os_family: linux
+
+probes:
+  - id: health
+    cmd: ["bash", "./scripts/health.sh"]
+    capture: stdout
+    timeout: 10s
+  - id: check-llm
+    cmd: ["bash", "./scripts/check-llm.sh"]
+    capture: stdout
+    timeout: 10s
+  - id: session-stats
+    cmd: ["bash", "./scripts/session-stats.sh"]
+    capture: stdout
+    timeout: 10s
+
+interventions: []
+
+safety:
+  max_auto_risk: none
+  needs_network: false
+
+references:
+  - ~/Clones/hKask/registry/manifests/grill-me.yaml
+  - ~/Clones/hKask/registry/templates/grill-me/
