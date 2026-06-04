@@ -21,24 +21,40 @@ done
 
 say() { printf '\033[1;34m[uninstall]\033[0m %s\n' "$*"; }
 
-say "Stopping timers and services"
-systemctl --user stop russell-sentinel.timer  2>/dev/null || true
-systemctl --user stop russell-digest.timer    2>/dev/null || true
-systemctl --user stop russell-acp-server.service 2>/dev/null || true
+NO_SYSTEMD=0
+if ! command -v systemctl &>/dev/null; then
+  say "WARNING: systemctl not found. Skipping systemd teardown."
+  NO_SYSTEMD=1
+fi
 
-say "Disabling timers and services"
-systemctl --user disable russell-sentinel.timer 2>/dev/null || true
-systemctl --user disable russell-digest.timer   2>/dev/null || true
-systemctl --user disable russell-acp-server.service 2>/dev/null || true
+if [ "$NO_SYSTEMD" -eq 0 ]; then
+  say "Stopping timers and services"
+  systemctl --user stop russell-sentinel.timer  2>/dev/null || true
+  systemctl --user stop russell-digest.timer    2>/dev/null || true
+  systemctl --user stop russell-acp-server.service 2>/dev/null || true
 
-say "Removing systemd user units"
-for u in russell-sentinel.timer russell-sentinel.service \
-         russell-digest.timer   russell-digest.service \
-         russell-failure@.service \
-         russell-acp-server.service; do
-  rm -f "$HOME/.config/systemd/user/$u"
-done
-systemctl --user daemon-reload
+  say "Disabling timers and services"
+  systemctl --user disable russell-sentinel.timer 2>/dev/null || true
+  systemctl --user disable russell-digest.timer   2>/dev/null || true
+  systemctl --user disable russell-acp-server.service 2>/dev/null || true
+
+  say "Removing systemd user units"
+  for u in russell-sentinel.timer russell-sentinel.service \
+           russell-digest.timer   russell-digest.service \
+           russell-failure@.service \
+           russell-acp-server.service; do
+    rm -f "$HOME/.config/systemd/user/$u"
+  done
+  systemctl --user daemon-reload
+else
+  say "Removing systemd user units (files only, no daemon-reload)"
+  for u in russell-sentinel.timer russell-sentinel.service \
+           russell-digest.timer   russell-digest.service \
+           russell-failure@.service \
+           russell-acp-server.service; do
+    rm -f "$HOME/.config/systemd/user/$u"
+  done
+fi
 
 say "Removing binaries"
 rm -f "$HOME/.local/bin/russell"

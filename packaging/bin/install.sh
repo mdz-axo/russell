@@ -26,16 +26,23 @@ REPO="$(cd "$HERE/../.." && pwd)"
 
 NO_START=0
 PROFILE=debug
+NO_SYSTEMD=0
 for arg in "$@"; do
   case "$arg" in
     --no-start) NO_START=1 ;;
     --release) PROFILE=release ;;
+    --no-systemd) NO_SYSTEMD=1 ;;
     -h|--help)
       sed -n '3,20p' "$0"
       exit 0 ;;
     *) echo "unknown flag: $arg" >&2; exit 2 ;;
   esac
 done
+
+if [ "$NO_SYSTEMD" -eq 0 ] && ! command -v systemctl &>/dev/null; then
+  say "WARNING: systemctl not found. Systemd units will not be installed."
+  NO_SYSTEMD=1
+fi
 
 say() { printf '\033[1;34m[install]\033[0m %s\n' "$*"; }
 
@@ -59,11 +66,15 @@ if [ -f "$ACP_BIN" ]; then
   install -m 0755 "$ACP_BIN" "$HOME/.local/bin/russell-acp-server"
 fi
 
-say "Installing systemd user units → ~/.config/systemd/user/"
-mkdir -p "$HOME/.config/systemd/user"
-for u in "$REPO"/packaging/systemd/*.service "$REPO"/packaging/systemd/*.timer; do
-  install -m 0644 "$u" "$HOME/.config/systemd/user/"
-done
+if [ "$NO_SYSTEMD" -eq 0 ]; then
+  say "Installing systemd user units → ~/.config/systemd/user/"
+  mkdir -p "$HOME/.config/systemd/user"
+  for u in "$REPO"/packaging/systemd/*.service "$REPO"/packaging/systemd/*.timer; do
+    install -m 0644 "$u" "$HOME/.config/systemd/user/"
+  done
+else
+  say "Skipping systemd units (systemd not available or --no-systemd)"
+fi
 
 say "Ensuring config + state + data directories"
 mkdir -p "$HOME/.config/harness" "$HOME/.local/state/harness/runs" \
@@ -94,21 +105,25 @@ if [ ! -f "$HOME/.config/harness/russell.env" ]; then
   fi
 fi
 
-say "Reloading systemd user daemon"
-systemctl --user daemon-reload
+if [ "$NO_SYSTEMD" -eq 0 ]; then
+  say "Reloading systemd user daemon"
+  systemctl --user daemon-reload
 
-say "Enabling timers and services"
-systemctl --user enable russell-sentinel.timer
-systemctl --user enable russell-digest.timer
-systemctl --user enable russell-acp-server.service
+  say "Enabling timers and services"
+  systemctl --user enable russell-sentinel.timer
+  systemctl --user enable russell-digest.timer
+  systemctl --user enable russell-acp-server.service
 
-if [ "$NO_START" -eq 0 ]; then
-  say "Starting timers and services"
-  systemctl --user start russell-sentinel.timer
-  systemctl --user start russell-digest.timer
-  systemctl --user start russell-acp-server.service 2>/dev/null || true
+  if [ "$NO_START" -eq 0 ]; then
+    say "Starting timers and services"
+    systemctl --user start russell-sentinel.timer
+    systemctl --user start russell-digest.timer
+    systemctl --user start russell-acp-server.service 2>/dev/null || true
+  else
+    say "Skipping start (--no-start)"
+  fi
 else
-  say "Skipping start (--no-start)"
+  say "Skipping systemd enable/start (systemd not available or --no-systemd)"
 fi
 
 say "Running first Sentinel cycle to prove the wiring"
