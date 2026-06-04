@@ -115,7 +115,7 @@ pub enum LoadError {
 
     /// An intervention's rollback strategy is missing.
     #[error(
-        "intervention '{intervention_id}' in {path} must declare rollback_id, rollback: none_needed, or rollback: reboot"
+        "intervention '{intervention_id}' in {path} must declare rollback: <id>, rollback: none_needed, or rollback: reboot"
     )]
     InterventionMissingRollback {
         /// Path to manifest.yaml.
@@ -124,16 +124,16 @@ pub enum LoadError {
         intervention_id: String,
     },
 
-    /// A `rollback_id` references an intervention that does not exist.
+    /// A `rollback` references an intervention that does not exist.
     #[error(
-        "rollback_id '{rollback_id}' in intervention '{intervention_id}' in {path} does not reference a known intervention"
+        "rollback '{rollback_id}' in intervention '{intervention_id}' in {path} does not reference a known intervention"
     )]
     RollbackIdNotFound {
         /// Path to manifest.yaml.
         path: PathBuf,
         /// Intervention that declares the rollback.
         intervention_id: String,
-        /// The rollback_id that doesn't resolve.
+        /// The rollback ID that doesn't resolve.
         rollback_id: String,
     },
 

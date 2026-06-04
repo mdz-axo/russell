@@ -15,7 +15,7 @@
 //! - **D (Dry-run):** `--dry-run` flag writes `would_*` actions,
 //!   never executes subprocess.
 //! - **R (Rollback):** [`Dispatcher::run_intervention_with_rollback`]
-//!   supports `rollback_id` (reverse intervention), `none_needed`,
+//!   supports `rollback: <id>` (reverse intervention), `none_needed`,
 //!   and `reboot` strategies.
 //! - **S (Structured log):** Every dispatch writes a `harness.event.v1`
 //!   record to the journal and an evidence bundle to disk.
