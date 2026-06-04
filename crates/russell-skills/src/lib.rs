@@ -408,14 +408,14 @@ pub struct Intervention {
 }
 
 /// Rollback strategy for an intervention.
+///
+/// With `#[serde(untagged)]` the variants are tried in order.
+/// `NoneNeeded` and `Reboot` must come before `RollbackId` so that
+/// the string values `"none_needed"` and `"reboot"` are claimed by
+/// their specific variants before the catch-all `RollbackId`.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(untagged)]
 pub enum Rollback {
-    /// Reference to a reverse intervention.
-    RollbackId {
-        /// The intervention to run to reverse this one.
-        rollback_id: String,
-    },
     /// Declared as not needing rollback.
     NoneNeeded {
         /// Must be literally "none_needed".
@@ -425,6 +425,11 @@ pub enum Rollback {
     Reboot {
         /// Must be literally "reboot".
         rollback: RollbackReboot,
+    },
+    /// Reference to a reverse intervention.
+    RollbackId {
+        /// The intervention to run to reverse this one.
+        rollback: String,
     },
 }
 
@@ -766,11 +771,11 @@ pub fn parse_manifest(yaml: &str, dir_name: &str) -> std::result::Result<Skill, 
     // Validate rollback strategies.
     for iv in &raw.interventions {
         match &iv.rollback {
-            Rollback::RollbackId { rollback_id } => {
-                if !raw.interventions.iter().any(|r| r.id == *rollback_id) {
+            Rollback::RollbackId { rollback } => {
+                if !raw.interventions.iter().any(|r| r.id == *rollback) {
                     return Err(format!(
                         "rollback_id '{}' in intervention '{}' does not reference a known intervention",
-                        rollback_id, iv.id
+                        rollback, iv.id
                     ));
                 }
             }

@@ -368,7 +368,7 @@ pub fn resolve_with_hkask(
     if let Some(iv) = skill.interventions.iter().find(|i| i.id == action_id) {
         let requires_human = skill.safety.require_human_for.contains(&iv.id);
         let (rollback_id, rollback_cmd, rollback_is_reboot) = match &iv.rollback {
-            Rollback::RollbackId { rollback_id: rid } => {
+            Rollback::RollbackId { rollback: rid } => {
                 let rb_cmd = skill
                     .interventions
                     .iter()

@@ -36,6 +36,8 @@
 - apparmor_denial_spike
 - journald_corruption
 - tmp_mount_nosuid_missing
+- package_out_of_date
+- system_maintenance
 
 # Cybernetic (pragmatic-cybernetics skill)
 - broken_feedback_loop
@@ -57,6 +59,9 @@
 - discourse_incoherence
 - implicit_expectation_mismatch
 - reference_implementation_drift
+- operator_requests_interrogation
+- knowledge_assessment_needed
+- learning_goal_identified
 
 # Sysadmin (sysadmin skill)
 - zombie_accumulation
@@ -67,6 +72,11 @@
 - swap_retention
 - coredump_accumulation
 - stale_mount
+- file_needs_creation
+- file_needs_update
+- file_needs_deletion
+- directory_needs_creation
+- config_drift
 
 # Web search (web-search skill)
 - search_capability_needed
@@ -90,6 +100,8 @@
 - skill_dependency_missing
 - skill_hardware_incompatible
 - skill_coverage_gap
+- skill_needs_conversion
+- flowdef_skill_detected
 
 # Scenario testing (scenario-tester skill)
 - agent_latency_spike

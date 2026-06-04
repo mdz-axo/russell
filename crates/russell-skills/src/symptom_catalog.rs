@@ -290,6 +290,16 @@ const SYMPTOM_DEFS: &[SymptomDef] = &[
         category: SymptomCategory::Ubuntu,
         severity_hint: SeverityHint::Low,
     },
+    SymptomDef {
+        name: "package_out_of_date",
+        category: SymptomCategory::Ubuntu,
+        severity_hint: SeverityHint::Low,
+    },
+    SymptomDef {
+        name: "system_maintenance",
+        category: SymptomCategory::Ubuntu,
+        severity_hint: SeverityHint::Low,
+    },
     // Cybernetic
     SymptomDef {
         name: "broken_feedback_loop",
@@ -377,6 +387,21 @@ const SYMPTOM_DEFS: &[SymptomDef] = &[
         category: SymptomCategory::Semantic,
         severity_hint: SeverityHint::Medium,
     },
+    SymptomDef {
+        name: "operator_requests_interrogation",
+        category: SymptomCategory::Semantic,
+        severity_hint: SeverityHint::Low,
+    },
+    SymptomDef {
+        name: "knowledge_assessment_needed",
+        category: SymptomCategory::Semantic,
+        severity_hint: SeverityHint::Low,
+    },
+    SymptomDef {
+        name: "learning_goal_identified",
+        category: SymptomCategory::Semantic,
+        severity_hint: SeverityHint::Low,
+    },
     // Sysadmin
     SymptomDef {
         name: "zombie_accumulation",
@@ -415,6 +440,31 @@ const SYMPTOM_DEFS: &[SymptomDef] = &[
     },
     SymptomDef {
         name: "stale_mount",
+        category: SymptomCategory::Sysadmin,
+        severity_hint: SeverityHint::Medium,
+    },
+    SymptomDef {
+        name: "file_needs_creation",
+        category: SymptomCategory::Sysadmin,
+        severity_hint: SeverityHint::Low,
+    },
+    SymptomDef {
+        name: "file_needs_update",
+        category: SymptomCategory::Sysadmin,
+        severity_hint: SeverityHint::Low,
+    },
+    SymptomDef {
+        name: "file_needs_deletion",
+        category: SymptomCategory::Sysadmin,
+        severity_hint: SeverityHint::Medium,
+    },
+    SymptomDef {
+        name: "directory_needs_creation",
+        category: SymptomCategory::Sysadmin,
+        severity_hint: SeverityHint::Low,
+    },
+    SymptomDef {
+        name: "config_drift",
         category: SymptomCategory::Sysadmin,
         severity_hint: SeverityHint::Medium,
     },
@@ -512,6 +562,16 @@ const SYMPTOM_DEFS: &[SymptomDef] = &[
     },
     SymptomDef {
         name: "skill_coverage_gap",
+        category: SymptomCategory::SkillDiscovery,
+        severity_hint: SeverityHint::Low,
+    },
+    SymptomDef {
+        name: "skill_needs_conversion",
+        category: SymptomCategory::SkillDiscovery,
+        severity_hint: SeverityHint::Medium,
+    },
+    SymptomDef {
+        name: "flowdef_skill_detected",
         category: SymptomCategory::SkillDiscovery,
         severity_hint: SeverityHint::Low,
     },

@@ -101,6 +101,32 @@ interventions:
     timeout: 15s
     needs_sudo: false
 
+  # --- Rollback interventions ---
+
+  - id: restore-backup
+    cmd: ["bash", "./scripts/restore-backup.sh"]
+    risk: low
+    idempotent: true
+    rollback: none_needed
+    timeout: 10s
+    needs_sudo: false
+
+  - id: delete-if-created
+    cmd: ["bash", "./scripts/delete-if-created.sh"]
+    risk: low
+    idempotent: true
+    rollback: none_needed
+    timeout: 5s
+    needs_sudo: false
+
+  - id: move-back
+    cmd: ["bash", "./scripts/move-back.sh"]
+    risk: low
+    idempotent: false
+    rollback: none_needed
+    timeout: 10s
+    needs_sudo: false
+
 safety:
   max_auto_risk: low
   require_human_for:

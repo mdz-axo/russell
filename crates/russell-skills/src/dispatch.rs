@@ -839,8 +839,8 @@ impl Dispatcher {
 #[must_use]
 pub fn resolve_rollback_strategy(rollback: &crate::Rollback) -> RollbackStrategy {
     match rollback {
-        crate::Rollback::RollbackId { rollback_id } => RollbackStrategy::RollbackId {
-            id: rollback_id.clone(),
+        crate::Rollback::RollbackId { rollback } => RollbackStrategy::RollbackId {
+            id: rollback.clone(),
         },
         crate::Rollback::NoneNeeded { .. } => RollbackStrategy::NoneNeeded,
         crate::Rollback::Reboot { .. } => RollbackStrategy::Reboot,
@@ -1453,7 +1453,7 @@ mod tests {
         use crate::{Rollback, RollbackNone, RollbackReboot};
 
         let with_id = Rollback::RollbackId {
-            rollback_id: "revert-id".into(),
+            rollback: "revert-id".into(),
         };
         if let RollbackStrategy::RollbackId { id } = resolve_rollback_strategy(&with_id) {
             assert_eq!(id, "revert-id");

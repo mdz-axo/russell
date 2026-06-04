@@ -65,6 +65,16 @@ interventions:
     timeout: 60s
     needs_sudo: false
 
+  # --- Rollback interventions ---
+
+  - id: delete-output
+    cmd: ["bash", "./scripts/delete-output.sh"]
+    risk: low
+    idempotent: true
+    rollback: none_needed
+    timeout: 10s
+    needs_sudo: false
+
 safety:
   max_auto_risk: low
   allowed_env_keys:
