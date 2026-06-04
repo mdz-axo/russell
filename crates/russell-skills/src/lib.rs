@@ -934,7 +934,7 @@ interventions:
     cmd: ["echo", "fix"]
     risk: low
     idempotent: true
-    rollback_id: no-such-id
+    rollback: no-such-id
 safety:
   max_auto_risk: low
 "#;
