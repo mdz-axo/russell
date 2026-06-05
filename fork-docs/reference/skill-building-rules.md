@@ -184,7 +184,8 @@ russell skill prune "$SKILL_ID"
 
 3. **Build skeleton:**
    ```
-   ACTION: skill-manager/build swap-watcher
+   ACTION: skill-manager/build
+   Arguments swap-watcher
    ```
 
 4. **Add probe/intervention:**
@@ -193,7 +194,8 @@ russell skill prune "$SKILL_ID"
 
 5. **Install:**
    ```
-   ACTION: skill-manager/install swap-watcher
+   ACTION: skill-manager/install
+   Arguments swap-watcher
    ```
 
 ### Manual Build

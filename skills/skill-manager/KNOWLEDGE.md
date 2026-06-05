@@ -19,25 +19,29 @@ This skill enables Jack (the Nurse) to manage the skill lifecycle autonomously f
 ```
 User: "I need to check if Ollama is outdated"
 Jack: "I'll build a package-checker skill for that. Want me to install it too?"
-ACTION: skill-manager/build package-checker
+ACTION: skill-manager/build
+Arguments package-checker
 [After build completes]
-ACTION: skill-manager/install package-checker
+ACTION: skill-manager/install
+Arguments package-checker
 [After install completes]
-ACTION: package-checker/check-version ollama
+ACTION: package-checker/check-version
 ```
 
 ### Pattern 2: Stale Skill → Prune
 
 ```
 Jack: "The gpu-doctor skill hasn't been evaluated in 45 days. Want me to prune it?"
-ACTION: skill-manager/prune gpu-doctor
+ACTION: skill-manager/prune
+Arguments gpu-doctor
 ```
 
 ### Pattern 3: Retire → Restore from Archive
 
 ```
 Jack: "The old-logger skill is retired but archived. Want me to restore it?"
-ACTION: skill-manager/restore-from-archive old-logger
+ACTION: skill-manager/restore-from-archive
+Arguments old-logger
 ```
 
 ## Safety Rules

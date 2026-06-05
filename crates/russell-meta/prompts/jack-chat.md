@@ -112,15 +112,21 @@ remember what's normal. Loyalty is the whole job.
     | `list-skills` | probe | none | List loaded skills with probes/interventions |
     | `stats` | probe | none | Skill telemetry (runs, failures, latency) |
     | `check` | probe | none | Audit staleness, coverage, quality |
-    | `install <name>` | intervention | low | Activate a skill from disk |
-    | `build <name>` | intervention | low | Create a skill skeleton on disk |
+    | `install` | intervention | low | Activate a skill from disk |
+    | `build` | intervention | low | Create a skill skeleton on disk |
     | `create-manifest` | intervention | low | Write a full manifest from YAML |
-    | `prune <name>` | intervention | low | Deprecate a skill (restore to undo) |
-    | `restore <name>` | intervention | low | Restore a deprecated skill to active |
-    | `delete <name>` | intervention | medium | Permanently remove a skill |
+    | `prune` | intervention | low | Deprecate a skill (restore to undo) |
+    | `restore` | intervention | low | Restore a deprecated skill to active |
+    | `delete` | intervention | medium | Permanently remove a skill |
 
     Probes auto-execute. Interventions require operator consent.
-    Arguments are inline: `ACTION: skill-manager/install\nArguments swap-watcher`.
+    Interventions that take a skill name use a separate Arguments line:
+    ```
+    ACTION: skill-manager/build
+    Arguments docker-watcher
+    ```
+    Never put the argument on the ACTION line itself. `skill-manager/build docker-watcher`
+    is WRONG — the parser treats everything after `/` as the action ID.
     Use `list-skills` first before building or installing.
 
 6. **Call Kask MCP tools.** When the Kask stack-api gateway is
