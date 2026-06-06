@@ -203,6 +203,11 @@ const SYMPTOM_DEFS: &[SymptomDef] = &[
         category: SymptomCategory::Hardware,
         severity_hint: SeverityHint::Critical,
     },
+    SymptomDef {
+        name: "gpu_not_responding",
+        category: SymptomCategory::Hardware,
+        severity_hint: SeverityHint::High,
+    },
     // System
     SymptomDef {
         name: "oom_killer_active",
@@ -226,6 +231,36 @@ const SYMPTOM_DEFS: &[SymptomDef] = &[
     },
     SymptomDef {
         name: "resource_exhaustion",
+        category: SymptomCategory::System,
+        severity_hint: SeverityHint::High,
+    },
+    SymptomDef {
+        name: "memory_pressure",
+        category: SymptomCategory::System,
+        severity_hint: SeverityHint::High,
+    },
+    SymptomDef {
+        name: "disk_pressure",
+        category: SymptomCategory::System,
+        severity_hint: SeverityHint::Medium,
+    },
+    SymptomDef {
+        name: "boot_partition_full",
+        category: SymptomCategory::System,
+        severity_hint: SeverityHint::High,
+    },
+    SymptomDef {
+        name: "kernel_param_misconfigured",
+        category: SymptomCategory::System,
+        severity_hint: SeverityHint::High,
+    },
+    SymptomDef {
+        name: "llm_not_responding",
+        category: SymptomCategory::System,
+        severity_hint: SeverityHint::High,
+    },
+    SymptomDef {
+        name: "model_loading_failure",
         category: SymptomCategory::System,
         severity_hint: SeverityHint::High,
     },
@@ -299,6 +334,41 @@ const SYMPTOM_DEFS: &[SymptomDef] = &[
         name: "system_maintenance",
         category: SymptomCategory::Ubuntu,
         severity_hint: SeverityHint::Low,
+    },
+    SymptomDef {
+        name: "pending_reboot",
+        category: SymptomCategory::Ubuntu,
+        severity_hint: SeverityHint::Low,
+    },
+    SymptomDef {
+        name: "kernel_old_installed",
+        category: SymptomCategory::Ubuntu,
+        severity_hint: SeverityHint::Low,
+    },
+    SymptomDef {
+        name: "autoremove_needed",
+        category: SymptomCategory::Ubuntu,
+        severity_hint: SeverityHint::Low,
+    },
+    SymptomDef {
+        name: "held_packages",
+        category: SymptomCategory::Ubuntu,
+        severity_hint: SeverityHint::Low,
+    },
+    SymptomDef {
+        name: "snap_stale",
+        category: SymptomCategory::Ubuntu,
+        severity_hint: SeverityHint::Low,
+    },
+    SymptomDef {
+        name: "flatpak_stale",
+        category: SymptomCategory::Ubuntu,
+        severity_hint: SeverityHint::Low,
+    },
+    SymptomDef {
+        name: "service_degraded",
+        category: SymptomCategory::Ubuntu,
+        severity_hint: SeverityHint::Medium,
     },
     // Cybernetic
     SymptomDef {
@@ -402,6 +472,31 @@ const SYMPTOM_DEFS: &[SymptomDef] = &[
         category: SymptomCategory::Semantic,
         severity_hint: SeverityHint::Low,
     },
+    SymptomDef {
+        name: "script_safety_concern",
+        category: SymptomCategory::Semantic,
+        severity_hint: SeverityHint::High,
+    },
+    SymptomDef {
+        name: "idrs_violation",
+        category: SymptomCategory::Semantic,
+        severity_hint: SeverityHint::High,
+    },
+    SymptomDef {
+        name: "script_style_issue",
+        category: SymptomCategory::Semantic,
+        severity_hint: SeverityHint::Low,
+    },
+    SymptomDef {
+        name: "script_content_needed",
+        category: SymptomCategory::Semantic,
+        severity_hint: SeverityHint::Low,
+    },
+    SymptomDef {
+        name: "script_inventory_needed",
+        category: SymptomCategory::Semantic,
+        severity_hint: SeverityHint::Low,
+    },
     // Sysadmin
     SymptomDef {
         name: "zombie_accumulation",
@@ -467,6 +562,61 @@ const SYMPTOM_DEFS: &[SymptomDef] = &[
         name: "config_drift",
         category: SymptomCategory::Sysadmin,
         severity_hint: SeverityHint::Medium,
+    },
+    SymptomDef {
+        name: "docker_daemon_down",
+        category: SymptomCategory::Sysadmin,
+        severity_hint: SeverityHint::High,
+    },
+    SymptomDef {
+        name: "ollama_daemon_down",
+        category: SymptomCategory::Sysadmin,
+        severity_hint: SeverityHint::High,
+    },
+    SymptomDef {
+        name: "cache_bloat",
+        category: SymptomCategory::Sysadmin,
+        severity_hint: SeverityHint::Low,
+    },
+    SymptomDef {
+        name: "npm_global_stale",
+        category: SymptomCategory::Sysadmin,
+        severity_hint: SeverityHint::Low,
+    },
+    SymptomDef {
+        name: "cargo_package_stale",
+        category: SymptomCategory::Sysadmin,
+        severity_hint: SeverityHint::Low,
+    },
+    SymptomDef {
+        name: "zed_agent_stale",
+        category: SymptomCategory::Sysadmin,
+        severity_hint: SeverityHint::Low,
+    },
+    SymptomDef {
+        name: "package_stale",
+        category: SymptomCategory::Sysadmin,
+        severity_hint: SeverityHint::Low,
+    },
+    SymptomDef {
+        name: "rust_toolchain_stale",
+        category: SymptomCategory::Sysadmin,
+        severity_hint: SeverityHint::Low,
+    },
+    SymptomDef {
+        name: "pip_packages_stale",
+        category: SymptomCategory::Sysadmin,
+        severity_hint: SeverityHint::Low,
+    },
+    SymptomDef {
+        name: "docker_images_stale",
+        category: SymptomCategory::Sysadmin,
+        severity_hint: SeverityHint::Low,
+    },
+    SymptomDef {
+        name: "dev_tool_stale",
+        category: SymptomCategory::Sysadmin,
+        severity_hint: SeverityHint::Low,
     },
     // Web search
     SymptomDef {
@@ -575,6 +725,11 @@ const SYMPTOM_DEFS: &[SymptomDef] = &[
         category: SymptomCategory::SkillDiscovery,
         severity_hint: SeverityHint::Low,
     },
+    SymptomDef {
+        name: "skill_audit_needed",
+        category: SymptomCategory::SkillDiscovery,
+        severity_hint: SeverityHint::Medium,
+    },
     // Scenario testing
     SymptomDef {
         name: "agent_latency_spike",
@@ -651,12 +806,19 @@ pub static SYMPTOMS: &[&str] = &[
     "gpu_fallback_to_cpu",
     "rocm_unreachable",
     "nvme_media_errors",
+    "gpu_not_responding",
     // System
     "oom_killer_active",
     "swap_pressure",
     "loadavg_high",
     "llm_slow",
     "resource_exhaustion",
+    "memory_pressure",
+    "disk_pressure",
+    "boot_partition_full",
+    "kernel_param_misconfigured",
+    "llm_not_responding",
+    "model_loading_failure",
     // Ubuntu-specific (ubuntu-jack skill)
     "systemd_service_degraded",
     "apt_stale",
@@ -670,6 +832,15 @@ pub static SYMPTOMS: &[&str] = &[
     "apparmor_denial_spike",
     "journald_corruption",
     "tmp_mount_nosuid_missing",
+    "package_out_of_date",
+    "system_maintenance",
+    "pending_reboot",
+    "kernel_old_installed",
+    "autoremove_needed",
+    "held_packages",
+    "snap_stale",
+    "flatpak_stale",
+    "service_degraded",
     // Cybernetic (pragmatic-cybernetics skill)
     "broken_feedback_loop",
     "alert_fatigue",
@@ -689,6 +860,14 @@ pub static SYMPTOMS: &[&str] = &[
     "discourse_incoherence",
     "implicit_expectation_mismatch",
     "reference_implementation_drift",
+    "operator_requests_interrogation",
+    "knowledge_assessment_needed",
+    "learning_goal_identified",
+    "script_safety_concern",
+    "idrs_violation",
+    "script_style_issue",
+    "script_content_needed",
+    "script_inventory_needed",
     // Sysadmin (sysadmin skill — host maintenance tooling)
     "zombie_accumulation",
     "clock_skew",
@@ -698,6 +877,22 @@ pub static SYMPTOMS: &[&str] = &[
     "swap_retention",
     "coredump_accumulation",
     "stale_mount",
+    "file_needs_creation",
+    "file_needs_update",
+    "file_needs_deletion",
+    "directory_needs_creation",
+    "config_drift",
+    "docker_daemon_down",
+    "ollama_daemon_down",
+    "cache_bloat",
+    "npm_global_stale",
+    "cargo_package_stale",
+    "zed_agent_stale",
+    "package_stale",
+    "rust_toolchain_stale",
+    "pip_packages_stale",
+    "docker_images_stale",
+    "dev_tool_stale",
     // Web search (web-search skill — MCP bridge to Brave Search, Firecrawl, Browserbase)
     "search_capability_needed",
     "web_knowledge_gap",
@@ -719,6 +914,9 @@ pub static SYMPTOMS: &[&str] = &[
     "skill_dependency_missing",
     "skill_hardware_incompatible",
     "skill_coverage_gap",
+    "skill_needs_conversion",
+    "flowdef_skill_detected",
+    "skill_audit_needed",
     // Scenario testing (scenario-tester skill — test agentic AI systems)
     "agent_latency_spike",
     "agent_throughput_degraded",

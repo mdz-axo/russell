@@ -130,11 +130,14 @@ pub fn prune_skill(paths: &Paths, name: &str, verbose: bool) -> Result<()> {
 /// List skills with their lifecycle status.
 pub fn list_skills(paths: &Paths) -> Result<()> {
     let skills_dir = paths.skills();
-    let skills = russell_skills::load_all(&skills_dir).context("loading skills")?;
+    let load_result = russell_skills::load_all(&skills_dir).context("loading skills")?;
+    let has_skipped = load_result.has_skipped();
+    let skipped = load_result.skipped.clone();
+    let skills = load_result.skills;
 
-    if skills.is_empty() {
+    if skills.is_empty() && skipped.is_empty() {
         println!(
-            "No skills loaded. Place skill directories under {}",
+            "No skills found. Place skill directories under {}",
             skills_dir.display()
         );
         return Ok(());
@@ -142,6 +145,14 @@ pub fn list_skills(paths: &Paths) -> Result<()> {
 
     for s in &skills {
         println!("{} v{} — {:?}", s.id, s.version, s.kind);
+    }
+
+    if has_skipped {
+        println!();
+        println!("Skipped skills:");
+        for s in &skipped {
+            println!("  {}: {}", s.id, s.reason);
+        }
     }
 
     Ok(())

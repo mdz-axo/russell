@@ -37,7 +37,11 @@ pub fn list(paths: &Paths) -> Result<()> {
 pub async fn run(paths: &Paths, id: &str, dry_run: bool) -> Result<()> {
     let (skill_id, step_id) = parse_skill_ref(id)?;
     let skills_dir = paths.skills();
-    let skills = load_all(&skills_dir).context("loading skills")?;
+    let load_result = load_all(&skills_dir).context("loading skills")?;
+    if load_result.has_skipped() {
+        eprintln!("{}", load_result.skipped_summary());
+    }
+    let skills = load_result.skills;
 
     let skill = skills
         .iter()

@@ -257,7 +257,17 @@ pub fn run(paths: &Paths) -> Result<()> {
 /// Removes orphan entries, adds missing ones, updates stale metadata.
 /// Cheap enough to run every sentinel cycle (5 min).
 fn reconcile_registry(paths: &Paths) {
-    let skills = russell_skills::load_all(&paths.skills()).unwrap_or_default();
+    let load_result = russell_skills::load_all(&paths.skills()).unwrap_or_else(|e| {
+        tracing::warn!(error = %e, "failed to load skills for registry reconciliation");
+        russell_skills::LoadResult {
+            skills: Vec::new(),
+            skipped: Vec::new(),
+        }
+    });
+    if load_result.has_skipped() {
+        tracing::warn!("{}", load_result.skipped_summary().trim());
+    }
+    let skills = load_result.skills;
     let registry_path = paths.state.join("registry").join("local-cache.yaml");
     let mut registry =
         russell_skills::registry::RegistryCache::load(&registry_path).unwrap_or_default();

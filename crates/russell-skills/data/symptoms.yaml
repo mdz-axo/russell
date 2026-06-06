@@ -15,6 +15,7 @@
 - gpu_fallback_to_cpu
 - rocm_unreachable
 - nvme_media_errors
+- gpu_not_responding
 
 # System
 - oom_killer_active
@@ -22,6 +23,12 @@
 - loadavg_high
 - llm_slow
 - resource_exhaustion
+- memory_pressure
+- disk_pressure
+- boot_partition_full
+- kernel_param_misconfigured
+- llm_not_responding
+- model_loading_failure
 
 # Ubuntu-specific (ubuntu-jack skill)
 - systemd_service_degraded
@@ -38,6 +45,13 @@
 - tmp_mount_nosuid_missing
 - package_out_of_date
 - system_maintenance
+- pending_reboot
+- kernel_old_installed
+- autoremove_needed
+- held_packages
+- snap_stale
+- flatpak_stale
+- service_degraded
 
 # Cybernetic (pragmatic-cybernetics skill)
 - broken_feedback_loop
@@ -62,6 +76,11 @@
 - operator_requests_interrogation
 - knowledge_assessment_needed
 - learning_goal_identified
+- script_safety_concern
+- idrs_violation
+- script_style_issue
+- script_content_needed
+- script_inventory_needed
 
 # Sysadmin (sysadmin skill)
 - zombie_accumulation
@@ -77,6 +96,17 @@
 - file_needs_deletion
 - directory_needs_creation
 - config_drift
+- docker_daemon_down
+- ollama_daemon_down
+- cache_bloat
+- npm_global_stale
+- cargo_package_stale
+- zed_agent_stale
+- package_stale
+- rust_toolchain_stale
+- pip_packages_stale
+- docker_images_stale
+- dev_tool_stale
 
 # Web search (web-search skill)
 - search_capability_needed
@@ -102,6 +132,7 @@
 - skill_coverage_gap
 - skill_needs_conversion
 - flowdef_skill_detected
+- skill_audit_needed
 
 # Scenario testing (scenario-tester skill)
 - agent_latency_spike
@@ -112,7 +143,5 @@
 - agent_test_scenario_failed
 - agent_concurrent_load_timeout
 - agent_resource_exhaustion_under_load
-- capability_attenuation_failure
-- prompt_sanitization_failure
 - capability_attenuation_failure
 - prompt_sanitization_failure

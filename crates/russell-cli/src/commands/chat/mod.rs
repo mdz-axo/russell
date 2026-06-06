@@ -392,7 +392,17 @@ pub async fn run(paths: &Paths) -> Result<()> {
     let reader = journal.reader();
 
     // Load skills at session start; can be reloaded with /reload.
-    let mut skills = russell_skills::load_all(&paths.skills()).unwrap_or_default();
+    let load_result = russell_skills::load_all(&paths.skills()).unwrap_or_else(|e| {
+        warn!(error = %e, "failed to read skills directory");
+        russell_skills::LoadResult {
+            skills: Vec::new(),
+            skipped: Vec::new(),
+        }
+    });
+    if load_result.has_skipped() {
+        eprintln!("{}", load_result.skipped_summary());
+    }
+    let mut skills = load_result.skills;
     let profile = russell_core::Profile::load(&paths.profile()).ok();
 
     // Initialize hKask MCP client (ADR-0025). Non-blocking — graceful
@@ -536,8 +546,8 @@ pub async fn run(paths: &Paths) -> Result<()> {
                         }
                         if is_skill_mgr_mutation {
                             match russell_skills::load_all(&paths.skills()) {
-                                Ok(fresh) => {
-                                    skills = fresh;
+                                Ok(result) => {
+                                    skills = result.skills;
                                     match russell_skills::registry::RegistryCache::load(
                                         &registry_path,
                                     ) {
@@ -579,8 +589,8 @@ pub async fn run(paths: &Paths) -> Result<()> {
                         }
                         if is_skill_mgr_mutation {
                             match russell_skills::load_all(&paths.skills()) {
-                                Ok(fresh) => {
-                                    skills = fresh;
+                                Ok(result) => {
+                                    skills = result.skills;
                                     match russell_skills::registry::RegistryCache::load(
                                         &registry_path,
                                     ) {
@@ -862,10 +872,21 @@ async fn handle_slash_command(
         "/refresh" | "/reload" => {
             let prev_count = skills.len();
             match russell_skills::load_all(&paths.skills()) {
-                Ok(fresh) => {
-                    *skills = fresh;
+                Ok(result) => {
+                    let has_skipped = result.has_skipped();
+                    let skipped_count = result.skipped.len();
+                    let skipped = result.skipped;
+                    *skills = result.skills;
                     let now = skills.len();
-                    if now > prev_count {
+                    if has_skipped {
+                        println!(
+                            "  → Skills reloaded. {} loaded, {} skipped:",
+                            now, skipped_count
+                        );
+                        for s in &skipped {
+                            println!("    - {}: {}", s.id, s.reason);
+                        }
+                    } else if now > prev_count {
                         println!(
                             "  → Skills reloaded. Now have {} loaded (was {}).",
                             now, prev_count

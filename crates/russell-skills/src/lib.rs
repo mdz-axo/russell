@@ -168,6 +168,44 @@ pub enum SkillKind {
     Lens,
 }
 
+/// A skill that was skipped during loading, along with the reason.
+#[derive(Debug, Clone)]
+pub struct SkippedSkill {
+    /// Directory name (skill ID candidate) that failed to load.
+    pub id: String,
+    /// Human-readable reason the skill was skipped.
+    pub reason: String,
+}
+
+/// Result of loading skills from a directory — both loaded and skipped.
+#[derive(Debug, Clone)]
+pub struct LoadResult {
+    /// Skills that loaded successfully.
+    pub skills: Vec<Skill>,
+    /// Skills that were skipped due to validation errors.
+    pub skipped: Vec<SkippedSkill>,
+}
+
+impl LoadResult {
+    /// Returns `true` if any skills were skipped.
+    pub fn has_skipped(&self) -> bool {
+        !self.skipped.is_empty()
+    }
+
+    /// Returns a formatted summary of skipped skills, suitable for
+    /// surfacing to the operator or Jack.
+    pub fn skipped_summary(&self) -> String {
+        if self.skipped.is_empty() {
+            return String::new();
+        }
+        let mut out = format!("{} skill(s) skipped:\n", self.skipped.len());
+        for s in &self.skipped {
+            out.push_str(&format!("  - {}: {}\n", s.id, s.reason));
+        }
+        out
+    }
+}
+
 impl Default for SkillKind {
     /// Default is `Actionable` — process skills (probes + interventions)
     /// are the primary case. Knowledge-only lenses must be explicitly
@@ -558,14 +596,25 @@ fn max_auto_risk_default() -> RiskBand {
 // --- Loading -------------------------------------------------------------
 
 /// Load all skill manifests from a `skills/` directory.
-pub fn load_all(skills_dir: &Path) -> Result<Vec<Skill>, LoadError> {
+///
+/// Returns a [`LoadResult`] containing both successfully loaded skills
+/// and any that were skipped due to validation errors. The skipped
+/// entries are collected so callers can surface them to the operator
+/// instead of silently discarding them.
+pub fn load_all(skills_dir: &Path) -> Result<LoadResult, LoadError> {
     let entries = match std::fs::read_dir(skills_dir) {
         Ok(d) => d,
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+            return Ok(LoadResult {
+                skills: Vec::new(),
+                skipped: Vec::new(),
+            });
+        }
         Err(e) => return Err(LoadError::ReadDir(e)),
     };
 
     let mut skills = Vec::new();
+    let mut skipped = Vec::new();
     for entry in entries {
         let entry = match entry {
             Ok(e) => e,
@@ -595,11 +644,15 @@ pub fn load_all(skills_dir: &Path) -> Result<Vec<Skill>, LoadError> {
             Ok(skill) => skills.push(skill),
             Err(e) => {
                 eprintln!("warning: skipping skill '{}': {e}", dir_name);
+                skipped.push(SkippedSkill {
+                    id: dir_name.to_string(),
+                    reason: e.to_string(),
+                });
             }
         }
     }
 
-    Ok(skills)
+    Ok(LoadResult { skills, skipped })
 }
 
 /// Load and validate a single skill manifest.
@@ -862,13 +915,14 @@ safety:
         let tmp = tempfile::tempdir().unwrap();
         let id = "gpu-doctor";
         write_skill(tmp.path(), id, &valid_manifest(id));
-        let skills = load_all(tmp.path()).unwrap();
-        assert_eq!(skills.len(), 1);
-        assert_eq!(skills[0].id, id);
-        assert_eq!(skills[0].probes.len(), 1);
-        assert_eq!(skills[0].interventions.len(), 1);
-        assert_eq!(skills[0].symptoms.len(), 1);
-        assert_eq!(skills[0].symptoms[0].name(), "vram_oom");
+        let result = load_all(tmp.path()).unwrap();
+        assert_eq!(result.skills.len(), 1);
+        assert!(result.skipped.is_empty());
+        assert_eq!(result.skills[0].id, id);
+        assert_eq!(result.skills[0].probes.len(), 1);
+        assert_eq!(result.skills[0].interventions.len(), 1);
+        assert_eq!(result.skills[0].symptoms.len(), 1);
+        assert_eq!(result.skills[0].symptoms[0].name(), "vram_oom");
     }
 
     #[test]
@@ -880,21 +934,24 @@ safety:
             "battery-doctor",
             &valid_manifest("battery-doctor"),
         );
-        let skills = load_all(tmp.path()).unwrap();
-        assert_eq!(skills.len(), 2);
+        let result = load_all(tmp.path()).unwrap();
+        assert_eq!(result.skills.len(), 2);
+        assert!(result.skipped.is_empty());
     }
 
     #[test]
     fn empty_dir_returns_empty_vec() {
         let tmp = tempfile::tempdir().unwrap();
-        let skills = load_all(tmp.path()).unwrap();
-        assert!(skills.is_empty());
+        let result = load_all(tmp.path()).unwrap();
+        assert!(result.skills.is_empty());
+        assert!(result.skipped.is_empty());
     }
 
     #[test]
     fn missing_skills_dir_returns_empty() {
-        let skills = load_all(Path::new("/nonexistent/skills")).unwrap();
-        assert!(skills.is_empty());
+        let result = load_all(Path::new("/nonexistent/skills")).unwrap();
+        assert!(result.skills.is_empty());
+        assert!(result.skipped.is_empty());
     }
 
     #[test]
@@ -902,8 +959,9 @@ safety:
         let tmp = tempfile::tempdir().unwrap();
         write_skill(tmp.path(), "gpu-doctor", &valid_manifest("wrong-id"));
         // Lenient: bad skill is skipped, not a hard error.
-        let skills = load_all(tmp.path()).unwrap();
-        assert!(skills.is_empty(), "mismatched id should be skipped");
+        let result = load_all(tmp.path()).unwrap();
+        assert!(result.skills.is_empty(), "mismatched id should be skipped");
+        assert_eq!(result.skipped.len(), 1);
     }
 
     #[test]
@@ -912,8 +970,12 @@ safety:
         let yaml = valid_manifest("gpu-doctor").replace("vram_oom", "made_up_symptom");
         write_skill(tmp.path(), "gpu-doctor", &yaml);
         // Lenient: bad skill is skipped, not a hard error.
-        let skills = load_all(tmp.path()).unwrap();
-        assert!(skills.is_empty(), "unknown symptom should be skipped");
+        let result = load_all(tmp.path()).unwrap();
+        assert!(
+            result.skills.is_empty(),
+            "unknown symptom should be skipped"
+        );
+        assert_eq!(result.skipped.len(), 1);
     }
 
     #[test]
@@ -940,8 +1002,12 @@ safety:
 "#;
         write_skill(tmp.path(), "gpu-doctor", yaml);
         // Lenient: bad skill is skipped, not a hard error.
-        let skills = load_all(tmp.path()).unwrap();
-        assert!(skills.is_empty(), "bad rollback_id should be skipped");
+        let result = load_all(tmp.path()).unwrap();
+        assert!(
+            result.skills.is_empty(),
+            "bad rollback_id should be skipped"
+        );
+        assert_eq!(result.skipped.len(), 1);
     }
 
     #[test]
@@ -961,8 +1027,12 @@ safety:
         )
         .unwrap();
         // Lenient: bad skill is skipped, not a hard error.
-        let skills = load_all(tmp.path()).unwrap();
-        assert!(skills.is_empty(), "unreferenced script should be skipped");
+        let result = load_all(tmp.path()).unwrap();
+        assert!(
+            result.skills.is_empty(),
+            "unreferenced script should be skipped"
+        );
+        assert_eq!(result.skipped.len(), 1);
     }
 
     #[test]
@@ -993,8 +1063,8 @@ safety:
   max_auto_risk: low
 "#;
         std::fs::write(skill_dir.join("manifest.yaml"), yaml).unwrap();
-        let skills = load_all(tmp.path()).unwrap();
-        assert_eq!(skills.len(), 1);
+        let result = load_all(tmp.path()).unwrap();
+        assert_eq!(result.skills.len(), 1);
     }
 
     #[test]
@@ -1004,8 +1074,8 @@ safety:
         std::fs::create_dir_all(tmp.path().join("__pycache__")).unwrap();
         std::fs::create_dir_all(tmp.path().join("templates")).unwrap();
         write_skill(tmp.path(), "gpu-doctor", &valid_manifest("gpu-doctor"));
-        let skills = load_all(tmp.path()).unwrap();
-        assert_eq!(skills.len(), 1);
+        let result = load_all(tmp.path()).unwrap();
+        assert_eq!(result.skills.len(), 1);
     }
 
     #[test]
@@ -1031,9 +1101,9 @@ safety:
   max_auto_risk: low
 "#;
         write_skill(tmp.path(), "gpu-doctor", yaml);
-        let skills = load_all(tmp.path()).unwrap();
-        assert_eq!(skills.len(), 1);
-        let iv = &skills[0].interventions[0];
+        let result = load_all(tmp.path()).unwrap();
+        assert_eq!(result.skills.len(), 1);
+        let iv = &result.skills[0].interventions[0];
         assert!(matches!(iv.rollback, Rollback::Reboot { .. }));
     }
 
@@ -1042,17 +1112,24 @@ safety:
         let tmp = tempfile::tempdir().unwrap();
         std::fs::create_dir_all(tmp.path().join("gpu-doctor")).unwrap();
         // Lenient: directory without manifest.yaml is skipped.
-        let skills = load_all(tmp.path()).unwrap();
-        assert!(skills.is_empty(), "missing manifest should be skipped");
+        let result = load_all(tmp.path()).unwrap();
+        assert!(
+            result.skills.is_empty(),
+            "missing manifest should be skipped"
+        );
+        // Missing manifest is tracked in skipped list.
+        assert_eq!(result.skipped.len(), 1);
+        assert_eq!(result.skipped[0].id, "gpu-doctor");
     }
 
     #[test]
     fn loads_gpu_doctor_fixture() {
         let fixture = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures");
-        let skills = load_all(&fixture).unwrap();
-        assert_eq!(skills.len(), 3);
+        let result = load_all(&fixture).unwrap();
+        assert_eq!(result.skills.len(), 3);
+        assert!(result.skipped.is_empty());
 
-        let gpu = skills.iter().find(|s| s.id == "gpu-doctor").unwrap();
+        let gpu = result.skills.iter().find(|s| s.id == "gpu-doctor").unwrap();
         assert_eq!(gpu.probes.len(), 3);
         assert_eq!(gpu.interventions.len(), 1);
         assert!(gpu.symptoms.iter().any(|s| s.name() == "vram_oom"));
@@ -1061,7 +1138,11 @@ safety:
         assert_eq!(reset.id, "reset-gpu");
         assert!(matches!(reset.risk, RiskBand::Medium));
 
-        let okapi = skills.iter().find(|s| s.id == "okapi-watcher").unwrap();
+        let okapi = result
+            .skills
+            .iter()
+            .find(|s| s.id == "okapi-watcher")
+            .unwrap();
         assert_eq!(okapi.probes.len(), 3);
         assert_eq!(okapi.interventions.len(), 1);
         assert!(okapi.symptoms.iter().any(|s| s.name() == "llm_slow"));
@@ -1073,7 +1154,7 @@ safety:
         );
         assert_eq!(okapi.interventions[0].id, "restart-okapi");
 
-        let sysadmin = skills.iter().find(|s| s.id == "sysadmin").unwrap();
+        let sysadmin = result.skills.iter().find(|s| s.id == "sysadmin").unwrap();
         assert_eq!(sysadmin.probes.len(), 2);
         assert_eq!(sysadmin.interventions.len(), 3);
         assert!(
@@ -1131,13 +1212,13 @@ safety:
   max_auto_risk: low
 "#;
         std::fs::write(skill_dir.join("manifest.yaml"), yaml).unwrap();
-        let skills = load_all(tmp.path()).unwrap();
+        let result = load_all(tmp.path()).unwrap();
         assert_eq!(
-            skills.len(),
+            result.skills.len(),
             1,
             "evaluation script should be recognized as referenced"
         );
-        let eval = skills[0]
+        let eval = result.skills[0]
             .evaluation
             .as_ref()
             .expect("evaluation should be parsed");

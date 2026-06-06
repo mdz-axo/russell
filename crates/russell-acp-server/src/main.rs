@@ -24,7 +24,7 @@ async fn main() -> anyhow::Result<()> {
     let skills_dir = PathBuf::from(std::env::var("HOME")?).join(".local/share/harness/skills");
 
     let skills = if skills_dir.exists() {
-        russell_skills::load_all(&skills_dir)?
+        russell_skills::load_all(&skills_dir)?.skills
     } else {
         tracing::warn!("skills directory not found: {}", skills_dir.display());
         Vec::new()
