@@ -2197,7 +2197,7 @@ dependencies = [
 
 [[package]]
 name = "russell-acp-server"
-version = "0.20.0"
+version = "0.23.0"
 dependencies = [
  "age",
  "anyhow",
@@ -2229,7 +2229,7 @@ dependencies = [
 
 [[package]]
 name = "russell-agent"
-version = "0.20.0"
+version = "0.23.0"
 dependencies = [
  "anyhow",
  "chrono",
@@ -2252,7 +2252,7 @@ dependencies = [
 
 [[package]]
 name = "russell-api-server"
-version = "0.20.0"
+version = "0.23.0"
 dependencies = [
  "anyhow",
  "axum",
@@ -2271,7 +2271,7 @@ dependencies = [
 
 [[package]]
 name = "russell-cli"
-version = "0.20.0"
+version = "0.23.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -2301,7 +2301,7 @@ dependencies = [
 
 [[package]]
 name = "russell-core"
-version = "0.20.0"
+version = "0.23.0"
 dependencies = [
  "age",
  "async-trait",
@@ -2325,7 +2325,7 @@ dependencies = [
 
 [[package]]
 name = "russell-mcp"
-version = "0.20.0"
+version = "0.23.0"
 dependencies = [
  "async-trait",
  "chrono",
@@ -2343,7 +2343,7 @@ dependencies = [
 
 [[package]]
 name = "russell-meta"
-version = "0.20.0"
+version = "0.23.0"
 dependencies = [
  "async-trait",
  "base64 0.22.1",
@@ -2371,7 +2371,7 @@ dependencies = [
 
 [[package]]
 name = "russell-proprio"
-version = "0.20.0"
+version = "0.23.0"
 dependencies = [
  "rusqlite",
  "russell-core",
@@ -2382,7 +2382,7 @@ dependencies = [
 
 [[package]]
 name = "russell-protocol"
-version = "0.20.0"
+version = "0.23.0"
 dependencies = [
  "chrono",
  "serde",
@@ -2391,7 +2391,7 @@ dependencies = [
 
 [[package]]
 name = "russell-sentinel"
-version = "0.20.0"
+version = "0.23.0"
 dependencies = [
  "russell-core",
  "thiserror 2.0.18",
@@ -2401,7 +2401,7 @@ dependencies = [
 
 [[package]]
 name = "russell-session"
-version = "0.20.0"
+version = "0.23.0"
 dependencies = [
  "async-trait",
  "chrono",
@@ -2417,7 +2417,7 @@ dependencies = [
 
 [[package]]
 name = "russell-skills"
-version = "0.20.0"
+version = "0.23.0"
 dependencies = [
  "hex",
  "landlock",
@@ -2437,7 +2437,7 @@ dependencies = [
 
 [[package]]
 name = "russell-testing"
-version = "0.20.0"
+version = "0.23.0"
 dependencies = [
  "anyhow",
  "insta",
