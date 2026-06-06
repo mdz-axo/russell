@@ -689,28 +689,76 @@ pub async fn run(paths: &Paths) -> Result<()> {
                 });
 
                 // Call Jack with the user's message as input.
-                call_jack(
-                    &mut history,
-                    &chat_path,
-                    &journal,
-                    &session_id,
-                    &current_model,
-                    &reader,
-                    &skills,
-                    &skipped,
-                    profile.as_ref(),
-                    &hkask_registry,
-                    &registry,
-                    paths,
-                    &mut pending_action,
-                    &hkask_client,
-                    &client_cfg,
-                )
-                .await?;
+                // After each call, check if a probe result was injected into
+                // history (meaning a probe auto-executed). If so, re-call Jack
+                // so he can interpret the result — closing the cybernetic loop
+                // without requiring the operator to ask "what did you learn?"
+                //
+                // Safety: cap the loop at 5 iterations to prevent runaway
+                // probe chains from exhausting the token budget.
+                let mut probe_loop_count: u32 = 0;
+                loop {
+                    call_jack(
+                        &mut history,
+                        &chat_path,
+                        &journal,
+                        &session_id,
+                        &current_model,
+                        &reader,
+                        &skills,
+                        &skipped,
+                        profile.as_ref(),
+                        &hkask_registry,
+                        &registry,
+                        paths,
+                        &mut pending_action,
+                        &hkask_client,
+                        &client_cfg,
+                    )
+                    .await?;
 
-                // Reload skill registry to capture fresh telemetry (post-Jack execution).
-                if let Ok(fresh) = russell_skills::registry::RegistryCache::load(&registry_path) {
-                    registry = fresh;
+                    // Reload skill registry to capture fresh telemetry (post-Jack execution).
+                    if let Ok(fresh) = russell_skills::registry::RegistryCache::load(&registry_path)
+                    {
+                        registry = fresh;
+                    }
+
+                    // If the most recent turn is a user message containing a probe
+                    // or intervention result, Jack needs another turn to interpret
+                    // it. Break when the last turn is an assistant message (Jack
+                    // already responded) or a plain user message (the operator
+                    // spoke — main loop will handle it).
+                    let should_continue = history
+                        .turns
+                        .last()
+                        .map(|t| {
+                            t.role == "user"
+                                && (t.content.starts_with("[probe result:")
+                                    || t.content.starts_with("[probe error:")
+                                    || t.content.starts_with("[intervention result:"))
+                        })
+                        .unwrap_or(false);
+
+                    if !should_continue {
+                        break;
+                    }
+
+                    probe_loop_count += 1;
+                    if probe_loop_count >= 5 {
+                        println!(
+                            "  → Probe chain limit reached (5). Stopping to preserve context budget."
+                        );
+                        break;
+                    }
+
+                    // Inject a prompt so Jack knows this is an auto-continuation,
+                    // not a new operator message. This gives him context that he
+                    // should interpret the result that just appeared.
+                    history.turns.push(Turn {
+                        role: "user".into(),
+                        content: "(Continue — interpret the result above and respond.)".to_string(),
+                    });
+                    save_history(&chat_path, &history);
                 }
             }
             Err(ReadlineError::Interrupted) => {
