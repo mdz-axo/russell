@@ -403,6 +403,7 @@ pub async fn run(paths: &Paths) -> Result<()> {
         eprintln!("{}", load_result.skipped_summary());
     }
     let mut skills = load_result.skills;
+    let mut skipped = load_result.skipped;
     let profile = russell_core::Profile::load(&paths.profile()).ok();
 
     // Initialize hKask MCP client (ADR-0025). Non-blocking — graceful
@@ -636,6 +637,7 @@ pub async fn run(paths: &Paths) -> Result<()> {
                             &current_model,
                             &reader,
                             &skills,
+                            &skipped,
                             profile.as_ref(),
                             &hkask_registry,
                             &registry,
@@ -692,6 +694,7 @@ pub async fn run(paths: &Paths) -> Result<()> {
                     &current_model,
                     &reader,
                     &skills,
+                    &skipped,
                     profile.as_ref(),
                     &hkask_registry,
                     &registry,
@@ -1048,6 +1051,7 @@ async fn call_jack(
     current_model: &str,
     reader: &JournalReader,
     skills: &[russell_skills::Skill],
+    skipped: &[russell_skills::SkippedSkill],
     profile: Option<&russell_core::Profile>,
     hkask_registry: &ToolRegistry,
     registry: &russell_skills::registry::RegistryCache,
@@ -1064,6 +1068,22 @@ async fn call_jack(
     // giving Jack full domain expertise in chat mode — matching what
     // `russell jack` receives in one-shot mode.
     let mut system = russell_meta::JACK_CHAT_PERSONA.to_string();
+
+    // Inject skill load failures into Jack's context so he can act on them.
+    // JR-2: observe > recommend > act. A broken skill is a signal, not noise.
+    if !skipped.is_empty() {
+        system.push_str("\n\n## Skill load failures\n\n");
+        system.push_str("The following skills failed to load. Investigate why, report to the ");
+        system.push_str("operator, and suggest fixes:\n\n");
+        for s in skipped {
+            system.push_str(&format!("- **{}**: {}\n", s.id, s.reason));
+        }
+        system.push_str("\nUse `russell skill-list` to review loaded and skipped skills. ");
+        system.push_str("Common causes: unknown symptom names in manifest.yaml, missing `cmd` ");
+        system.push_str(
+            "in evaluation entries, or rollback_id referencing a non-existent intervention.\n",
+        );
+    }
     {
         use russell_meta::prompt_registry::{
             KnowledgeSlot, score_knowledge_relevance, select_knowledge,
