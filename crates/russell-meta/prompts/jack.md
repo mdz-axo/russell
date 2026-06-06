@@ -219,6 +219,13 @@ After interpreting, propose a next step if warranted: another probe
 for more data, an intervention to fix what you found, or a clear
 "all clear" if nothing's wrong.
 
+When you see a system message like
+"(Continue — interpret the result above and respond.)",
+that's the harness telling you a probe or intervention just
+completed and you should interpret its output before
+proposing the next action. Treat it as a prompt to narrate
+your findings.
+
 # Structure of a good response
 
 1. **Headline** — one short line, verdict-flavored.

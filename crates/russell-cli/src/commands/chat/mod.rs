@@ -148,6 +148,22 @@ fn is_refusal(input: &str) -> bool {
     )
 }
 
+/// Check if the most recent history turn is an action result that Jack
+/// should interpret — probe result, intervention result, or kask tool result.
+fn is_action_result_in_history(history: &ChatHistory) -> bool {
+    history
+        .turns
+        .last()
+        .map(|t| {
+            t.role == "user"
+                && (t.content.starts_with("[probe result:")
+                    || t.content.starts_with("[probe error:")
+                    || t.content.starts_with("[intervention result:")
+                    || t.content.starts_with("[kask tool result:"))
+        })
+        .unwrap_or(false)
+}
+
 // ─── Slash command handlers (from commands.rs) ──────────────────────────────
 
 /// Prompt the operator to pick from a numbered list of models.
@@ -563,6 +579,52 @@ pub async fn run(paths: &Paths) -> Result<()> {
                             }
                         }
                         pending_action = None;
+
+                        // Gap A: After executing an approved intervention, Jack
+                        // should interpret the result — not just print it and
+                        // wait for the operator to ask "what happened?"
+                        if is_action_result_in_history(&history) {
+                            history.turns.push(Turn {
+                                role: "user".into(),
+                                content: "(Continue — interpret the result above and respond.)"
+                                    .to_string(),
+                            });
+                            save_history(&chat_path, &history);
+                            for _ in 0..5 {
+                                call_jack(
+                                    &mut history,
+                                    &chat_path,
+                                    &journal,
+                                    &session_id,
+                                    &current_model,
+                                    &reader,
+                                    &skills,
+                                    &skipped,
+                                    profile.as_ref(),
+                                    &hkask_registry,
+                                    &registry,
+                                    paths,
+                                    &mut pending_action,
+                                    &hkask_client,
+                                    &client_cfg,
+                                )
+                                .await?;
+                                if let Ok(fresh) =
+                                    russell_skills::registry::RegistryCache::load(&registry_path)
+                                {
+                                    registry = fresh;
+                                }
+                                if !is_action_result_in_history(&history) {
+                                    break;
+                                }
+                                history.turns.push(Turn {
+                                    role: "user".into(),
+                                    content: "(Continue — interpret the result above and respond.)"
+                                        .to_string(),
+                                });
+                                save_history(&chat_path, &history);
+                            }
+                        }
                         continue;
                     }
                     if let Some(_pw) = trimmed.strip_prefix("/approve ") {
@@ -607,6 +669,51 @@ pub async fn run(paths: &Paths) -> Result<()> {
                             }
                         }
                         pending_action = None;
+
+                        // Gap A (password variant): Same auto-interpretation loop
+                        // as the regular /approve path above.
+                        if is_action_result_in_history(&history) {
+                            history.turns.push(Turn {
+                                role: "user".into(),
+                                content: "(Continue — interpret the result above and respond.)"
+                                    .to_string(),
+                            });
+                            save_history(&chat_path, &history);
+                            for _ in 0..5 {
+                                call_jack(
+                                    &mut history,
+                                    &chat_path,
+                                    &journal,
+                                    &session_id,
+                                    &current_model,
+                                    &reader,
+                                    &skills,
+                                    &skipped,
+                                    profile.as_ref(),
+                                    &hkask_registry,
+                                    &registry,
+                                    paths,
+                                    &mut pending_action,
+                                    &hkask_client,
+                                    &client_cfg,
+                                )
+                                .await?;
+                                if let Ok(fresh) =
+                                    russell_skills::registry::RegistryCache::load(&registry_path)
+                                {
+                                    registry = fresh;
+                                }
+                                if !is_action_result_in_history(&history) {
+                                    break;
+                                }
+                                history.turns.push(Turn {
+                                    role: "user".into(),
+                                    content: "(Continue — interpret the result above and respond.)"
+                                        .to_string(),
+                                });
+                                save_history(&chat_path, &history);
+                            }
+                        }
                         continue;
                     }
                     if is_refusal(trimmed) {
@@ -695,8 +802,8 @@ pub async fn run(paths: &Paths) -> Result<()> {
                 // without requiring the operator to ask "what did you learn?"
                 //
                 // Safety: cap the loop at 5 iterations to prevent runaway
-                // probe chains from exhausting the token budget.
-                let mut probe_loop_count: u32 = 0;
+                // action-result chains from exhausting the token budget.
+                let mut action_loop_count: u32 = 0;
                 loop {
                     call_jack(
                         &mut history,
@@ -723,30 +830,19 @@ pub async fn run(paths: &Paths) -> Result<()> {
                         registry = fresh;
                     }
 
-                    // If the most recent turn is a user message containing a probe
-                    // or intervention result, Jack needs another turn to interpret
-                    // it. Break when the last turn is an assistant message (Jack
+                    // If the most recent turn is a user message containing an
+                    // action result, Jack needs another turn to interpret it.
+                    // Break when the last turn is an assistant message (Jack
                     // already responded) or a plain user message (the operator
                     // spoke — main loop will handle it).
-                    let should_continue = history
-                        .turns
-                        .last()
-                        .map(|t| {
-                            t.role == "user"
-                                && (t.content.starts_with("[probe result:")
-                                    || t.content.starts_with("[probe error:")
-                                    || t.content.starts_with("[intervention result:"))
-                        })
-                        .unwrap_or(false);
-
-                    if !should_continue {
+                    if !is_action_result_in_history(&history) {
                         break;
                     }
 
-                    probe_loop_count += 1;
-                    if probe_loop_count >= 5 {
+                    action_loop_count += 1;
+                    if action_loop_count >= 5 {
                         println!(
-                            "  → Probe chain limit reached (5). Stopping to preserve context budget."
+                            "  → Action chain limit reached (5). Stopping to preserve context budget."
                         );
                         break;
                     }
@@ -1469,5 +1565,73 @@ mod tests {
         let response = "Arguments \"multi word value\" --flag ok";
         let args = extract_inline_args(response);
         assert_eq!(args, vec!["multi word value", "--flag", "ok"]);
+    }
+
+    // ── is_action_result_in_history tests ─────────────────────────────────
+
+    #[test]
+    fn action_result_detection_probe() {
+        let mut h = ChatHistory::new("test".to_string());
+        h.turns.push(Turn {
+            role: "user".into(),
+            content: "[probe result: sysadmin/probe-systemd-failed, exit=0]\nall_clear".to_string(),
+        });
+        assert!(is_action_result_in_history(&h));
+    }
+
+    #[test]
+    fn action_result_detection_probe_error() {
+        let mut h = ChatHistory::new("test".to_string());
+        h.turns.push(Turn {
+            role: "user".into(),
+            content: "[probe error: sysadmin/probe-systemd-failed] timeout".to_string(),
+        });
+        assert!(is_action_result_in_history(&h));
+    }
+
+    #[test]
+    fn action_result_detection_intervention() {
+        let mut h = ChatHistory::new("test".to_string());
+        h.turns.push(Turn {
+            role: "user".into(),
+            content: "[intervention result: okapi-watcher/restart-okapi, exit=0]\nok".to_string(),
+        });
+        assert!(is_action_result_in_history(&h));
+    }
+
+    #[test]
+    fn action_result_detection_kask() {
+        let mut h = ChatHistory::new("test".to_string());
+        h.turns.push(Turn {
+            role: "user".into(),
+            content: "[kask tool result: brave_web_search, status=ok]\nfound results".to_string(),
+        });
+        assert!(is_action_result_in_history(&h));
+    }
+
+    #[test]
+    fn action_result_detection_plain_user_message() {
+        let mut h = ChatHistory::new("test".to_string());
+        h.turns.push(Turn {
+            role: "user".into(),
+            content: "How's the system doing?".to_string(),
+        });
+        assert!(!is_action_result_in_history(&h));
+    }
+
+    #[test]
+    fn action_result_detection_assistant_message() {
+        let mut h = ChatHistory::new("test".to_string());
+        h.turns.push(Turn {
+            role: "assistant".into(),
+            content: "The system looks fine.".to_string(),
+        });
+        assert!(!is_action_result_in_history(&h));
+    }
+
+    #[test]
+    fn action_result_detection_empty_history() {
+        let h = ChatHistory::new("test".to_string());
+        assert!(!is_action_result_in_history(&h));
     }
 }
