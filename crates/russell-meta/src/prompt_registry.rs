@@ -35,7 +35,7 @@ use crate::error::Result;
 
 // ─── Compiled-in templates ────────────────────────────────────────────────
 
-/// SOAP one-shot template — used by `russell jack`.
+/// SOAP one-shot template — used by `russell chat` SOAP mode.
 const TEMPLATE_SOAP: &str = include_str!("../prompts/templates/soap.md.j2");
 
 /// Chat objective template — used by `russell chat`.
@@ -376,7 +376,7 @@ fn truncate_tokens_filter(s: String, limit: u32) -> String {
 /// Which prompt template to use, determined by invocation mode.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PromptMode {
-    /// One-shot SOAP health check (`russell jack`).
+    /// One-shot SOAP health check.
     Soap,
     /// Multi-turn chat REPL (`russell chat`).
     Chat,

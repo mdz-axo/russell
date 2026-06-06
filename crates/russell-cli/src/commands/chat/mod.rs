@@ -1213,8 +1213,7 @@ async fn call_jack(
 
     // Build system prompt: persona + relevance-scored KNOWLEDGE.md injection.
     // All applicable skill knowledge is injected (within token budget),
-    // giving Jack full domain expertise in chat mode — matching what
-    // `russell jack` receives in one-shot mode.
+    // giving Jack full domain expertise in chat mode.
     let mut system = russell_meta::JACK_CHAT_PERSONA.to_string();
 
     // Inject skill load failures into Jack's context so he can act on them.

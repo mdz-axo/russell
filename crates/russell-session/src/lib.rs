@@ -4,7 +4,7 @@
 //! Provides the multi-turn interactive session with Jack persona, including
 //! consent flow for interventions. Used by all three interaction surfaces:
 //!
-//! - **CLI** — `russell jack` interactive REPL
+//! - **CLI** — `russell chat` interactive REPL
 //! - **API** — HTTP REST endpoints
 //! - **ACP** — JSON-RPC over stdio (hKask integration)
 //!

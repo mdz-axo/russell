@@ -3,7 +3,7 @@
 //!
 //! Formats the current journal state into a Markdown block
 //! that Jack can consume each turn. This must provide the same
-//! signals as the `russell jack` one-shot SOAP prompt — including
+//! signals as the `russell chat` SOAP prompt — including
 //! baselines, reflex arcs, self-vitals, and skill telemetry —
 //! so Jack has full metacognitive awareness of the system and
 //! his own capabilities regardless of interface mode.

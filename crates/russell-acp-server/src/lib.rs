@@ -24,7 +24,7 @@
 //! Russell's interactive Jack session is available on three functionally
 //! equivalent surfaces:
 //!
-//! - **CLI** — `russell jack` interactive REPL (via `russell-session`)
+//! - **CLI** — `russell chat` interactive REPL
 //! - **API** — HTTP REST endpoints (via `russell-api-server`)
 //! - **ACP** — JSON-RPC over stdio (this crate, via `russell-session`)
 //!

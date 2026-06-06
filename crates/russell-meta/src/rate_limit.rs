@@ -2,8 +2,8 @@
 //! Token-bucket rate limiter for LLM calls (T14).
 //!
 //! Prevents resource exhaustion (local GPU VRAM, Okapi connection
-//! pool) from runaway chat sessions or repeated `russell jack`
-//! invocations.
+//! pool) from runaway chat sessions or repeated
+//! `russell chat` invocations.
 //!
 //! ## Design
 //!

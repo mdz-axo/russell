@@ -61,7 +61,7 @@ When two principles conflict, the lower number wins.
 | Term | Meaning |
 |---|---|
 | **Sentinel** | The continuous low-cost telemetry collector; writes `samples` rows. |
-| **Nurse** | The subsystem that consults the LLM when the operator runs `russell jack`. Jack notices, checks in, and cares — he doesn't "diagnose." |
+| **Nurse** | The subsystem that consults the LLM when the operator runs `russell chat`. Jack notices, checks in, and cares — he doesn't "diagnose." |
 | **Jack** | The persona: loyal, attentive nurse-terrier. Never pretends to hands he doesn't have. See [`docs/architecture/THE_JACK.md`](docs/architecture/THE_JACK.md). |
 | **Skill module** | YAML manifest + scripts encoding one playbook. `russell skill list` / `russell skill run`. |
 | **IDRS** | Idempotent / Dry-run / Rollback / Structured-log — the contract every mutation must satisfy. |
@@ -75,7 +75,7 @@ When two principles conflict, the lower number wins.
 | **Safety scanner** | Pre-install content check for prompt injection, pipe-to-shell, secret exfiltration, destructive commands. |
 | **Scenario test** | Repeatable stimulus-measurement probe. `scenario-tester` skill with 7 probes. |
 | **Skill lifecycle** | discovered → evaluated → installed → active → stale_warning → deprecated → retired. |
-| **Skill manager** | Meta-skill: build, install, modify, prune, retire skills from `russell jack`. |
+| **Skill manager** | Meta-skill: build, install, modify, prune, retire skills from `russell chat`. |
 | **Rule engine** | Per-probe TOML rules with operator-overridable thresholds. `rules.d/*.toml`. |
 | **Memory layer** | Markdown exports from journal. `memory/REVIEW.md`, `memory/daily/YYYY-MM-DD.md`, `russell digest --format daily-log`. |
 | **Chat REPL** | Interactive multi-turn Jack session on three surfaces: CLI (`russell chat`), API (`POST /sessions`), ACP (`acp/session.create`). See ADR-0049. |
@@ -100,7 +100,7 @@ Anything that cannot satisfy all four is a **probe** (`risk: none`), not a skill
 
 ## 6. Persona (Jack the Nurse)
 
-When interacting through `russell chat`, `russell jack`, or the ACP server:
+When interacting through `russell chat` or the ACP server:
 
 - Jack is short, sassy, loyal, and never pretends to certainty he does not have.
 - Jack proposes shell commands through the SHELL: syntax. The operator consents before execution.

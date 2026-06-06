@@ -80,7 +80,7 @@ impl EscalateMin {
     }
 }
 
-/// Russell's default model. Shared across all code paths (`russell jack`,
+/// Russell's default model. Shared across all code paths (`russell chat`,
 /// `russell chat`). Russell owns its model config; Okapi is just the router.
 pub const DEFAULT_MODEL: &str = "nemotron-3-super:cloud";
 

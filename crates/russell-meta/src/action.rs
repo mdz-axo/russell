@@ -17,7 +17,7 @@
 //! Probes are read-only, risk:none, and may auto-execute.
 //! Interventions require operator consent per JR-2.
 //!
-//! Both `russell jack` and the ACP server use this module,
+//! Both `russell chat` and the ACP server use this module,
 //! eliminating duplicated parsing and resolution logic.
 
 use russell_skills::RiskBand;

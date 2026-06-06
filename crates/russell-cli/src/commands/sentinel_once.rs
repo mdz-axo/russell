@@ -124,7 +124,7 @@ pub fn run(paths: &Paths) -> Result<()> {
 
     // 4. Reflex arc check — for each threshold breach, find matching
     //    arcs and emit reflex_proposed events. These events are consumed
-    //    by the Nurse (russell jack / chat) which may auto-execute
+    //    by the Nurse (`russell chat`) which may auto-execute
     //    risk:low interventions or propose risk:medium/+ for consent.
     //
     //    Cooldown: skip arcs that fired for the same probe within the

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 //! Shared Okapi health-check and auto-start pipeline.
 //!
-//! `russell jack` (one-shot SOAP) and the ACP server need
+//! `russell chat` (one-shot SOAP) and the ACP server need
 //! to verify that Okapi is reachable before dispatching LLM calls.
 //! This module provides a single `ensure_ready` function that:
 //!
