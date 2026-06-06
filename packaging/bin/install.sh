@@ -87,7 +87,8 @@ say "Ensuring config + state + data directories"
 mkdir -p "$HOME/.config/harness" "$HOME/.local/state/harness/runs" \
          "$HOME/.local/state/harness/evidence/help" \
          "$HOME/.local/state/harness/digest" \
-         "$HOME/.local/share/harness/skills"
+         "$HOME/.local/share/harness/skills" \
+         "$HOME/.local/share/harness/rules.d"
 
 say "Installing skills → ~/.local/share/harness/skills/"
 for skill_dir in "$REPO"/skills/*/; do
@@ -101,6 +102,12 @@ for skill_dir in "$REPO"/skills/*/; do
   fi
 done
 chmod +x "$HOME/.local/share/harness/skills/"*/scripts/*.sh 2>/dev/null || true
+
+say "Installing default rules"
+if [ -f "$REPO/rules.d/docs.toml" ]; then
+    cp "$REPO/rules.d/docs.toml" "$HOME/.local/share/harness/rules.d/"
+    say "  → rules.d/docs.toml installed"
+fi
 
 if [ ! -f "$HOME/.config/harness/russell.env" ]; then
   # Prefer the repo .env if it's populated (convenience during dev).

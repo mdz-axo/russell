@@ -248,7 +248,7 @@ if [ "$NO_SYSTEMD" = "0" ]; then
 fi
 
 echo "==> Installing default rules…"
-if [ ! -f "${SHARE_DIR}/rules.d/memory.toml" ]; then
+if [ ! -f "${SHARE_DIR}/rules.d/README.md" ]; then
     cat > "${SHARE_DIR}/rules.d/README.md" <<'RULES_README'
 # Russell Rules
 
@@ -268,6 +268,11 @@ crit_above = 95.0   # threshold for critical severity
 Files are loaded alphabetically. Later files override earlier files.
 RULES_README
     echo "  → rules.d/README.md created as guidance"
+fi
+
+if [ -f "${REPO_ROOT}/rules.d/docs.toml" ]; then
+    cp "${REPO_ROOT}/rules.d/docs.toml" "${SHARE_DIR}/rules.d/"
+    echo "  → rules.d/docs.toml installed"
 fi
 
 echo "==> Installing default skills…"
