@@ -91,6 +91,20 @@ pub enum ResolvedAction {
         /// Expected arguments (required fields from inputSchema).
         required_fields: Vec<String>,
     },
+    /// Shell command proposed directly by the LLM (ADR-0050).
+    /// Executed via `bash -c`, subject to safety classification
+    /// and the consent gate. This replaces the old JR-3 absolute
+    /// prohibition — Jack can now propose and execute shell commands,
+    /// but every command goes through risk classification and
+    /// operator consent before execution.
+    ShellCommand {
+        /// The raw command string to execute via `bash -c`.
+        command: String,
+        /// Risk band determined by the shell safety classifier.
+        risk: RiskBand,
+        /// Whether the command likely requires sudo.
+        needs_sudo: bool,
+    },
 }
 
 impl ResolvedAction {
@@ -106,6 +120,12 @@ impl ResolvedAction {
         matches!(self, Self::HKaskTool { .. })
     }
 
+    /// Returns `true` if this is a raw shell command (ADR-0050).
+    #[must_use]
+    pub fn is_shell_command(&self) -> bool {
+        matches!(self, Self::ShellCommand { .. })
+    }
+
     /// Returns the risk band for this action.
     #[must_use]
     pub fn risk_band(&self) -> RiskBand {
@@ -113,6 +133,7 @@ impl ResolvedAction {
             Self::Probe { .. } => RiskBand::None,
             Self::Intervention { risk, .. } => *risk,
             Self::HKaskTool { risk_band, .. } => *risk_band,
+            Self::ShellCommand { risk, .. } => *risk,
         }
     }
 
@@ -123,6 +144,7 @@ impl ResolvedAction {
             Self::Probe { skill_id, .. } => skill_id,
             Self::Intervention { skill_id, .. } => skill_id,
             Self::HKaskTool { .. } => "hkask",
+            Self::ShellCommand { .. } => "shell",
         }
     }
 
@@ -133,16 +155,21 @@ impl ResolvedAction {
             Self::Probe { action_id, .. } => action_id,
             Self::Intervention { action_id, .. } => action_id,
             Self::HKaskTool { tool_name, .. } => tool_name,
+            Self::ShellCommand { command, .. } => command,
         }
     }
 
     /// The command argv. Empty for hKask tools (they're MCP calls, not subprocesses).
+    /// For ShellCommand, returns a synthetic argv `["bash", "-c", command]`.
     #[must_use]
-    pub fn cmd(&self) -> &[String] {
+    pub fn cmd(&self) -> Vec<String> {
         match self {
-            Self::Probe { cmd, .. } => cmd,
-            Self::Intervention { cmd, .. } => cmd,
-            Self::HKaskTool { .. } => &[],
+            Self::Probe { cmd, .. } => cmd.clone(),
+            Self::Intervention { cmd, .. } => cmd.clone(),
+            Self::HKaskTool { .. } => vec![],
+            Self::ShellCommand { command, .. } => {
+                vec!["bash".to_string(), "-c".to_string(), command.clone()]
+            }
         }
     }
 
@@ -157,17 +184,18 @@ impl ResolvedAction {
                 ..
             } => *risk > *max_auto_risk,
             Self::HKaskTool { risk_band, .. } => *risk_band > RiskBand::None,
+            Self::ShellCommand { .. } => true, // Shell commands always require consent
         }
     }
 
     /// Append extra CLI arguments to the command argv.
-    /// Only applies to probes and interventions; no-op for hKask tools.
+    /// Only applies to probes and interventions; no-op for hKask tools and shell commands.
     pub fn append_cmd_args(&mut self, args: &[String]) {
         match self {
             Self::Probe { cmd, .. } | Self::Intervention { cmd, .. } => {
                 cmd.extend(args.iter().cloned());
             }
-            Self::HKaskTool { .. } => {}
+            Self::HKaskTool { .. } | Self::ShellCommand { .. } => {}
         }
     }
 }
@@ -216,6 +244,13 @@ pub enum ActionError {
         /// The first ACTION: line found (used for deduplication fallback).
         first_action: String,
     },
+    /// A SHELL: command was blocked by the safety classifier (ADR-0050).
+    ShellBlocked {
+        /// The command that was blocked.
+        command: String,
+        /// The reason it was blocked.
+        reason: String,
+    },
 }
 
 impl std::fmt::Display for ActionError {
@@ -262,11 +297,14 @@ impl std::fmt::Display for ActionError {
                     "Jack proposed {count} actions in one response (only one is allowed). Using the first: {first_action}"
                 )
             }
+            Self::ShellBlocked { command, reason } => {
+                write!(f, "Shell command blocked: {reason}. Command: {command}")
+            }
         }
     }
 }
 
-/// Parse the last `ACTION:` line from a response and resolve it
+/// Parse the last `ACTION:` or `SHELL:` line from a response and resolve it
 pub fn resolve(
     response: &str,
     skills: &[Skill],
@@ -274,12 +312,39 @@ pub fn resolve(
     resolve_with_hkask(response, skills, &[])
 }
 
-/// Parse the last `ACTION:` line from a response and resolve it
+/// Parse the last `ACTION:` or `SHELL:` line from a response and resolve it.
 pub fn resolve_with_hkask(
     response: &str,
     skills: &[Skill],
     hkask_tools: &[HKaskToolInfo],
 ) -> Option<std::result::Result<ResolvedAction, ActionError>> {
+    // ADR-0050: Check for SHELL: prefix first.
+    // SHELL: lines are raw shell commands proposed by Jack.
+    let shell_lines: Vec<&str> = response
+        .lines()
+        .filter(|line| line.trim().starts_with("SHELL:"))
+        .collect();
+    if !shell_lines.is_empty() {
+        if shell_lines.len() > 1 {
+            tracing::warn!(
+                count = shell_lines.len(),
+                first = %shell_lines[0].trim(),
+                "LLM produced multiple SHELL lines; using the first"
+            );
+        }
+        let shell_line = shell_lines[0];
+        let raw = shell_line.trim();
+        let command = match raw.strip_prefix("SHELL:") {
+            Some(s) if !s.trim().is_empty() => s.trim(),
+            _ => {
+                return Some(Err(ActionError::MalformedPrefix {
+                    raw: raw.to_string(),
+                }));
+            }
+        };
+        return Some(classify_shell_command(command));
+    }
+
     // Task 3.4: Detect nested ACTION: patterns.
     // ADR-0029 §4: "Only the first ACTION: line is considered valid."
     // When multiple ACTION lines appear (LLM confusion, not injection),
@@ -605,6 +670,246 @@ fn parse_arg_value(s: &str) -> serde_json::Value {
         return serde_json::json!(n);
     }
     serde_json::Value::String(s.to_string())
+}
+
+// ---------------------------------------------------------------------------
+// Shell command safety classifier (ADR-0050)
+// ---------------------------------------------------------------------------
+
+/// Destructive patterns that are always blocked.
+const BLOCKED_PATTERNS: &[&str] = &[
+    "rm -rf /",
+    "rm -rf /*",
+    "mkfs",
+    "dd if=",
+    ":(){ :|:& };:", // fork bomb
+    "chmod -R 777 /",
+    "chown -R",
+    "> /dev/sd",
+    "shutdown",
+    "reboot",
+    "init 0",
+    "init 6",
+    "systemctl poweroff",
+    "systemctl reboot",
+    "halt",
+    "poweroff",
+];
+
+/// High-risk patterns that require explicit consent.
+const HIGH_RISK_PATTERNS: &[&str] = &[
+    "apt remove",
+    "apt-get remove",
+    "dpkg --remove",
+    "dpkg -r",
+    "snap remove",
+    "pip uninstall",
+    "npm uninstall",
+    "cargo uninstall",
+    "rm -rf",
+    "rm -r",
+    "kill -9",
+    "killall",
+    "pkill -9",
+    "systemctl stop",
+    "systemctl disable",
+    "systemctl mask",
+    "iptables -F",
+    "ufw disable",
+    "docker rm",
+    "docker system prune",
+    "podman rm",
+    "podman system prune",
+    "format",
+    "mkfs",
+    "parted",
+    "fdisk",
+    "gdisk",
+];
+
+/// Commands that require sudo (heuristic).
+const SUDO_PATTERNS: &[&str] = &[
+    "sudo ",
+    "apt install",
+    "apt-get install",
+    "apt update",
+    "apt upgrade",
+    "apt-get update",
+    "apt-get upgrade",
+    "systemctl ",
+    "journalctl ",
+    "dpkg ",
+    "snap ",
+    "npm install -g",
+    "pip install",
+    "chmod ",
+    "chown ",
+    "mount ",
+    "umount ",
+    "fdisk ",
+    "parted ",
+    "mkfs ",
+    "fsck ",
+];
+
+/// Read-only command prefixes (risk: none).
+const READ_ONLY_PREFIXES: &[&str] = &[
+    "ls",
+    "cat ",
+    "head ",
+    "tail ",
+    "less ",
+    "which ",
+    "type ",
+    "command -v",
+    "echo ",
+    "printf ",
+    "stat ",
+    "file ",
+    "wc ",
+    "grep ",
+    "egrep ",
+    "fgrep ",
+    "awk ",
+    "sed -n", // only print, no mutation
+    "dpkg-query",
+    "dpkg -l",
+    "dpkg -s",
+    "dpkg -S",
+    "apt list",
+    "apt-cache ",
+    "apt show",
+    "apt policy",
+    "npm list",
+    "npm view",
+    "npm --version",
+    "npm -v",
+    "node --version",
+    "node -v",
+    "pip show",
+    "pip list",
+    "pip --version",
+    "snap list",
+    "snap find",
+    "snap info",
+    "uname",
+    "hostname",
+    "uptime",
+    "free ",
+    "df ",
+    "du ",
+    "ps ",
+    "top ",
+    "htop",
+    "iostat",
+    "vmstat",
+    "mpstat",
+    "dmesg",
+    "journalctl ",
+    "systemctl status",
+    "systemctl list",
+    "systemctl is-active",
+    "systemctl is-enabled",
+    "systemctl is-failed",
+    "docker ps",
+    "docker images",
+    "docker inspect",
+    "podman ps",
+    "podman images",
+    "podman inspect",
+    "git status",
+    "git log",
+    "git diff",
+    "git show",
+    "git branch",
+    "git remote",
+    "git tag",
+    "nvcc --version",
+    "rocm-smi",
+    "rocminfo",
+    "nvidia-smi",
+    "curl ",
+    "wget ",
+    "dig ",
+    "nslookup",
+    "ping ",
+    "traceroute",
+    "ss ",
+    "ip addr",
+    "ip link",
+    "ip route",
+    "ifconfig",
+    "env",
+    "printenv",
+    "id",
+    "whoami",
+    "who",
+    "w ",
+    "last ",
+    "date",
+    "cal",
+    "bc ",
+];
+
+/// Classify a shell command for risk and safety.
+/// Returns `Ok(ResolvedAction::ShellCommand)` or `Err(ActionError::ShellBlocked)`.
+pub fn classify_shell_command(command: &str) -> std::result::Result<ResolvedAction, ActionError> {
+    let cmd_lower = command.to_lowercase();
+
+    // 1. Check blocked patterns first.
+    for pattern in BLOCKED_PATTERNS {
+        if cmd_lower.contains(pattern) {
+            return Err(ActionError::ShellBlocked {
+                command: command.to_string(),
+                reason: format!("destructive pattern detected: {pattern}"),
+            });
+        }
+    }
+
+    // 2. Check for obvious pipe-to-hidden / exfiltration attempts.
+    if cmd_lower.contains(">&2") && cmd_lower.contains("/dev/tcp/") {
+        return Err(ActionError::ShellBlocked {
+            command: command.to_string(),
+            reason: "potential reverse shell or exfiltration".into(),
+        });
+    }
+
+    // 3. Determine if command likely needs sudo.
+    let needs_sudo =
+        SUDO_PATTERNS.iter().any(|p| cmd_lower.starts_with(p)) || cmd_lower.starts_with("sudo ");
+
+    // 4. Classify risk.
+    // Read-only commands get risk: none (auto-execute, no consent needed).
+    let is_read_only = READ_ONLY_PREFIXES
+        .iter()
+        .any(|prefix| cmd_lower.starts_with(prefix));
+
+    if is_read_only && !needs_sudo {
+        return Ok(ResolvedAction::ShellCommand {
+            command: command.to_string(),
+            risk: RiskBand::None,
+            needs_sudo: false,
+        });
+    }
+
+    // High-risk patterns require consent at medium risk.
+    let is_high_risk = HIGH_RISK_PATTERNS.iter().any(|p| cmd_lower.contains(p));
+
+    if is_high_risk {
+        return Ok(ResolvedAction::ShellCommand {
+            command: command.to_string(),
+            risk: RiskBand::Medium,
+            needs_sudo,
+        });
+    }
+
+    // Everything else is low risk (installs, starts, etc.).
+    // Still requires consent, but lower threshold.
+    Ok(ResolvedAction::ShellCommand {
+        command: command.to_string(),
+        risk: RiskBand::Low,
+        needs_sudo,
+    })
 }
 
 #[cfg(test)]

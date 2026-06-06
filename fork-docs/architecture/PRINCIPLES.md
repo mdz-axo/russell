@@ -42,15 +42,15 @@ ddmvss_categories: [domain, capability, interface, composition, trust, observabi
 
 ---
 
-### JR-3: The LLM Never Emits Shell
+### JR-3: Shell Commands Go Through the Consent Gate
 
-**Statement:** The LLM is a consultant, never an executor. It may rank a differential, compose a summary, or explain a symptom. It may not generate shell commands the dispatcher executes. The LLM selects from **known IDs registered in loaded manifests**; the boundary rejects unknown IDs.
+**Statement:** The LLM may propose shell commands. Every command goes through the safety classifier and the consent gate before execution. Destructive commands are blocked. The LLM proposes; the operator consents; the dispatcher executes.
 
-**Rationale:** A single hallucinated `rm -rf` is a career-ending event for a health harness. The way to prevent it is structural, not hopeful.
+**Rationale:** An absolute prohibition on shell output prevented Jack from helping with the most common operator requests — installing packages, checking versions, reading logs. The LLM already understands these tasks; silencing it subtracted value. The right boundary is at execution, not at suggestion: the operator reviews every command before it runs.
 
-**Consequence:** Cost: Russell cannot improvise a fix the manifests do not know about. Buy: no single LLM misstep becomes a mutation.
+**Consequence:** Cost: the safety classifier is heuristic and may misclassify rare edge cases. Buy: Jack can now help with any task the operator would do at a shell, while destructive commands remain blocked and all mutations require consent.
 
-**Linked ADRs:** ADR-0008.
+**Linked ADRs:** ADR-0050 (supersedes ADR-0008).
 
 ---
 

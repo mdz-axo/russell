@@ -2,22 +2,33 @@
 agent:
   name: "package-checker"
   type: "Bot"
-  version: "0.1.0"
-  
+  version: "0.2.0"
+
 charter:
-  description: "Validate skill package structure and content"
+  description: "Check, install, and update system packages across multiple package managers"
   editor: "russell"
-  
+
 capabilities:
-  - "check:package:structure"
-  - "check:package:manifest"
-  
+  - "check:package:version"
+  - "check:package:installed"
+  - "check:package:updates"
+  - "install:npm:package"
+  - "update:apt:package"
+  - "search:package:multi-manager"
+
 rights:
-  - read: "skill_packages"
-  
+  - read: "system_packages"
+  - read: "npm_global_packages"
+  - read: "snap_packages"
+  - read: "pip_packages"
+  - write: "npm_global_packages"
+
 responsibilities:
-  - "check: package structure"
-  - "validate: manifest schema"
-  
+  - "check: package versions across all managers"
+  - "detect: which package managers are available"
+  - "validate: package names before install attempts"
+  - "install: npm global packages with operator consent"
+  - "update: apt packages with operator consent"
+
 visibility:
   default: "operator-only"

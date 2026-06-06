@@ -4,6 +4,8 @@
 //! Handles probes and interventions via the skill dispatcher with
 //! IDRS compliance (journaling, rollback, evidence bundles).
 
+use std::io::Write;
+
 use russell_core::journal::{HelpSessionInput, HelpSessionStatus, JournalWriter};
 use russell_core::paths::Paths;
 use russell_meta::action::ResolvedAction;
@@ -39,6 +41,7 @@ pub async fn execute_pending_action(
     };
 
     let is_probe = action.is_probe();
+    let is_shell = action.is_shell_command();
     let (
         risk,
         needs_sudo,
@@ -76,9 +79,20 @@ pub async fn execute_pending_action(
             *rollback_is_reboot,
         ),
         ResolvedAction::HKaskTool { .. } => {
-            println!("  → Internal error: HKaskTool routed to local dispatcher.");
+            println!("  \u{2192} Internal error: HKaskTool routed to local dispatcher.");
             return None;
         }
+        ResolvedAction::ShellCommand {
+            risk, needs_sudo, ..
+        } => (
+            *risk,
+            *needs_sudo,
+            RiskBand::None, // No skill-level cap for raw shell
+            false,          // No requires_human flag
+            None,           // No rollback for raw shell
+            None,
+            false,
+        ),
     };
 
     let mut dispatcher = Dispatcher::new(&skill_dir);
@@ -161,13 +175,18 @@ pub async fn execute_pending_action(
         StepType::Intervention
     };
 
+    // Shell commands use direct execution, not the skill dispatcher.
+    if is_shell {
+        return execute_shell_command(journal, action, session_id, model, timeout).await;
+    }
+
     if is_probe {
         // Probes: use run_and_journal (read-only, no rollback needed).
         let result = dispatcher
             .run_and_journal(
                 journal,
                 &evidence_base,
-                action.cmd(),
+                &action.cmd(),
                 &skill_id,
                 &action_id,
                 step_type,
@@ -214,7 +233,7 @@ pub async fn execute_pending_action(
             &evidence_base,
             &skill_id,
             &action_id,
-            action.cmd(),
+            &action.cmd(),
             risk.as_str(),
             rollback_strategy,
             |_rb_id| rollback_cmd_owned.clone(),
@@ -422,4 +441,175 @@ pub fn journal_chat_turn(
         evidence_ref: &evidence_ref,
     };
     let _ = journal.append_help_session(&input);
+}
+
+/// Execute a raw shell command (ADR-0050).
+/// Runs `bash -c <command>` directly, journals the result,
+/// and returns the output for LLM context injection.
+pub async fn execute_shell_command(
+    journal: &JournalWriter,
+    action: &ResolvedAction,
+    session_id: &str,
+    model: &str,
+    timeout: std::time::Duration,
+) -> Option<String> {
+    let (command, risk, needs_sudo) = match action {
+        ResolvedAction::ShellCommand {
+            command,
+            risk,
+            needs_sudo,
+            ..
+        } => (command.clone(), *risk, *needs_sudo),
+        _ => return None,
+    };
+
+    // Build the subprocess command.
+    // If sudo is needed, we wrap with sudo -S and read password.
+    let mut cmd = if needs_sudo {
+        let mut c = tokio::process::Command::new("sudo");
+        c.arg("-S").arg("--").arg("bash").arg("-c").arg(&command);
+        c
+    } else {
+        let mut c = tokio::process::Command::new("bash");
+        c.arg("-c").arg(&command);
+        c
+    };
+    cmd.stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .stdin(std::process::Stdio::piped());
+
+    // If sudo, prompt for password.
+    if needs_sudo {
+        eprint!("  \u{2192} Sudo password for shell command: ");
+        let _ = std::io::stderr().flush();
+        let password = rpassword::read_password().unwrap_or_default();
+        if password.is_empty() {
+            println!("  \u{2192} Empty password. Aborting.");
+            return None;
+        }
+        // Spawn and pipe password.
+        let mut child = match cmd.spawn() {
+            Ok(c) => c,
+            Err(e) => {
+                println!("  \u{2192} Failed to spawn: {e}");
+                return Some(format!("[shell error: failed to spawn] {e}\n"));
+            }
+        };
+        if let Some(ref mut stdin) = child.stdin {
+            use tokio::io::AsyncWriteExt;
+            let _ = stdin.write_all(format!("{password}\n").as_bytes()).await;
+            let _ = stdin; // Drop stdin reference so process proceeds
+        }
+        // Wait with timeout.
+        let outcome = match tokio::time::timeout(timeout, child.wait_with_output()).await {
+            Ok(Ok(output)) => output,
+            Ok(Err(e)) => {
+                println!("  \u{2192} Execution failed: {e}");
+                return Some(format!("[shell error: execution failed] {e}\n"));
+            }
+            Err(_) => {
+                println!("  \u{2192} Timed out after {:?}.", timeout);
+                return Some(format!("[shell error: timed out after {:?}]\n", timeout));
+            }
+        };
+        let exit_code = outcome.status.code();
+        let stdout = String::from_utf8_lossy(&outcome.stdout);
+        let stderr = String::from_utf8_lossy(&outcome.stderr);
+        return format_shell_result(
+            &command, exit_code, &stdout, &stderr, risk, journal, session_id, model,
+        );
+    }
+
+    // Non-sudo path.
+    let mut child = match cmd.spawn() {
+        Ok(c) => c,
+        Err(e) => {
+            println!("  \u{2192} Failed to spawn: {e}");
+            return Some(format!("[shell error: failed to spawn] {e}\n"));
+        }
+    };
+    // Close stdin.
+    if let Some(ref mut stdin) = child.stdin {
+        use tokio::io::AsyncWriteExt;
+        let _ = stdin.shutdown().await;
+    }
+    let outcome = match tokio::time::timeout(timeout, child.wait_with_output()).await {
+        Ok(Ok(output)) => output,
+        Ok(Err(e)) => {
+            println!("  \u{2192} Execution failed: {e}");
+            return Some(format!("[shell error: execution failed] {e}\n"));
+        }
+        Err(_) => {
+            println!("  \u{2192} Timed out after {:?}.", timeout);
+            return Some(format!("[shell error: timed out after {:?}]\n", timeout));
+        }
+    };
+    let exit_code = outcome.status.code();
+    let stdout = String::from_utf8_lossy(&outcome.stdout);
+    let stderr = String::from_utf8_lossy(&outcome.stderr);
+    format_shell_result(
+        &command, exit_code, &stdout, &stderr, risk, journal, session_id, model,
+    )
+}
+
+/// Format a shell command result for LLM context injection and journal it.
+#[allow(clippy::too_many_arguments)]
+fn format_shell_result(
+    command: &str,
+    exit_code: Option<i32>,
+    stdout: &str,
+    stderr: &str,
+    risk: russell_skills::RiskBand,
+    journal: &JournalWriter,
+    session_id: &str,
+    model: &str,
+) -> Option<String> {
+    let exit_str = match exit_code {
+        Some(code) => format!("exit={code}"),
+        None => "killed/timeout".to_string(),
+    };
+
+    if exit_code == Some(0) {
+        if !stdout.is_empty() {
+            println!("  {}", stdout.trim());
+        }
+        println!("  \u{2192} Shell command complete.");
+    } else {
+        println!("  \u{2192} Shell command exited with code {:?}.", exit_code);
+        if !stderr.is_empty() {
+            println!("  stderr: {}", stderr.trim());
+        }
+    }
+
+    // Journal the shell execution.
+    journal_chat_turn(
+        journal,
+        session_id,
+        model,
+        &format!("shell: {command}"),
+        &format!("{exit_str}, risk={:?}", risk),
+    );
+
+    // Build result for LLM context.
+    let mut report = format!("[shell result: {command}, {exit_str}, risk={:?}]\n", risk);
+    if !stdout.is_empty() {
+        let stdout_trimmed = stdout.trim();
+        if stdout_trimmed.len() > 3000 {
+            report.push_str(&stdout_trimmed[..3000]);
+            report.push_str("\n\u{2026} (output truncated)\n");
+        } else {
+            report.push_str(stdout_trimmed);
+            report.push('\n');
+        }
+    }
+    if !stderr.is_empty() {
+        let stderr_trimmed = stderr.trim();
+        let stderr_truncated = if stderr_trimmed.len() > 1000 {
+            format!("{}\u{2026} (truncated)", &stderr_trimmed[..1000])
+        } else {
+            stderr_trimmed.to_string()
+        };
+        report.push_str(&format!("stderr: {stderr_truncated}\n"));
+    }
+    Some(report)
 }

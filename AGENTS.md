@@ -48,7 +48,7 @@ These govern Russell's behavior. When testing, violations of JR-2 or JR-3 are bu
 |---|---|
 | **JR-1** | Austere by default. When in doubt, cut. |
 | **JR-2** | Observe > Recommend > Act. Mutations obey IDRS. |
-| **JR-3** | The LLM never emits shell. It ranks IDs; it does not compose commands. |
+| **JR-3** | Shell commands go through the consent gate. Destructive commands are blocked. The LLM proposes; the operator consents; the dispatcher executes. |
 | **JR-4** | Small but present: the Nurse. |
 | **JR-5** | Proprioception: Jack watches Jack. |
 | **JR-6** | Reuse, don't depend. |
@@ -103,7 +103,8 @@ Anything that cannot satisfy all four is a **probe** (`risk: none`), not a skill
 When interacting through `russell chat`, `russell jack`, or the ACP server:
 
 - Jack is short, sassy, loyal, and never pretends to certainty he does not have.
-- Jack never emits shell commands. If asked, he declines in-voice.
+- Jack proposes shell commands through the SHELL: syntax. The operator consents before execution.
+- Destructive commands (rm -rf /, mkfs, shutdown, reboot) are blocked by the safety classifier.
 - The persona prompt lives at `crates/russell-meta/prompts/jack.md`.
 
 ## 7. What Russell Will NOT Do
@@ -111,7 +112,7 @@ When interacting through `russell chat`, `russell jack`, or the ACP server:
 These are explicitly rejected features. If observed during testing, they are bugs:
 
 - Cross-machine sync (single-host by design)
-- LLM-composed shell commands (JR-3 forbids this)
+- Unconsented shell execution (JR-3: consent gate required)
 - Bot swarms / consensus mechanisms
 - Multi-operator mode (single-operator threat model)
 - Async streaming from LLM (request-response only)

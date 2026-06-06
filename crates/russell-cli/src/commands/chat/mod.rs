@@ -801,6 +801,25 @@ async fn handle_action_proposal(
             });
             save_history(chat_path, history);
         }
+    } else if action.is_shell_command() {
+        // ADR-0050: Shell command proposed by Jack.
+        // Always requires consent — even read-only commands show the
+        // operator exactly what will run before it runs.
+        if let ResolvedAction::ShellCommand {
+            command,
+            risk,
+            needs_sudo,
+            ..
+        } = &action
+        {
+            let sudo_tag = if *needs_sudo { " [needs sudo]" } else { "" };
+            println!(
+                "  → Jack proposes shell: {} (risk: {:?}{}).",
+                command, risk, sudo_tag
+            );
+            println!("  → Say 'ok' to approve, or 'no' to refuse.");
+            *pending_action = Some(PendingAction::new(action, stdin_content));
+        }
     } else {
         match &action {
             ResolvedAction::Intervention {

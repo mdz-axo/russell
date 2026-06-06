@@ -1,9 +1,11 @@
 # Skill manifest for package-checker
-# Enables Jack to check package versions and update packages via apt.
+# Enables Jack to check package versions and update packages across
+# multiple package managers: apt/dpkg, npm, snap, pip3.
 # Addresses the capability gap identified in user sovereignty analysis.
+# v0.2.0: Added multi-package-manager support (npm, snap, pip3).
 
 id: package-checker
-version: 0.1.0
+version: 0.2.0
 authored: 2026-05-22
 min_harness_version: 0.20.0
 
@@ -12,23 +14,52 @@ kind: actionable
 symptoms:
   - package_out_of_date
   - system_maintenance
+  - npm_package_missing
+  - npm_install_failed
+  - snap_package_issue
+  - pip_package_missing
 
 applies_when:
   - os_family: linux
 
 probes:
+  # --- Cross-manager probes ------------------------------------------
   - id: match-package
     cmd: ["bash", "./scripts/match-package.sh"]
-    timeout: 5s
+    timeout: 15s
   - id: check-version
     cmd: ["bash", "./scripts/check-version.sh"]
-    timeout: 5s
+    timeout: 10s
   - id: list-installed
     cmd: ["bash", "./scripts/list-installed.sh"]
     timeout: 10s
   - id: check-updates
     cmd: ["bash", "./scripts/check-updates.sh"]
     timeout: 30s
+  - id: detect-managers
+    cmd: ["bash", "./scripts/detect-managers.sh"]
+    timeout: 10s
+
+  # --- npm probes ----------------------------------------------------
+  - id: npm-check-version
+    cmd: ["bash", "./scripts/npm-check-version.sh"]
+    timeout: 15s
+  - id: npm-list-global
+    cmd: ["bash", "./scripts/npm-list-global.sh"]
+    timeout: 15s
+
+  # --- snap probes ---------------------------------------------------
+  - id: snap-check-version
+    cmd: ["bash", "./scripts/snap-check-version.sh"]
+    timeout: 10s
+  - id: snap-list
+    cmd: ["bash", "./scripts/snap-list.sh"]
+    timeout: 10s
+
+  # --- pip probes ----------------------------------------------------
+  - id: pip-check-version
+    cmd: ["bash", "./scripts/pip-check-version.sh"]
+    timeout: 15s
 
 interventions:
   - id: update-package
@@ -43,11 +74,22 @@ interventions:
     idempotent: true
     rollback: none_needed
     needs_sudo: true
+  - id: npm-install
+    cmd: ["bash", "./scripts/npm-install.sh"]
+    risk: low
+    idempotent: true
+    rollback: npm-uninstall
+    needs_sudo: true
 
 safety:
   max_auto_risk: low
   require_human_for:
     - update-all
+  allowed_env_keys:
+    - HOME
+    - PATH
+    - RUSSELL_DRY_RUN
+  needs_network: true
 
 references:
   - docs/reviews/jack-sovereignty-analysis.md
