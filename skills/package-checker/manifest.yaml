@@ -1,67 +1,97 @@
 # Skill manifest for package-checker
 # Enables Jack to check package versions and update packages across
-# multiple package managers: apt/dpkg, npm, snap, pip3.
-# Addresses the capability gap identified in user sovereignty analysis.
-# v0.2.0: Added multi-package-manager support (npm, snap, pip3).
+# multiple ecosystems: apt/dpkg, npm global, cargo, snap, Zed agents,
+# rustup, pip, docker, flatpak, and uv.
 
 id: package-checker
-version: 0.2.0
+version: 0.3.0
 authored: 2026-05-22
+updated: 2026-06-06
 min_harness_version: 0.20.0
 
-kind: actionable
+visibility: public
+lexicon:
+  primary: KnowAct
+  terms: [detect, classify, report, monitor, update]
 
 symptoms:
-  - package_out_of_date
-  - system_maintenance
-  - npm_package_missing
-  - npm_install_failed
-  - snap_package_issue
-  - pip_package_missing
+  - apt_stale
+  - npm_global_stale
+  - cargo_package_stale
+  - snap_stale
+  - zed_agent_stale
+  - package_stale
+  - systemd_timer_misfire
+  - rust_toolchain_stale
+  - pip_packages_stale
+  - docker_images_stale
+  - flatpak_stale
+  - dev_tool_stale
 
 applies_when:
   - os_family: linux
 
+allowed_env_keys:
+  - HOME
+  - PATH
+  - RUSSELL_DRY_RUN
+
 probes:
-  # --- Cross-manager probes ------------------------------------------
+  # ─── apt/dpkg (original) ───
   - id: match-package
     cmd: ["bash", "./scripts/match-package.sh"]
-    timeout: 15s
+    timeout: 5s
   - id: check-version
     cmd: ["bash", "./scripts/check-version.sh"]
-    timeout: 10s
+    timeout: 5s
   - id: list-installed
     cmd: ["bash", "./scripts/list-installed.sh"]
-    timeout: 10s
+    timeout: 15s
   - id: check-updates
     cmd: ["bash", "./scripts/check-updates.sh"]
     timeout: 30s
-  - id: detect-managers
-    cmd: ["bash", "./scripts/detect-managers.sh"]
-    timeout: 10s
-
-  # --- npm probes ----------------------------------------------------
-  - id: npm-check-version
-    cmd: ["bash", "./scripts/npm-check-version.sh"]
+  # ─── multi-ecosystem probes ───
+  - id: check-npm-outdated
+    cmd: ["bash", "./scripts/check-npm-outdated.sh"]
+    timeout: 30s
+    needs_network: true
+  - id: check-cargo-outdated
+    cmd: ["bash", "./scripts/check-cargo-outdated.sh"]
+    timeout: 60s
+    needs_network: true
+  - id: check-snap-outdated
+    cmd: ["bash", "./scripts/check-snap-outdated.sh"]
     timeout: 15s
-  - id: npm-list-global
-    cmd: ["bash", "./scripts/npm-list-global.sh"]
+  - id: check-zed-agents
+    cmd: ["bash", "./scripts/check-zed-agents.sh"]
     timeout: 15s
-
-  # --- snap probes ---------------------------------------------------
-  - id: snap-check-version
-    cmd: ["bash", "./scripts/snap-check-version.sh"]
-    timeout: 10s
-  - id: snap-list
-    cmd: ["bash", "./scripts/snap-list.sh"]
-    timeout: 10s
-
-  # --- pip probes ----------------------------------------------------
-  - id: pip-check-version
-    cmd: ["bash", "./scripts/pip-check-version.sh"]
+  - id: check-all-stale
+    cmd: ["bash", "./scripts/check-all-stale.sh"]
+    timeout: 120s
+    needs_network: true
+  # ─── dev-tool ecosystem probes ───
+  - id: check-rustup-outdated
+    cmd: ["bash", "./scripts/check-rustup-outdated.sh"]
+    timeout: 30s
+    needs_network: true
+  - id: check-pip-outdated
+    cmd: ["bash", "./scripts/check-pip-outdated.sh"]
+    timeout: 60s
+    needs_network: true
+  - id: check-docker-outdated
+    cmd: ["bash", "./scripts/check-docker-outdated.sh"]
     timeout: 15s
+  - id: check-flatpak-outdated
+    cmd: ["bash", "./scripts/check-flatpak-outdated.sh"]
+    timeout: 30s
+    needs_network: true
+  - id: check-uv-outdated
+    cmd: ["bash", "./scripts/check-uv-outdated.sh"]
+    timeout: 30s
+    needs_network: true
 
 interventions:
+  # ─── apt/dpkg (original) ───
   - id: update-package
     cmd: ["bash", "./scripts/update-package.sh"]
     risk: low
@@ -74,22 +104,74 @@ interventions:
     idempotent: true
     rollback: none_needed
     needs_sudo: true
-  - id: npm-install
-    cmd: ["bash", "./scripts/npm-install.sh"]
+  # ─── multi-ecosystem interventions ───
+  - id: update-npm-package
+    cmd: ["bash", "./scripts/update-npm-package.sh"]
     risk: low
     idempotent: true
-    rollback: npm-uninstall
+    rollback: none_needed
+    needs_sudo: false
+  - id: update-cargo-package
+    cmd: ["bash", "./scripts/update-cargo-package.sh"]
+    risk: low
+    idempotent: true
+    rollback: none_needed
+    needs_sudo: false
+  - id: update-snap-package
+    cmd: ["bash", "./scripts/update-snap-package.sh"]
+    risk: low
+    idempotent: true
+    rollback: none_needed
     needs_sudo: true
+  - id: update-zed-agent
+    cmd: ["bash", "./scripts/update-zed-agent.sh"]
+    risk: low
+    idempotent: true
+    rollback: none_needed
+    needs_sudo: false
+  # ─── dev-tool ecosystem interventions ───
+  - id: update-rustup
+    cmd: ["bash", "./scripts/update-rustup.sh"]
+    risk: low
+    idempotent: true
+    rollback: none_needed
+    needs_sudo: false
+  - id: update-pip-packages
+    cmd: ["bash", "./scripts/update-pip-packages.sh"]
+    risk: low
+    idempotent: true
+    rollback: none_needed
+    needs_sudo: false
+  - id: update-docker-images
+    cmd: ["bash", "./scripts/update-docker-images.sh"]
+    risk: medium
+    idempotent: true
+    rollback: none_needed
+    needs_sudo: false
+  - id: update-flatpak
+    cmd: ["bash", "./scripts/update-flatpak.sh"]
+    risk: low
+    idempotent: true
+    rollback: none_needed
+    needs_sudo: false
 
 safety:
   max_auto_risk: low
   require_human_for:
     - update-all
-  allowed_env_keys:
-    - HOME
-    - PATH
-    - RUSSELL_DRY_RUN
-  needs_network: true
+    - update-snap-package
+    - update-docker-images
+
+evaluation:
+  after_intervention:
+    - id: verify-update
+      cmd: ["bash", "./scripts/verify-update.sh"]
+      timeout: 5s
+      expect_exit: 0
+    - id: verify-update-cross
+      cmd: ["bash", "./scripts/verify-update-cross.sh"]
+      timeout: 15s
+      expect_exit: 0
 
 references:
   - docs/reviews/jack-sovereignty-analysis.md

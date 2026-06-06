@@ -549,6 +549,7 @@ pub async fn run(paths: &Paths) -> Result<()> {
                             match russell_skills::load_all(&paths.skills()) {
                                 Ok(result) => {
                                     skills = result.skills;
+                                    skipped = result.skipped;
                                     match russell_skills::registry::RegistryCache::load(
                                         &registry_path,
                                     ) {
@@ -592,6 +593,7 @@ pub async fn run(paths: &Paths) -> Result<()> {
                             match russell_skills::load_all(&paths.skills()) {
                                 Ok(result) => {
                                     skills = result.skills;
+                                    skipped = result.skipped;
                                     match russell_skills::registry::RegistryCache::load(
                                         &registry_path,
                                     ) {
@@ -665,6 +667,7 @@ pub async fn run(paths: &Paths) -> Result<()> {
                     && handle_slash_command(
                         trimmed,
                         &mut skills,
+                        &mut skipped,
                         &mut editor,
                         &mut current_model,
                         &mut okapi_models,
@@ -862,6 +865,7 @@ async fn handle_action_proposal(
 async fn handle_slash_command(
     trimmed: &str,
     skills: &mut Vec<russell_skills::Skill>,
+    skipped: &mut Vec<russell_skills::SkippedSkill>,
     editor: &mut DefaultEditor,
     current_model: &mut String,
     okapi_models: &mut Vec<String>,
@@ -878,7 +882,7 @@ async fn handle_slash_command(
                 Ok(result) => {
                     let has_skipped = result.has_skipped();
                     let skipped_count = result.skipped.len();
-                    let skipped = result.skipped;
+                    *skipped = result.skipped;
                     *skills = result.skills;
                     let now = skills.len();
                     if has_skipped {
@@ -886,7 +890,7 @@ async fn handle_slash_command(
                             "  → Skills reloaded. {} loaded, {} skipped:",
                             now, skipped_count
                         );
-                        for s in &skipped {
+                        for s in skipped {
                             println!("    - {}: {}", s.id, s.reason);
                         }
                     } else if now > prev_count {
