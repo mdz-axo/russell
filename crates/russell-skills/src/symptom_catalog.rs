@@ -564,6 +564,11 @@ const SYMPTOM_DEFS: &[SymptomDef] = &[
         severity_hint: SeverityHint::Medium,
     },
     SymptomDef {
+        name: "broken_symlinks",
+        category: SymptomCategory::Sysadmin,
+        severity_hint: SeverityHint::Low,
+    },
+    SymptomDef {
         name: "docker_daemon_down",
         category: SymptomCategory::Sysadmin,
         severity_hint: SeverityHint::High,
@@ -882,6 +887,7 @@ pub static SYMPTOMS: &[&str] = &[
     "file_needs_deletion",
     "directory_needs_creation",
     "config_drift",
+    "broken_symlinks",
     "docker_daemon_down",
     "ollama_daemon_down",
     "cache_bloat",

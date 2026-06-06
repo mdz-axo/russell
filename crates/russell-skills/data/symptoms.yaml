@@ -96,6 +96,7 @@
 - file_needs_deletion
 - directory_needs_creation
 - config_drift
+- broken_symlinks
 - docker_daemon_down
 - ollama_daemon_down
 - cache_bloat
