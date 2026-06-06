@@ -129,10 +129,22 @@ fi
 
 if [ ! -f "$HOME/.config/harness/russell.env" ]; then
   # Prefer the repo .env if it's populated (convenience during dev).
-  # Otherwise seed from the template.
   if [ -f "$REPO/.env.example" ]; then
     say "Seeding ~/.config/harness/russell.env from .env.example (template)"
     cp "$REPO/.env.example" "$HOME/.config/harness/russell.env"
+    chmod 0600 "$HOME/.config/harness/russell.env"
+  else
+    say "Creating ~/.config/harness/russell.env (default template)"
+    cat > "$HOME/.config/harness/russell.env" <<'ENV_EOF'
+# Russell environment configuration.
+# See docs/operations/REUSE_MANIFEST.md for available vars.
+
+# Okapi endpoint for LLM inference
+# OLLAMA_HOST=127.0.0.1:11435
+
+# Override the LLM model for `russell jack`
+# HARVESTER_MODEL=deepseek-v4-pro
+ENV_EOF
     chmod 0600 "$HOME/.config/harness/russell.env"
   fi
 fi
