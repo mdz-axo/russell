@@ -66,6 +66,16 @@ rm -f "$HOME/.cargo/bin/russell"
 rm -f "$HOME/.cargo/bin/russell-acp-server"
 rm -f "$HOME/.cargo/bin/russell-api-server"
 
+say "Removing PATH entry from shell rc files"
+for _rc in "$HOME/.bashrc" "$HOME/.zshrc"; do
+  if [ -f "$_rc" ]; then
+    if grep -qF '"$HOME/.local/bin:$PATH"' "$_rc" 2>/dev/null; then
+      sed -i '/^export PATH="\$HOME\/\.local\/bin:\$PATH"$/d' "$_rc"
+      say "  → Removed from $_rc"
+    fi
+  fi
+done
+
 if [ "$PURGE" -eq 1 ]; then
   say "Purging data + config (destructive)"
   rm -rf "$HOME/.local/state/harness"

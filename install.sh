@@ -116,6 +116,16 @@ if [ "$ACTION" = "uninstall" ]; then
     rm -f "${HOME}/.cargo/bin/russell-acp-server"
     rm -f "${HOME}/.cargo/bin/russell-api-server"
 
+    echo "==> Removing PATH entry from shell rc files…"
+    for _rc in "${HOME}/.bashrc" "${HOME}/.zshrc"; do
+        if [ -f "$_rc" ]; then
+            if grep -qF '"$HOME/.local/bin:$PATH"' "$_rc" 2>/dev/null; then
+                sed -i '/^export PATH="\$HOME\/\.local\/bin:\$PATH"$/d' "$_rc"
+                echo "  → Removed from $_rc"
+            fi
+        fi
+    done
+
     echo "==> Russell state and data preserved at:"
     echo "    ${STATE_DIR}"
     echo "    ${SHARE_DIR}"
@@ -289,6 +299,24 @@ if [ -d "${REPO_ROOT}/skills" ]; then
     done
 fi
 
+echo "==> Ensuring ~/.local/bin is in PATH…"
+PATH_LINE='export PATH="$HOME/.local/bin:$PATH"'
+_rc_added=0
+for _rc in "${HOME}/.bashrc" "${HOME}/.zshrc"; do
+    if [ -f "$_rc" ] && ! grep -qF '"$HOME/.local/bin:$PATH"' "$_rc" 2>/dev/null && ! grep -qF '"$HOME/.local/bin"' "$_rc" 2>/dev/null; then
+        echo "" >> "$_rc"
+        echo "$PATH_LINE" >> "$_rc"
+        echo "  → Added to $_rc"
+        _rc_added=1
+    fi
+done
+if [ "$_rc_added" = "0" ]; then
+    echo "  → ~/.local/bin already in PATH or shell rc (no change needed)"
+fi
+
+# Export for the rest of this script so russell commands work immediately
+export PATH="${BIN_DIR}:${PATH}"
+
 echo "==> Setting up environment…"
 if [ ! -f "${CONFIG_DIR}/russell.env" ]; then
     cat > "${CONFIG_DIR}/russell.env" <<'ENV_EOF'
@@ -332,6 +360,10 @@ echo "  Env:       ${CONFIG_DIR}/russell.env"
 echo ""
 echo "  Try:  russell status"
 echo "        russell jack"
+if [ "$_rc_added" = "1" ]; then
+    echo ""
+    echo "  NOTE: Start a new shell or run:  source ~/.bashrc"
+fi
 echo ""
 if [ "$NO_SYSTEMD" = "0" ]; then
     echo "  Timers:"

@@ -83,6 +83,24 @@ else
   say "Skipping systemd units (systemd not available or --no-systemd)"
 fi
 
+say "Ensuring ~/.local/bin is in PATH"
+PATH_LINE='export PATH="$HOME/.local/bin:$PATH"'
+_rc_added=0
+for _rc in "$HOME/.bashrc" "$HOME/.zshrc"; do
+  if [ -f "$_rc" ] && ! grep -qF '"$HOME/.local/bin:$PATH"' "$_rc" 2>/dev/null && ! grep -qF '"$HOME/.local/bin"' "$_rc" 2>/dev/null; then
+    echo "" >> "$_rc"
+    echo "$PATH_LINE" >> "$_rc"
+    say "  → Added to $_rc"
+    _rc_added=1
+  fi
+done
+if [ "$_rc_added" = "0" ]; then
+  say "  → ~/.local/bin already in PATH or shell rc (no change needed)"
+fi
+
+# Export for the rest of this script so russell commands work immediately
+export PATH="$HOME/.local/bin:$PATH"
+
 say "Ensuring config + state + data directories"
 mkdir -p "$HOME/.config/harness" "$HOME/.local/state/harness/runs" \
          "$HOME/.local/state/harness/evidence/help" \
@@ -148,6 +166,12 @@ say "Running first Sentinel cycle to prove the wiring"
 say "Status:"
 "$HOME/.local/bin/russell" status
 
+PATH_NOTE=""
+if [ "$_rc_added" = "1" ]; then
+  PATH_NOTE="
+  NOTE: Start a new shell or run:  source ~/.bashrc"
+fi
+
 cat <<TAIL
 
 Russell is installed.
@@ -155,7 +179,7 @@ Russell is installed.
   russell status                     # summary
   russell list --limit 20            # recent events
   russell digest --since-hours 168   # weekly digest
-  russell jack --note "your worry"   # ask Jack
+  russell jack --note "your worry"   # ask Jack${PATH_NOTE}
 
   systemctl --user list-timers 'russell-*'
   journalctl --user -u russell-sentinel.service --since "1 hour ago"
