@@ -45,23 +45,23 @@
 //! async fn main() -> anyhow::Result<()> {
 //!     // Load template crate (skills directory)
 //!     let template_crate_path = std::path::PathBuf::from("~/.local/share/harness/skills");
-//!     
+//!
 //!     // Create pod (Populated state)
 //!     let mut pod = RussellPod::new(&template_crate_path)?;
-//!     
+//!
 //!     // Register with hKask ACP runtime (Registered state)
 //!     // let runtime = AcpRuntime::connect("stdio").await?;
 //!     // pod.register(&runtime).await?;
-//!     
+//!
 //!     // Activate pod (Activated state)
 //!     // pod.activate().await?;
-//!     
+//!
 //!     // Pod is now running: sentinel probing, ACP serving
 //!     // ...
-//!     
+//!
 //!     // Deactivate when done (Deactivated state)
 //!     // pod.deactivate().await?;
-//!     
+//!
 //!     Ok(())
 //! }
 //! ```
@@ -104,5 +104,5 @@ pub mod pod;
 pub use artifacts::{ArtifactStore, ArtifactType, ArtifactVisibility};
 pub use cns::{CnsEmitter, CnsPort, CnsSpan, LoggingCnsAdapter, NoopCnsAdapter};
 pub use lifecycle::{LifecycleError, LifecycleResult, PodLifecycleState};
-pub use persona::{AgentCapabilities, AgentCharter, AgentPersona, AgentType};
+pub use persona::{AgentCapabilities, AgentCharter, AgentPersona, AgentType, parse_webid};
 pub use pod::{PodID, RussellPod};

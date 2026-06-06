@@ -19,17 +19,67 @@ use sha2::Sha256;
 
 use crate::error::{AcpError, Result};
 
+/// Token validation error messages — single source of truth (P2.8).
+///
+/// Centralising these strings prevents drift between error creation sites
+/// and test assertions, and makes future i18n straightforward.
+pub mod token_errors {
+    /// Macaroon HMAC signature did not match the expected value.
+    pub const SIGNATURE_MISMATCH: &str = "macaroon signature mismatch";
+    /// Token was explicitly revoked by the operator.
+    pub const REVOKED: &str = "token has been revoked";
+    /// Nonce was already used — replay attack indicator.
+    pub const REPLAY_DETECTED: &str = "replay detected: nonce already used";
+    /// Production mode requires a root key; none was provided.
+    pub const ROOT_KEY_REQUIRED: &str = "root key required in production mode";
+    /// No root key configured and dev-mode is disabled.
+    pub const AUTH_REQUIRED_NO_KEY: &str = "authentication required: root key not configured";
+    /// Root key has an invalid length for HMAC-SHA256.
+    pub const INVALID_ROOT_KEY_LENGTH: &str = "invalid root key length";
+    /// Wire token base64 is malformed.
+    pub const INVALID_BASE64: &str = "invalid base64 token";
+    /// Wire token is not valid UTF-8.
+    pub const INVALID_UTF8: &str = "token is not valid UTF-8";
+    /// Wire token missing the `id:` prefix.
+    pub const MISSING_IDENTIFIER: &str = "token does not contain a valid identifier";
+    /// Wire token missing the `id` field value.
+    pub const MISSING_ID_FIELD: &str = "token missing id field";
+    /// Root key is None despite being required for signature verification.
+    pub const ROOT_KEY_NOT_CONFIGURED: &str = "root key not configured";
+}
+
 type HmacSha256 = Hmac<Sha256>;
+
+/// Consolidated mutable state for MacaroonAuth (P2.1).
+///
+/// Grouping `used_nonces` and `revoked_tokens` behind a single lock reduces
+/// lock operations from two separate mutex acquisitions to one, and ensures
+/// atomic state transitions (e.g., a token can be checked for revocation and
+/// its nonce recorded in a single critical section).
+#[derive(Debug)]
+struct MacaroonState {
+    /// Nonces used for replay protection ("token_id:nonce" → present).
+    /// Fallback when persistent store (journal) is unavailable.
+    used_nonces: HashSet<String>,
+    /// Revoked token IDs.
+    revoked_tokens: HashSet<String>,
+}
+
+impl MacaroonState {
+    fn new() -> Self {
+        Self {
+            used_nonces: HashSet::new(),
+            revoked_tokens: HashSet::new(),
+        }
+    }
+}
 
 /// Macaroon authenticator.
 pub struct MacaroonAuth {
     /// Root key for validation (optional — if None, auth is skipped in dev mode).
     root_key: Option<Vec<u8>>,
-    /// Nonces used for replay protection (token_id -> nonce set).
-    /// Used as fallback when persistent store is unavailable.
-    used_nonces: Mutex<HashSet<String>>,
-    /// Revoked token IDs.
-    revoked_tokens: Mutex<HashSet<String>>,
+    /// Consolidated mutable state: nonces + revocation behind a single lock (P2.1).
+    state: Mutex<MacaroonState>,
     /// Whether dev mode (no root key) is explicitly allowed.
     dev_mode_allowed: bool,
     /// Persistent nonce store (journal writer) for replay protection.
@@ -41,8 +91,7 @@ impl std::fmt::Debug for MacaroonAuth {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("MacaroonAuth")
             .field("root_key", &self.root_key.as_ref().map(|_| "***"))
-            .field("used_nonces", &self.used_nonces)
-            .field("revoked_tokens", &self.revoked_tokens)
+            .field("state", &self.state)
             .field("dev_mode_allowed", &self.dev_mode_allowed)
             .field("journal", &self.journal.as_ref().map(|_| "JournalWriter"))
             .finish()
@@ -81,8 +130,7 @@ impl MacaroonAuth {
     pub fn new(root_key: Option<String>, dev_mode_allowed: bool) -> Self {
         Self {
             root_key: root_key.map(|k| k.into_bytes()),
-            used_nonces: Mutex::new(HashSet::new()),
-            revoked_tokens: Mutex::new(HashSet::new()),
+            state: Mutex::new(MacaroonState::new()),
             dev_mode_allowed,
             journal: None,
         }
@@ -125,7 +173,7 @@ impl MacaroonAuth {
         // Generate macaroon signature
         let signature = if let Some(ref root_key) = self.root_key {
             let mut mac = HmacSha256::new_from_slice(root_key)
-                .map_err(|_| AcpError::Internal("invalid root key length".into()))?;
+                .map_err(|_| AcpError::Internal(token_errors::INVALID_ROOT_KEY_LENGTH.into()))?;
             mac.update(identifier.as_bytes());
             for attenuation in &attenuations {
                 mac.update(attenuation.kind.as_str().as_bytes());
@@ -136,9 +184,7 @@ impl MacaroonAuth {
         } else {
             // Dev mode: no signature (only if explicitly allowed)
             if !self.dev_mode_allowed {
-                return Err(AcpError::Internal(
-                    "root key required in production mode".into(),
-                ));
+                return Err(AcpError::Internal(token_errors::ROOT_KEY_REQUIRED.into()));
             }
             BASE64.encode(identifier.as_bytes())
         };
@@ -159,7 +205,7 @@ impl MacaroonAuth {
         // If no root key configured, check if dev mode is allowed.
         if self.root_key.is_none() && !self.dev_mode_allowed {
             return Err(AcpError::Internal(
-                "authentication required: root key not configured".into(),
+                token_errors::AUTH_REQUIRED_NO_KEY.into(),
             ));
         }
 
@@ -169,37 +215,34 @@ impl MacaroonAuth {
             return Err(AcpError::TokenExpired(expires.to_rfc3339()));
         }
 
-        // Check revocation.
+        // Check revocation and replay in a single critical section (P2.1).
         {
-            let revoked = self.revoked_tokens.lock().unwrap();
-            if revoked.contains(&token.token_id) {
-                return Err(AcpError::InvalidToken("token has been revoked".into()));
-            }
-        }
+            let mut state = self.state.lock().unwrap();
 
-        // Check replay (nonce must not have been used before).
-        if let Some(ref journal) = self.journal {
-            // Persistent nonce store — survives restarts.
-            let expires_unix = token
-                .expires_at
-                .map(|dt| dt.timestamp())
-                .unwrap_or(i64::MAX);
-            let replay = journal
-                .check_and_mark_nonce(&token.token_id, &token.nonce, expires_unix)
-                .map_err(|e| AcpError::Internal(format!("nonce store error: {e}")))?;
-            if replay {
-                return Err(AcpError::InvalidToken(
-                    "replay detected: nonce already used".into(),
-                ));
+            // Check revocation.
+            if state.revoked_tokens.contains(&token.token_id) {
+                return Err(AcpError::InvalidToken(token_errors::REVOKED.into()));
             }
-        } else {
-            // In-memory fallback — resets on restart.
-            let mut nonces = self.used_nonces.lock().unwrap();
-            let nonce_key = format!("{}:{}", token.token_id, token.nonce);
-            if !nonces.insert(nonce_key) {
-                return Err(AcpError::InvalidToken(
-                    "replay detected: nonce already used".into(),
-                ));
+
+            // Check replay (nonce must not have been used before).
+            if let Some(ref journal) = self.journal {
+                // Persistent nonce store — survives restarts.
+                let expires_unix = token
+                    .expires_at
+                    .map(|dt| dt.timestamp())
+                    .unwrap_or(i64::MAX);
+                let replay = journal
+                    .check_and_mark_nonce(&token.token_id, &token.nonce, expires_unix)
+                    .map_err(|e| AcpError::Internal(format!("nonce store error: {e}")))?;
+                if replay {
+                    return Err(AcpError::InvalidToken(token_errors::REPLAY_DETECTED.into()));
+                }
+            } else {
+                // In-memory fallback — resets on restart.
+                let nonce_key = format!("{}:{}", token.token_id, token.nonce);
+                if !state.used_nonces.insert(nonce_key) {
+                    return Err(AcpError::InvalidToken(token_errors::REPLAY_DETECTED.into()));
+                }
             }
         }
 
@@ -211,7 +254,7 @@ impl MacaroonAuth {
         let root_key = self
             .root_key
             .as_ref()
-            .ok_or_else(|| AcpError::Internal("root key not configured".into()))?;
+            .ok_or_else(|| AcpError::Internal(token_errors::ROOT_KEY_NOT_CONFIGURED.into()))?;
 
         // Rebuild the signed message
         let identifier = format!(
@@ -228,7 +271,7 @@ impl MacaroonAuth {
 
         let expected_signature = {
             let mut mac = HmacSha256::new_from_slice(root_key)
-                .map_err(|_| AcpError::Internal("invalid root key length".into()))?;
+                .map_err(|_| AcpError::Internal(token_errors::INVALID_ROOT_KEY_LENGTH.into()))?;
             mac.update(identifier.as_bytes());
             for attenuation in &token.attenuations {
                 mac.update(attenuation.kind.as_str().as_bytes());
@@ -240,7 +283,9 @@ impl MacaroonAuth {
 
         // Constant-time comparison to prevent timing attacks
         if !constant_time_eq(token.token.as_bytes(), expected_signature.as_bytes()) {
-            return Err(AcpError::InvalidToken("macaroon signature mismatch".into()));
+            return Err(AcpError::InvalidToken(
+                token_errors::SIGNATURE_MISMATCH.into(),
+            ));
         }
 
         Ok(())
@@ -248,8 +293,8 @@ impl MacaroonAuth {
 
     /// Revoke a token by its ID.
     pub fn revoke_token(&self, token_id: &str) {
-        let mut revoked = self.revoked_tokens.lock().unwrap();
-        revoked.insert(token_id.to_string());
+        let mut state = self.state.lock().unwrap();
+        state.revoked_tokens.insert(token_id.to_string());
     }
 
     /// Decode a wire token (base64-encoded) into a CapabilityToken.
@@ -260,16 +305,16 @@ impl MacaroonAuth {
     pub fn decode_wire_token(&self, wire_token: &str) -> Result<CapabilityToken> {
         use base64::{Engine as _, engine::general_purpose::STANDARD};
 
-        let decoded = STANDARD
-            .decode(wire_token)
-            .map_err(|e| AcpError::InvalidToken(format!("invalid base64 token: {e}")))?;
+        let decoded = STANDARD.decode(wire_token).map_err(|e| {
+            AcpError::InvalidToken(format!("{}: {e}", token_errors::INVALID_BASE64))
+        })?;
 
         let identifier = String::from_utf8(decoded)
-            .map_err(|e| AcpError::InvalidToken(format!("token is not valid UTF-8: {e}")))?;
+            .map_err(|e| AcpError::InvalidToken(format!("{}: {e}", token_errors::INVALID_UTF8)))?;
 
         if !identifier.starts_with("id:") {
             return Err(AcpError::InvalidToken(
-                "token does not contain a valid identifier".into(),
+                token_errors::MISSING_IDENTIFIER.into(),
             ));
         }
 
@@ -302,7 +347,9 @@ impl MacaroonAuth {
         }
 
         if token_id.is_empty() {
-            return Err(AcpError::InvalidToken("token missing id field".into()));
+            return Err(AcpError::InvalidToken(
+                token_errors::MISSING_ID_FIELD.into(),
+            ));
         }
 
         Ok(CapabilityToken {
@@ -318,8 +365,8 @@ impl MacaroonAuth {
 
     /// Check if a token has been revoked.
     pub fn is_revoked(&self, token_id: &str) -> bool {
-        let revoked = self.revoked_tokens.lock().unwrap();
-        revoked.contains(token_id)
+        let state = self.state.lock().unwrap();
+        state.revoked_tokens.contains(token_id)
     }
 
     /// Check if a token has a specific capability.
@@ -613,5 +660,69 @@ mod tests {
             auth.validate(&revoked_token),
             Err(AcpError::InvalidToken(_))
         ));
+    }
+
+    #[test]
+    fn token_error_constants_match_messages() {
+        // P2.8: Verify constants match previously hardcoded strings.
+        assert_eq!(
+            token_errors::SIGNATURE_MISMATCH,
+            "macaroon signature mismatch"
+        );
+        assert_eq!(token_errors::REVOKED, "token has been revoked");
+        assert_eq!(
+            token_errors::REPLAY_DETECTED,
+            "replay detected: nonce already used"
+        );
+        assert_eq!(
+            token_errors::ROOT_KEY_REQUIRED,
+            "root key required in production mode"
+        );
+        assert_eq!(
+            token_errors::AUTH_REQUIRED_NO_KEY,
+            "authentication required: root key not configured"
+        );
+        assert_eq!(
+            token_errors::INVALID_ROOT_KEY_LENGTH,
+            "invalid root key length"
+        );
+        assert_eq!(token_errors::INVALID_BASE64, "invalid base64 token");
+        assert_eq!(token_errors::INVALID_UTF8, "token is not valid UTF-8");
+        assert_eq!(
+            token_errors::MISSING_IDENTIFIER,
+            "token does not contain a valid identifier"
+        );
+        assert_eq!(token_errors::MISSING_ID_FIELD, "token missing id field");
+        assert_eq!(
+            token_errors::ROOT_KEY_NOT_CONFIGURED,
+            "root key not configured"
+        );
+    }
+
+    #[test]
+    fn consolidated_state_atomic_check_and_nonce() {
+        // P2.1: Verify that revocation and nonce checking use the same lock.
+        // A revoked token's nonce should not be recorded in the nonce set
+        // because validation short-circuits on revocation.
+        let auth = MacaroonAuth::new(Some("root".to_string()), false);
+        let token = auth
+            .create_token(
+                vec!["acp:session".to_string()],
+                vec![],
+                Some(chrono::Duration::hours(1)),
+            )
+            .unwrap();
+
+        // Validate once — should succeed and record nonce.
+        assert!(auth.validate(&token).is_ok());
+
+        // Revoke the token.
+        auth.revoke_token(&token.token_id);
+
+        // Second validation should fail with REVOKED, not REPLAY_DETECTED.
+        match auth.validate(&token) {
+            Err(AcpError::InvalidToken(msg)) if msg == token_errors::REVOKED => {}
+            other => panic!("expected InvalidToken(REVOKED), got {:?}", other),
+        }
     }
 }

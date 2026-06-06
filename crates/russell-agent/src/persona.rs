@@ -194,6 +194,41 @@ impl AgentPersona {
     }
 }
 
+/// Validate and parse a WebID string.
+///
+/// WebIDs follow the Solid specification: an HTTPS URI that identifies an agent.
+/// This function performs basic structural validation (scheme, authority, no fragment)
+/// and returns the string unchanged on success, or a [`PersonaError`] on failure.
+///
+/// See: <https://www.w3.org/TR/webid/>
+pub fn parse_webid(raw: &str) -> Result<String, PersonaError> {
+    // Must be an absolute HTTPS URI.
+    if !raw.starts_with("https://") {
+        return Err(PersonaError::Validation(format!(
+            "WebID must use https scheme: {raw}"
+        )));
+    }
+
+    // Must have an authority (host).
+    let after_scheme = &raw[8..]; // skip "https://"
+    let authority_end = after_scheme.find('/').unwrap_or(after_scheme.len());
+    let authority = &after_scheme[..authority_end];
+    if authority.is_empty() || !authority.contains('.') {
+        return Err(PersonaError::Validation(format!(
+            "WebID has invalid authority: {raw}"
+        )));
+    }
+
+    // Must not contain a fragment identifier (fragments identify documents, not agents).
+    if raw.contains('#') {
+        return Err(PersonaError::Validation(format!(
+            "WebID must not contain a fragment: {raw}"
+        )));
+    }
+
+    Ok(raw.to_string())
+}
+
 impl Default for AgentPersona {
     fn default() -> Self {
         Self {
@@ -233,4 +268,42 @@ pub enum PersonaError {
     /// Validation error
     #[error("validation error: {0}")]
     Validation(String),
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_webid_accepts_valid() {
+        assert_eq!(
+            parse_webid("https://example.com/profile/russell").unwrap(),
+            "https://example.com/profile/russell"
+        );
+        assert_eq!(
+            parse_webid("https://russell.example.net/").unwrap(),
+            "https://russell.example.net/"
+        );
+    }
+
+    #[test]
+    fn parse_webid_rejects_http() {
+        assert!(parse_webid("http://example.com/profile").is_err());
+    }
+
+    #[test]
+    fn parse_webid_rejects_no_host() {
+        assert!(parse_webid("https://").is_err());
+        assert!(parse_webid("https://localhost").is_err()); // no dot in authority
+    }
+
+    #[test]
+    fn parse_webid_rejects_fragment() {
+        assert!(parse_webid("https://example.com/profile#me").is_err());
+    }
+
+    #[test]
+    fn parse_webid_rejects_empty() {
+        assert!(parse_webid("").is_err());
+    }
 }

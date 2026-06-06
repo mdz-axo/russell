@@ -53,7 +53,7 @@ pub use russell_session::{
 };
 
 // Re-export main types for convenience.
-pub use auth::{CapabilityToken, MacaroonAuth};
+pub use auth::{CapabilityToken, MacaroonAuth, token_errors};
 pub use cns::{AcpCnsEmitter, CnsPort, LoggingCnsAdapter, NoopCnsAdapter};
 pub use dispatch::AcpDispatch;
 pub use encryption::{EncryptionKey, decrypt_token, encrypt_token};
