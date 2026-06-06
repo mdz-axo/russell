@@ -1,0 +1,28 @@
+# SPDX-License-Identifier: MIT OR Apache-2.0
+[Unit]
+Description=Russell API Server — HTTP REST interface
+Documentation=https://github.com/Replicant-Partners/russell
+After=network.target
+ConditionPathExists=%h/.local/share/harness/skills
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/russell-api-server
+Environment=RUSSELL_DOCTOR_BACKEND=okapi
+Environment=RUSSELL_DOCTOR_MODEL=qwen3.5:cloud
+# Restart on failure (graceful degradation)
+Restart=on-failure
+RestartSec=10
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=read-only
+PrivateTmp=true
+ReadWritePaths=%h/.local/state/harness %h/.local/share/harness
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=russell-api
+
+[Install]
+WantedBy=default.target

@@ -39,22 +39,24 @@ for arg in "$@"; do
   esac
 done
 
+say() { printf '\033[1;34m[install]\033[0m %s\n' "$*"; }
+
 if [ "$NO_SYSTEMD" -eq 0 ] && ! command -v systemctl &>/dev/null; then
   say "WARNING: systemctl not found. Systemd units will not be installed."
   NO_SYSTEMD=1
 fi
 
-say() { printf '\033[1;34m[install]\033[0m %s\n' "$*"; }
-
 say "Building russell ($PROFILE)…"
 if [ "$PROFILE" = "release" ]; then
-  (cd "$REPO" && cargo build --release -p russell-cli -p russell-acp-server)
+  (cd "$REPO" && cargo build --release -p russell-cli -p russell-acp-server -p russell-api-server)
   BIN="$REPO/target/release/russell"
   ACP_BIN="$REPO/target/release/russell-acp-server"
+  API_BIN="$REPO/target/release/russell-api-server"
 else
-  (cd "$REPO" && cargo build -p russell-cli -p russell-acp-server)
+  (cd "$REPO" && cargo build -p russell-cli -p russell-acp-server -p russell-api-server)
   BIN="$REPO/target/debug/russell"
   ACP_BIN="$REPO/target/debug/russell-acp-server"
+  API_BIN="$REPO/target/debug/russell-api-server"
 fi
 
 say "Installing binary → ~/.local/bin/russell"
@@ -64,6 +66,11 @@ install -m 0755 "$BIN" "$HOME/.local/bin/russell"
 if [ -f "$ACP_BIN" ]; then
   say "Installing ACP server → ~/.local/bin/russell-acp-server"
   install -m 0755 "$ACP_BIN" "$HOME/.local/bin/russell-acp-server"
+fi
+
+if [ -f "$API_BIN" ]; then
+  say "Installing API server → ~/.local/bin/russell-api-server"
+  install -m 0755 "$API_BIN" "$HOME/.local/bin/russell-api-server"
 fi
 
 if [ "$NO_SYSTEMD" -eq 0 ]; then
@@ -113,12 +120,14 @@ if [ "$NO_SYSTEMD" -eq 0 ]; then
   systemctl --user enable russell-sentinel.timer
   systemctl --user enable russell-digest.timer
   systemctl --user enable russell-acp-server.service
+  systemctl --user enable russell-api-server.service
 
   if [ "$NO_START" -eq 0 ]; then
     say "Starting timers and services"
     systemctl --user start russell-sentinel.timer
     systemctl --user start russell-digest.timer
     systemctl --user start russell-acp-server.service 2>/dev/null || true
+    systemctl --user start russell-api-server.service 2>/dev/null || true
   else
     say "Skipping start (--no-start)"
   fi

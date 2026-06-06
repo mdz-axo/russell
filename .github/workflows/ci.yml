@@ -38,7 +38,7 @@ jobs:
         run: cargo test --workspace
 
       - name: Verify release build
-        run: cargo build --release -p russell-cli -p russell-acp-server
+        run: cargo build --release -p russell-cli -p russell-acp-server -p russell-api-server
 
       - name: Verify install scripts are valid
         run: |
@@ -47,6 +47,7 @@ jobs:
           bash -n packaging/bin/uninstall.sh
           grep -q 'russell-cli' install.sh
           grep -q 'russell-acp-server' install.sh
+          grep -q 'russell-api-server' install.sh
 
       - name: Install cargo-deny
         run: cargo install cargo-deny --locked

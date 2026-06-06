@@ -12,6 +12,7 @@
 # Installs:
 #   ~/.local/bin/russell             — the binary
 #   ~/.local/bin/russell-acp-server  — ACP server for hKask
+#   ~/.local/bin/russell-api-server — HTTP REST API server
 #   ~/.local/state/harness/          — journal, evidence, memory
 #   ~/.local/share/harness/skills/   — skill manifests + scripts
 #   ~/.local/share/harness/rules.d/  — default threshold rules
@@ -90,7 +91,7 @@ if [ "$ACTION" = "uninstall" ]; then
     if [ "$NO_SYSTEMD" = "0" ]; then
         echo "==> Stopping and disabling Russell timers and services…"
         for unit in russell-sentinel.timer russell-digest.timer \
-                    russell-acp-server.service; do
+                    russell-acp-server.service russell-api-server.service; do
             systemctl --user stop "$unit" 2>/dev/null || true
             systemctl --user disable "$unit" 2>/dev/null || true
         done
@@ -102,6 +103,7 @@ if [ "$ACTION" = "uninstall" ]; then
         rm -f "${SYSTEMD_USER_DIR}/russell-digest.timer"
         rm -f "${SYSTEMD_USER_DIR}/russell-failure@.service"
         rm -f "${SYSTEMD_USER_DIR}/russell-acp-server.service"
+        rm -f "${SYSTEMD_USER_DIR}/russell-api-server.service"
     else
         echo "==> Skipping systemd teardown (systemd not available)"
     fi
@@ -109,8 +111,10 @@ if [ "$ACTION" = "uninstall" ]; then
     echo "==> Removing binaries…"
     rm -f "${BIN_DIR}/${BINARY_NAME}"
     rm -f "${BIN_DIR}/russell-acp-server"
+    rm -f "${BIN_DIR}/russell-api-server"
     rm -f "${HOME}/.cargo/bin/${BINARY_NAME}"
     rm -f "${HOME}/.cargo/bin/russell-acp-server"
+    rm -f "${HOME}/.cargo/bin/russell-api-server"
 
     echo "==> Russell state and data preserved at:"
     echo "    ${STATE_DIR}"
@@ -130,13 +134,15 @@ echo "==> Building Russell (${MODE})…"
 cd "$REPO_ROOT"
 
 if [ "$MODE" = "release" ]; then
-    cargo build --release -p russell-cli -p russell-acp-server 2>&1
+    cargo build --release -p russell-cli -p russell-acp-server -p russell-api-server 2>&1
     BINARY_SRC="${REPO_ROOT}/target/release/${BINARY_NAME}"
     ACP_SERVER_SRC="${REPO_ROOT}/target/release/russell-acp-server"
+    API_SERVER_SRC="${REPO_ROOT}/target/release/russell-api-server"
 else
-    cargo build -p russell-cli -p russell-acp-server 2>&1
+    cargo build -p russell-cli -p russell-acp-server -p russell-api-server 2>&1
     BINARY_SRC="${REPO_ROOT}/target/debug/${BINARY_NAME}"
     ACP_SERVER_SRC="${REPO_ROOT}/target/debug/russell-acp-server"
+    API_SERVER_SRC="${REPO_ROOT}/target/debug/russell-api-server"
 fi
 
 if [ ! -f "$BINARY_SRC" ]; then
@@ -148,6 +154,10 @@ if [ ! -f "$ACP_SERVER_SRC" ]; then
     echo "WARNING: russell-acp-server binary not found at ${ACP_SERVER_SRC}"
 fi
 
+if [ ! -f "$API_SERVER_SRC" ]; then
+    echo "WARNING: russell-api-server binary not found at ${API_SERVER_SRC}"
+fi
+
 #######################
 # Check mode
 #######################
@@ -157,6 +167,7 @@ if [ "$ACTION" = "check" ]; then
     echo "Would install to:"
     echo "  binary:    ${BIN_DIR}/${BINARY_NAME}"
     echo "  acp:       ${BIN_DIR}/russell-acp-server"
+    echo "  api:       ${BIN_DIR}/russell-api-server"
     echo "  state:     ${STATE_DIR}"
     echo "  data:      ${SHARE_DIR}"
     echo "  config:    ${CONFIG_DIR}"
@@ -167,6 +178,7 @@ if [ "$ACTION" = "check" ]; then
         echo "  russell-sentinel.timer"
         echo "  russell-digest.timer"
         echo "  russell-acp-server.service"
+        echo "  russell-api-server.service"
     else
         echo "Systemd units: SKIPPED (systemd not available)"
     fi
@@ -196,6 +208,14 @@ else
     echo "  → Warning: russell-acp-server not built, skipping"
 fi
 
+if [ -f "$API_SERVER_SRC" ]; then
+    cp "$API_SERVER_SRC" "${BIN_DIR}/russell-api-server"
+    chmod +x "${BIN_DIR}/russell-api-server"
+    echo "  → russell-api-server installed"
+else
+    echo "  → Warning: russell-api-server not built, skipping"
+fi
+
 CARGO_BIN="${HOME}/.cargo/bin/${BINARY_NAME}"
 if [ -f "$CARGO_BIN" ] && [ "$CARGO_BIN" != "${BIN_DIR}/${BINARY_NAME}" ]; then
     echo "  → Removing stale ${CARGO_BIN} (canonical is ${BIN_DIR}/${BINARY_NAME})"
@@ -208,6 +228,12 @@ if [ -f "$ACP_CARGO_BIN" ]; then
     rm -f "$ACP_CARGO_BIN"
 fi
 
+API_CARGO_BIN="${HOME}/.cargo/bin/russell-api-server"
+if [ -f "$API_CARGO_BIN" ]; then
+    echo "  → Removing stale ${API_CARGO_BIN} (canonical is ${BIN_DIR}/russell-api-server)"
+    rm -f "$API_CARGO_BIN"
+fi
+
 if [ "$NO_SYSTEMD" = "0" ]; then
     echo "==> Installing systemd units…"
     mkdir -p "$SYSTEMD_USER_DIR"
@@ -217,7 +243,8 @@ if [ "$NO_SYSTEMD" = "0" ]; then
     cp "${REPO_ROOT}/packaging/systemd/russell-digest.timer" "$SYSTEMD_USER_DIR"
     cp "${REPO_ROOT}/packaging/systemd/russell-failure@.service" "$SYSTEMD_USER_DIR"
     cp "${REPO_ROOT}/packaging/systemd/russell-acp-server.service" "$SYSTEMD_USER_DIR"
-    echo "  → 6 systemd units installed"
+    cp "${REPO_ROOT}/packaging/systemd/russell-api-server.service" "$SYSTEMD_USER_DIR"
+    echo "  → 7 systemd units installed"
 fi
 
 echo "==> Installing default rules…"
@@ -279,10 +306,12 @@ if [ "$NO_SYSTEMD" = "0" ]; then
     systemctl --user enable russell-sentinel.timer
     systemctl --user enable russell-digest.timer
     systemctl --user enable russell-acp-server.service
+    systemctl --user enable russell-api-server.service
 
     systemctl --user start russell-sentinel.timer
     systemctl --user start russell-digest.timer 2>/dev/null || true
     systemctl --user start russell-acp-server.service 2>/dev/null || true
+    systemctl --user start russell-api-server.service 2>/dev/null || true
 fi
 
 echo ""

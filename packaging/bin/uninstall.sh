@@ -32,17 +32,19 @@ if [ "$NO_SYSTEMD" -eq 0 ]; then
   systemctl --user stop russell-sentinel.timer  2>/dev/null || true
   systemctl --user stop russell-digest.timer    2>/dev/null || true
   systemctl --user stop russell-acp-server.service 2>/dev/null || true
+  systemctl --user stop russell-api-server.service 2>/dev/null || true
 
   say "Disabling timers and services"
   systemctl --user disable russell-sentinel.timer 2>/dev/null || true
   systemctl --user disable russell-digest.timer   2>/dev/null || true
   systemctl --user disable russell-acp-server.service 2>/dev/null || true
+  systemctl --user disable russell-api-server.service 2>/dev/null || true
 
   say "Removing systemd user units"
   for u in russell-sentinel.timer russell-sentinel.service \
            russell-digest.timer   russell-digest.service \
            russell-failure@.service \
-           russell-acp-server.service; do
+           russell-acp-server.service russell-api-server.service; do
     rm -f "$HOME/.config/systemd/user/$u"
   done
   systemctl --user daemon-reload
@@ -51,7 +53,7 @@ else
   for u in russell-sentinel.timer russell-sentinel.service \
            russell-digest.timer   russell-digest.service \
            russell-failure@.service \
-           russell-acp-server.service; do
+           russell-acp-server.service russell-api-server.service; do
     rm -f "$HOME/.config/systemd/user/$u"
   done
 fi
@@ -59,8 +61,10 @@ fi
 say "Removing binaries"
 rm -f "$HOME/.local/bin/russell"
 rm -f "$HOME/.local/bin/russell-acp-server"
+rm -f "$HOME/.local/bin/russell-api-server"
 rm -f "$HOME/.cargo/bin/russell"
 rm -f "$HOME/.cargo/bin/russell-acp-server"
+rm -f "$HOME/.cargo/bin/russell-api-server"
 
 if [ "$PURGE" -eq 1 ]; then
   say "Purging data + config (destructive)"
