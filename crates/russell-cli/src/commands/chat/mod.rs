@@ -149,7 +149,8 @@ fn is_refusal(input: &str) -> bool {
 }
 
 /// Check if the most recent history turn is an action result that Jack
-/// should interpret — probe result, intervention result, or kask tool result.
+/// should interpret — probe result, intervention result, kask tool result,
+/// or action parse error.
 fn is_action_result_in_history(history: &ChatHistory) -> bool {
     history
         .turns
@@ -159,7 +160,8 @@ fn is_action_result_in_history(history: &ChatHistory) -> bool {
                 && (t.content.starts_with("[probe result:")
                     || t.content.starts_with("[probe error:")
                     || t.content.starts_with("[intervention result:")
-                    || t.content.starts_with("[kask tool result:"))
+                    || t.content.starts_with("[kask tool result:")
+                    || t.content.starts_with("[action error:"))
         })
         .unwrap_or(false)
 }
@@ -849,10 +851,11 @@ pub async fn run(paths: &Paths) -> Result<()> {
 
                     // Inject a prompt so Jack knows this is an auto-continuation,
                     // not a new operator message. This gives him context that he
-                    // should interpret the result that just appeared.
+                    // should interpret the result or error that just appeared.
                     history.turns.push(Turn {
                         role: "user".into(),
-                        content: "(Continue — interpret the result above and respond.)".to_string(),
+                        content: "(Continue — interpret the result or error above and respond.)"
+                            .to_string(),
                     });
                     save_history(&chat_path, &history);
                 }
@@ -1404,7 +1407,20 @@ async fn call_jack(
                     .await?;
                 }
                 Some(Err(e)) => {
-                    println!("  → {e}");
+                    // The action Jack proposed failed to parse (unknown skill,
+                    // unknown action, malformed syntax, etc.). Push the
+                    // error into history so Jack can see it in his next turn
+                    // and interpret it for the operator.
+                    let error_msg = format!("[action error: {e}]");
+                    println!("  → {error_msg}");
+                    history.turns.push(Turn {
+                        role: "user".into(),
+                        content: error_msg,
+                    });
+                    save_history(chat_path, history);
+                    // The main REPL loop's auto-interpret mechanism will
+                    // detect the [action error:] prefix in history and
+                    // re-call Jack to interpret it.
                 }
                 None => { /* normal, no action proposed */ }
             }
@@ -1604,6 +1620,16 @@ mod tests {
         h.turns.push(Turn {
             role: "user".into(),
             content: "[kask tool result: brave_web_search, status=ok]\nfound results".to_string(),
+        });
+        assert!(is_action_result_in_history(&h));
+    }
+
+    #[test]
+    fn action_result_detection_action_error() {
+        let mut h = ChatHistory::new("test".to_string());
+        h.turns.push(Turn {
+            role: "user".into(),
+            content: "[action error: 'kask' is not a loaded skill.]".to_string(),
         });
         assert!(is_action_result_in_history(&h));
     }

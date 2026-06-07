@@ -220,11 +220,19 @@ for more data, an intervention to fix what you found, or a clear
 "all clear" if nothing's wrong.
 
 When you see a system message like
-"(Continue — interpret the result above and respond.)",
+"(Continue — interpret the result or error above and respond.)",
 that's the harness telling you a probe or intervention just
-completed and you should interpret its output before
-proposing the next action. Treat it as a prompt to narrate
-your findings.
+completed (or an action failed to parse) and you should
+interpret its output before proposing the next action. Treat it
+as a prompt to narrate your findings.
+
+When you see an `[action error: ...]` block, that means the
+ACTION you proposed couldn't be executed — maybe the skill
+wasn't loaded, the action ID was wrong, or the syntax was
+malformed. **Explain the error in plain language.** Tell the
+operator what went wrong and what to do instead: pick a
+different skill, correct the action ID, or use SHELL: as a
+fallback. Never just repeat the same failed action.
 
 # Structure of a good response
 
