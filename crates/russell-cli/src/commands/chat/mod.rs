@@ -434,7 +434,7 @@ fn persist_generative_settings(
 ) {
     use russell_core::profile::GenerativeConfig;
 
-    let gen = GenerativeConfig {
+    let gc = GenerativeConfig {
         temperature: Some(settings.temperature),
         top_k: Some(settings.top_k),
         top_p: Some(settings.top_p),
@@ -443,15 +443,15 @@ fn persist_generative_settings(
         persona: Some(settings.persona.clone()),
     };
 
-    if let Some(ref mut p) = profile {
-        p.generative = Some(gen);
+    if let Some(p) = profile {
+        p.generative = Some(gc);
         if let Err(e) = p.save(&paths.profile()) {
             warn!(error = %e, "failed to save profile after settings change");
         }
     } else {
         // No profile on disk yet — create a stub and persist.
         let mut p = russell_core::Profile::stub();
-        p.generative = Some(gen);
+        p.generative = Some(gc);
         if let Err(e) = p.save(&paths.profile()) {
             warn!(error = %e, "failed to save stub profile after settings change");
         } else {
@@ -610,7 +610,7 @@ pub async fn run(paths: &Paths, no_hhh: bool, persona: Option<String>) -> Result
     }
     let mut skills = load_result.skills;
     let mut skipped = load_result.skipped;
-    let profile = russell_core::Profile::load(&paths.profile()).ok();
+    let mut profile = russell_core::Profile::load(&paths.profile()).ok();
 
     let mut history = ChatHistory::new(session_id.clone());
     let mut editor = DefaultEditor::new().context("initialising readline")?;
@@ -619,23 +619,23 @@ pub async fn run(paths: &Paths, no_hhh: bool, persona: Option<String>) -> Result
     // Initialize generative settings from CLI flags (P3: Generative Space).
     let mut settings = GenerativeSettings::default();
     // Apply persisted overrides from profile (non-None fields override defaults).
-    if let Some(ref gen) = profile.as_ref().and_then(|p| p.generative.as_ref()) {
-        if let Some(v) = gen.temperature {
+    if let Some(gc) = profile.as_ref().and_then(|p| p.generative.as_ref()) {
+        if let Some(v) = gc.temperature {
             settings.temperature = v;
         }
-        if let Some(v) = gen.top_k {
+        if let Some(v) = gc.top_k {
             settings.top_k = v;
         }
-        if let Some(v) = gen.top_p {
+        if let Some(v) = gc.top_p {
             settings.top_p = v;
         }
-        if let Some(v) = gen.repeat_penalty {
+        if let Some(v) = gc.repeat_penalty {
             settings.repeat_penalty = v;
         }
-        if let Some(v) = gen.hhh_filter {
+        if let Some(v) = gc.hhh_filter {
             settings.hhh_filter = v;
         }
-        if let Some(ref v) = gen.persona {
+        if let Some(ref v) = gc.persona {
             settings.persona = v.clone();
         }
     }

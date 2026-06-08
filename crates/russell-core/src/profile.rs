@@ -285,10 +285,10 @@ mod tests {
         });
         let json = serde_json::to_string_pretty(&profile).unwrap();
         let back: Profile = serde_json::from_str(&json).unwrap();
-        let gen = back.generative.unwrap();
-        assert_eq!(gen.temperature, Some(0.9));
-        assert!(gen.top_k.is_none());
-        assert_eq!(gen.top_p, Some(0.8));
+        let gc = back.generative.unwrap();
+        assert_eq!(gc.temperature, Some(0.9));
+        assert!(gc.top_k.is_none());
+        assert_eq!(gc.top_p, Some(0.8));
     }
 
     #[test]
