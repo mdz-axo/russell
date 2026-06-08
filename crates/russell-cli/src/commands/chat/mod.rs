@@ -20,6 +20,7 @@ use std::io::Write;
 use std::time::Instant;
 use tracing::{info, warn};
 
+use execute::format_remote_tool_result;
 use execute::journal_chat_turn;
 
 // ─── Chat history types (from history.rs) ───────────────────────────────────
@@ -869,6 +870,20 @@ async fn handle_action_proposal(
         let probe_result =
             execute::execute_pending_action(journal, paths, &pa, session_id, current_model).await;
         if let Some(result_text) = probe_result {
+            history.turns.push(Turn {
+                role: "user".into(),
+                content: result_text,
+            });
+            save_history(chat_path, history);
+        }
+    } else if action.is_remote_tool() {
+        // Remote MCP tools are read-only queries — auto-execute like probes.
+        if let ResolvedAction::RemoteTool { tool_name } = &action {
+            println!("  → Calling remote tool: {tool_name}…");
+            // TODO: Wire to actual MCP client when available.
+            // For now, push a placeholder result so Jack can interpret it.
+            let result_text =
+                format_remote_tool_result(tool_name, "placeholder (MCP client not yet wired)");
             history.turns.push(Turn {
                 role: "user".into(),
                 content: result_text,

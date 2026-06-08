@@ -1,0 +1,60 @@
+# Magna Carta Verification Report
+
+**Principle:** {{ principle | replace('_', ' ') | title }}
+**Version:** {{ version }}
+**Date:** {{ report_date }}
+
+---
+
+## Summary
+
+| Status | Count |
+|--------|-------|
+| Pass   | {{ results | selectattr('status', 'equalto', 'pass') | list | length }} |
+| Fail   | {{ results | selectattr('status', 'equalto', 'fail') | list | length }} |
+| Gap    | {{ results | selectattr('status', 'equalto', 'gap') | list | length }} |
+| Total  | {{ results | length }} |
+
+---
+
+## Assertions
+
+{% for result in results %}
+### {{ result.assertion_id }}: {{ result.name }}
+
+- **Status:** {{ result.status | upper }}
+- **Method:** {{ result.method }}
+- **Claim:** {{ result.claim }}
+
+{% if result.findings %}
+**Findings:**
+{% for finding in result.findings %}
+- {{ finding }}
+{% endfor %}
+{% endif %}
+
+{% if result.gaps %}
+**Gaps:**
+{% for gap in result.gaps %}
+- {{ gap }}
+{% endfor %}
+{% endif %}
+
+---
+
+{% endfor %}
+
+## Resolution Required
+
+{% set failed = results | selectattr('status', 'equalto', 'fail') | list %}
+{% if failed %}
+The following assertions require operator attention:
+
+{% for result in failed %}
+- **{{ result.assertion_id }}** ({{ result.name }}): {{ result.claim }}
+{% endfor %}
+
+Jack should present these findings to the operator and ask how to proceed.
+{% else %}
+All assertions pass or are gaps. No resolution required.
+{% endif %}

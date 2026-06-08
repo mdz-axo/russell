@@ -76,9 +76,23 @@ pub enum ResolvedAction {
         /// Whether the command likely requires sudo.
         needs_sudo: bool,
     },
+    /// Remote MCP tool call (e.g. `ACTION: remote/brave_web_search`).
+    /// These are not local skills — they invoke external tools
+    /// through the MCP protocol. Remote tools are auto-executed
+    /// (like probes) since they are read-only queries.
+    RemoteTool {
+        /// The remote tool name (e.g. `brave_web_search`).
+        tool_name: String,
+    },
 }
 
 impl ResolvedAction {
+    /// Returns `true` if this is a remote MCP tool call.
+    #[must_use]
+    pub fn is_remote_tool(&self) -> bool {
+        matches!(self, Self::RemoteTool { .. })
+    }
+
     /// Returns `true` if this is a probe (read-only, auto-execute).
     #[must_use]
     pub fn is_probe(&self) -> bool {
@@ -95,7 +109,7 @@ impl ResolvedAction {
     #[must_use]
     pub fn risk_band(&self) -> RiskBand {
         match self {
-            Self::Probe { .. } => RiskBand::None,
+            Self::Probe { .. } | Self::RemoteTool { .. } => RiskBand::None,
             Self::Intervention { risk, .. } => *risk,
             Self::ShellCommand { risk, .. } => *risk,
         }
@@ -108,6 +122,7 @@ impl ResolvedAction {
             Self::Probe { skill_id, .. } => skill_id,
             Self::Intervention { skill_id, .. } => skill_id,
             Self::ShellCommand { .. } => "shell",
+            Self::RemoteTool { .. } => "remote",
         }
     }
 
@@ -118,6 +133,7 @@ impl ResolvedAction {
             Self::Probe { action_id, .. } => action_id,
             Self::Intervention { action_id, .. } => action_id,
             Self::ShellCommand { command, .. } => command,
+            Self::RemoteTool { tool_name, .. } => tool_name,
         }
     }
 
@@ -130,6 +146,7 @@ impl ResolvedAction {
             Self::ShellCommand { command, .. } => {
                 vec!["bash".to_string(), "-c".to_string(), command.clone()]
             }
+            Self::RemoteTool { .. } => vec![], // remote tools are not local commands
         }
     }
 
@@ -137,7 +154,7 @@ impl ResolvedAction {
     #[must_use]
     pub fn consent_required(&self) -> bool {
         match self {
-            Self::Probe { .. } => false,
+            Self::Probe { .. } | Self::RemoteTool { .. } => false,
             Self::Intervention {
                 risk,
                 max_auto_risk,
@@ -154,7 +171,7 @@ impl ResolvedAction {
             Self::Probe { cmd, .. } | Self::Intervention { cmd, .. } => {
                 cmd.extend(args.iter().cloned());
             }
-            Self::ShellCommand { .. } => {}
+            Self::ShellCommand { .. } | Self::RemoteTool { .. } => {}
         }
     }
 }
@@ -346,6 +363,15 @@ pub fn resolve(
             }));
         }
     };
+
+    // Handle remote MCP tools: ACTION: remote/<tool_name>
+    // These are not local skills — they invoke external tools
+    // through the MCP protocol.
+    if skill_id == "remote" {
+        return Some(Ok(ResolvedAction::RemoteTool {
+            tool_name: action_id.to_string(),
+        }));
+    }
 
     let skill = match skills.iter().find(|s| s.id == skill_id) {
         Some(s) => s,

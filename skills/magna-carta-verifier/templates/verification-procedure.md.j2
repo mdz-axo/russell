@@ -1,0 +1,60 @@
+# Magna Carta Verification Procedure
+
+## Principle: {{ principle | replace('_', ' ') | title }}
+
+{% for assertion in assertions %}
+### {{ assertion.id }}: {{ assertion.name }}
+
+**Claim:** {{ assertion.claim }}
+
+**Method:** {{ assertion.method }}
+
+#### Verification Steps
+
+{% if 'structural_audit' in assertion.method %}
+1. **Structural Audit**
+   - Locate target crate `{{ assertion.targets[0].crate }}` in `crates/`
+   - Search for gate `{{ assertion.targets[0].gate }}` in `src/`
+   - Verify gate is called on each target method:
+   {% for target in assertion.targets %}
+     - `{{ target.crate }}::{{ target.module }}`: {% for m in target.methods %}`{{ m }}`{% if not loop.last %}, {% endif %}{% endfor %} → gate: `{{ target.gate }}`
+   {% endfor %}
+   - Record: gate present on all methods → **pass**; gate missing → **fail**
+{% endif %}
+
+{% if 'behavioral_probe' in assertion.method %}
+2. **Behavioral Probe**
+   - Attempt access without valid consent token
+   - Verify access is denied by default implementation
+   - Target crates:
+   {% for target in assertion.targets %}
+     - `{{ target.crate }}::{{ target.module }}` (gate: `{{ target.gate }}`)
+   {% endfor %}
+   - Record: access denied → **pass**; access granted → **fail**
+{% endif %}
+
+{% if 'absence_check' in assertion.method %}
+3. **Absence Check**
+   - Search for prohibited patterns in target crate source:
+     - `admin_override`, `engineer_mode`, `god_token`
+     - `bypass_consent`, `skip_sovereignty`, `hidden_gate`
+     - `force_allow`
+   - Target crates:
+   {% for target in assertion.targets %}
+     - `{{ target.crate }}::{{ target.module }}`
+   {% endfor %}
+   - Record: prohibited pattern not found → **pass**; found → **fail**
+{% endif %}
+
+{% if 'resource_verification' in assertion.method %}
+4. **Resource Verification**
+   - Verify `DataSovereigntyBoundary` categorization exists in target crate
+   - Check resource categories (sovereign / shared / public) are declared
+   - Target crates:
+   {% for target in assertion.targets %}
+     - `{{ target.crate }}::{{ target.module }}` (gate: `{{ target.gate }}`)
+   {% endfor %}
+   - Record: categorization consistent → **pass**; missing or inconsistent → **fail**
+{% endif %}
+
+{% endfor %}

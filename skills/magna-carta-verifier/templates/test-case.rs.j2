@@ -1,0 +1,60 @@
+// Magna Carta Test Cases — {{ principle | replace('_', ' ') | title }}
+// Auto-generated from assertion manifests. Render as code blocks for CI integration.
+
+{% for assertion in assertions %}
+/// {{ assertion.id }}: {{ assertion.name }}
+///
+/// Claim: {{ assertion.claim }}
+/// Method: {{ assertion.method }}
+#[test]
+fn test_{{ assertion.id }}() {
+    {% if 'structural_audit' in assertion.method %}
+    // Structural audit: verify gate presence on target methods
+    {% for target in assertion.targets %}
+    // crate: {{ target.crate }}, module: {{ target.module }}
+    {% for method in target.methods %}
+    assert!(
+        gate_exists("{{ target.gate }}", "{{ target.crate }}", "{{ target.module }}", "{{ method }}"),
+        "Gate '{{ target.gate }}' missing on {{ target.crate }}::{{ target.module }}::{{ method }}"
+    );
+    {% endfor %}
+    {% endfor %}
+    {% endif %}
+
+    {% if 'behavioral_probe' in assertion.method %}
+    // Behavioral probe: verify access denied without consent
+    {% for target in assertion.targets %}
+    // crate: {{ target.crate }}, module: {{ target.module }}
+    {% for method in target.methods %}
+    assert!(
+        access_denied_without_consent("{{ target.crate }}", "{{ target.module }}", "{{ method }}"),
+        "Access granted without consent on {{ target.crate }}::{{ target.module }}::{{ method }}"
+    );
+    {% endfor %}
+    {% endfor %}
+    {% endif %}
+
+    {% if 'absence_check' in assertion.method %}
+    // Absence check: verify prohibited patterns do not exist
+    {% for target in assertion.targets %}
+    // crate: {{ target.crate }}, module: {{ target.module }}
+    assert!(
+        no_prohibited_patterns("{{ target.crate }}", "{{ target.module }}"),
+        "Prohibited pattern found in {{ target.crate }}::{{ target.module }}"
+    );
+    {% endfor %}
+    {% endif %}
+
+    {% if 'resource_verification' in assertion.method %}
+    // Resource verification: check categorization consistency
+    {% for target in assertion.targets %}
+    // crate: {{ target.crate }}, module: {{ target.module }}
+    assert!(
+        categorization_consistent("{{ target.crate }}", "{{ target.module }}"),
+        "Resource categorization inconsistent in {{ target.crate }}::{{ target.module }}"
+    );
+    {% endfor %}
+    {% endif %}
+}
+
+{% endfor %}

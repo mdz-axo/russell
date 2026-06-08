@@ -89,6 +89,15 @@ pub async fn execute_pending_action(
             None,
             false,
         ),
+        ResolvedAction::RemoteTool { .. } => (
+            RiskBand::None, // Remote tools are read-only queries
+            false,          // No sudo
+            RiskBand::None, // max_auto_risk
+            false,          // No requires_human
+            None,           // No rollback
+            None,
+            false,
+        ),
     };
 
     let mut dispatcher = Dispatcher::new(&skill_dir);
@@ -608,4 +617,22 @@ fn format_shell_result(
         report.push_str(&format!("stderr: {stderr_truncated}\n"));
     }
     Some(report)
+}
+
+/// Format a remote MCP tool result for LLM context injection.
+/// This produces the `[remote tool result: ...]` prefix that
+/// `is_action_result_in_history` detects.
+pub fn format_remote_tool_result(tool_name: &str, output: &str) -> String {
+    let mut report = format!("[remote tool result: {tool_name}, status=ok]\n");
+    if !output.is_empty() {
+        let trimmed = output.trim();
+        if trimmed.len() > 3000 {
+            report.push_str(&trimmed[..3000]);
+            report.push_str("\n… (output truncated)\n");
+        } else {
+            report.push_str(trimmed);
+            report.push('\n');
+        }
+    }
+    report
 }

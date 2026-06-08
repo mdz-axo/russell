@@ -1,0 +1,87 @@
+# P2: Affirmative Consent — Assertion Manifest
+# Verifies default-deny, scoped/versioned/expiring consent, hierarchical
+# structures, and fail-closed behavior.
+
+principle: affirmative_consent
+version: "0.1.0"
+description: >
+  Default is deny. Nothing passes without an explicit yes. Consent is
+  scoped, versioned, and expiring. Structures are hierarchical.
+  Misconfiguration defaults to deny.
+
+assertions:
+  - id: p2a
+    name: default_deny
+    claim: "Default is deny — no access without explicit consent grant"
+    method: structural + behavioral
+    targets:
+      - crate: russell-consent
+        module: consent::default
+        methods: [DenyAllConsent, deny_all]
+        gate: deny_all
+      - crate: russell-sovereignty
+        module: sovereignty::boundary
+        methods: [requires_affirmative_consent, russell_default]
+        gate: deny_all
+
+  - id: p2b
+    name: scoped_consent
+    claim: "Consent grants are scoped to specific categories and resource versions"
+    method: structural_audit
+    targets:
+      - crate: russell-consent
+        module: consent::grant
+        methods: [grant_scope, validate_scope, category_scope, version_scope]
+        gate: require_consent
+      - crate: russell-consent
+        module: consent::types
+        methods: [ConsentScope, ConsentCategory]
+        gate: require_consent
+
+  - id: p2c
+    name: expiring_consent
+    claim: "Consent grants expire by date or resource version upgrade"
+    method: structural + behavioral
+    targets:
+      - crate: russell-consent
+        module: consent::grant
+        methods: [check_expiry, expire_grant, validate_version_bound]
+        gate: require_consent
+      - crate: russell-consent
+        module: consent::clock
+        methods: [is_expired, time_bound_check]
+        gate: require_consent
+
+  - id: p2d
+    name: hierarchical_consent
+    claim: "Consent structures are hierarchical (master → per-skill → per-action-type)"
+    method: structural_audit
+    targets:
+      - crate: russell-consent
+        module: consent::hierarchy
+        methods:
+          [
+            resolve_consent,
+            master_consent,
+            per_skill_consent,
+            per_action_type_consent,
+          ]
+        gate: require_consent
+      - crate: russell-consent
+        module: consent::types
+        methods: [ConsentLevel, ConsentHierarchy]
+        gate: require_consent
+
+  - id: p2e
+    name: fail_closed
+    claim: "Fail-closed: misconfiguration or missing wiring defaults to deny"
+    method: behavioral_probe
+    targets:
+      - crate: russell-consent
+        module: consent::default
+        methods: [DenyAllConsent, misconfiguration_fallback]
+        gate: deny_all
+      - crate: russell-sovereignty
+        module: sovereignty::boundary
+        methods: [requires_affirmative_consent, fail_closed_default]
+        gate: deny_all

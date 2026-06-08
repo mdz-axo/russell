@@ -1,0 +1,55 @@
+# SPDX-License-Identifier: MIT
+# magna-carta-verifier — Verifies Magna Carta principles P1–P4 through structured assertions.
+#
+# A read-only verification skill: probes run assertion manifests against the
+# codebase and runtime to confirm that Operator Sovereignty, Affirmative
+# Consent, Generative Space, and Clear Boundaries (OCAP) are correctly
+# implemented. No mutations, no interventions — just observe and report.
+#
+# Install: copy this directory to ~/.local/share/harness/skills/magna-carta-verifier/
+
+id: magna-carta-verifier
+version: 0.1.0
+authored: 2026-06-07
+min_harness_version: 0.20.0
+
+symptoms:
+  - magna-carta-violation
+
+applies_when:
+  - os_family: linux
+
+probes:
+  - id: verify-p1-operator-sovereignty
+    cmd:
+      [
+        "bash",
+        "./scripts/verify.sh",
+        "./manifests/p1-operator-sovereignty.yaml",
+      ]
+    capture: stdout
+    timeout: 30s
+
+  - id: verify-p2-affirmative-consent
+    cmd:
+      ["bash", "./scripts/verify.sh", "./manifests/p2-affirmative-consent.yaml"]
+    capture: stdout
+    timeout: 30s
+
+  - id: verify-p3-generative-space
+    cmd: ["bash", "./scripts/verify.sh", "./manifests/p3-generative-space.yaml"]
+    capture: stdout
+    timeout: 30s
+
+  - id: verify-p4-clear-boundaries
+    cmd: ["bash", "./scripts/verify.sh", "./manifests/p4-clear-boundaries.yaml"]
+    capture: stdout
+    timeout: 30s
+
+interventions: []
+
+safety:
+  max_auto_risk: none
+
+references:
+  - fork-docs/architecture/magna-carta.md

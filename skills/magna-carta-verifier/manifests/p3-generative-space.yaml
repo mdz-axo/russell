@@ -1,0 +1,81 @@
+# P3: Generative Space — Assertion Manifest
+# Verifies settings exposure, equal access, open-source commitment,
+# operator curation, and non-normativity.
+
+principle: generative_space
+version: "0.1.0"
+description: >
+  All generative settings are exposed to operators. No privileged engineer
+  access. Generative resources are open-source. Constraints are
+  operator-curated. Operator preferences override LLM defaults.
+
+assertions:
+  - id: p3a
+    name: settings_exposure
+    claim: "Inference and tooling expose all probabilistic/generative settings to operators"
+    method: structural_audit
+    targets:
+      - crate: russell-meta
+        module: meta::settings
+        methods: [temperature, top_k, top_p, repeat_penalty, all_settings]
+        gate: operator_accessible
+      - crate: russell-meta
+        module: meta::inference
+        methods: [expose_settings, list_parameters]
+        gate: operator_accessible
+
+  - id: p3b
+    name: equal_access
+    claim: "Internal engineers and operators have equal access to generative settings"
+    method: absence_check
+    targets:
+      - crate: russell-meta
+        module: meta::settings
+        methods: [all_settings, list_parameters]
+        gate: no_engineer_mode
+      - crate: russell-meta
+        module: meta::access
+        methods: [check_role, resolve_access]
+        gate: no_engineer_mode
+
+  - id: p3c
+    name: open_source
+    claim: "Generative resources are open-source with exposed weights and settings"
+    method: structural + behavioral
+    targets:
+      - crate: russell-meta
+        module: meta::provider
+        methods: [expose_weights, expose_settings, verify_open_source]
+        gate: open_source_check
+      - crate: russell-meta
+        module: meta::inference
+        methods: [list_providers, check_provider_openness]
+        gate: open_source_check
+
+  - id: p3d
+    name: operator_curated
+    claim: "Constraints are operator-curated, not system-imposed (HHH is operator-selectable)"
+    method: structural + behavioral
+    targets:
+      - crate: russell-meta
+        module: meta::constraints
+        methods: [operator_selectable, hhh_toggle, set_constraint]
+        gate: operator_controlled
+      - crate: russell-meta
+        module: meta::persona
+        methods: [persona_settings, disable_hhh]
+        gate: operator_controlled
+
+  - id: p3e
+    name: preference_override
+    claim: "Operator preference overrides take precedence over LLM aggregate defaults"
+    method: absence_check
+    targets:
+      - crate: russell-meta
+        module: meta::defaults
+        methods: [operator_override, apply_preferences]
+        gate: no_forced_alignment
+      - crate: russell-meta
+        module: meta::alignment
+        methods: [check_normativity, resolve_preference]
+        gate: no_forced_alignment
