@@ -1959,22 +1959,19 @@ mod tests {
         }
         let expires = crate::time::now_unix() + 3600;
         // First use → not seen before.
-        assert_eq!(
-            w.check_and_mark_nonce("token-1", "nonce-abc", expires)
-                .unwrap(),
-            false
+        assert!(
+            !w.check_and_mark_nonce("token-1", "nonce-abc", expires)
+                .unwrap()
         );
         // Second use → replay detected.
-        assert_eq!(
+        assert!(
             w.check_and_mark_nonce("token-1", "nonce-abc", expires)
-                .unwrap(),
-            true
+                .unwrap()
         );
         // Different nonce → not seen before.
-        assert_eq!(
-            w.check_and_mark_nonce("token-1", "nonce-def", expires)
-                .unwrap(),
-            false
+        assert!(
+            !w.check_and_mark_nonce("token-1", "nonce-def", expires)
+                .unwrap()
         );
     }
 

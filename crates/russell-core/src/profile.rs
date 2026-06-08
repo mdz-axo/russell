@@ -294,8 +294,10 @@ mod tests {
     #[test]
     fn generative_config_partial_update_persists() {
         // Setting only one field leaves others as None ("use default").
-        let mut cfg = GenerativeConfig::default();
-        cfg.temperature = Some(0.5);
+        let cfg = GenerativeConfig {
+            temperature: Some(0.5),
+            ..Default::default()
+        };
         let json = serde_json::to_string(&cfg).unwrap();
         let back: GenerativeConfig = serde_json::from_str(&json).unwrap();
         assert_eq!(back.temperature, Some(0.5));
