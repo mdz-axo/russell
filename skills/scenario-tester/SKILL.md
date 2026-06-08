@@ -15,9 +15,9 @@ artifact_type: skill
 
 # scenario-tester Skill
 
-Placeholder hKask artifact for scenario-tester.
+Placeholder agent artifact for scenario-tester.
 
-## hKask Replicant Metadata
+## Replicant Metadata
 
 - **Replicant ID**: russell
 - **Visibility**: public

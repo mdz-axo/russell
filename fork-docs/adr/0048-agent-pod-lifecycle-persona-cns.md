@@ -26,7 +26,7 @@ authentication, capability tokens, and CNS span emission — all requiring
 a unified entity that owns these concerns. Without a pod abstraction:
 
 1. **No identity.** Each crate independently reads `profile.json`; no
-   single entity represents "Russell" to hKask's CNS or ACP layer.
+   single entity represents "Russell" to the CNS or ACP layer.
 2. **No lifecycle.** Starting and stopping sentinel + ACP server is ad-hoc
    shell scripting; no state machine enforces ordering or prevents
    invalid transitions.
@@ -56,7 +56,7 @@ Populated → Registered → Activated → Deactivated
 - **Registered:** ACP server connection validated; capability token
   obtained. Pod can receive requests but has not started observation.
 - **Activated:** Sentinel timer and ACP server running. Pod observes,
-  reports, and responds to operator and hKask.
+  reports, and responds to agents.
 - **Deactivated:** Sentinel and ACP server stopped. Terminal state;
   pod must be re-populated.
 
@@ -91,8 +91,8 @@ The pod emits structured spans via the `CnsPort` hexagonal port:
 | `cns.russell.skill.dispatched` | Skill execution |
 | `cns.russell.llm.escalation` | Nurse LLM call |
 
-Spans degrade gracefully: if `HKASK_CNS_ENDPOINT` is not set, spans
-log locally via `tracing::info!`. No hard dependency on hKask.
+Spans degrade gracefully: if `REMOTE_CNS_ENDPOINT` is not set, spans
+log locally via `tracing::info!`. No hard dependency on an external CNS.
 
 ### Artifact storage
 
@@ -124,7 +124,7 @@ Six new CLI verbs expose pod operations:
 | Pod lifecycle | Kubernetes Pod lifecycle (Pending → Running → Succeeded/Failed). Cleveland, B. et al. (2015). *Kubernetes: Up and Running*. O'Reilly. |
 | Agent identity | Beer, S. (1972). *Brain of the Firm*. VSM S1/S2 identity channels. |
 | Hexagonal port | Cockburn, A. (2005). *Hexagonal Architecture*. `CnsPort` as adapter interface. |
-| NuEvent schema | hKask CNS specification. See [ADR-0044](0044-cns-span-emission.md). |
+| NuEvent schema | CNS specification. See [ADR-0044](0044-cns-span-emission.md). |
 
 ## Alternatives Considered
 
@@ -143,7 +143,7 @@ Six new CLI verbs expose pod operations:
 
 - **Positive:** Unified identity for ACP auth and CNS emission.
   Explicit lifecycle prevents partial activation. Artifact visibility
-  model supports safe export to hKask.
+  model supports safe export to agents.
 - **Positive:** CLI verbs give the operator direct pod control without
   needing systemd service management for lifecycle transitions.
 - **Negative:** `russell-agent` depends on 5 other Russell crates
@@ -157,7 +157,7 @@ Six new CLI verbs expose pod operations:
 
 ## References
 
-- [ADR-0027: hKask ACP Integration](0027-acp-integration.md)
+- [ADR-0027: ACP Integration](0027-acp-integration.md)
 - [ADR-0042: Adversarial Review Remediation Plan](0042-adversarial-review-remediation-plan.md)
 - [ADR-0044: CNS Span Emission](0044-cns-span-emission.md)
 - [ADR-0047: Capability Token Rotation](0047-capability-token-rotation.md)

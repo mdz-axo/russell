@@ -19,7 +19,7 @@ Russell is a single-host, single-operator harness that:
 
 - **observes** the host on a 5-minute cadence (Sentinel),
 - **remembers** what he saw in a SQLite journal,
-- **reports** through ACP (Agent Client Protocol) to hKask,
+- **reports** through ACP (Agent Client Protocol),
 - **watches himself** (proprioception — "did I run on time?"),
 - and when asked, **cries for help** via a local LLM
   (Okapi by default; OpenRouter opt-in).
@@ -29,7 +29,7 @@ observe, recommend, act, change settings, manage skills.
 Jack advises and proposes actions; the operator consents.
 
 **Primary interface:** `russell chat` (CLI REPL) — the operator's control surface
-**Secondary interface:** ACP server for hKask integration
+**Secondary interface:** ACP server for agent integration
 **Tertiary interface:** CLI subcommands (`sentinel-once`, `skill list`, etc.)
 **Deployment:** Hybrid (ACP server + systemd sentinel timer)
 
@@ -71,7 +71,7 @@ When two principles conflict, the lower number wins.
 | **Risk band** | `none` / `low` / `medium` / `high` / `critical`. Determines consent requirement and auto-execution eligibility. The operator's consent overrides the band — once the operator approves, the action executes regardless of risk level. |
 | **EWMA baseline** | Per-probe mean + variance, 30-day rolling p50/p95/p99. |
 | **Poka-yoke** | The dispatcher refusing any ID not in the loaded manifest. |
-| **Proprioception** | Russell's self-observation. 9 self-observation points: 7 numeric vitals (`sentinel_last_run_age_s`, `journal_writer_stall_s`, `llm_p95_latency_ms`, `timer_drift_s`, `help_error_rate_pct`, `hkask_mcp_reachable_ms`, `remote_discovery_latency_s`) + 2 boolean integrity checks (`journal_chain_intact`, `evidence_integrity_ok`). |
+| **Proprioception** | Russell's self-observation. 8 self-observation points: 6 numeric vitals (`sentinel_last_run_age_s`, `journal_writer_stall_s`, `llm_p95_latency_ms`, `timer_drift_s`, `help_error_rate_pct`, `remote_discovery_latency_s`) + 2 boolean integrity checks (`journal_chain_intact`, `evidence_integrity_ok`). |
 | **Skill workshop** | **Removed.** Skill lifecycle management absorbed into `russell skill` subcommands and ACP session interface. |
 | **Registry cache** | `local-cache.yaml` mapping symptom→skill. Rebuildable from installed skills. |
 | **Safety scanner** | Pre-install content check for prompt injection, pipe-to-shell, secret exfiltration, destructive commands. |

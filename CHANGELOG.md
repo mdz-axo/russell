@@ -37,9 +37,11 @@ status: "Active"
 ## [0.20.0] — 2026-05-23
 
 ### Added
-- **ACP server** (`russell-acp-server`): Agent Client Protocol server for hKask
-  integration. Supports `acp/capabilities`, `acp/session.create`,
+- **ACP server** (`russell-acp-server`): Agent Client Protocol server for
+  agent integration. Supports `acp/capabilities`, `acp/session.create`,
   `acp/session.message`, `acp/probe/run`. Macaroon-based auth.
+  *(Note: hKask-specific integration was later removed; ACP server now serves
+  generic agent clients.)*
 - **Agent crate** (`russell-agent`): Pod lifecycle management, persona
   configuration, memory artifact export.
 - **Pod CLI commands**: `pod-status`, `pod-activate`, `pod-deactivate`,
@@ -52,14 +54,15 @@ status: "Active"
 - **Memory layer**: `russell digest --format daily-log` for markdown exports.
 
 ### Changed
-- **Primary interface shifted to ACP**: CLI is now secondary; hKask integration
-  goes through the ACP server.
+- **Primary interface shifted to ACP**: CLI is now secondary; agent
+  integration goes through the ACP server.
 - **Chat REPL removed**: Multi-turn conversation absorbed into ACP session
   interface. `russell chat` no longer exists. (Reverted in Unreleased — see ADR-0049.)
 - **Workshop REPL removed**: Skill workshop functionality absorbed into skill
   lifecycle commands (`skill-install`, `skill-prune`).
 - **Kask → hKask migration**: Environment variables renamed from `KASK_*` to
   `HKASK_*`. Backward-compatible fallbacks in MCP client.
+  *(Obsolete: hKask integration was later removed; these env vars no longer exist.)*
 - **Workspace restructured**: 11 crates (removed `russell-reflex` — unused).
 - **Systemd units cleaned**: Removed `kask-gateway`, `kask-token-rotate`,
   `russell-okapi` units. Added `russell-acp-server.service`.

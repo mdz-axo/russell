@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: MIT
 # flowdef-converter: convert intervention / dry-run probe
-# Converts an hKask FlowDef manifest into a Russell skill.
+# Converts a FlowDef manifest into a Russell skill.
 #
 # When RUSSELL_DRY_RUN=1, outputs the converted content to stdout without
 # writing files. Otherwise, writes the skill files to the output directory.
@@ -22,7 +22,7 @@ set -euo pipefail
 MANIFEST_PATH="${1:-}"
 OUTPUT_DIR="${2:-}"
 DRY_RUN="${RUSSELL_DRY_RUN:-0}"
-HKASK_REGISTRY="${HKASK_REGISTRY_DIR:-$HOME/Clones/hKask/registry}"
+FLOWDEF_REGISTRY="${FLOWDEF_REGISTRY_DIR:-}"
 SKILLS_DIR="${RUSSELL_SKILLS_DIR:-$HOME/.local/share/harness/skills}"
 BACKUP_DIR="${RUSSELL_BACKUP_DIR:-$HOME/.local/share/harness/backups}"
 
@@ -132,9 +132,9 @@ for tref in $TEMPLATE_REFS; do
 
     TPATH=""
     for candidate in \
-        "${HKASK_REGISTRY}/templates/${TDIR}/${TNAME}.j2" \
-        "${HKASK_REGISTRY}/templates/${TNAME}.j2" \
-        "${HKASK_REGISTRY}/templates/${tref}.j2"; do
+        "${FLOWDEF_REGISTRY}/templates/${TDIR}/${TNAME}.j2" \
+        "${FLOWDEF_REGISTRY}/templates/${TNAME}.j2" \
+        "${FLOWDEF_REGISTRY}/templates/${tref}.j2"; do
         if [[ -f "$candidate" ]]; then
             TPATH="$candidate"
             break
@@ -150,10 +150,10 @@ done
 
 # --- Build KNOWLEDGE.md ---
 TODAY=$(date +%Y-%m-%d)
-KNOWLEDGE_MD="# ${SKILL_NAME:-$SKILL_ID} — Russell Skill (Converted from hKask FlowDef)
+KNOWLEDGE_MD="# ${SKILL_NAME:-$SKILL_ID} — Russell Skill (Converted from FlowDef)
 
-> **Converted from hKask FlowDef** on ${TODAY}. Original: ${MANIFEST_PATH}
-> This skill was converted from hKask's orchestrated process model to Russell's
+> **Converted from FlowDef** on ${TODAY}. Original: ${MANIFEST_PATH}
+> This skill was converted from FlowDef's orchestrated process model to Russell's
 > knowledge-injection + chat REPL model. The methodology is preserved; the
 > execution model is adapted. See flowdef-converter/KNOWLEDGE.md for the mapping.
 
@@ -193,7 +193,7 @@ ${TEMPLATE_CONTENT:-No template content extracted.}
 
 ## Safety
 
-- This skill was auto-converted from hKask FlowDef. Review carefully.
+- This skill was auto-converted from FlowDef. Review carefully.
 - Energy caps, OCAP capabilities, and CNS spans are NOT carried over.
 - Russell's consent gate replaces OCAP.
 - Russell's journal replaces CNS.
@@ -204,7 +204,7 @@ ${TEMPLATE_CONTENT:-No template content extracted.}
 **Converter:** flowdef-converter v1.0.0"
 
 # --- Build manifest.yaml ---
-MANIFEST_YAML="# Auto-converted from hKask FlowDef on ${TODAY}
+MANIFEST_YAML="# Auto-converted from FlowDef on ${TODAY}
 # Original: ${MANIFEST_PATH}
 # Converter: flowdef-converter v1.0.0
 

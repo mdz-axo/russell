@@ -14,7 +14,7 @@ status: "Deferred"
 
 ## Context
 
-Russell's ACP server currently implements a 1:1 session model: one hKask agent creates one session with Russell. However, hKask may orchestrate multiple agents consulting Russell simultaneously (e.g., a diagnostic agent, a remediation agent, and a monitoring agent all querying Russell's health data).
+Russell's ACP server currently implements a 1:1 session model: one agent creates one session with Russell. However, an orchestrating agent may coordinate multiple agents consulting Russell simultaneously (e.g., a diagnostic agent, a remediation agent, and a monitoring agent all querying Russell's health data).
 
 The adversarial review (2026-05-23) identified this as underspecified:
 - Current session model assumes single-agent topology
@@ -39,7 +39,7 @@ The adversarial review (2026-05-23) identified this as underspecified:
 ### Current Mitigation
 
 The 1:1 model is sufficient for current use cases:
-- hKask orchestrates agents sequentially, not concurrently
+- Agents are orchestrated sequentially, not concurrently
 - Each agent creates its own session with Russell
 - Sessions are short-lived (minutes, not hours)
 - No observed contention or conflicts
@@ -47,7 +47,7 @@ The 1:1 model is sufficient for current use cases:
 ### When to Revisit
 
 Revisit this decision when:
-- hKask demonstrates concurrent multi-agent orchestration
+- an orchestrating agent demonstrates concurrent multi-agent orchestration
 - Session duration increases significantly (hours/days)
 - Observed contention or state conflicts in production
 - Operator requests multi-agent collaboration features
@@ -95,6 +95,6 @@ Revisit this decision when:
 
 ## References
 
-- [ADR-0027: hKask ACP Integration](../0027-acp-integration.md)
+- [ADR-0027: ACP Integration](../0027-acp-integration.md)
 - [ADR-0041: ACP Consent Protocol](../0041-acp-consent-protocol.md)
 - Adversarial Review Action Plan (2026-05-23) §Tier 3 recommendations

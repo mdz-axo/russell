@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: MIT
-# flowdef-converter — convert hKask FlowDef skills to Russell's modality.
+# flowdef-converter — convert FlowDef skills to Russell's modality.
 #
-# Reads hKask FlowDef process manifests (multi-step orchestrated flows
+# Reads FlowDef process manifests (multi-step orchestrated flows
 # with Jinja2 templates, energy caps, CNS spans) and converts them into
 # Russell skill format (manifest.yaml + KNOWLEDGE.md + probe/intervention
 # scripts). The conversion preserves the methodology while adapting the
@@ -18,7 +18,7 @@
 #   FlowDef escalation → KNOWLEDGE.md decision rules
 #   FlowDef error_handling → script error handling
 #
-# This skill is the bridge between hKask's process-orchestrated paradigm
+# This skill is the bridge between FlowDef's process-orchestrated paradigm
 # and Russell's knowledge-injection + chat REPL paradigm.
 #
 # Install: copy this directory to ~/.local/share/harness/skills/flowdef-converter/
@@ -80,5 +80,5 @@ safety:
   allowed_env_keys:
     - RUSSELL_DRY_RUN
     - RUSSELL_SKILLS_DIR
-    - HKASK_REGISTRY_DIR
+    - FLOWDEF_REGISTRY_DIR
     - HOME

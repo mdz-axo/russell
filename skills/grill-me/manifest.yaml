@@ -7,8 +7,8 @@
 # The actual grilling happens through `russell chat` — multi-turn REPL
 # where Jack uses this knowledge to conduct oral examinations.
 #
-# Adapted from hKask FlowDef grill-me v0.21.0 for Russell's skill paradigm.
-# The hKask version uses orchestrated process steps; Russell uses knowledge
+# Adapted from FlowDef grill-me v0.21.0 for Russell's skill paradigm.
+# The original version uses orchestrated process steps; Russell uses knowledge
 # injection + chat REPL. The methodology is identical.
 #
 # Install: copy this directory to ~/.local/share/harness/skills/grill-me/
@@ -50,5 +50,4 @@ safety:
   needs_network: false
 
 references:
-  - ~/Clones/hKask/registry/manifests/grill-me.yaml
-  - ~/Clones/hKask/registry/templates/grill-me/
+  - grill-me/KNOWLEDGE.md

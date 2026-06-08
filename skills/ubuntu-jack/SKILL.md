@@ -15,9 +15,9 @@ artifact_type: skill
 
 # ubuntu-jack Skill
 
-Placeholder hKask artifact for ubuntu-jack.
+Placeholder agent artifact for ubuntu-jack.
 
-## hKask Replicant Metadata
+## Replicant Metadata
 
 - **Replicant ID**: russell
 - **Visibility**: public

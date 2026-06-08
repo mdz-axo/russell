@@ -15,9 +15,9 @@ artifact_type: semantic_memory
 
 # pragmatic-cybernetics Skill
 
-Placeholder hKask artifact for pragmatic-cybernetics.
+Placeholder agent artifact for pragmatic-cybernetics.
 
-## hKask Replicant Metadata
+## Replicant Metadata
 
 - **Replicant ID**: russell
 - **Visibility**: public

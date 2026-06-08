@@ -172,6 +172,6 @@ Russell's domain-specific terms:
 
 ## References
 
-- hKask DDMVSS: `~/Clones/hKask/docs/architecture/DDMVSS.md` §3
+- DDMVSS framework (see architecture/DDMVSS.md) §3
 - Evans, E. (2003). *Domain-Driven Design*. Addison-Wesley.
 - Miller, M.S. (2003). "Robust Composition." PhD thesis, Johns Hopkins.

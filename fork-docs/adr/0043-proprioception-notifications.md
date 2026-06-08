@@ -50,11 +50,11 @@ Implement `acp/notifications.list` JSON-RPC method that returns recent proprioce
     "notifications": [
       {
         "id": "evt_123",
-        "vital": "hkask_mcp_reachable_ms",
+        "vital": "remote_mcp_reachable_ms",
         "severity": "warn",
         "value": "2500",
         "threshold": "2000",
-        "summary": "hkask_mcp_reachable_ms = 2500 (threshold: 2000)",
+        "summary": "remote_mcp_reachable_ms = 2500 (threshold: 2000)",
         "timestamp": "2026-05-24T10:30:00Z"
       }
     ],
@@ -72,7 +72,7 @@ Implement `acp/notifications.list` JSON-RPC method that returns recent proprioce
 ```rust
 pub struct ProprioNotification {
     pub id: String,              // Event ID from journal
-    pub vital: String,           // Vital name (e.g., "hkask_mcp_reachable_ms")
+    pub vital: String,           // Vital name (e.g., "remote_mcp_reachable_ms")
     pub severity: String,        // "warn", "alert", "critical"
     pub value: serde_json::Value,
     pub threshold: serde_json::Value,
@@ -126,7 +126,7 @@ async fn list_notifications(
 
 ### Security Model
 
-- **Authentication required** — Only authenticated hKask agents can query notifications
+- **Authentication required** — Only authenticated agents can query notifications
 - **Read-only** — No mutations, no consent required
 - **Bounded query** — Max 7-day window to prevent excessive data retrieval
 - **Journal reader** — Uses read-only `JournalReader`, not `JournalWriter`
@@ -137,7 +137,7 @@ async fn list_notifications(
 
 ### Positive
 
-- **Proactive monitoring** — hKask agents can query Russell's health status
+- **Proactive monitoring** — Agents can query Russell's health status
 - **Structured data** — Notifications include vital name, value, threshold, severity
 - **Bounded queries** — Time window prevents excessive data retrieval
 - **Audit trail** — All queries logged via ACP request logging
@@ -190,5 +190,5 @@ async fn list_notifications(
 ## References
 
 - [ADR-0021: Proprioception Phase 2A](0021-proprioception-phase2-reflex-arcs.md)
-- [ADR-0027: hKask ACP Integration](0027-acp-integration.md)
+- [ADR-0027: ACP Integration](0027-acp-integration.md)
 - Adversarial Review Action Plan (2026-05-23) §Tier 2 recommendations

@@ -53,7 +53,7 @@ ddmvss_categories: [domain, capability]
 
 ### FR-3: Report Through ACP
 
-**Goal:** Russell reports through ACP (Agent Client Protocol) to hKask.
+**Goal:** Russell reports through ACP (Agent Client Protocol).
 
 **Criteria:**
 - [x] Implements ACP server (`russell-acp-server`)
@@ -72,7 +72,7 @@ ddmvss_categories: [domain, capability]
 **Goal:** Russell watches himself the same way he watches the host.
 
 **Criteria:**
-- [x] Collects 9 self-vitals (sentinel_last_run_age_s, journal_writer_stall_s, llm_p95_latency_ms, timer_drift_s, help_error_rate_pct, hkask_mcp_reachable_ms, remote_discovery_latency_s, journal_chain_intact, evidence_integrity_ok)
+- [x] Collects 9 self-vitals (sentinel_last_run_age_s, journal_writer_stall_s, llm_p95_latency_ms, timer_drift_s, help_error_rate_pct, remote_mcp_reachable_ms, remote_discovery_latency_s, journal_chain_intact, evidence_integrity_ok)
 - [x] Evaluates self-vitals against thresholds
 - [x] Emits events for self-vital breaches
 - [x] Implements reflex arcs (threshold + rate breaches → interventions)

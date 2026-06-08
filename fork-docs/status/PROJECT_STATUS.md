@@ -18,7 +18,7 @@ ddmvss_categories: [domain, capability, interface, composition, trust, observabi
 
 ## Summary
 
-Russell is a **cybernetic health harness** for a single Linux AI/ML workstation. He observes the host, remembers what he saw, reports through ACP to hKask, watches himself, and cries for help via a local LLM when asked.
+Russell is a **cybernetic health harness** for a single Linux AI/ML workstation. He observes the host, remembers what he saw, reports through ACP, watches himself, and cries for help via a local LLM when asked.
 
 **Current phase:** MVP complete, documentation migrated to DDMVSS
 
@@ -196,7 +196,7 @@ See `plans/TODO.md` for full list.
 8. **TODO-8:** Define skill retirement policy (1 day)
 9. **TODO-9:** Implement macaroon rotation (2-3 days)
 10. **TODO-10:** Implement evidence bundle sealing (2-3 days)
-11. **TODO-11:** Align with hKask DDMVSS (1-2 days)
+11. **TODO-11: DDMVSS internal alignment (1-2 days)
 
 ---
 

@@ -129,7 +129,7 @@ npx @modelcontextprotocol/inspector russell mcp
   server exits with it.
 - Trivial to run in ad-hoc contexts via the MCP inspector.
 - No port-binding conflicts, no certificate management.
-- Russell can be used standalone (without Kask) by any
+- Russell can be used standalone (without an orchestrator) by any
   MCP-speaking agent.
 
 ### Negative / accepted costs
@@ -179,4 +179,4 @@ Rejected: Windows is out of charter per ADR-0001.
 - MCP specification: https://modelcontextprotocol.io
 - [ADR-0001](0001-scope-and-charter.md) — single-host scope.
 - [ADR-0025](0025-hkask-mcp-client-trusted-relationship.md) —
-  Russell as MCP *client* to Kask (orthogonal to this ADR).
+  Russell as MCP client to an external agent (orthogonal to this ADR).

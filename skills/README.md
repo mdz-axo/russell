@@ -1,18 +1,17 @@
-# Russell Skills — hKask Universal Agentic Registry
+# Russell Skills — Agent Registry
 
 **Replicant ID**: `russell`  
 **Visibility**: public-except-episodic  
 **Total Skills**: 13  
 
-## hKask Artifact Structure
+## Artifact Structure
 
-Each Russell skill includes three artifact types for hKask registry compatibility:
+Each Russell skill includes these artifact types:
 
 | File | Purpose | Format |
 |---|---|---|
 | `manifest.yaml` | Russell native | YAML |
-| `SKILL.md` | hKask universal skill | Markdown (OpenClaw-compatible) |
-| `skill.json` | hKask descriptor | JSON (SchemaStore-registered) |
+| `SKILL.md` | Skill documentation | Markdown |
 
 ## Skills Catalog
 
@@ -37,21 +36,9 @@ Each Russell skill includes three artifact types for hKask registry compatibilit
 Skill templates in `templates/` directory:
 
 - `russell-skill.yaml.j2` — Russell native manifest
-- `SKILL.md.j2` — hKask universal skill
-- `skill.json.j2` — hKask descriptor
+- `SKILL.md.j2` — Skill documentation template
 
-## Publishing to hKask
 
-```bash
-# Lint skill package
-npx @hol-org/registry skills lint --dir ./skills/okapi-watcher
-
-# Verify against schema
-npx @hol-org/registry skills verify --name "okapi-watcher" --tier basic
-
-# Publish to registry
-npx @hol-org/registry skills publish --dir ./skills/okapi-watcher --account-id 0.0.1234
-```
 
 ## Replicant Metadata
 
@@ -70,6 +57,4 @@ All Russell skills include:
 
 ## References
 
-- [hKask Integration Guide](../../docs/standards/hkask-integration.md)
 - [REPLICANT.md](../../REPLICANT.md)
-- [HCS-26 Standard](https://github.com/hiero-ledger/hiero-consensus-specifications/blob/main/docs/standards/hcs-26.md)

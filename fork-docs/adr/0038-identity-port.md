@@ -16,8 +16,8 @@ status: "Implemented"
 
 Russell operates in a multi-authentication environment:
 
-1. **Macaroon OCAP tokens** — Used by the ACP server for hKask agent authentication (ADR-0026)
-2. **hKask capability tokens** — Used by the Nurse pipeline for inference requests
+1. **Macaroon OCAP tokens** — Used by the ACP server for external agent authentication (ADR-0026)
+2. **Capability tokens** — Used by the Nurse pipeline for inference requests
 3. **Future token formats** — JWT, WebID, or other identity systems may emerge
 
 The adversarial review (2026-05-23) identified weakness W7: "Dual auth systems" — the ACP server and Nurse pipeline used divergent authentication models with no shared abstraction. This created:
@@ -174,7 +174,7 @@ impl SimpleIdentity {
 
 1. **Capability constants module** — Define `pub const ACP_SESSION: &str = "acp:session";` etc. to prevent typos.
 
-2. **hKask token adapter** — Implement `IdentityPort` for hKask's capability token format (used in Nurse pipeline).
+2. **External token adapter** — Implement `IdentityPort` for external capability token formats (used in Nurse pipeline).
 
 3. **Capability attenuation** — Extend `has_capability()` to support attenuations (e.g., `"acp:session:max_duration:3600"`).
 

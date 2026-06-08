@@ -305,6 +305,6 @@ Quarterly retrospective:
 
 ## 9. References
 
-- hKask Writing Excellence: `~/Clones/hKask/docs/standards/WRITING_EXCELLENCE.md`
+- Writing Excellence (see standards/WRITING_EXCELLENCE.md)
 - Diátaxis: https://diataxis.fr/
 - Strunk & White. *The Elements of Style*.

@@ -166,7 +166,7 @@ requires human review.
   and a `classify_shell_command` function implementing the safety
   classifier.
 - The `SHELL:` prefix is parsed before `ACTION:` in
-  `resolve_with_hkask`.
+  `resolve_action`.
 - The chat handler routes `ShellCommand` through the consent gate.
 - Shell execution uses `bash -c` (or `sudo -S -- bash -c` for
   sudo commands) with timeout and output capture.

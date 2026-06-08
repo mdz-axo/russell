@@ -20,7 +20,7 @@ The adversarial multi-perspective review (2026-05-19) identified weakness A3:
 
 Russell had two separate MCP crates:
 
-1. **`russell-mcp`** — MCP client for hKask integration (HTTP REST API client, token auth, tool registry)
+1. **`russell-mcp`** — MCP client for external integration (HTTP REST API client, token auth, tool registry)
 2. **`russell-mcp-server`** — MCP server for IDE frontends (rmcp-based stdio server)
 
 This created:
@@ -38,7 +38,7 @@ Consolidate both crates into a single `russell-mcp` crate with feature flags:
 1. **Single crate** — `russell-mcp` contains both client and server code.
 
 2. **Feature flags**:
-   - `client` (default) — MCP client for hKask integration (reqwest, auth, registry)
+   - `client` (default) — MCP client for external integration (reqwest, auth, registry)
    - `server` — MCP server for IDE frontends (rmcp, tools)
 
 3. **Directory structure** (actual implementation):
@@ -46,7 +46,7 @@ Consolidate both crates into a single `russell-mcp` crate with feature flags:
    crates/russell-mcp/
    ├── src/
    │   ├── auth.rs        # Token provider chain
-   │   ├── client.rs      # HKask MCP client
+   │   ├── client.rs      # MCP client
    │   ├── config.rs      # Configuration
    │   ├── error.rs       # Error types
    │   ├── health.rs      # Health check
@@ -56,7 +56,7 @@ Consolidate both crates into a single `russell-mcp` crate with feature flags:
    └── Cargo.toml
    ```
 
-   **Note:** The `server/` subdirectory described in the original proposal was not implemented. The MCP server functionality lives in `russell-acp-server` (separate crate) per ADR-0027, which provides the ACP session interface for hKask integration.
+   **Note:** The `server/` subdirectory described in the original proposal was not implemented. The MCP server functionality lives in `russell-acp-server` (separate crate) per ADR-0027, which provides the ACP session interface for external agent integration.
 
 4. **Conditional compilation** — Modules gated by `#[cfg(feature = "...")]` in `lib.rs`.
 
@@ -182,5 +182,5 @@ Command::Mcp => russell_mcp::server::serve_stdio(paths).await,
 
 - Adversarial Review Action Plan §A3 (Task A3)
 - `docs/adr/0003-mcp-transport.md` (deferred server)
-- `docs/adr/0025-hkask-mcp-client-trusted-relationship.md` (client)
+- [ADR-0025](0025-hkask-mcp-client-trusted-relationship.md) (client) — **Superseded** (hKask integration removed)
 - Cockburn, A. (2005). "Hexagonal Architecture"

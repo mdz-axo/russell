@@ -15,9 +15,9 @@ artifact_type: skill
 
 # web-search Skill
 
-Placeholder hKask artifact for web-search.
+Placeholder agent artifact for web-search.
 
-## hKask Replicant Metadata
+## Replicant Metadata
 
 - **Replicant ID**: russell
 - **Visibility**: public

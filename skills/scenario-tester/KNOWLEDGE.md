@@ -3,16 +3,16 @@
 > **A note from Jack about testing agents:** Testing an AI agent isn't like
 > testing a library. There's no deterministic return value — there's only
 > emergent behavior under load. Okapi loads a model, responds to a prompt,
-> maybe hallucinates, maybe times out. hKask dispatches tools, orchestrates
-> subagents, maybe gets stuck in a loop. Russell watches, records, and cries
-> for help. I need to know: is the agent fast enough? Does it degrade under
-> concurrent load? Does it fail gracefully? So I design scenarios — user
-> stories turned into stress tests — and I run them, measure them, and report
-> what I see. That's phase A (design) and phase B (execute). I have probes for
-> both.
+> maybe hallucinates, maybe times out. Remote agents dispatch tools,
+> orchestrate subagents, maybe get stuck in a loop. Russell watches,
+> records, and cries for help. I need to know: is the agent fast enough?
+> Does it degrade under concurrent load? Does it fail gracefully? So I design
+> scenarios — user stories turned into stress tests — and I run them, measure
+> them, and report what I see. That's phase A (design) and phase B (execute).
+> I have probes for both.
 >
 > **Source:** This knowledge file. Paired with probe scripts in `scripts/`.
-> **Test targets:** Okapi (LLM inference), hKask (agent orchestration, via MCP),
+> **Test targets:** Okapi (LLM inference), external agents (via MCP),
 > Russell (health harness self-test).
 
 ---
@@ -52,11 +52,11 @@ cleanup: <how to restore state after test>
 - `okapi-context-window` — Escalate prompt length 1K→4K→16K→64K chars, measure latency growth
 - `okapi-error-recovery` — Send malformed requests, measure error rate and recovery time
 
-**hKask scenarios (via MCP tools):**
-- `kask-tool-completion` — Dispatch a known tool, measure round-trip time
-- `kask-multi-agent-orchestration` — Chain 3 subagent calls, measure end-to-end latency
-- `kask-tool-timeout` — Request a slow tool, observe timeout behavior
-- `kask-concurrent-sessions` — 2 concurrent sessions, measure isolation
+**External agent scenarios (via MCP):**
+- `remote-tool-completion` — Dispatch a known tool, measure round-trip time
+- `remote-multi-agent-orchestration` — Chain 3 subagent calls, measure end-to-end latency
+- `remote-tool-timeout` — Request a slow tool, observe timeout behavior
+- `remote-concurrent-sessions` — 2 concurrent sessions, measure isolation
 
 **Russell scenarios:**
 - `russell-sentinel-cadence` — Run sentinel 10x, measure cadence regularity

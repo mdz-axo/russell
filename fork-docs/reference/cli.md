@@ -195,14 +195,14 @@ persistence is auditable). Lifecycle management is available via
 ## 4. ACP Server
 
 The ACP (Agent Client Protocol) server is Russell's primary interface
-for hKask integration. It runs as a separate binary:
+for agent integration. It runs as a separate binary:
 
 ```
 russell-acp-server
 ```
 
 The server implements JSON-RPC 2.0 over stdio with macaroon OCAP
-authentication. hKask agents create sessions, query Russell's health
+authentication. Agents create sessions, query Russell's health
 data, dispatch skills (filtered by visibility), and provide consent
 for interventions. See [`../deployment/acp-integration.md`](../deployment/acp-integration.md).
 
@@ -234,7 +234,7 @@ russell-sentinel.service
 russell-digest.timer    — Sunday 09:00
 russell-digest.service
 russell-failure@.service — templated failure capture
-russell-acp-server.service — ACP server for hKask
+russell-acp-server.service — ACP server for agent integration
 ```
 
 Manage with: `systemctl --user {enable,disable,start,stop} russell-*.{timer,service}`.

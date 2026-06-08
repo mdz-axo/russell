@@ -271,7 +271,7 @@ skeleton, then `skill-manager/install` to register it.
 
 ### flowdef-converter
 
-The converter reads hKask FlowDef manifests and templates, then uses
+The converter reads FlowDef manifests and templates, then uses
 workspace interventions to write the converted Russell skill files.
 
 ### sysadmin

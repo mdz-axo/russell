@@ -23,7 +23,7 @@ available on three functionally equivalent surfaces:
 
 1. **CLI** — `russell chat` (direct operator interaction)
 2. **API** — HTTP REST endpoints (`russell-api-server`)
-3. **ACP** — JSON-RPC over stdio (`russell-acp-server`, hKask integration)
+3. **ACP** — JSON-RPC over stdio (`russell-acp-server`, ACP integration)
 
 The CHANGELOG entry "Chat REPL removed" and the AGENTS.md vocabulary entry
 "Chat REPL — Removed" were both incorrect documentation changes that
@@ -81,7 +81,7 @@ All three surfaces MUST support:
 - Operator can interact with Jack from any surface
 - CLI remains available for direct local use without HTTP or ACP overhead
 - API enables web-based frontends and scripting via curl
-- ACP enables hKask agent integration
+- ACP enables agent integration
 - Each surface uses implementation appropriate to its concurrency model
 
 ### Negative
@@ -107,7 +107,7 @@ All three surfaces MUST support:
 
 ## References
 
-- [ADR-0027: hKask ACP Integration](0027-acp-integration.md)
+- [ADR-0027: ACP Integration](0027-acp-integration.md)
 - [ADR-0041: ACP Consent Protocol](0041-acp-consent-protocol.md)
 - [ADR-0042: Adversarial Review Remediation Plan](0042-adversarial-review-remediation-plan.md)
 - `crates/russell-cli/src/commands/chat/` — restored CLI chat module

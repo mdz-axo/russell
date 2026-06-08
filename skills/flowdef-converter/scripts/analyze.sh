@@ -6,7 +6,7 @@
 set -euo pipefail
 
 MANIFEST_PATH="${1:-}"
-HKASK_REGISTRY="${HKASK_REGISTRY_DIR:-$HOME/Clones/hKask/registry}"
+FLOWDEF_REGISTRY="${FLOWDEF_REGISTRY_DIR:-}"
 
 if [[ -z "$MANIFEST_PATH" ]]; then
     echo "Usage: analyze.sh <path-to-flowdef-manifest>" >&2

@@ -1,11 +1,11 @@
 # Russell Macaroon Client Configuration
 #
 # This configuration enables Russell to use macaroons for authentication
-# with hKask MCP server and Okapi inference engine.
+# with external MCP servers and the Okapi inference engine.
 #
 # Location: ~/.config/russell/config.yaml
 
-hKask:
+remote:
   mcp_endpoint: http://127.0.0.1:8080/mcp
   agent_id: russell-prod-1
 

@@ -53,7 +53,7 @@ ddmvss_categories: [domain, capability, interface, composition, trust, observabi
 
 **Options:**
 1. Operator curates manually
-2. Automated curation bot (like hKask's spec-curator-bot)
+2. Automated curation bot
 3. Hybrid (automated evaluation, operator approval)
 
 **Status:** Open
@@ -79,13 +79,13 @@ ddmvss_categories: [domain, capability, interface, composition, trust, observabi
 
 ### OQ-5: Formal Vocabulary Catalog
 
-**Question:** Should Russell have a formal vocabulary catalog like hKask's hLexicon?
+**Question:** Should Russell have a formal vocabulary catalog?
 
 **Context:** Russell has domain-specific terms (sentinel, journal, jack, skill, etc.) but no formal catalog with definitions and allocations.
 
 **Options:**
 1. Create `reference/vocabulary.md` with formal definitions
-2. Integrate with hKask's hLexicon (Russell as domain anchor)
+2. Create Russell-specific vocabulary catalog
 3. No formal catalog (current informal approach)
 
 **Status:** Open
@@ -236,15 +236,15 @@ ddmvss_categories: [domain, capability, interface, composition, trust, observabi
 
 ## Integration
 
-### OQ-15: hKask DDMVSS Alignment
+### OQ-15: DDMVSS Alignment
 
-**Question:** How do we ensure Russell's DDMVSS stays aligned with hKask's DDMVSS?
+**Question:** How do we ensure Russell's DDMVSS stays internally consistent?
 
-**Context:** Russell's DDMVSS is based on hKask's, but may drift over time.
+**Context:** Russell's DDMVSS defines the project's architecture, but may drift over time.
 
 **Options:**
-1. Regular sync (quarterly review against hKask)
-2. Automated validation (CI check against hKask schema)
+1. Regular review of documentation consistency
+2. Automated validation (CI check against DDMVSS schema)
 3. No alignment (Russell evolves independently)
 
 **Status:** Open
@@ -279,5 +279,5 @@ ddmvss_categories: [domain, capability, interface, composition, trust, observabi
 
 ## References
 
-- hKask Open Questions: `~/Clones/hKask/docs/OPEN_QUESTIONS.md`
+- DDMVSS framework (see architecture/DDMVSS.md)
 - DDMVSS: `architecture/DDMVSS.md` §5

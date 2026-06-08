@@ -15,9 +15,9 @@ artifact_type: skill
 
 # sysadmin Skill
 
-Placeholder hKask artifact for sysadmin.
+Placeholder agent artifact for sysadmin.
 
-## hKask Replicant Metadata
+## Replicant Metadata
 
 - **Replicant ID**: russell
 - **Visibility**: public

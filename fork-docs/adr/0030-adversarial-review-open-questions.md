@@ -54,7 +54,7 @@ implemented), or should they be unified into a single `JournalPort` trait?
 
 ### Q2: Shared Protocol Crate Publishing Model (T9)
 
-Russell and hKask share the same operator and local Okapi backend but
+Russell and external agents share the same operator and local Okapi backend but
 have no shared types. JR-6 mandates "copy-with-provenance" over
 dependencies, but this creates drift.
 
@@ -62,8 +62,8 @@ dependencies, but this creates drift.
   private registry. Both projects depend on it.
 - **Option B:** Copy-with-provenance (per JR-6). Manually sync types
   quarterly.
-- **Option C:** Russell exposes a well-known MCP tool schema; hKask
-  discovers tools at runtime. No shared compile-time types needed.
+- **Option C:** Russell exposes a well-known MCP tool schema; external
+  agents discover tools at runtime. No shared compile-time types needed.
 
 ### Q3: Sandbox Depth for Skill Subprocesses
 
@@ -88,7 +88,7 @@ The genesis hash is currently `SHA-256(/etc/machine-id)`. This is:
 Should the seed include additional entropy? Options:
 - Hardware RNG at first journal creation (stored in `baselines` or a
   new table)
-- HMAC with a keystore-derived key (hKask alignment)
+- HMAC with a keystore-derived key (local integrity)
 
 **Recommendation:** Current approach is sufficient for the single-operator
 threat model. Add HMAC if the MCP server ever becomes network-accessible.
@@ -167,7 +167,7 @@ effective across timer-driven invocations without requiring a daemon.
 ## Decision
 
 Record these questions. Implement Q10 (journal-backed budget) as the
-next discrete task. Others await operator input or hKask coordination.
+next discrete task. Others await operator input or further analysis.
 
 ## Consequences
 

@@ -23,7 +23,7 @@ ddmvss_categories: [interface, composition]
 | Surface | Technology | Use Case |
 |---------|-----------|----------|
 | `CLI` | Rust binary (`russell`) | Operator interaction, scripting |
-| `ACP` | JSON-RPC 2.0 over stdio | Agent integration (hKask) |
+| `ACP` | JSON-RPC 2.0 over stdio | Agent integration |
 | `systemd` | User units | Background operation |
 
 ### 1.2 Interface Equivalence Matrix
@@ -252,7 +252,7 @@ safety:
 
 ## References
 
-- hKask DDMVSS: `~/Clones/hKask/docs/architecture/DDMVSS.md` §5.3, §5.4
+- DDMVSS framework (see architecture/DDMVSS.md) §5.3, §5.4
 - ADR-0003 (MCP transport)
 - ADR-0027 (ACP integration)
 - ADR-0049 (three-surface interaction)

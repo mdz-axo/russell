@@ -204,7 +204,7 @@ Nine self-vitals:
 | `llm_p95_latency_ms` | help_session latency | Warn > 8000ms, Alert > 20000ms |
 | `timer_drift_s` | cadence interval | Warn > target+20% |
 | `help_error_rate_pct` | failed LLM calls / total | Warn > 20%, Alert > 50% |
-| `hkask_mcp_reachable_ms` | MCP endpoint ping | Warn > 1000ms |
+| `remote_mcp_reachable_ms` | Remote MCP endpoint ping | Warn > 1000ms |
 | `remote_discovery_latency_s` | remote skill registry lookup | Warn > 5s |
 | `journal_chain_intact` | hash chain verification | Fail = `false` |
 | `evidence_integrity_ok` | evidence bundle checksums | Fail = `false` |
@@ -307,7 +307,7 @@ Nine self-vitals:
 
 ## References
 
-- hKask DDMVSS: `~/Clones/hKask/docs/architecture/DDMVSS.md` §5.5, §5.6
+- DDMVSS framework (see architecture/DDMVSS.md) §5.5, §5.6
 - ADR-0004 (SQLite journal)
 - ADR-0015 (proprioception self-health)
 - ADR-0021 (proprioception phase 2 reflex arcs)

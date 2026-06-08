@@ -35,9 +35,9 @@ thresholds:
 precondition: "Russell journal accessible"
 cleanup: "none"
 ---
-# hkask-tool-completion.yaml — HKask MCP tool round-trip test.
-id: hkask-tool-completion
-target: hkask
+# remote-tool-completion.yaml — Remote MCP tool round-trip test.
+id: remote-tool-completion
+target: remote
 description: "Dispatch a known MCP tool and measure round-trip time"
 tool: "russell/host_snapshot"
 timeout_s: 30
@@ -47,5 +47,5 @@ measurements:
 thresholds:
   roundtrip_max_ms: { max: 5000 }
   result_min_bytes: { min: 100 }
-precondition: "HKask gateway running, arsenal-mcp-russell tool available"
+precondition: "MCP gateway running, host_snapshot tool available"
 cleanup: "none"

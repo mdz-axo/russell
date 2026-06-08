@@ -76,9 +76,9 @@ probes:
     capture: stdout
     timeout: 10s
 
-  # --- HKask services -------------------------------------------------
-  - id: probe-hkask-services
-    cmd: ["bash", "./scripts/probe-hkask-services.sh"]
+  # --- Remote services -------------------------------------------------
+  - id: probe-remote-services
+    cmd: ["bash", "./scripts/probe-remote-services.sh"]
     capture: stdout
     timeout: 10s
 

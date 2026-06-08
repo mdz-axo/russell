@@ -78,7 +78,7 @@ russell digest --since-hours 168       # Markdown health report
 russell jack --note "ollama hangs"     # ask Jack (LLM-assisted)
 russell skill list                     # registered skills
 russell skill run <id>                 # run a skill by ID
-russell-acp-server                     # ACP server for hKask integration
+russell-acp-server                     # ACP server for agent integration
 ```
 
 ## The attitude
@@ -125,7 +125,7 @@ See [`docs/status/CONSOLIDATED-STATUS.md`](docs/status/CONSOLIDATED-STATUS.md).
 - [x] Phase 2 — Rules engine, EWMA baselines, proprioception.
       Self-vitals, autoimmune guard, memory layer.
 - [x] Phase 3 — Skills framework. Manifest parser, dispatcher,
-      risk-band enforcement, rollback. ACP server for hKask.
+      risk-band enforcement, rollback. ACP server for agent integration.
 - [ ] Phase 4 — Real skills, operational depth.
 
 ## The four-question contract

@@ -15,9 +15,9 @@ artifact_type: semantic_memory
 
 # skill-discovery Skill
 
-Placeholder hKask artifact for skill-discovery.
+Placeholder agent artifact for skill-discovery.
 
-## hKask Replicant Metadata
+## Replicant Metadata
 
 - **Replicant ID**: russell
 - **Visibility**: public

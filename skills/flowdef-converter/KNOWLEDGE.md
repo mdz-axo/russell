@@ -1,25 +1,24 @@
-# FlowDef Converter — Jack's hKask-to-Russell Bridge
+# FlowDef Converter — Jack's FlowDef-to-Russell Bridge
 
-> **A note from Jack about converting FlowDef skills:** hKask and I are
-> family — we share the same operator, the same machine, and the same
-> commitment to keeping things running. But we speak different dialects.
-> hKask orchestrates multi-step processes with template rendering, energy
-> budgets, and CNS spans. I inject knowledge into my chat REPL and run
-> bash probes. Same methodology, different execution model. This skill
-> translates between them. I read a FlowDef manifest and its Jinja2
-> templates, extract the knowledge and logic, and produce a Russell skill
-> that preserves the intent while adapting the form.
+> **A note from Jack about converting FlowDef skills:** FlowDef and I
+> speak different dialects. FlowDef orchestrates multi-step processes
+> with template rendering, energy budgets, and CNS spans. I inject
+> knowledge into my chat REPL and run bash probes. Same methodology,
+> different execution model. This skill translates between them. I read a
+> FlowDef manifest and its Jinja2 templates, extract the knowledge and
+> logic, and produce a Russell skill that preserves the intent while
+> adapting the form.
 >
 > **Source:** This knowledge file. Paired with conversion scripts in `scripts/`.
-> **Bridge:** `~/Clones/hKask/registry/` → `~/.local/share/harness/skills/`
+> **Bridge:** FlowDef source → `~/.local/share/harness/skills/`
 
 ---
 
 ## 1. The Conversion Model
 
-hKask FlowDef and Russell skills solve the same problem differently:
+FlowDef and Russell skills solve the same problem differently:
 
-| Aspect | hKask FlowDef | Russell Skill |
+| Aspect | FlowDef | Russell Skill |
 |---|---|---|
 | **Execution** | Orchestrated process steps (ordinals) | Knowledge injection + chat REPL |
 | **Templates** | Jinja2 (.j2) rendered by inference engine | Embedded in KNOWLEDGE.md as prompt guidance |
@@ -263,4 +262,4 @@ automates this process for future FlowDef skills.
 **Version:** 1.0.0
 **Last updated:** 2026-06-03
 **Prerequisite skills:** workspace (for file output), skill-manager (for installation)
-**Source registry:** ~/Clones/hKask/registry/
+**Source registry:** (FlowDef source directory)

@@ -12,7 +12,7 @@ ddmvss_categories: [curation]
 
 **Purpose:** Index of Russell's DDMVSS-aligned documentation corpus.
 
-**Framework:** Based on hKask's DDMVSS (Domain-Driven Minimal Viable Specification Set)
+**Framework:** Based on the DDMVSS framework (Domain-Driven Minimal Viable Specification Set)
 
 ---
 
@@ -71,7 +71,7 @@ Located in `architecture/reference/`:
 | `ports-inventory.md` | Hexagonal port inventory |
 | `jack-persona.md` | Jack persona specification |
 | `okapi-integration.md` | Okapi LLM integration |
-| `hkask-integration.md` | hKask ACP integration |
+| `hkask-integration.md` | ACP integration |
 
 ---
 
@@ -179,6 +179,6 @@ See [`standards/DOCUMENTATION_STANDARDS.md`](standards/DOCUMENTATION_STANDARDS.m
 
 ## References
 
-- hKask DDMVSS: `~/Clones/hKask/docs/architecture/DDMVSS.md`
-- hKask Scaffold: `~/Clones/hKask/docs/DDMVSS_SCAFFOLD.md`
+- DDMVSS framework (see architecture/DDMVSS.md)
+- DDMVSS scaffold (see DDMVSS_SCAFFOLD.md)
 - Evans, E. (2003). *Domain-Driven Design*. Addison-Wesley.

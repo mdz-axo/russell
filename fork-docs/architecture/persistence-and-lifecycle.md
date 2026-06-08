@@ -325,7 +325,7 @@ rm -rf ~/.local/state/harness/
 
 ## References
 
-- hKask DDMVSS: `~/Clones/hKask/docs/architecture/DDMVSS.md` §5.7, §5.8
+- DDMVSS framework (see architecture/DDMVSS.md) §5.7, §5.8
 - ADR-0004 (SQLite journal)
 - ADR-0006 (profile abstraction)
 - ADR-0024 (skill registry, workshop, lifecycle)

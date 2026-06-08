@@ -2,12 +2,12 @@
 # SPDX-License-Identifier: MIT
 # flowdef-converter: check-templates probe
 # Verifies that all template_ref values in the manifest have corresponding
-# .j2 template files in the hKask registry.
+# .j2 template files in the FlowDef registry.
 
 set -euo pipefail
 
 MANIFEST_PATH="${1:-}"
-HKASK_REGISTRY="${HKASK_REGISTRY_DIR:-$HOME/Clones/hKask/registry}"
+FLOWDEF_REGISTRY="${FLOWDEF_REGISTRY_DIR:-}"
 
 if [[ -z "$MANIFEST_PATH" ]]; then
     echo "Usage: check-templates.sh <path-to-flowdef-manifest>" >&2
@@ -27,7 +27,7 @@ if [[ -z "$SKILL_ID" ]]; then
 fi
 
 echo "skill_id: ${SKILL_ID}"
-echo "registry: ${HKASK_REGISTRY}"
+echo "registry: ${FLOWDEF_REGISTRY:-<not configured>}"
 echo "---"
 
 # Extract all template_refs (skip nulls)
@@ -43,15 +43,18 @@ MISSING=0
 
 for ref in $TEMPLATE_REFS; do
     # Template refs are like "grill-me/grill-me-round"
-    # Files are at HKASK_REGISTRY/templates/<dir>/<file>.j2
+    # Search in FLOWDEF_REGISTRY/templates if configured
     TEMPLATE_DIR=$(echo "$ref" | cut -d'/' -f1)
     TEMPLATE_NAME=$(echo "$ref" | cut -d'/' -f2-)
 
-    SEARCH_PATHS=(
-        "${HKASK_REGISTRY}/templates/${TEMPLATE_DIR}/${TEMPLATE_NAME}.j2"
-        "${HKASK_REGISTRY}/templates/${TEMPLATE_NAME}.j2"
-        "${HKASK_REGISTRY}/templates/${ref}.j2"
-    )
+    SEARCH_PATHS=()
+    if [[ -n "$FLOWDEF_REGISTRY" ]]; then
+        SEARCH_PATHS+=(
+            "${FLOWDEF_REGISTRY}/templates/${TEMPLATE_DIR}/${TEMPLATE_NAME}.j2"
+            "${FLOWDEF_REGISTRY}/templates/${TEMPLATE_NAME}.j2"
+            "${FLOWDEF_REGISTRY}/templates/${ref}.j2"
+        )
+    fi
 
     found_path=""
     for sp in "${SEARCH_PATHS[@]}"; do

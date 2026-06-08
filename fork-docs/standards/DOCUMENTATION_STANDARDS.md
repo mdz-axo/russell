@@ -20,7 +20,7 @@ ddmvss_categories: [curation]
 
 ### 1.1 DDMVSS Corpus (19 Documents)
 
-Russell's documentation follows hKask's DDMVSS framework:
+Russell's documentation follows the DDMVSS framework:
 
 **Framework documents (4):**
 - `architecture/russell-architecture-master.md` — Index
@@ -58,7 +58,7 @@ Located in `architecture/reference/`:
 - `ports-inventory.md` — Hexagonal port inventory
 - `jack-persona.md` — Jack persona specification
 - `okapi-integration.md` — Okapi LLM integration
-- `hkask-integration.md` — hKask ACP integration
+- `hkask-integration.md` — ACP integration
 
 ### 1.3 Decision Records
 
@@ -185,7 +185,7 @@ See `architecture/reference/vocabulary.md` for complete vocabulary.
 ### 5.4 Links
 
 - Use relative links for internal documents: `[PRINCIPLES.md](PRINCIPLES.md)`
-- Use absolute links for external resources: `[hKask DDMVSS](https://github.com/hkask/hkask/blob/main/docs/architecture/DDMVSS.md)`
+- Use absolute links for external resources: `[DDMVSS](https://github.com/example/ddmvss)`
 - Use anchor links for sections: `[§3 Completeness Predicates](#3-completeness-predicates)`
 
 ---
@@ -278,6 +278,6 @@ done
 
 ## 9. References
 
-- hKask DDMVSS: `~/Clones/hKask/docs/architecture/DDMVSS.md`
-- hKask Documentation Standards: `~/Clones/hKask/docs/standards/DOCUMENTATION_STANDARDS.md`
+- DDMVSS framework (see architecture/DDMVSS.md)
+- Documentation Standards (see standards/DOCUMENTATION_STANDARDS.md)
 - Diátaxis: https://diataxis.fr/

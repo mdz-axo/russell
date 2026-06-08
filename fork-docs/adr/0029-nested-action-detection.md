@@ -46,7 +46,7 @@ Implement nested ACTION: detection:
    first line (deduplication). The response is not rejected.
 
 2. **Error variant** — `NestedActionDetected` variant preserved for
-   diagnostic use; no longer returned by `resolve_with_hkask()` in the
+   diagnostic use; no longer returned by `resolve_action()` in the
    multi-ACTION case (first-line wins instead).
 
 3. **Security logging** — When multiple ACTION lines are detected, emit a
@@ -95,13 +95,13 @@ Implement nested ACTION: detection:
 
 | File | Change |
 |---|---|
-| `russell-meta/src/action.rs` | Add `NestedActionDetected` error variant, count ACTION: lines in `resolve_with_hkask()` |
+| `russell-meta/src/action.rs` | Add `NestedActionDetected` error variant, count ACTION: lines in `resolve_action()` |
 
 ### Test Coverage
 
 - `nested_action_deduplicated_to_first` — Two ACTION: patterns resolve to the first
 - `single_action_is_ok` — One ACTION: pattern (expected case)
-- `nested_hkask_action_deduplicated_to_first` — Two hKask ACTION: patterns resolve to the first
+- `nested_external_action_deduplicated_to_first` — Two ACTION: patterns resolve to the first
 - `triple_action_deduplicated_to_first` — Three ACTION: patterns resolve to the first
 
 All 22 action parser tests pass.
@@ -111,7 +111,7 @@ All 22 action parser tests pass.
 | Principle | Compliance |
 |---|---|
 | **JR-3** (LLM never emits shell) | Poka-yoke: parser uses first ACTION line, ignoring duplicates |
-| **JR-6** (Reuse over dependency) | Pattern borrowed from hKask capability boundaries |
+| **JR-6** (Reuse over dependency) | Pattern borrowed from capability boundaries |
 | **Schneier** (Defense in depth) | Layered security: parser enforces protocol even if LLM fails |
 | **Miller** (Capability separation) | Parser (port) enforces rules on LLM (adapter) output |
 

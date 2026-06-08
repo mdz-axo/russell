@@ -179,7 +179,7 @@ MVP-complete(G) := complete?(G, c) for all 9 categories ∧ curated?(G)
 | `realizes` | Goals must anchor to a bounded context | Goals become generic; no context to test against |
 | `constrains` | Unconstrained capabilities are ambient authority | Security model collapses; any agent can mutate |
 | `enables` | Capabilities must surface through interfaces | System has powers no one can exercise |
-| `belongsToDomain` | Domain membership prevents scope creep | Spec tries to cover Russell + hKask + Okapi |
+| `belongsToDomain` | Domain membership prevents scope creep | Spec tries to cover Russell + Okapi |
 | `satisfies` | Without completeness predicate, "done" is undefined | MVP never ships; infinite refinement |
 | `composesInto` | Atomic specs must compose | Each new feature requires full re-specification |
 | `simplifiesVia` | Focusing assumptions collapse dimensions | Spec surface triples; redundant docs per interface |
@@ -266,7 +266,7 @@ Russell's bounded contexts (discovered from code):
 
 ### 5.3 Vocabulary
 
-- **Q5:** Should Russell have a formal vocabulary catalog like hKask's hLexicon?
+- **Q5:** Should Russell have a formal vocabulary catalog?
 - **Q6:** How do we prevent vocabulary drift (e.g., "sentinel" vs "telemetry collector")?
 
 ### 5.4 Composition
@@ -278,7 +278,7 @@ Russell's bounded contexts (discovered from code):
 
 ## 6. References
 
-- hKask DDMVSS: `~/Clones/hKask/docs/architecture/DDMVSS.md`
+- DDMVSS framework (see architecture/DDMVSS.md)
 - Evans, E. (2003). *Domain-Driven Design*. Addison-Wesley.
 - Miller, M.S. (2003). "Robust Composition: Towards a Unified Approach to Access Control and Concurrency Control." PhD thesis, Johns Hopkins.
 - Beer, S. (1972). *Brain of the Firm*. Wiley.

@@ -15,9 +15,9 @@ artifact_type: semantic_memory
 
 # skill-maintenance Skill
 
-Placeholder hKask artifact for skill-maintenance.
+Placeholder agent artifact for skill-maintenance.
 
-## hKask Replicant Metadata
+## Replicant Metadata
 
 - **Replicant ID**: russell
 - **Visibility**: public

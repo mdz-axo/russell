@@ -15,9 +15,9 @@ artifact_type: semantic_memory
 
 # journal-compactor Skill
 
-Placeholder hKask artifact for journal-compactor.
+Placeholder agent artifact for journal-compactor.
 
-## hKask Replicant Metadata
+## Replicant Metadata
 
 - **Replicant ID**: russell
 - **Visibility**: public

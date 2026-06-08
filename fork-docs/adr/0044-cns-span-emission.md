@@ -14,9 +14,9 @@ status: "Implemented"
 
 ## Context
 
-Russell's agent pod (`russell-agent`) defines a `CnsEmitter` that sends structured observability spans to hKask's Central Nervous System (CNS) endpoint. However, the ACP server (`russell-acp-server`) had no CNS emission, creating an observability gap:
+Russell's agent pod (`russell-agent`) defines a `CnsEmitter` that sends structured observability spans to a CNS endpoint. However, the ACP server (`russell-acp-server`) had no CNS emission, creating an observability gap:
 
-- Session creation events not visible to hKask
+- Session creation events not visible to external observability
 - Skill dispatch events not tracked
 - LLM escalation events not monitored
 - Consent decisions not auditable
@@ -45,13 +45,13 @@ Implement `AcpCnsEmitter` in `russell-acp-server` that emits structured spans fo
 ```rust
 pub struct AcpCnsEmitter {
     source: String,                    // "russell-acp-server"
-    cns_endpoint: Option<String>,      // from $HKASK_CNS_ENDPOINT
+    cns_endpoint: Option<String>,      // from $REMOTE_CNS_ENDPOINT
     http_client: Option<reqwest::Client>,
 }
 
 impl AcpCnsEmitter {
     pub fn new(source: impl Into<String>) -> Self {
-        let cns_endpoint = std::env::var("HKASK_CNS_ENDPOINT").ok();
+        let cns_endpoint = std::env::var("REMOTE_CNS_ENDPOINT").ok();
         let http_client = cns_endpoint
             .as_ref()
             .and_then(|_| reqwest::Client::builder().build().ok());
@@ -121,7 +121,7 @@ if let Some(ref cns) = self.cns {
 
 ### Positive
 
-- **Complete observability** — hKask CNS receives all ACP events
+- **Complete observability** — CNS receives all ACP events
 - **Structured spans** — Consistent format with `russell-agent` CNS emission
 - **Graceful degradation** — Works without CNS endpoint (local logging)
 - **Async emission** — Non-blocking, 5s timeout prevents stalls
@@ -135,7 +135,7 @@ if let Some(ref cns) = self.cns {
 ### Neutral
 
 - **No breaking changes** — CNS emission is additive, optional
-- **Opt-in** — Only active if `HKASK_CNS_ENDPOINT` is configured
+- **Opt-in** — Only active if `REMOTE_CNS_ENDPOINT` is configured
 
 ---
 
@@ -177,7 +177,7 @@ if let Some(ref cns) = self.cns {
 
 ## References
 
-- [ADR-0027: hKask ACP Integration](0027-acp-integration.md)
+- [ADR-0027: ACP Integration](0027-acp-integration.md)
 - [ADR-0041: ACP Consent Protocol](0041-acp-consent-protocol.md)
 - Adversarial Review Action Plan (2026-05-23) §Tier 2 recommendations
 - `crates/russell-agent/src/cns.rs` — Agent pod CNS emission (reference implementation)

@@ -1,24 +1,24 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: MIT
 # flowdef-converter: list-convertible probe
-# Lists all FlowDef manifests in the hKask registry that can be converted.
+# Lists all FlowDef manifests that can be converted.
 
 set -euo pipefail
 
-HKASK_REGISTRY="${HKASK_REGISTRY_DIR:-$HOME/Clones/hKask/registry}"
+FLOWDEF_REGISTRY="${FLOWDEF_REGISTRY_DIR:-}"
 
-if [[ ! -d "$HKASK_REGISTRY/manifests" ]]; then
-    echo "hKask registry not found at: ${HKASK_REGISTRY}"
+if [[ -z "$FLOWDEF_REGISTRY" ]] || [[ ! -d "$FLOWDEF_REGISTRY/manifests" ]]; then
+    echo "FlowDef registry not configured or not found. Set FLOWDEF_REGISTRY_DIR."
     exit 1
 fi
 
-echo "registry: ${HKASK_REGISTRY}/manifests"
+echo "registry: ${FLOWDEF_REGISTRY}/manifests"
 echo "---"
 
 COUNT=0
 CONVERTIBLE=0
 
-for manifest in "$HKASK_REGISTRY"/manifests/*.yaml; do
+for manifest in "$FLOWDEF_REGISTRY"/manifests/*.yaml; do
     if [[ ! -f "$manifest" ]]; then
         continue
     fi

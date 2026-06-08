@@ -101,9 +101,9 @@ cargo run -p russell-acp-server
 stdio is the only v1 transport (ADR-0003). See
 [`AGENTS.md`](AGENTS.md) §8 for ACP server commands.
 
-### 8.1 hKask Integration
+### 8.1 Agent Integration
 
-Configure hKask to connect via ACP. See
+Configure external agents to connect via ACP. See
 [`docs/deployment/acp-integration.md`](docs/deployment/acp-integration.md).
 
 ### 8.2 Ad-hoc

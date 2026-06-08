@@ -11,7 +11,7 @@
 #
 # Installs:
 #   ~/.local/bin/russell             — the binary
-#   ~/.local/bin/russell-acp-server  — ACP server for hKask
+#   ~/.local/bin/russell-acp-server  — ACP server
 #   ~/.local/bin/russell-api-server — HTTP REST API server
 #   ~/.local/state/harness/          — journal, evidence, memory
 #   ~/.local/share/harness/skills/   — skill manifests + scripts

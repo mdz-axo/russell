@@ -14,7 +14,7 @@ status: "Implemented"
 
 ## Context
 
-Russell's capability tokens (hKask-format, used for SOAP inference) were generated once and persisted with `expires_at: null` (infinite lifetime). This violated the Schneier principle: secrets should have bounded lifetimes to limit exposure from compromise.
+Russell's capability tokens (used for SOAP inference) were generated once and persisted with `expires_at: null` (infinite lifetime). This violated the Schneier principle: secrets should have bounded lifetimes to limit exposure from compromise.
 
 The adversarial review (2026-05-23) identified this as a security concern:
 - If a token is compromised, it remains valid indefinitely

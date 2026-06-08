@@ -25,7 +25,7 @@ ddmvss_categories: [domain, capability, interface, composition, trust, observabi
 **Description:** Define machine-checkable criteria for "Russell is complete"
 
 **Steps:**
-1. Research hKask's completeness predicate implementation
+1. Research completeness predicate patterns
 2. Define per-context predicates for each of 8 bounded contexts
 3. Define system-wide integration predicate
 4. Implement `is_complete()` function in `russell-core`
@@ -166,7 +166,7 @@ ddmvss_categories: [domain, capability, interface, composition, trust, observabi
 1. Design rotation strategy (time-based, use-based, or TTL-only)
 2. Implement rotation in `russell-acp-server`
 3. Add rotation timer or counter
-4. Test rotation with hKask integration
+4. Test rotation with ACP integration
 5. File ADR documenting decision
 
 **Estimated effort:** 2-3 days
@@ -190,14 +190,14 @@ ddmvss_categories: [domain, capability, interface, composition, trust, observabi
 
 ---
 
-### TODO-11: Align with hKask DDMVSS
+### TODO-11: DDMVSS Internal Alignment
 
 **Category:** Curation  
 **Context:** OQ-15  
-**Description:** Ensure Russell's DDMVSS stays aligned with hKask's DDMVSS
+**Description:** Ensure Russell's DDMVSS stays internally consistent
 
 **Steps:**
-1. Review hKask DDMVSS documentation
+1. Review DDMVSS documentation for consistency
 2. Compare with Russell DDMVSS documentation
 3. Identify divergences
 4. Update Russell documentation to align
@@ -243,7 +243,7 @@ ddmvss_categories: [domain, capability, interface, composition, trust, observabi
 **Completed:** 2026-05-25  
 **Description:** Migrated documentation from TOGAF-Lite to DDMVSS
 
-**Result:** 19 core documents created, all aligned with hKask DDMVSS framework
+**Result:** 19 core documents created, all aligned with DDMVSS framework
 
 ---
 

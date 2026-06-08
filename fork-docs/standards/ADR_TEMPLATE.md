@@ -321,5 +321,5 @@ Before submitting an ADR:
 
 ## References
 
-- hKask ADR Template: `~/Clones/hKask/docs/standards/ADR_TEMPLATE.md`
+- ADR Template (see standards/ADR_TEMPLATE.md)
 - Michael Nygard. "Documenting Architecture Decisions." https://cognitect.com/blog/2011/11/15/documenting-architecture-decisions

@@ -72,7 +72,7 @@ pub struct DataSovereigntyBoundary {
 
 **Default Russell Configuration:**
 - **Sovereign:** journal entries, proprioceptive readings, SOAP bundles, consent records
-- **Shared:** sentinel samples (via ACP to hKask, with consent)
+- **Shared:** sentinel samples (via ACP, with consent)
 - **Public:** hlexicon terms, skill manifests (if published)
 
 ### SOLID Alignment
@@ -268,7 +268,7 @@ The Sentinel (continuous telemetry collector) monitors, providing algedonic sign
 
 When triggered, Jack escalates to:
 - The operator (via `russell chat` or ACP session)
-- hKask (via ACP `acp/session.create`)
+- External agents (via ACP `acp/session.create`)
 - Journal audit trail
 
 ---
@@ -415,7 +415,7 @@ impl JournalWriter {
 
 **To Builders:** Within these boundaries, build freely. All settings are exposed. All tools are available. Operator-curated, not system-imposed.
 
-**To hKask:** Affirmative consent is required. Consent must be explicit, scoped, versioned, and expiring. No speculative judgment.
+**For external agents:** Affirmative consent is required. Consent must be explicit, scoped, versioned, and expiring. No speculative judgment.
 
 ---
 

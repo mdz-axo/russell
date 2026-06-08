@@ -63,15 +63,13 @@ Monitors the local Okapi LLM instance for health issues, model availability, and
 ## References
 
 - [Okapi AGENTS.md](~/Clones/Okapi/AGENTS.md)
-- [Kask Integration Points](~/Clones/Okapi/fork-docs/plans/KASK_INTEGRATION_POINTS.md)
 
-## hKask Replicant Metadata
+## Replicant Metadata
 
-This skill is part of the **Russell** replicant profile in the hKask Universal Agentic Registry.
+This skill is part of the **Russell** replicant profile.
 
 - **Replicant ID**: `russell`
 - **Visibility**: `public` (semantic memory artifact)
 - **Episodic Memory**: Not included (private to Russell instance)
-- **Registry Topic**: HCS-2 skill discovery registry
 
 > Russell is a cybernetic health harness for Linux AI/ML workstations. He observes, remembers, and reports — never mutates without IDRS contract.

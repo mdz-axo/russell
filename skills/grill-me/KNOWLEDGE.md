@@ -9,7 +9,7 @@
 > scratch?" And at the end, I'll hand you a map of exactly where your
 > understanding is solid and where it has holes.
 >
-> **Source:** This knowledge file. Adapted from hKask grill-me v0.21.0.
+> **Source:** This knowledge file. Adapted from grill-me v0.21.0.
 > **Interface:** `russell chat` (multi-turn REPL). No scripts execute the
 > grilling — I do it myself, in conversation.
 
@@ -328,5 +328,5 @@ is reachable. If it's not, okapi-watcher can diagnose why.
 
 **Version:** 1.0.0
 **Last updated:** 2026-06-03
-**Adapted from:** hKask grill-me v0.21.0
+**Adapted from:** grill-me v0.21.0
 **Prerequisite skills:** None (okapi-watcher recommended for LLM pre-check)

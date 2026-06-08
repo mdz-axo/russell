@@ -12,7 +12,7 @@ ddmvss_categories: [domain, capability, interface, composition, trust, observabi
 
 **Purpose:** Thin pointer document to Russell's DDMVSS-aligned architecture corpus.
 
-**Russell is a cybernetic health harness for a single Linux AI/ML workstation.** He observes the host on a 5-minute cadence, remembers what he saw in a SQLite journal, reports through ACP to hKask, watches himself (proprioception), and cries for help via a local LLM when asked.
+**Russell is a cybernetic health harness for a single Linux AI/ML workstation.** He observes the host on a 5-minute cadence, remembers what he saw in a SQLite journal, reports through ACP, watches himself (proprioception), and cries for help via a local LLM when asked.
 
 ---
 
@@ -38,7 +38,7 @@ ddmvss_categories: [domain, capability, interface, composition, trust, observabi
 | [`reference/ports-inventory.md`](reference/ports-inventory.md) | Hexagonal port inventory |
 | [`reference/jack-persona.md`](reference/jack-persona.md) | Jack persona specification |
 | [`reference/okapi-integration.md`](reference/okapi-integration.md) | Okapi LLM integration contract |
-| [`reference/hkask-integration.md`](reference/hkask-integration.md) | hKask ACP integration |
+| [`reference/hkask-integration.md`](reference/hkask-integration.md) | ACP integration |
 
 ## Specifications
 
@@ -88,5 +88,5 @@ Russell's bounded contexts (discovered from code):
 
 ## References
 
-- hKask DDMVSS: `~/Clones/hKask/docs/architecture/DDMVSS.md`
-- hKask Scaffold: `~/Clones/hKask/docs/DDMVSS_SCAFFOLD.md`
+- DDMVSS framework (see architecture/DDMVSS.md)
+- DDMVSS scaffold (see DDMVSS_SCAFFOLD.md)

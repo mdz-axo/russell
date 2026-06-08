@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: MIT OR Apache-2.0
 [Unit]
-Description=Russell ACP Server — hKask integration
+Description=Russell ACP Server — agent integration
 Documentation=https://github.com/Replicant-Partners/russell
 After=network.target
 ConditionPathExists=%h/.local/share/harness/skills

@@ -28,7 +28,7 @@ status: "Deferred"
 
 ### Current Mitigations
 
-1. **Single operator** — Russell and hKask are deployed by the same operator, enabling coordinated updates
+1. **Single operator** — Russell and the agent are deployed by the same operator, enabling coordinated updates
 2. **JSON-RPC 2.0** — Stable, versioned protocol underneath ACP methods
 3. **Method-level errors** — Unknown methods return `InvalidRequest`, allowing graceful handling
 4. **Capabilities query** — `acp/capabilities` advertises supported skills and probes
@@ -36,9 +36,9 @@ status: "Deferred"
 ### When to Revisit
 
 Revisit this decision when:
-- hKask and Russell are deployed by different operators
+- Agents and Russell are deployed by different operators
 - Protocol breaking changes are planned
-- Multiple hKask versions must coexist
+- Multiple agent versions must coexist
 - Observed compatibility issues in production
 
 ---
@@ -98,7 +98,7 @@ Revisit this decision when:
 
 ### Negative (of deferral)
 
-- **Coordinated deployment required** — Russell and hKask must be updated together
+- **Coordinated deployment required** — Russell and the agent must be updated together
 - **No graceful degradation** — Protocol mismatches cause hard failures
 - **Future rework** — Versioning will require significant refactoring
 
@@ -130,6 +130,6 @@ Revisit this decision when:
 
 ## References
 
-- [ADR-0027: hKask ACP Integration](../0027-acp-integration.md)
+- [ADR-0027: ACP Integration](../0027-acp-integration.md)
 - [JSON-RPC 2.0 Specification](https://www.jsonrpc.org/specification)
 - Adversarial Review Action Plan (2026-05-23) §Tier 3 recommendations

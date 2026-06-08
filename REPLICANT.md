@@ -1,5 +1,5 @@
 ---
-title: "Russell Replicant — hKask Universal Agentic Registry"
+title: "Russell Replicant — Agent Registry"
 audience: [operators, developers, agents]
 last_updated: 2026-05-24
 togaf_phase: "Preliminary"
@@ -12,21 +12,7 @@ status: "Active"
 <!-- STATUS: Active -->
 <!-- LAST_UPDATED: 2026-05-24 -->
 
----
-title: "Russell Replicant — hKask Universal Agentic Registry"
-audience: [operators, developers, agents]
-last_updated: 2026-05-24
-togaf_phase: "Preliminary"
-version: "1.1.0"
-status: "Active"
----
-
-<!-- TOGAF_DOMAIN: Business Architecture -->
-<!-- VERSION: 1.1.0 -->
-<!-- STATUS: Active -->
-<!-- LAST_UPDATED: 2026-05-24 -->
-
-# Russell Replicant — hKask Universal Agentic Registry
+# Russell Replicant — Agent Registry
 
 **Replicant ID**: `russell`  
 **Type**: Cybernetic Health Harness  
@@ -35,7 +21,7 @@ status: "Active"
 
 ## Overview
 
-Russell is a replicant in the hKask Universal Agentic Registry — a cybernetic health harness that observes Linux AI/ML workstations, remembers what it saw in a SQLite journal, and reports through the ACP (Agent Client Protocol) server and a local CLI. When asked, Russell cries for help via a local LLM (Okapi by default).
+Russell is a cybernetic health harness that observes Linux AI/ML workstations, remembers what it saw in a SQLite journal, and reports through the ACP (Agent Client Protocol) server and a local CLI. When asked, Russell cries for help via a local LLM (Okapi by default).
 
 ## Visibility Model
 
@@ -78,9 +64,9 @@ Russell implements the **Observe > Recommend > Act** posture (JR-2):
 1. **Sentinel** — 5-minute cadence probe collection
 2. **Journal** — SQLite with hash-chain integrity (tamper-evident)
 3. **Nurse (Jack)** — LLM consultation via Okapi/OpenRouter
-4. **Proprioception** — Self-observation (7 self-vitals)
+4. **Proprioception** — Self-observation (6 self-vitals)
 5. **Skills** — YAML manifests + scripts (IDRS-contract mutations)
-6. **ACP Server** — Agent Client Protocol for hKask integration (primary interface)
+6. **ACP Server** — Agent Client Protocol for agent integration (primary interface)
 
 ## IDRS Contract
 
@@ -91,15 +77,13 @@ All mutations satisfy the IDRS contract:
 - **R** — Rollback (pre-state captured, reverse intervention)
 - **S** — Structured log (`harness.event.v1` in journal)
 
-## hKask Integration
+## Skill Registry
 
-Russell skills are compatible with hKask's skill registry:
+Russell skills are published in standard formats:
 
 - `SKILL.md` — Universal skill definition (OpenClaw-compatible)
 - `skill.json` — Manifest descriptor (SchemaStore-registered)
 - `manifest.yaml` — Russell-native format (backward-compatible)
-
-Skills can be published to the hKask registry via HCS-26 topic registries.
 
 ## Installation
 

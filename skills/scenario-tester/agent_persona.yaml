@@ -3,24 +3,24 @@ agent:
   name: "scenario-tester"
   type: "Bot"
   version: "0.1.0"
-  
+
 charter:
-  description: "Repeatable scenario tests for Okapi, hKask, Russell"
+  description: "Repeatable scenario tests for Okapi, external agents, Russell"
   editor: "russell"
-  
+
 capabilities:
   - "test:scenario:run"
   - "test:scenario:evaluate"
   - "test:scenario:report"
-  
+
 rights:
   - read: "test_scenarios"
   - write: "test_results"
-  
+
 responsibilities:
   - "run: scenario probes"
   - "evaluate: stimulus-response"
   - "report: test results"
-  
+
 visibility:
   default: "operator-only"

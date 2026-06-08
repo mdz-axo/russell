@@ -304,4 +304,4 @@ cargo semver-checks
 - JR-6 (Reuse, don't depend)
 - ADR-0013 (Rust workspace layout)
 - ADR-0017 (Reuse over dependency)
-- hKask Dependency Policy: `~/Clones/hKask/docs/standards/DEPENDENCY_POLICY.md`
+- Dependency Policy (see standards/DEPENDENCY_POLICY.md)

@@ -1,19 +1,23 @@
 ---
-title: "ADR-0025: hKask MCP Client — Trusted Local Relationship"
-audience: [developers, architects, agents]
-last_updated: 2026-05-19
+title: "ADR-0025: hKask MCP Client — Trusted Local Relationship [SUPERSEDED]"
+ audience: [developers, architects, agents]
+last_updated: 2026-06-07
 ddmvss_context: "mcp"
 ddmvss_artifact: "adr"
-version: "2.0.0"
-status: "Accepted"
+version: "2.1.0"
+status: "Superseded"
 ---
 
-
+> **⚠️ Superseded.** The hKask integration described in this ADR has been removed.
+> Russell is now a standalone project. The MCP client for hKask, the trusted
+> bilateral relationship, and all hKask-specific authentication and tool
+> registry mechanisms are no longer implemented. This ADR is retained for
+> historical record only.
 
 # ADR-0025: hKask MCP Client — Trusted Local Relationship
 
-- **Status:** Accepted
-- **Date:** 2026-05-14 (original), 2026-05-19 (hKask migration)
+- **Status:** Superseded — hKask integration removed. Russell is now standalone.
+- **Date:** 2026-05-14 (original), 2026-05-19 (hKask migration), 2026-06-07 (superseded)
 - **Deciders:** Project operator
 - **Tags:** `mcp`, `hkask`, `trust`, `tools`, `phase-4`
 - **Lifts:** Partial lift of [ADR-0003](0003-mcp-transport.md)

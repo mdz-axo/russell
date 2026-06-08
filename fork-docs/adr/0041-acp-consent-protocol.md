@@ -14,13 +14,13 @@ status: "Implemented"
 
 ## Context
 
-Russell's ACP server exposes skills to hKask agents. Some skills contain interventions that require explicit operator consent before execution (per JR-2: Observe > Recommend > Act). The adversarial review (2026-05-23) identified that interventions requiring consent had no mechanism for hKask agents to:
+Russell's ACP server exposes skills to external agents. Some skills contain interventions that require explicit operator consent before execution (per JR-2: Observe > Recommend > Act). The adversarial review (2026-05-23) identified that interventions requiring consent had no mechanism for agents to:
 
 1. Surface a `PendingAction` to the operator
 2. Receive consent (approve/deny) in a subsequent message
 3. Execute the approved action with the original arguments
 
-This created a gap: the consent gate was CLI-only (`russell chat`), not available via ACP. hKask agents could not complete the full observe → recommend → consent → act loop.
+This created a gap: the consent gate was CLI-only (`russell chat`), not available via ACP. Agents could not complete the full observe → recommend → consent → act loop.
 
 ---
 
@@ -30,7 +30,7 @@ Implement a consent protocol over ACP with two new JSON-RPC methods:
 
 ### 1. `acp/consent.respond`
 
-Allows hKask agents to respond to a pending consent request.
+Allows agents to respond to a pending consent request.
 
 **Request:**
 ```json
@@ -133,7 +133,7 @@ pub enum ConsentDecision {
 
 ### Positive
 
-- **Complete consent loop** — hKask agents can now surface interventions, receive consent, and execute approved actions via ACP
+- **Complete consent loop** — Agents can now surface interventions, receive consent, and execute approved actions via ACP
 - **Security** — Session ownership + action ID matching prevents unauthorized consent responses
 - **Audit trail** — All consent decisions recorded in session history with operator attribution
 - **State clarity** — `InputRequired` state makes it explicit when a session is waiting for operator input
@@ -185,13 +185,13 @@ pub enum ConsentDecision {
 2. **Batch consent** — Allow operator to approve/deny multiple pending actions in one response
 3. **Consent history** — Query past consent decisions via `acp/consent.history` method
 4. **Consent policies** — Pre-approve specific interventions (e.g., "always allow cache cleanup")
-5. **Consent notifications** — Push notification to operator when consent is required (via hKask UI)
+5. **Consent notifications** — Push notification to operator when consent is required (via agent interface)
 
 ---
 
 ## References
 
-- [ADR-0027: hKask ACP Integration](0027-acp-integration.md)
+- [ADR-0027: ACP Integration](0027-acp-integration.md)
 - [ADR-0036: Andon Cord for Reflex Arcs](deferred/0036-andon-cord-reflex-arcs.md) (deferred, consent absorbed here)
 - Adversarial Review Action Plan (2026-05-23) §Tier 1 recommendations
 - JR-2: Observe > Recommend > Act

@@ -37,7 +37,7 @@ pub trait InferencePort: Send + Sync {
     /// Check if the backend is available and healthy.
     async fn health_check(&self) -> Result<bool>;
 
-    /// Get the backend identifier (e.g., "hkask", "okapi").
+    /// Get the backend identifier (e.g., "okapi", "remote").
     fn backend_id(&self) -> &str;
 }
 ```
@@ -77,7 +77,7 @@ let bundle = SoapBundle::new("High CPU usage")
 ```rust
 pub struct InferenceResponse {
     pub text: String,                    // Generated response
-    pub backend: String,                 // "hkask", "okapi", etc.
+    pub backend: String,                 // "okapi", "remote", etc.
     pub model: Option<String>,           // Model identifier
     pub latency_ms: Option<u64>,         // Response time
     pub token_usage: Option<TokenUsage>, // Token statistics
@@ -92,18 +92,18 @@ pub struct TokenUsage {
 
 ### Implementations
 
-**1. HkaskInferenceAdapter (russell-meta)**
+**1. RemoteInferenceAdapter (russell-meta)**
 
-Connects to hKask's REST API at `/api/llm/infer`:
+Connects to a remote LLM API at `/api/llm/infer`:
 
 ```rust
-pub struct HkaskInferenceAdapter {
+pub struct RemoteInferenceAdapter {
     endpoint: String,
     capability_token: Option<String>,
     client: reqwest::Client,
 }
 
-impl HkaskInferenceAdapter {
+impl RemoteInferenceAdapter {
     pub fn new(endpoint: impl Into<String>) -> Self;
     pub fn with_token(mut self, token: impl Into<String>) -> Self;
     pub fn with_token_from_file(mut self) -> Option<Self>;
@@ -117,7 +117,7 @@ Local-first fallback using Okapi (Ollama-compatible endpoint). See "Future Work"
 ### Location
 
 - **Trait:** `crates/russell-core/src/inference.rs`
-- **HkaskInferenceAdapter:** `crates/russell-meta/src/hkask_adapter.rs`
+- **RemoteInferenceAdapter:** `crates/russell-meta/src/remote_adapter.rs`
 - **OkapiInferenceAdapter:** Planned for `crates/russell-meta/src/okapi_adapter.rs`
 
 ---
@@ -128,7 +128,7 @@ Local-first fallback using Okapi (Ollama-compatible endpoint). See "Future Work"
 
 - **Hexagonal architecture** — Inference is now a proper port. The Nurse depends on an abstraction; adapters provide concrete implementations.
 
-- **Resilience** — The Nurse can fall back to local Okapi when hKask is unavailable. Critical for single-host operation.
+- **Resilience** — The Nurse can fall back to local Okapi when a remote backend is unavailable. Critical for single-host operation.
 
 - **Testability** — Unit tests can use a mock `InferencePort` without network calls. Integration tests can verify adapter behavior.
 
@@ -148,7 +148,7 @@ Local-first fallback using Okapi (Ollama-compatible endpoint). See "Future Work"
 
 ### Neutral
 
-- **No breaking changes** — Existing `call_hkask()` function remains for backward compatibility. The port is additive.
+- **No breaking changes** — Existing inference function remains for backward compatibility. The port is additive.
 
 - **Backward compatible** — Code that doesn't need the abstraction can continue using direct HTTP calls.
 
@@ -160,7 +160,7 @@ Local-first fallback using Okapi (Ollama-compatible endpoint). See "Future Work"
 |---|---|
 | **JR-6** (Reuse, don't depend) | Nurse depends on abstraction, not specific LLM backend |
 | **Cockburn** (Hexagonal architecture) | Inference is a port with multiple adapters |
-| **JR-4** (Small but present) | Nurse can function with local Okapi when hKask is unavailable |
+| **JR-4** (Small but present) | Nurse can function with local Okapi when a remote backend is unavailable |
 | **Schneier** (Defense in depth) | Multiple backends provide redundancy against single points of failure |
 
 ---
@@ -169,11 +169,11 @@ Local-first fallback using Okapi (Ollama-compatible endpoint). See "Future Work"
 
 **Files created:**
 - `crates/russell-core/src/inference.rs` — Trait definition + `SoapBundle` + `InferenceResponse`
-- `crates/russell-meta/src/hkask_adapter.rs` — `HkaskInferenceAdapter` implementation
+- `crates/russell-meta/src/remote_adapter.rs` — `RemoteInferenceAdapter` implementation
 
 **Files modified:**
 - `crates/russell-acp-server/src/handler.rs` — Session messages use `InferencePort`
-- `crates/russell-acp-server/src/main.rs` — Initialize `HkaskInferenceAdapter`
+- `crates/russell-acp-server/src/main.rs` — Initialize `RemoteInferenceAdapter`
 
 **Tests:**
 - `test_soap_bundle_creation` — Verifies basic bundle construction
@@ -188,11 +188,11 @@ Local-first fallback using Okapi (Ollama-compatible endpoint). See "Future Work"
 
 1. **OkapiInferenceAdapter** — Implement local-first fallback using Okapi (Ollama-compatible endpoint at `http://localhost:11434`). This is the next priority.
 
-2. **Fallback chain** — Implement `FallbackInferenceAdapter` that tries hKask first, then Okapi, then offline mode.
+2. **Fallback chain** — Implement `FallbackInferenceAdapter` that tries remote first, then Okapi, then offline mode.
 
 3. **Model selection** — Extend `InferencePort` to support model selection (e.g., "use claude-3-opus for complex assessments").
 
-4. **Streaming responses** — Add `infer_stream()` method for backends that support streaming (hKask, Claude).
+4. **Streaming responses** — Add `infer_stream()` method for backends that support streaming.
 
 5. **Prompt caching** — Cache SOAP bundle formatting to avoid redundant serialization.
 
