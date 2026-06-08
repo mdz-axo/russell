@@ -11,8 +11,8 @@
 //!
 //! ## Template integration
 //!
-//! The `compose_with_kask_templated` function uses the prompt registry
-//! to render templates from `.md.j2` files. The legacy `compose_with_kask`
+//! The `compose_with_tools_templated` function uses the prompt registry
+//! to render templates from `.md.j2` files. The legacy `compose_with_tools`
 //! function retains the original `writeln!()` approach for backward
 //! compatibility while callers migrate.
 
@@ -40,26 +40,20 @@ pub fn compose(
     loaded_skills: &[Skill],
     skills_base_dir: &Path,
 ) -> Result<SoapPrompt> {
-    compose_with_kask(reader, profile, note, loaded_skills, skills_base_dir, &[])
+    compose_with_tools(reader, profile, note, loaded_skills, skills_base_dir, &[])
 }
 
-/// Build the SOAP prompt with Kask MCP tool awareness.
+/// Build the SOAP prompt with optional remote MCP tool awareness.
 ///
-/// Same as [`compose`] but additionally includes available Kask tools
+/// Same as [`compose`] but additionally includes available remote MCP tools
 /// in the prompt's "Available actions" section.
-///
-/// Same as [`compose`] but additionally includes available Kask tools
-/// in the prompt's "Available actions" section.
-/// Same as [`compose`] but additionally includes available Kask tools
-/// in the prompt's "Available actions" section.
-/// in the prompt's "Available actions" section.
-pub fn compose_with_kask(
+pub fn compose_with_tools(
     reader: &JournalReader,
     profile: Option<&Profile>,
     note: Option<&str>,
     loaded_skills: &[Skill],
     skills_base_dir: &Path,
-    kask_tool_names: &[(String, Option<String>)],
+    remote_tool_names: &[(String, Option<String>)],
 ) -> Result<SoapPrompt> {
     let now = russell_core::time::now_unix();
     let window_start = now - 24 * 3600;
@@ -284,20 +278,20 @@ pub fn compose_with_kask(
         }
     }
 
-    // Phase 4C: Kask MCP tools (ADR-0025 §7).
-    if !kask_tool_names.is_empty() {
-        writeln!(objective, "\n### Kask MCP tools")?;
+    // Phase 4C: Remote MCP tools.
+    if !remote_tool_names.is_empty() {
+        writeln!(objective, "\n### Remote MCP tools")?;
         writeln!(objective, "| tool | risk |")?;
         writeln!(objective, "|---|---|")?;
-        for (name, risk) in kask_tool_names {
+        for (name, risk) in remote_tool_names {
             let risk_str = risk.as_deref().unwrap_or("medium");
             writeln!(objective, "| {name} | {risk_str} |")?;
         }
         writeln!(
             objective,
-            "\nYou can also call Kask tools via ACTION syntax:\n\
-             ACTION: kask/<tool-name>\n\
-             (e.g. ACTION: kask/paradigm_shift_query)\n\n\
+            "\nYou can also call remote MCP tools via ACTION syntax:\n\
+             ACTION: remote/<tool-name>\n\
+             (e.g. ACTION: remote/paradigm_shift_query)\n\n\
              If the tool needs arguments, add an Arguments line:\n\
              Arguments: {{\"prompt\": \"...\", \"depth\": \"quick\"}}\n\n\
              Tools with risk 'none' auto-execute. Others require operator consent."
@@ -364,7 +358,7 @@ pub fn compose_templated(
     note: Option<&str>,
     loaded_skills: &[Skill],
     skills_base_dir: &Path,
-    kask_tool_names: &[(String, Option<String>)],
+    remote_tool_names: &[(String, Option<String>)],
     skill_registry: Option<&russell_skills::registry::RegistryCache>,
 ) -> Result<SoapPrompt> {
     use std::collections::HashMap;
@@ -412,7 +406,7 @@ pub fn compose_templated(
         })
         .collect();
 
-    let kask_tools: Vec<serde_json::Value> = kask_tool_names
+    let remote_tools: Vec<serde_json::Value> = remote_tool_names
         .iter()
         .map(|(name, risk)| {
             serde_json::json!({
@@ -457,8 +451,8 @@ pub fn compose_templated(
     if !knowledge.is_empty() {
         ctx.insert("knowledge_skills".to_string(), serde_json::json!(knowledge));
     }
-    if !kask_tools.is_empty() {
-        ctx.insert("kask_tools".to_string(), serde_json::json!(kask_tools));
+    if !remote_tools.is_empty() {
+        ctx.insert("remote_tools".to_string(), serde_json::json!(remote_tools));
     }
 
     let (rendered, hint) = registry.render_with_hint("soap", &ctx)?;
@@ -1185,7 +1179,7 @@ mod tests {
     }
 
     #[test]
-    fn compose_with_kask_includes_kask_tools_section() {
+    fn compose_with_tools_includes_remote_tools_section() {
         let tmp = tempfile::tempdir().unwrap();
         let db = tmp.path().join("journal.db");
         let w = JournalWriter::open(&db).unwrap();
@@ -1193,7 +1187,7 @@ mod tests {
         let skills_dir = tmp.path().join("skills");
         std::fs::create_dir_all(&skills_dir).unwrap();
 
-        let kask_tools = vec![
+        let remote_tools = vec![
             (
                 "paradigm_shift_query".to_string(),
                 Some("medium".to_string()),
@@ -1204,19 +1198,19 @@ mod tests {
             ),
         ];
 
-        let prompt = compose_with_kask(
+        let prompt = compose_with_tools(
             &reader,
             None,
-            Some("test kask tools"),
+            Some("test remote tools"),
             &[],
             Path::new("/nonexistent"),
-            &kask_tools,
+            &remote_tools,
         )
         .unwrap();
 
         assert!(
-            prompt.rendered.contains("### Kask MCP tools"),
-            "should include Kask MCP tools section"
+            prompt.rendered.contains("### Remote MCP tools"),
+            "should include remote MCP tools section"
         );
         assert!(
             prompt.rendered.contains("paradigm_shift_query"),
@@ -1227,33 +1221,33 @@ mod tests {
             "should list russell_host_snapshot"
         );
         assert!(
-            prompt.rendered.contains("ACTION: kask/"),
-            "should include Kask ACTION syntax"
+            prompt.rendered.contains("ACTION: remote/"),
+            "should include remote ACTION syntax"
         );
     }
 
     #[test]
-    fn compose_with_kask_empty_tools_no_section() {
+    fn compose_with_tools_empty_tools_no_section() {
         let tmp = tempfile::tempdir().unwrap();
         let db = tmp.path().join("journal.db");
         let w = JournalWriter::open(&db).unwrap();
         let reader = w.reader();
 
-        let kask_tools: Vec<(String, Option<String>)> = vec![];
+        let remote_tools: Vec<(String, Option<String>)> = vec![];
 
-        let prompt = compose_with_kask(
+        let prompt = compose_with_tools(
             &reader,
             None,
-            Some("test empty kask"),
+            Some("test empty remote"),
             &[],
             Path::new("/nonexistent"),
-            &kask_tools,
+            &remote_tools,
         )
         .unwrap();
 
         assert!(
-            !prompt.rendered.contains("### Kask MCP tools"),
-            "should NOT include Kask section when no tools available"
+            !prompt.rendered.contains("### Remote MCP tools"),
+            "should NOT include remote tools section when no tools available"
         );
     }
 

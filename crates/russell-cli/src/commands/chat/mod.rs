@@ -1519,11 +1519,11 @@ mod tests {
     }
 
     #[test]
-    fn action_result_detection_kask() {
+    fn action_result_detection_remote() {
         let mut h = ChatHistory::new("test".to_string());
         h.turns.push(Turn {
             role: "user".into(),
-            content: "[kask tool result: brave_web_search, status=ok]\nfound results".to_string(),
+            content: "[remote tool result: brave_web_search, status=ok]\nfound results".to_string(),
         });
         assert!(is_action_result_in_history(&h));
     }

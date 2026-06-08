@@ -147,7 +147,7 @@ After calibration, I begin round-based interrogation...
 
 ## 4. Converting the grill-me FlowDef (Example)
 
-The hKask grill-me FlowDef has 5 steps:
+The FlowDef grill-me has 5 steps:
 
 | Ordinal | Action | Russell Conversion |
 |---------|--------|-------------------|

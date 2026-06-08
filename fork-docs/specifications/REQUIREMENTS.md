@@ -552,6 +552,8 @@ ddmvss_categories: [domain, capability]
 
 **New from Magna Carta v2.0:** ACR-2, GSR-1 (partial), GSR-2 (partial), CBR-1, CBR-2
 
+**Status:** MVP complete; Magna Carta v2.0 gaps in progress
+
 **Status:** MVP complete
 
 ---

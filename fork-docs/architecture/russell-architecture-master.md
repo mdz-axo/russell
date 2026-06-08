@@ -38,7 +38,7 @@ ddmvss_categories: [domain, capability, interface, composition, trust, observabi
 | [`reference/ports-inventory.md`](reference/ports-inventory.md) | Hexagonal port inventory |
 | [`reference/jack-persona.md`](reference/jack-persona.md) | Jack persona specification |
 | [`reference/okapi-integration.md`](reference/okapi-integration.md) | Okapi LLM integration contract |
-| [`reference/hkask-integration.md`](reference/hkask-integration.md) | ACP integration |
+| [`reference/acp-integration.md`](reference/acp-integration.md) | ACP integration |
 
 ## Specifications
 

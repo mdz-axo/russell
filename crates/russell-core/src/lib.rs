@@ -21,6 +21,7 @@ pub mod reflex;
 pub mod risk;
 pub mod rule;
 pub mod schedule;
+pub mod sovereignty;
 pub mod telemetry;
 pub mod time;
 
@@ -34,4 +35,9 @@ pub use profile::Profile;
 pub use reflex::{BudgetVerdict, ReflexBudget, ReflexSet};
 pub use risk::RiskBand;
 pub use rule::{ConfigWarning, RuleSet};
+pub use sovereignty::{
+    ConsentGate, ConsentGrant, ConsentScope, ConsentStatus, DataCategory, DataSovereigntyBoundary,
+    DenyAllConsent, OperatorConsent, OperatorSovereigntyState, SovereigntyChecker,
+    SovereigntyError, SovereigntyTier,
+};
 pub use time::{Clock, FixedClock, SystemClock};

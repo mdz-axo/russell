@@ -71,7 +71,7 @@ Located in `architecture/reference/`:
 | `ports-inventory.md` | Hexagonal port inventory |
 | `jack-persona.md` | Jack persona specification |
 | `okapi-integration.md` | Okapi LLM integration |
-| `hkask-integration.md` | ACP integration |
+| `acp-integration.md` | ACP integration |
 
 ---
 

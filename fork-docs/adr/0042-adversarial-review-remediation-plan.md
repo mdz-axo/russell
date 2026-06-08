@@ -15,7 +15,7 @@ status: "Active"
 **Date:** 2026-05-24
 **Status:** Active
 **Supersedes:** ADR-0030 (Adversarial Review — Open Questions)
-**Scope:** Full Russell codebase (11 crates) + hKask integration contracts
+**Scope:** Full Russell codebase (11 crates). Originally included hKask integration contracts, which have since been removed.
 **Reviewers:** Architecture (Cockburn hexagonal), Security (Schneier defense-in-depth), Capability (Miller OCAP/Agoric), Functional (Hoare recursion/minimalism)
 
 ---
