@@ -406,6 +406,9 @@ impl OperatorConsent {
 
     /// Check whether consent exists for a given action, considering
     /// scope, version, and expiration.
+    ///
+    /// This performs an exact key lookup. For hierarchical resolution
+    /// across scopes, use [`resolve_consent`] instead.
     pub fn check_consent(&self, action: &str, current_version: Option<&str>) -> ConsentStatus {
         match self.grants.get(action) {
             None => ConsentStatus::Denied,
@@ -436,6 +439,120 @@ impl OperatorConsent {
                 }
             }
         }
+    }
+
+    /// Resolve consent for a given skill/action using hierarchical scope
+    /// matching (P2: Affirmative Consent — most-specific-wins).
+    ///
+    /// Unlike `check_consent` which does an exact key lookup, this method
+    /// searches ALL grants and finds the most specific one whose scope
+    /// covers the requested skill_id and action_type.
+    ///
+    /// Specificity order: `PerActionType` > `PerSkill` > `Master`.
+    ///
+    /// Returns the most specific `Granted` status found, or the most
+    /// specific non-Granted status if no grant covers the request.
+    pub fn resolve_consent(
+        &self,
+        skill_id: &str,
+        action_type: &str,
+        current_version: Option<&str>,
+    ) -> ConsentStatus {
+        let mut best_granted: Option<(u8, ConsentScope)> = None; // (specificity, scope)
+        let mut best_denied: Option<(u8, ConsentStatus)> = None; // (specificity, status)
+
+        for grant in self.grants.values() {
+            // Check if this grant's scope covers the requested action.
+            if !grant.scope.covers(skill_id, action_type) {
+                continue;
+            }
+
+            let specificity = scope_specificity(&grant.scope);
+
+            // Check expiration.
+            if let Some(expires_at) = grant.expires_at
+                && chrono::Utc::now() > expires_at
+            {
+                // Track the most specific expired/mismatched grant.
+                match &best_denied {
+                    Some((prev_spec, _)) if specificity > *prev_spec => {
+                        best_denied = Some((
+                            specificity,
+                            ConsentStatus::Expired {
+                                expired_at: expires_at,
+                            },
+                        ));
+                    }
+                    None => {
+                        best_denied = Some((
+                            specificity,
+                            ConsentStatus::Expired {
+                                expired_at: expires_at,
+                            },
+                        ));
+                    }
+                    _ => {} // less specific, ignore
+                }
+                continue;
+            }
+
+            // Check version mismatch.
+            if let (Some(granted_version), Some(current_ver)) =
+                (&grant.resource_version, current_version)
+                && granted_version != current_ver
+            {
+                match &best_denied {
+                    Some((prev_spec, _)) if specificity > *prev_spec => {
+                        best_denied = Some((
+                            specificity,
+                            ConsentStatus::VersionMismatch {
+                                granted_version: granted_version.clone(),
+                                current_version: current_ver.to_string(),
+                            },
+                        ));
+                    }
+                    None => {
+                        best_denied = Some((
+                            specificity,
+                            ConsentStatus::VersionMismatch {
+                                granted_version: granted_version.clone(),
+                                current_version: current_ver.to_string(),
+                            },
+                        ));
+                    }
+                    _ => {} // less specific, ignore
+                }
+                continue;
+            }
+
+            // This grant is valid. Track the most specific one.
+            match best_granted {
+                Some((prev_spec, _)) if specificity > prev_spec => {
+                    best_granted = Some((specificity, grant.scope.clone()));
+                }
+                None => {
+                    best_granted = Some((specificity, grant.scope.clone()));
+                }
+                _ => {} // less specific, ignore
+            }
+        }
+
+        match best_granted {
+            Some((_, scope)) => ConsentStatus::Granted { scope },
+            None => best_denied.map(|(_, s)| s).unwrap_or(ConsentStatus::Denied),
+        }
+    }
+}
+
+/// Specificity ranking for hierarchical consent resolution.
+/// Higher number = more specific.
+///
+/// `PerActionType` (2) > `PerSkill` (1) > `Master` (0)
+fn scope_specificity(scope: &ConsentScope) -> u8 {
+    match scope {
+        ConsentScope::Master => 0,
+        ConsentScope::PerSkill { .. } => 1,
+        ConsentScope::PerActionType { .. } => 2,
     }
 }
 
@@ -707,6 +824,201 @@ mod tests {
             ConsentStatus::Expired { .. } => {} // pass
             other => panic!("Expected Expired, got {:?}", other),
         }
+    }
+
+    #[test]
+    fn resolve_consent_master_covers_all() {
+        let mut consent = OperatorConsent::new();
+        let grant = ConsentGrant {
+            categories: HashSet::new(),
+            resource_version: None,
+            expires_at: None,
+            scope: ConsentScope::Master,
+            granted_at: chrono::Utc::now(),
+        };
+        consent.grant("master-grant".to_string(), grant);
+
+        // Master scope should cover any skill/action
+        let status = consent.resolve_consent("any-skill", "any-action", None);
+        assert_eq!(
+            status,
+            ConsentStatus::Granted {
+                scope: ConsentScope::Master
+            }
+        );
+    }
+
+    #[test]
+    fn resolve_consent_per_skill_covers_skill_actions() {
+        let mut consent = OperatorConsent::new();
+        let grant = ConsentGrant {
+            categories: HashSet::new(),
+            resource_version: None,
+            expires_at: None,
+            scope: ConsentScope::PerSkill {
+                skill_id: "sysadmin".to_string(),
+            },
+            granted_at: chrono::Utc::now(),
+        };
+        consent.grant("sysadmin/grant".to_string(), grant);
+
+        // PerSkill should cover actions within the skill
+        let status = consent.resolve_consent("sysadmin", "sweep-caches", None);
+        assert_eq!(
+            status,
+            ConsentStatus::Granted {
+                scope: ConsentScope::PerSkill {
+                    skill_id: "sysadmin".to_string()
+                }
+            }
+        );
+
+        // PerSkill should NOT cover a different skill
+        let status = consent.resolve_consent("other-skill", "sweep-caches", None);
+        assert_eq!(status, ConsentStatus::Denied);
+    }
+
+    #[test]
+    fn resolve_consent_per_action_type_covers_action() {
+        let mut consent = OperatorConsent::new();
+        let grant = ConsentGrant {
+            categories: HashSet::new(),
+            resource_version: None,
+            expires_at: None,
+            scope: ConsentScope::PerActionType {
+                action_type: "probe".to_string(),
+            },
+            granted_at: chrono::Utc::now(),
+        };
+        consent.grant("probe-grant".to_string(), grant);
+
+        // PerActionType should cover probes in any skill
+        let status = consent.resolve_consent("sysadmin", "probe", None);
+        assert_eq!(
+            status,
+            ConsentStatus::Granted {
+                scope: ConsentScope::PerActionType {
+                    action_type: "probe".to_string()
+                }
+            }
+        );
+
+        // PerActionType should NOT cover interventions
+        let status = consent.resolve_consent("sysadmin", "intervention", None);
+        assert_eq!(status, ConsentStatus::Denied);
+    }
+
+    #[test]
+    fn resolve_consent_most_specific_wins() {
+        let mut consent = OperatorConsent::new();
+
+        // Add a Master grant
+        let master_grant = ConsentGrant {
+            categories: HashSet::new(),
+            resource_version: None,
+            expires_at: None,
+            scope: ConsentScope::Master,
+            granted_at: chrono::Utc::now(),
+        };
+        consent.grant("master".to_string(), master_grant);
+
+        // Add a PerSkill grant
+        let skill_grant = ConsentGrant {
+            categories: HashSet::new(),
+            resource_version: None,
+            expires_at: None,
+            scope: ConsentScope::PerSkill {
+                skill_id: "sysadmin".to_string(),
+            },
+            granted_at: chrono::Utc::now(),
+        };
+        consent.grant("sysadmin/grant".to_string(), skill_grant);
+
+        // Add a PerActionType grant
+        let action_grant = ConsentGrant {
+            categories: HashSet::new(),
+            resource_version: None,
+            expires_at: None,
+            scope: ConsentScope::PerActionType {
+                action_type: "probe".to_string(),
+            },
+            granted_at: chrono::Utc::now(),
+        };
+        consent.grant("probe-grant".to_string(), action_grant);
+
+        // For sysadmin/probe: PerActionType is most specific (2 > 1 > 0)
+        let status = consent.resolve_consent("sysadmin", "probe", None);
+        assert_eq!(
+            status,
+            ConsentStatus::Granted {
+                scope: ConsentScope::PerActionType {
+                    action_type: "probe".to_string()
+                }
+            }
+        );
+
+        // For sysadmin/intervention: PerSkill wins over Master
+        let status = consent.resolve_consent("sysadmin", "intervention", None);
+        assert_eq!(
+            status,
+            ConsentStatus::Granted {
+                scope: ConsentScope::PerSkill {
+                    skill_id: "sysadmin".to_string()
+                }
+            }
+        );
+
+        // For other-skill/action: Master wins
+        let status = consent.resolve_consent("other-skill", "action", None);
+        assert_eq!(
+            status,
+            ConsentStatus::Granted {
+                scope: ConsentScope::Master
+            }
+        );
+    }
+
+    #[test]
+    fn resolve_consent_expired_grant_falls_through() {
+        let mut consent = OperatorConsent::new();
+
+        // Add an expired Master grant
+        let expired_time = chrono::Utc::now() - chrono::Duration::hours(1);
+        let expired_grant = ConsentGrant {
+            categories: HashSet::new(),
+            resource_version: None,
+            expires_at: Some(expired_time),
+            scope: ConsentScope::Master,
+            granted_at: chrono::Utc::now() - chrono::Duration::hours(2),
+        };
+        consent.grant("expired-master".to_string(), expired_grant);
+
+        // Add a valid PerSkill grant
+        let skill_grant = ConsentGrant {
+            categories: HashSet::new(),
+            resource_version: None,
+            expires_at: None,
+            scope: ConsentScope::PerSkill {
+                skill_id: "sysadmin".to_string(),
+            },
+            granted_at: chrono::Utc::now(),
+        };
+        consent.grant("sysadmin/grant".to_string(), skill_grant);
+
+        // For sysadmin/action: PerSkill grant is valid
+        let status = consent.resolve_consent("sysadmin", "action", None);
+        assert_eq!(
+            status,
+            ConsentStatus::Granted {
+                scope: ConsentScope::PerSkill {
+                    skill_id: "sysadmin".to_string()
+                }
+            }
+        );
+
+        // For other-skill/action: No valid grant (expired Master)
+        let status = consent.resolve_consent("other-skill", "action", None);
+        assert!(matches!(status, ConsentStatus::Expired { .. }));
     }
 
     #[test]

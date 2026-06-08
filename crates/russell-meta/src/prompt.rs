@@ -346,6 +346,7 @@ pub fn compose_with_tools(
         objective,
         rendered,
         temperature: None,
+        top_p: None,
         max_tokens: None,
     })
 }
@@ -483,6 +484,7 @@ pub fn compose_templated(
         objective,
         rendered,
         temperature,
+        top_p: None,
         max_tokens,
     })
 }

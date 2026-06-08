@@ -1,7 +1,7 @@
 ---
 title: "Russell Interface and Composition"
 audience: [architects, developers, agents]
-last_updated: 2026-05-25
+last_updated: 2026-06-08
 version: "1.0.0"
 status: "Active"
 domain: "Cross-cutting"
@@ -39,6 +39,7 @@ ddmvss_categories: [interface, composition]
 | Self-triage | `russell self-triage` | N/A | N/A |
 | Consult Jack | `russell jack` | `acp/jack/consult` | N/A |
 | Chat with Jack | `russell chat` | `acp/session/create` | N/A |
+| View/set generative settings | `/settings` (in chat) | N/A | N/A |
 | Export evidence | `russell digest` | N/A | N/A |
 
 **Focusing assumption:** All three surfaces exercise the same functional core. No surface has exclusive capabilities (except where noted).
@@ -63,6 +64,8 @@ ddmvss_categories: [interface, composition]
 | `russell skill retire <id>` | Retire skill | medium |
 | `russell self-triage` | Self-diagnosis | none |
 | `russell digest` | Export evidence | none |
+| `/settings` (in chat) | Display generative settings | none |
+| `/settings set <key> <value>` (in chat) | Change generative setting | low |
 | `russell verify-journal` | Verify hash chain | none |
 
 ### 2.2 CLI Architecture
@@ -247,6 +250,91 @@ safety:
 - [x] Registry schema defined
 - [x] Composition rules documented
 - [x] Dispatcher rules documented
+- [x] Generative settings documented (P3)
+
+---
+
+## 9. Generative Settings (P3)
+
+**Principle:** P3 (Generative Space) — all generative settings are exposed to the operator with no admin-gated or hidden values. The operator curates; the system never imposes.
+
+### 9.1 REPL Commands
+
+| Command | Purpose | Persistence |
+|---------|---------|-------------|
+| `/settings` | Display current generative settings | Read-only |
+| `/settings set <key> <value>` | Change a setting in-session | Writes to profile |
+
+**Available keys:**
+
+| Key | Type | Range / Values | Default |
+|-----|------|----------------|--------|
+| `temperature` | f64 | 0.0 – 2.0 | 0.7 |
+| `top_k` | u32 | ≥ 0 | 40 |
+| `top_p` | f64 | 0.0 – 1.0 | 0.9 |
+| `repeat_penalty` | f64 | ≥ 1.0 | 1.1 |
+| `hhh_filter` | enum | on / off | on |
+| `persona` | string | Any loaded persona name | "jack" |
+
+### 9.2 CLI Flags
+
+| Flag | Purpose | Overrides |
+|------|---------|----------|
+| `russell chat --no-hhh` | Disable HHH filter | Profile `hhh_filter` |
+| `russell chat --persona <name>` | Select persona | Profile `persona` |
+
+**Priority chain:** CLI flag > profile setting > compiled default.
+
+On startup the chat command resolves settings in order:
+
+1. Compiled defaults (hard-coded in `GenerativeSettings`)
+2. Profile overrides (`GenerativeConfig` fields that are `Some`)
+3. CLI flag overrides (parsed from `--no-hhh`, `--persona`, etc.)
+
+### 9.3 Profile Persistence
+
+`GenerativeConfig` in `russell-core::profile` stores each setting as an `Option`:
+
+| Field | Type | Semantics |
+|-------|------|----------|
+| `temperature` | `Option<f64>` | `None` = use compiled default |
+| `top_k` | `Option<u32>` | `None` = use compiled default |
+| `top_p` | `Option<f64>` | `None` = use compiled default |
+| `repeat_penalty` | `Option<f64>` | `None` = use compiled default |
+| `hhh_filter` | `Option<bool>` | `None` = use compiled default (on) |
+| `persona` | `Option<String>` | `None` = use compiled default ("jack") |
+
+On `/settings set <key> <value>`, the change is:
+
+1. Applied immediately to the running session's `GenerativeSettings`
+2. Written to the profile's `generative` field via atomic save
+
+On next startup, profile values override compiled defaults before CLI flags are applied.
+
+### 9.4 Inference Wiring
+
+`GenerativeSettings` is defined in `crates/russell-cli/src/commands/chat/mod.rs` and flows into inference as follows:
+
+| Setting | Forwarded? | Path |
+|---------|------------|------|
+| `temperature` | Yes | `GenerativeSettings::temperature` → `SoapPrompt::temperature` → `call_llm_via_port` → `call_okapi_with_spinner` |
+| `top_p` | No (tracked) | Tracked in `GenerativeSettings`; not forwarded (Okapi API limitation) |
+| `top_k` | No (tracked) | Tracked in `GenerativeSettings`; not forwarded (Okapi API limitation) |
+| `repeat_penalty` | No (tracked) | Tracked in `GenerativeSettings`; not forwarded (Okapi API limitation) |
+| `hhh_filter` | Yes | Controls prompt construction (system prompt includes/excludes HHH preamble) |
+| `persona` | Yes | Selects persona prompt file from `crates/russell-meta/prompts/<name>.md` |
+
+### 9.5 P3 Principle Assertions
+
+| Assertion | Mechanism |
+|----------|-----------|
+| All generative settings are exposed to the operator | `/settings` displays every key; no admin-gated or hidden settings exist |
+| No setting is hidden or privileged | `GenerativeConfig` fields are plain `Option` types; no `#[serde(skip)]` or access control |
+| Changes take effect immediately | `/settings set` mutates the live `GenerativeSettings` before persisting |
+| Changes persist across sessions | Atomic save to profile's `generative` field; loaded on next startup |
+| Operator curation over system imposition | Defaults are overridable at every layer; the system never locks a setting |
+
+**Cross-reference:** P3 (Generative Space) in Magna Carta — `fork-docs/architecture/magna-carta.md` §3.
 
 ---
 

@@ -227,6 +227,8 @@ fn handle_help() {
     println!("  /model <name> — switch to a model (fuzzy match)");
     println!("  /settings     — show current generative settings");
     println!("  /settings set <key> <value> — change a setting");
+    println!("  /verify       — run Magna Carta Verifier (P1–P4)");
+    println!("  /verify <principle> — verify one principle (p1, p2, p3, p4)");
     println!("  /approve      — consent to Jack's proposed action");
     println!("                  (also: 'ok', 'yes', 'do it', 'go ahead')");
     println!("  /deny         — refuse Jack's proposed action");
@@ -480,6 +482,7 @@ async fn call_okapi_with_spinner(
     model: &str,
     messages: &[serde_json::Value],
     inference_temperature: Option<f64>,
+    inference_top_p: Option<f64>,
 ) -> std::result::Result<String, String> {
     use rand::seq::SliceRandom;
     use tokio::sync::oneshot;
@@ -493,7 +496,14 @@ async fn call_okapi_with_spinner(
     let model = model.to_string();
     let messages = messages.to_vec();
     tokio::spawn(async move {
-        let result = call_llm_via_port(&cfg, &model, &messages, inference_temperature).await;
+        let result = call_llm_via_port(
+            &cfg,
+            &model,
+            &messages,
+            inference_temperature,
+            inference_top_p,
+        )
+        .await;
         let _ = tx.send(result);
     });
 
@@ -530,6 +540,7 @@ async fn call_llm_via_port(
     model: &str,
     messages: &[serde_json::Value],
     inference_temperature: Option<f64>,
+    inference_top_p: Option<f64>,
 ) -> std::result::Result<String, String> {
     use russell_meta::client::SoapPrompt;
     use russell_meta::oai_client::OkapiClient;
@@ -555,6 +566,7 @@ async fn call_llm_via_port(
         objective: String::new(),
         rendered: rendered.trim_end().to_string(),
         temperature: inference_temperature,
+        top_p: inference_top_p,
         max_tokens: None,
     };
 
@@ -1162,8 +1174,142 @@ async fn handle_action_proposal(
     Ok(())
 }
 
+/// Run the Magna Carta Verifier skill.
+///
+/// If `principle` is `None`, runs all four P1–P4 manifests.
+/// Accepts shortcuts: `p1`, `p2`, `p3`, `p4`.
+fn run_magna_carta_verify(principle: Option<&str>, paths: &Paths) {
+    let skill_dir = paths.skills().join("magna-carta-verifier");
+    let verify_script = skill_dir.join("scripts/verify.sh");
+
+    if !verify_script.exists() {
+        println!(
+            "  → Magna Carta Verifier not found at {}",
+            verify_script.display()
+        );
+        println!("    Install it to ~/.local/share/harness/skills/magna-carta-verifier/");
+        println!();
+        return;
+    }
+
+    let all_manifests = [
+        (
+            "p1",
+            "P1 — Operator Sovereignty",
+            "manifests/p1-operator-sovereignty.yaml",
+        ),
+        (
+            "p2",
+            "P2 — Affirmative Consent",
+            "manifests/p2-affirmative-consent.yaml",
+        ),
+        (
+            "p3",
+            "P3 — Generative Space",
+            "manifests/p3-generative-space.yaml",
+        ),
+        (
+            "p4",
+            "P4 — Clear Boundaries",
+            "manifests/p4-clear-boundaries.yaml",
+        ),
+    ];
+
+    let targets: Vec<_> = match principle {
+        Some(p) => {
+            let p = p.to_lowercase();
+            if let Some(entry) = all_manifests.iter().find(|(key, _, _)| *key == p) {
+                vec![*entry]
+            } else {
+                println!("  → Unknown principle '{p}'. Use p1, p2, p3, or p4.");
+                println!();
+                return;
+            }
+        }
+        None => all_manifests.to_vec(),
+    };
+
+    let mut any_failure = false;
+    for (key, label, manifest_rel) in &targets {
+        let manifest_path = skill_dir.join(manifest_rel);
+        println!("  {label} [{key}]:");
+
+        if !manifest_path.exists() {
+            println!("    ⚠  manifest not found: {}", manifest_path.display());
+            println!();
+            continue;
+        }
+
+        let output = std::process::Command::new("bash")
+            .arg(&verify_script)
+            .arg(&manifest_path)
+            .current_dir(&skill_dir)
+            .output();
+
+        match output {
+            Ok(out) => {
+                let stdout = String::from_utf8_lossy(&out.stdout);
+                let stderr = String::from_utf8_lossy(&out.stderr);
+
+                if !stderr.is_empty() {
+                    for line in stderr.lines() {
+                        println!("    {line}");
+                    }
+                }
+
+                let mut pass_count = 0usize;
+                let mut fail_count = 0usize;
+                let mut gap_count = 0usize;
+
+                for line in stdout.lines() {
+                    if line.trim().is_empty() {
+                        continue;
+                    }
+                    // Each line is a JSON object from verify.sh
+                    if line.contains("\"status\":\"pass\"") {
+                        pass_count += 1;
+                    } else if line.contains("\"status\":\"fail\"") {
+                        fail_count += 1;
+                        any_failure = true;
+                    } else if line.contains("\"status\":\"gap\"") {
+                        gap_count += 1;
+                    }
+                    // Print each assertion result indented
+                    println!("    {line}");
+                }
+
+                if pass_count + fail_count + gap_count == 0 {
+                    println!("    (no assertions found)");
+                } else {
+                    let summary = format!("{pass_count} pass, {fail_count} fail, {gap_count} gap");
+                    if fail_count > 0 {
+                        println!("    ✗ {summary}");
+                    } else {
+                        println!("    ✓ {summary}");
+                    }
+                }
+
+                if !out.status.success() {
+                    any_failure = true;
+                }
+            }
+            Err(e) => {
+                println!("    ✗ failed to run verify.sh: {e}");
+                any_failure = true;
+            }
+        }
+        println!();
+    }
+
+    if any_failure {
+        println!("  Magna Carta verification completed with failures.");
+    } else {
+        println!("  Magna Carta verification completed — all assertions pass or gap.");
+    }
+    println!();
+}
+
 /// Handle slash commands. Returns `true` if the command was handled
-/// (caller should `continue` the REPL loop), `false` if not recognized.
 /// (caller should `continue` the REPL loop), `false` if not recognized.
 #[allow(clippy::too_many_arguments)]
 async fn handle_slash_command(
@@ -1228,6 +1374,15 @@ async fn handle_slash_command(
         }
         "/settings" => {
             handle_settings_display(settings);
+            true
+        }
+        "/verify" => {
+            run_magna_carta_verify(None, paths);
+            true
+        }
+        s if s.starts_with("/verify ") => {
+            let arg = s["/verify ".len()..].trim();
+            run_magna_carta_verify(Some(arg), paths);
             true
         }
         other => {
@@ -1536,8 +1691,20 @@ async fn call_jack(
     } else {
         None // let the prompt template default take over
     };
+    let inference_top_p = if settings.top_p != 0.95 {
+        Some(settings.top_p)
+    } else {
+        None // let the client default take over
+    };
     let cfg = russell_meta::client::ClientConfig::from_env();
-    let response = call_okapi_with_spinner(&cfg, current_model, &messages, inference_temp).await;
+    let response = call_okapi_with_spinner(
+        &cfg,
+        current_model,
+        &messages,
+        inference_temp,
+        inference_top_p,
+    )
+    .await;
 
     match response {
         Ok(content) => {

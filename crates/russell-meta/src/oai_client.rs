@@ -79,6 +79,9 @@ impl LlmClient for OkapiClient {
             ],
             "temperature": temperature,
         });
+        if let Some(top_p) = prompt.top_p {
+            body["top_p"] = json!(top_p);
+        }
         if let Some(max_tokens) = prompt.max_tokens {
             body["max_tokens"] = json!(max_tokens);
         }

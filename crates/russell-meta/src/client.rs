@@ -125,6 +125,11 @@ pub struct SoapPrompt {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(default)]
     pub temperature: Option<f64>,
+    /// Top-p (nucleus) sampling from the operator's generative settings.
+    /// If `None`, the client uses its default.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
+    pub top_p: Option<f64>,
     /// Max tokens hint from the prompt template.
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(default)]

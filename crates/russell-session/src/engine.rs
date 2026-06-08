@@ -96,6 +96,22 @@ impl SessionEngine {
         }
     }
 
+    /// Resolve consent for a skill/action using hierarchical scope matching.
+    ///
+    /// P2 (Affirmative Consent): most-specific-wins resolution across all
+    /// grants. `PerActionType` > `PerSkill` > `Master`.
+    pub fn resolve_consent(
+        &self,
+        skill_id: &str,
+        action_type: &str,
+        current_version: Option<&str>,
+    ) -> russell_core::sovereignty::ConsentStatus {
+        match &self.consent {
+            Some(consent) => consent.resolve_consent(skill_id, action_type, current_version),
+            None => russell_core::sovereignty::ConsentStatus::Denied,
+        }
+    }
+
     /// Create a new session.
     pub fn create_session(
         &mut self,
@@ -515,5 +531,53 @@ mod tests {
         engine.revoke_consent("test/action");
         let status = engine.check_consent("test/action", None);
         assert!(matches!(status, ConsentStatus::Denied));
+    }
+
+    #[test]
+    fn engine_resolve_consent_hierarchical() {
+        use russell_core::sovereignty::{ConsentGrant, ConsentScope, ConsentStatus};
+        use std::collections::HashSet;
+
+        let mut engine = SessionEngine::new("You are Jack.");
+
+        // Grant Master scope
+        let master_grant = ConsentGrant {
+            categories: HashSet::new(),
+            resource_version: None,
+            expires_at: None,
+            scope: ConsentScope::Master,
+            granted_at: chrono::Utc::now(),
+        };
+        engine.grant_consent("master".to_string(), master_grant);
+
+        // Grant PerSkill scope
+        let skill_grant = ConsentGrant {
+            categories: HashSet::new(),
+            resource_version: None,
+            expires_at: None,
+            scope: ConsentScope::PerSkill {
+                skill_id: "sysadmin".to_string(),
+            },
+            granted_at: chrono::Utc::now(),
+        };
+        engine.grant_consent("sysadmin/grant".to_string(), skill_grant);
+
+        // resolve_consent should find the most specific grant
+        let status = engine.resolve_consent("sysadmin", "action", None);
+        assert!(matches!(
+            status,
+            ConsentStatus::Granted {
+                scope: ConsentScope::PerSkill { .. }
+            }
+        ));
+
+        // For a different skill, Master should apply
+        let status = engine.resolve_consent("other-skill", "action", None);
+        assert!(matches!(
+            status,
+            ConsentStatus::Granted {
+                scope: ConsentScope::Master
+            }
+        ));
     }
 }

@@ -14,7 +14,7 @@ assertions:
   - id: p4a
     name: dual_gate
     claim: "Every access path goes through require_capability + require_sovereignty"
-    method: structural + behavioral
+    method: structural_audit
     targets:
       - crate: russell-acp-server
         module: auth

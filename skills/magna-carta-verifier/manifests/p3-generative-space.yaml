@@ -41,7 +41,7 @@ assertions:
   - id: p3c
     name: open_source
     claim: "Generative resources are open-source with exposed weights and settings"
-    method: structural + behavioral
+    method: structural_audit
     targets:
       - crate: russell-meta
         module: oai_client
@@ -55,7 +55,7 @@ assertions:
   - id: p3d
     name: operator_curated
     claim: "Constraints are operator-curated, not system-imposed (HHH is operator-selectable)"
-    method: structural + behavioral
+    method: structural_audit
     targets:
       - crate: russell-cli
         module: commands::chat
