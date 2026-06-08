@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 //! `russell-meta` — metacognitive layer (the Nurse).
 //!
-//! Collects telemetry and calls hKask for LLM inference.
+//! Collects telemetry and calls LLM backends for inference.
 
 #![deny(unsafe_code)]
 #![deny(rust_2018_idioms)]
@@ -18,7 +18,7 @@ pub mod fallback;
 pub mod fallback_adapter;
 pub mod health;
 pub mod help;
-pub mod hkask_adapter;
+
 pub mod mock;
 pub mod oai_client;
 pub mod okapi_adapter;
@@ -30,7 +30,7 @@ pub use client::{Backend, ClientConfig, EscalateMin, LlmClient, LlmResponse, Soa
 pub use error::{DoctorError, Result};
 pub use fallback_adapter::FallbackInferenceAdapter;
 pub use help::{HelpOutcome, run_help, run_help_with_endpoint};
-pub use hkask_adapter::HkaskInferenceAdapter;
+
 pub use okapi_adapter::OkapiInferenceAdapter;
 
 /// Jack's nurse persona prompt (loaded from `prompts/jack.md`).

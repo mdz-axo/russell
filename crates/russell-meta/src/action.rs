@@ -23,24 +23,9 @@
 use russell_skills::RiskBand;
 use russell_skills::{Rollback, Skill};
 
-/// Metadata for a hKask tool available in the registry, passed by
-/// the caller (keeps `russell-meta` free of `russell-mcp` dependency).
-#[derive(Debug, Clone)]
-pub struct HKaskToolInfo {
-    /// Tool name (the callable ID).
-    pub name: String,
-    /// Risk band from annotations. Defaults to `RiskBand::Medium`
-    /// when unset — safe default per IDRS. Probes should explicitly
-    /// declare `RiskBand::None`.
-    pub risk_band: RiskBand,
-    /// JSON Schema for the tool's input parameters (from `tools/list`).
-    /// Used to extract required field names for operator prompting.
-    pub input_schema: Option<serde_json::Value>,
-}
-
 /// A resolved ACTION — either a probe (read-only), an intervention
-/// (mutating, requires consent per JR-2), or a hKask MCP tool call
-/// (ADR-0025).
+/// (mutating, requires consent per JR-2), or a shell command
+/// (ADR-0050).
 #[derive(Debug, Clone)]
 pub enum ResolvedAction {
     /// Read-only probe. Auto-executable (risk: none).
@@ -77,20 +62,6 @@ pub enum ResolvedAction {
         /// Whether rollback requires a reboot.
         rollback_is_reboot: bool,
     },
-    /// hKask MCP tool call (ADR-0025). Executed via the MCP client,
-    /// not the local skill dispatcher.
-    HKaskTool {
-        /// The MCP tool name (from `tools/list`).
-        tool_name: String,
-        /// Risk band from tool annotations. Defaults to `Medium` when
-        /// unset — safe default requiring operator consent.
-        risk_band: RiskBand,
-        /// Arguments for the tool call, parsed from the LLM response.
-        /// `None` if the LLM did not provide any.
-        arguments: Option<serde_json::Value>,
-        /// Expected arguments (required fields from inputSchema).
-        required_fields: Vec<String>,
-    },
     /// Shell command proposed directly by the LLM (ADR-0050).
     /// Executed via `bash -c`, subject to safety classification
     /// and the consent gate. This replaces the old JR-3 absolute
@@ -114,12 +85,6 @@ impl ResolvedAction {
         matches!(self, Self::Probe { .. })
     }
 
-    /// Returns `true` if this is a hKask MCP tool call.
-    #[must_use]
-    pub fn is_hkask_tool(&self) -> bool {
-        matches!(self, Self::HKaskTool { .. })
-    }
-
     /// Returns `true` if this is a raw shell command (ADR-0050).
     #[must_use]
     pub fn is_shell_command(&self) -> bool {
@@ -132,7 +97,6 @@ impl ResolvedAction {
         match self {
             Self::Probe { .. } => RiskBand::None,
             Self::Intervention { risk, .. } => *risk,
-            Self::HKaskTool { risk_band, .. } => *risk_band,
             Self::ShellCommand { risk, .. } => *risk,
         }
     }
@@ -143,7 +107,6 @@ impl ResolvedAction {
         match self {
             Self::Probe { skill_id, .. } => skill_id,
             Self::Intervention { skill_id, .. } => skill_id,
-            Self::HKaskTool { .. } => "hkask",
             Self::ShellCommand { .. } => "shell",
         }
     }
@@ -154,19 +117,16 @@ impl ResolvedAction {
         match self {
             Self::Probe { action_id, .. } => action_id,
             Self::Intervention { action_id, .. } => action_id,
-            Self::HKaskTool { tool_name, .. } => tool_name,
             Self::ShellCommand { command, .. } => command,
         }
     }
 
-    /// The command argv. Empty for hKask tools (they're MCP calls, not subprocesses).
-    /// For ShellCommand, returns a synthetic argv `["bash", "-c", command]`.
+    /// The command argv. For ShellCommand, returns a synthetic argv `["bash", "-c", command]`.
     #[must_use]
     pub fn cmd(&self) -> Vec<String> {
         match self {
             Self::Probe { cmd, .. } => cmd.clone(),
             Self::Intervention { cmd, .. } => cmd.clone(),
-            Self::HKaskTool { .. } => vec![],
             Self::ShellCommand { command, .. } => {
                 vec!["bash".to_string(), "-c".to_string(), command.clone()]
             }
@@ -183,19 +143,18 @@ impl ResolvedAction {
                 max_auto_risk,
                 ..
             } => *risk > *max_auto_risk,
-            Self::HKaskTool { risk_band, .. } => *risk_band > RiskBand::None,
             Self::ShellCommand { .. } => true, // Shell commands always require consent
         }
     }
 
     /// Append extra CLI arguments to the command argv.
-    /// Only applies to probes and interventions; no-op for hKask tools and shell commands.
+    /// Only applies to probes and interventions; no-op for shell commands.
     pub fn append_cmd_args(&mut self, args: &[String]) {
         match self {
             Self::Probe { cmd, .. } | Self::Intervention { cmd, .. } => {
                 cmd.extend(args.iter().cloned());
             }
-            Self::HKaskTool { .. } | Self::ShellCommand { .. } => {}
+            Self::ShellCommand { .. } => {}
         }
     }
 }
@@ -305,18 +264,10 @@ impl std::fmt::Display for ActionError {
 }
 
 /// Parse the last `ACTION:` or `SHELL:` line from a response and resolve it
+/// against the loaded skill set.
 pub fn resolve(
     response: &str,
     skills: &[Skill],
-) -> Option<std::result::Result<ResolvedAction, ActionError>> {
-    resolve_with_hkask(response, skills, &[])
-}
-
-/// Parse the last `ACTION:` or `SHELL:` line from a response and resolve it.
-pub fn resolve_with_hkask(
-    response: &str,
-    skills: &[Skill],
-    hkask_tools: &[HKaskToolInfo],
 ) -> Option<std::result::Result<ResolvedAction, ActionError>> {
     // ADR-0050: Check for SHELL: prefix first.
     // SHELL: lines are raw shell commands proposed by Jack.
@@ -396,22 +347,10 @@ pub fn resolve_with_hkask(
         }
     };
 
-    // hKask MCP tool path (ADR-0025 §7).
-    // Only route to hKask if tools are available (registry is populated).
-    if skill_id == "hkask" && !hkask_tools.is_empty() {
-        // Strip inline arguments from the action_id (e.g. "tool --arg val" → "tool").
-        let bare_tool_name = action_id.split(' ').next().unwrap_or(action_id);
-        return resolve_hkask_tool(bare_tool_name, hkask_tools, skills, response);
-    }
-
     let skill = match skills.iter().find(|s| s.id == skill_id) {
         Some(s) => s,
         None => {
-            // Include "hkask" in the loaded list if we have hKask tools.
-            let mut loaded: Vec<String> = skills.iter().map(|s| s.id.clone()).collect();
-            if !hkask_tools.is_empty() {
-                loaded.push("hkask".to_string());
-            }
+            let loaded: Vec<String> = skills.iter().map(|s| s.id.clone()).collect();
             return Some(Err(ActionError::UnknownSkill {
                 skill_id: skill_id.to_string(),
                 loaded,
@@ -466,210 +405,6 @@ pub fn resolve_with_hkask(
         probes,
         interventions,
     }))
-}
-
-/// Resolve a hKask MCP tool reference against the cached tool registry.
-fn resolve_hkask_tool(
-    tool_name: &str,
-    hkask_tools: &[HKaskToolInfo],
-    skills: &[Skill],
-    response: &str,
-) -> Option<std::result::Result<ResolvedAction, ActionError>> {
-    // Poka-yoke: tool must exist in the registry.
-    if let Some(tool) = hkask_tools.iter().find(|t| t.name == tool_name) {
-        // Extract required fields from the tool's inputSchema.
-        let required_fields = extract_required_fields(&tool.input_schema);
-
-        // Extract arguments from the LLM response body.
-        let arguments = extract_arguments_from_response(response, tool_name);
-
-        return Some(Ok(ResolvedAction::HKaskTool {
-            tool_name: tool.name.clone(),
-            risk_band: tool.risk_band,
-            arguments,
-            required_fields,
-        }));
-    }
-
-    // Tool not found — build a diagnostic error.
-    let available: Vec<String> = hkask_tools.iter().map(|t| t.name.clone()).collect();
-    let mut loaded: Vec<String> = skills.iter().map(|s| s.id.clone()).collect();
-    if !hkask_tools.is_empty() {
-        loaded.push("hkask".to_string());
-    }
-
-    Some(Err(ActionError::UnknownAction {
-        skill_id: "hkask".to_string(),
-        action_id: tool_name.to_string(),
-        probes: available,
-        interventions: vec![],
-    }))
-}
-
-/// Extract required field names from a tool's JSON Schema `input_schema`.
-///
-/// Returns an empty vec if the schema is `None` or has no `required` array.
-fn extract_required_fields(schema: &Option<serde_json::Value>) -> Vec<String> {
-    schema
-        .as_ref()
-        .and_then(|s| s.get("required"))
-        .and_then(|r| r.as_array())
-        .map(|fields| {
-            fields
-                .iter()
-                .filter_map(|v| v.as_str().map(String::from))
-                .collect()
-        })
-        .unwrap_or_default()
-}
-
-/// Parse tool arguments from the LLM response body.
-fn extract_arguments_from_response(response: &str, _tool_name: &str) -> Option<serde_json::Value> {
-    // Format 1: Look for "Arguments:" line with JSON payload.
-    if let Some(line) = response
-        .lines()
-        .find(|l| l.trim().starts_with("Arguments:"))
-        && let Some(json_str) = line
-            .trim()
-            .strip_prefix("Arguments:")
-            .map(|s| s.trim())
-            .filter(|s| !s.is_empty())
-        && let Ok(value) = serde_json::from_str::<serde_json::Value>(json_str)
-    {
-        return Some(value);
-    }
-
-    // Format 2: Key=value pairs on the ACTION line after the tool name.
-    // Look for the ACTION line and parse trailing key=value pairs.
-    if let Some(action_line) = response
-        .lines()
-        .rev()
-        .find(|line| line.trim().starts_with("ACTION:"))
-    {
-        let after_prefix = action_line
-            .trim()
-            .strip_prefix("ACTION:")
-            .unwrap_or("")
-            .trim();
-
-        // After "hkask/tool-name", look for --key value pairs or key=value.
-        // Find the tool name (skip "hkask/" prefix and tool name).
-        // Use the part after the first '/' that follows "hkask".
-        if let Some(rest) = after_prefix.strip_prefix("hkask/") {
-            // Split out the tool name.
-            if let Some(first_space) = rest.find(' ') {
-                let args_str = rest[first_space..].trim();
-                if let Some(args) = parse_key_value_args(args_str) {
-                    return Some(args);
-                }
-            }
-        }
-    }
-
-    None
-}
-
-/// Parse `--key value` or `key=value` pairs into a JSON object.
-/// Handles quoted values with internal spaces.
-fn parse_key_value_args(args_str: &str) -> Option<serde_json::Value> {
-    let mut map = serde_json::Map::new();
-    let tokens = tokenize_args(args_str);
-    let mut i = 0;
-
-    while i < tokens.len() {
-        let token = &tokens[i];
-
-        // Handle `--key` format.
-        if let Some(key) = token.strip_prefix("--") {
-            if key.is_empty() {
-                i += 1;
-                continue;
-            }
-            if i + 1 < tokens.len() {
-                let value = parse_arg_value(&tokens[i + 1]);
-                map.insert(key.to_string(), value);
-                i += 2;
-            } else {
-                map.insert(key.to_string(), serde_json::Value::Bool(true));
-                i += 1;
-            }
-            continue;
-        }
-
-        // Handle `key=value` format.
-        if let Some((key, value)) = token.split_once('=') {
-            let value = parse_arg_value(value);
-            map.insert(key.to_string(), value);
-            i += 1;
-            continue;
-        }
-
-        i += 1;
-    }
-
-    if map.is_empty() {
-        None
-    } else {
-        Some(serde_json::Value::Object(map))
-    }
-}
-
-/// Tokenize argument string, preserving quoted segments.
-fn tokenize_args(s: &str) -> Vec<String> {
-    let mut tokens = Vec::new();
-    let chars: Vec<char> = s.chars().collect();
-    let mut i = 0;
-
-    while i < chars.len() {
-        // Skip whitespace.
-        while i < chars.len() && chars[i].is_whitespace() {
-            i += 1;
-        }
-        if i >= chars.len() {
-            break;
-        }
-
-        // Quoted string.
-        if chars[i] == '"' {
-            i += 1; // skip opening quote
-            let mut s = String::new();
-            while i < chars.len() && chars[i] != '"' {
-                s.push(chars[i]);
-                i += 1;
-            }
-            if i < chars.len() {
-                i += 1; // skip closing quote
-            }
-            tokens.push(s);
-        } else {
-            let mut s = String::new();
-            while i < chars.len() && !chars[i].is_whitespace() {
-                s.push(chars[i]);
-                i += 1;
-            }
-            tokens.push(s);
-        }
-    }
-
-    tokens
-}
-
-/// Parse a single argument value: try JSON, then number, then string.
-fn parse_arg_value(s: &str) -> serde_json::Value {
-    // Try JSON literal first (true, false, null, numbers, quoted strings).
-    if let Ok(v) = serde_json::from_str::<serde_json::Value>(s)
-        && !v.is_string()
-    {
-        return v;
-    }
-    // Try number.
-    if let Ok(n) = s.parse::<i64>() {
-        return serde_json::json!(n);
-    }
-    if let Ok(n) = s.parse::<f64>() {
-        return serde_json::json!(n);
-    }
-    serde_json::Value::String(s.to_string())
 }
 
 // ---------------------------------------------------------------------------
@@ -956,22 +691,6 @@ mod tests {
     }
 
     #[test]
-    fn hkask_tool_with_risk_band() {
-        let skills = [make_skill()];
-        let hkask_tools = make_hkask_tools();
-        let result =
-            resolve_with_hkask("ACTION: hkask/russell_host_snapshot", &skills, &hkask_tools)
-                .unwrap()
-                .unwrap();
-        match result {
-            ResolvedAction::HKaskTool { risk_band, .. } => {
-                assert_eq!(risk_band, RiskBand::None);
-            }
-            _ => panic!("expected HKaskTool"),
-        }
-    }
-
-    #[test]
     fn resolves_probe() {
         let skills = [make_skill()];
         let result = resolve("ACTION: test-skill/probe-1", &skills)
@@ -1032,152 +751,6 @@ mod tests {
         assert!(err.to_string().contains("empty"));
     }
 
-    // ── Kask MCP tool resolution tests (ADR-0025) ──────────────────
-
-    fn make_hkask_tools() -> Vec<HKaskToolInfo> {
-        vec![
-            HKaskToolInfo {
-                name: "paradigm_shift_query".into(),
-                risk_band: RiskBand::Medium,
-                input_schema: Some(serde_json::json!({
-                    "type": "object",
-                    "properties": {
-                        "prompt": {"type": "string"},
-                        "depth": {"type": "string", "enum": ["quick", "thorough"]}
-                    },
-                    "required": ["prompt"]
-                })),
-            },
-            HKaskToolInfo {
-                name: "russell_host_snapshot".into(),
-                risk_band: RiskBand::None,
-                input_schema: None,
-            },
-        ]
-    }
-
-    #[test]
-    fn resolves_hkask_tool() {
-        let skills = [make_skill()];
-        let hkask_tools = make_hkask_tools();
-        let result =
-            resolve_with_hkask("ACTION: hkask/paradigm_shift_query", &skills, &hkask_tools)
-                .unwrap()
-                .unwrap();
-        assert!(result.is_hkask_tool());
-        assert_eq!(result.skill_id(), "hkask");
-        assert_eq!(result.action_id(), "paradigm_shift_query");
-    }
-
-    #[test]
-    fn unknown_hkask_tool_is_error() {
-        let skills = [make_skill()];
-        let hkask_tools = make_hkask_tools();
-        let err = resolve_with_hkask("ACTION: hkask/nonexistent", &skills, &hkask_tools)
-            .unwrap()
-            .unwrap_err();
-        assert!(err.to_string().contains("nonexistent"));
-    }
-
-    #[test]
-    fn hkask_prefix_without_tools_is_unknown_skill() {
-        let skills = [make_skill()];
-        // No hKask tools available — "hkask" is not a loaded skill.
-        let err = resolve_with_hkask("ACTION: hkask/anything", &skills, &[])
-            .unwrap()
-            .unwrap_err();
-        assert!(err.to_string().contains("hkask"));
-    }
-
-    #[test]
-    fn local_skill_still_resolves_with_hkask_tools_present() {
-        let skills = [make_skill()];
-        let hkask_tools = make_hkask_tools();
-        let result = resolve_with_hkask("ACTION: test-skill/probe-1", &skills, &hkask_tools)
-            .unwrap()
-            .unwrap();
-        assert!(result.is_probe());
-        assert_eq!(result.skill_id(), "test-skill");
-    }
-
-    #[test]
-    fn hkask_tool_parses_required_fields_from_schema() {
-        let skills = [make_skill()];
-        let hkask_tools = make_hkask_tools();
-        let result =
-            resolve_with_hkask("ACTION: hkask/paradigm_shift_query", &skills, &hkask_tools)
-                .unwrap()
-                .unwrap();
-        match result {
-            ResolvedAction::HKaskTool {
-                required_fields, ..
-            } => {
-                assert_eq!(required_fields, vec!["prompt"]);
-            }
-            _ => panic!("expected HKaskTool"),
-        }
-    }
-
-    #[test]
-    fn hkask_tool_parses_arguments_line() {
-        let skills = [make_skill()];
-        let hkask_tools = make_hkask_tools();
-        let response = "Let me query the Cascade about that.\n\nArguments: {\"prompt\": \"What is wrong?\", \"depth\": \"thorough\"}\n\nACTION: hkask/paradigm_shift_query";
-        let result = resolve_with_hkask(response, &skills, &hkask_tools)
-            .unwrap()
-            .unwrap();
-        match result {
-            ResolvedAction::HKaskTool { arguments, .. } => {
-                let args = arguments.unwrap();
-                assert_eq!(args["prompt"], "What is wrong?");
-                assert_eq!(args["depth"], "thorough");
-            }
-            _ => panic!("expected HKaskTool"),
-        }
-    }
-
-    #[test]
-    fn hkask_tool_parses_key_value_args() {
-        let skills = [make_skill()];
-        let hkask_tools = make_hkask_tools();
-        let result = resolve_with_hkask(
-            "ACTION: hkask/paradigm_shift_query --prompt \"check GPU\" --depth thorough",
-            &skills,
-            &hkask_tools,
-        )
-        .unwrap()
-        .unwrap();
-        match result {
-            ResolvedAction::HKaskTool { arguments, .. } => {
-                let args = arguments.unwrap();
-                assert_eq!(args["prompt"], "check GPU");
-                assert_eq!(args["depth"], "thorough");
-            }
-            _ => panic!("expected HKaskTool"),
-        }
-    }
-
-    #[test]
-    fn hkask_tool_no_required_fields() {
-        let skills = [make_skill()];
-        let hkask_tools = make_hkask_tools();
-        let result =
-            resolve_with_hkask("ACTION: hkask/russell_host_snapshot", &skills, &hkask_tools)
-                .unwrap()
-                .unwrap();
-        match result {
-            ResolvedAction::HKaskTool {
-                required_fields,
-                arguments,
-                ..
-            } => {
-                assert!(required_fields.is_empty());
-                assert!(arguments.is_none());
-            }
-            _ => panic!("expected HKaskTool"),
-        }
-    }
-
     // ── Task 3.4: Nested ACTION: Detection tests ──────────────────
 
     #[test]
@@ -1202,20 +775,6 @@ mod tests {
     }
 
     #[test]
-    fn nested_hkask_action_deduplicated_to_first() {
-        // Multiple hKask ACTION lines: first one wins.
-        let skills = [make_skill()];
-        let hkask_tools = make_hkask_tools();
-        let response = "Checking hKask.\nACTION: hkask/russell_host_snapshot\n\nAlso query:\nACTION: hkask/paradigm_shift_query";
-        let result = resolve_with_hkask(response, &skills, &hkask_tools)
-            .unwrap()
-            .unwrap();
-        // Should resolve to the FIRST hKask tool.
-        assert!(result.is_hkask_tool());
-        assert_eq!(result.action_id(), "russell_host_snapshot");
-    }
-
-    #[test]
     fn triple_action_deduplicated_to_first() {
         // Three ACTION lines: first one wins.
         let skills = [make_skill()];
@@ -1223,18 +782,5 @@ mod tests {
         let result = resolve(response, &skills).unwrap().unwrap();
         assert!(result.is_probe());
         assert_eq!(result.action_id(), "probe-1");
-    }
-
-    #[test]
-    fn extract_required_fields_no_schema() {
-        let fields = extract_required_fields(&None);
-        assert!(fields.is_empty());
-    }
-
-    #[test]
-    fn extract_required_fields_empty_schema() {
-        let schema = Some(serde_json::json!({"type": "object", "properties": {}}));
-        let fields = extract_required_fields(&schema);
-        assert!(fields.is_empty());
     }
 }

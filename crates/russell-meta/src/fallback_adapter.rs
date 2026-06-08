@@ -67,11 +67,11 @@ impl CircuitBreaker {
 /// Fallback inference adapter — tries primary backend first, falls back to secondary on failure.
 ///
 /// Includes a circuit breaker per backend to avoid hammering a down service.
-/// Typical usage: primary = hKask (remote), secondary = Okapi (local).
+/// Typical usage: primary = remote (Okapi), secondary = local.
 pub struct FallbackInferenceAdapter {
-    /// Primary backend (e.g., hKask).
+    /// Primary backend.
     primary: Arc<dyn InferencePort>,
-    /// Secondary backend (e.g., Okapi).
+    /// Secondary backend.
     secondary: Arc<dyn InferencePort>,
     /// Circuit breaker for primary.
     primary_cb: CircuitBreaker,

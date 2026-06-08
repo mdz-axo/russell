@@ -16,7 +16,7 @@ members = [
     "crates/russell-session",
     "crates/russell-api-server",
     "crates/russell-agent",
-    "crates/russell-mcp",
+
 ]
 
 [workspace.package]
@@ -35,7 +35,7 @@ russell-sentinel = { path = "crates/russell-sentinel" }
 russell-skills   = { path = "crates/russell-skills" }
 russell-meta     = { path = "crates/russell-meta" }
 russell-proprio  = { path = "crates/russell-proprio" }
-russell-mcp      = { path = "crates/russell-mcp" }
+
 russell-cli      = { path = "crates/russell-cli" }
 russell-testing  = { path = "crates/russell-testing" }
 russell-session   = { path = "crates/russell-session" }

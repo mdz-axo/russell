@@ -2,7 +2,7 @@
 //! Inference port — unified LLM backend abstraction.
 //!
 //! Provides a common interface for different LLM inference backends
-//! (hKask, Okapi, local models, etc.) following hexagonal architecture.
+//! (Okapi, local models, etc.) following hexagonal architecture.
 //!
 //! The Nurse pipeline uses this port to request inference without
 //! knowing the specific backend implementation.
@@ -130,7 +130,7 @@ impl SoapBundle {
 pub struct InferenceResponse {
     /// The generated text response.
     pub text: String,
-    /// Backend identifier (e.g., "hkask", "okapi", "local").
+    /// Backend identifier (e.g., "okapi", "local").
     pub backend: String,
     /// Model identifier, if applicable.
     pub model: Option<String>,
@@ -138,7 +138,7 @@ pub struct InferenceResponse {
     pub latency_ms: Option<u64>,
     /// Token usage statistics, if available.
     pub token_usage: Option<TokenUsage>,
-    /// Extracted ACTION: proposals from LLM output (hKask returns these).
+    /// Extracted ACTION: proposals from LLM output.
     #[serde(default)]
     pub actions: Vec<String>,
 }
@@ -157,7 +157,7 @@ pub struct TokenUsage {
 /// Unified inference port for LLM backends.
 ///
 /// Implementations provide inference capabilities for different backends
-/// (hKask REST API, Okapi local inference, etc.).
+/// (Okapi local inference, remote API, etc.).
 #[async_trait::async_trait]
 pub trait InferencePort: Send + Sync {
     /// Perform inference with a prompt and optional SOAP context.
@@ -170,7 +170,7 @@ pub trait InferencePort: Send + Sync {
     /// Check if the backend is available and healthy.
     async fn health_check(&self) -> Result<bool>;
 
-    /// Get the backend identifier (e.g., "hkask", "okapi").
+    /// Get the backend identifier (e.g., "okapi").
     fn backend_id(&self) -> &str;
 }
 

@@ -2,7 +2,7 @@
 //! Identity port — unified authentication abstraction.
 //!
 //! Provides a common interface for different authentication systems
-//! (macaroon OCAP, hKask capability tokens, etc.) following hexagonal
+//! (macaroon OCAP, ACP capability tokens, etc.) following hexagonal
 //! architecture principles.
 //!
 //! See [ADR-0026](../../../docs/adr/0026-macaroon-ocap.md).
@@ -10,7 +10,7 @@
 /// Unified identity port for authentication and authorization.
 ///
 /// Implementations provide principal identification and capability checking
-/// regardless of the underlying token format (macaroon, JWT, hKask token, etc.).
+/// regardless of the underlying token format (macaroon, JWT, etc.).
 pub trait IdentityPort: Send + Sync {
     /// Get the principal identifier (e.g., token ID, WebID, user ID).
     fn principal_id(&self) -> &str;

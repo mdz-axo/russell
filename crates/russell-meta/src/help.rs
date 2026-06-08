@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
-//! `run_help` — Nurse pipeline via hKask.
+//! `run_help` — Nurse pipeline via LLM inference.
 //!
-//! Russell collects telemetry and sends it to hKask for LLM inference.
-//! hKask handles prompt composition, LLM calls, and returns the response.
+//! Russell collects telemetry and sends it to an LLM backend for inference.
+//! Falls back to an offline summary when no backend is reachable.
 
 use std::path::PathBuf;
 use std::time::Duration;
@@ -10,7 +10,6 @@ use std::time::Duration;
 use serde::{Deserialize, Serialize};
 use time::OffsetDateTime;
 use tracing::{info, warn};
-use ulid::Ulid;
 
 use russell_core::config::RuntimeConfig;
 use russell_core::journal::{HelpSessionInput, HelpSessionStatus, JournalWriter};
@@ -23,7 +22,7 @@ use crate::error::{DoctorError, Result};
 pub struct HelpOutcome {
     /// Unique session identifier.
     pub session_id: String,
-    /// Backend used ("hkask" or "offline").
+    /// Backend used ("okapi" or "offline").
     pub backend: &'static str,
     /// Path to the evidence bundle directory.
     pub evidence_dir: PathBuf,
@@ -36,35 +35,17 @@ pub struct HelpOutcome {
 /// Reason the LLM inference was skipped.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 pub enum SkipReason {
-    /// hKask was unreachable; offline fallback was used.
+    /// Remote backend was unreachable; offline fallback was used.
     OfflineFallback,
     /// No crit/alert events; threshold gate prevented escalation.
     ThresholdSkip,
 }
 
-#[derive(Serialize)]
-struct HKaskInferRequest {
-    /// Nested request envelope matching hKask's `SoapInferAuthRequest`.
-    request: HKaskInferInner,
-    /// Capability token (base64-encoded hKask CapabilityToken JSON).
-    capability_token: String,
-}
-
-#[derive(Serialize)]
-struct HKaskInferInner {
-    subjective: Option<String>,
-    objective: ObjectiveData,
-    assessment: String,
-    plan: String,
-}
-
-#[derive(Serialize)]
 struct ObjectiveData {
     severity_counts: SeverityCounts,
     recent_events: Vec<EventRecord>,
 }
 
-#[derive(Serialize)]
 struct SeverityCounts {
     crit: u64,
     alert: u64,
@@ -72,7 +53,6 @@ struct SeverityCounts {
     info: u64,
 }
 
-#[derive(Serialize)]
 struct EventRecord {
     probe: String,
     severity: String,
@@ -80,40 +60,30 @@ struct EventRecord {
     ts: String,
 }
 
-#[derive(Deserialize, Serialize)]
-struct HKaskInferResponse {
-    response: String,
-    model: String,
-    latency_ms: u64,
-    #[serde(default)]
-    actions: Vec<String>,
-}
-
-/// Run the Nurse pipeline using the hKask endpoint from [`RuntimeConfig`].
+/// Run the Nurse pipeline using the Okapi endpoint from [`RuntimeConfig`].
 ///
 /// Loads configuration from environment variables (see [`RuntimeConfig::from_env`]).
 pub async fn run_help(
     paths: &Paths,
     writer: &JournalWriter,
     note: Option<&str>,
-    _hkask_tool_names: &[(String, Option<String>)],
 ) -> Result<HelpOutcome> {
     let config = RuntimeConfig::from_env();
-    run_help_with_endpoint(paths, writer, note, &config.hkask_endpoint).await
+    run_help_with_endpoint(paths, writer, note, &config.okapi_endpoint).await
 }
 
-/// Run the Nurse pipeline with a configurable hKask endpoint.
+/// Run the Nurse pipeline with a configurable inference endpoint.
 ///
-/// Gathers objective telemetry, checks the threshold gate, calls hKask
-/// for LLM inference, and journals the help session. Falls back to an
-/// offline summary if hKask is unreachable or the threshold gate skips.
+/// Gathers objective telemetry, checks the threshold gate, calls the
+/// LLM backend for inference, and journals the help session. Falls back to an
+/// offline summary if the backend is unreachable or the threshold gate skips.
 pub async fn run_help_with_endpoint(
     paths: &Paths,
     writer: &JournalWriter,
     note: Option<&str>,
     endpoint: &str,
 ) -> Result<HelpOutcome> {
-    let session_id = Ulid::new().to_string();
+    let session_id = ulid::Ulid::new().to_string();
     let evidence_dir = paths.evidence().join("help").join(&session_id);
     std::fs::create_dir_all(&evidence_dir).map_err(|e| DoctorError::io(&evidence_dir, e))?;
 
@@ -149,21 +119,56 @@ pub async fn run_help_with_endpoint(
         });
     }
 
-    let capability_token = load_capability_token().unwrap_or_default();
-    let request = HKaskInferRequest {
-        request: HKaskInferInner {
-            subjective: note.map(String::from),
-            objective,
-            assessment: String::new(),
-            plan: String::new(),
-        },
-        capability_token,
-    };
+    // Attempt inference via the configured backend.
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(30))
+        .build()
+        .map_err(|e| DoctorError::Config(format!("HTTP client: {e}")))?;
 
-    let response = match call_hkask(endpoint, &request).await {
-        Ok(r) => r,
+    let subjective = note.unwrap_or("System health check requested");
+    let body = serde_json::json!({
+        "subjective": subjective,
+        "objective": objective,
+    });
+
+    let response = match client
+        .post(endpoint)
+        .header("Content-Type", "application/json")
+        .json(&body)
+        .send()
+        .await
+    {
+        Ok(resp) if resp.status().is_success() => resp,
+        Ok(resp) => {
+            let status = resp.status();
+            warn!(status = %status, "inference endpoint returned non-success");
+            let response = fallback_summary(&gather_objective(writer).await);
+            let ts = OffsetDateTime::now_utc();
+            let input = HelpSessionInput {
+                id: &session_id,
+                ts_unix: ts.unix_timestamp(),
+                ts: &ts.to_string(),
+                backend: "offline",
+                model: None,
+                note,
+                prompt_chars: 0,
+                response_chars: response.len() as i64,
+                latency_ms: None,
+                status: HelpSessionStatus::Fallback,
+                error_kind: None,
+                evidence_ref: &evidence_dir.to_string_lossy(),
+            };
+            writer.append_help_session(&input)?;
+            return Ok(HelpOutcome {
+                session_id,
+                backend: "offline",
+                evidence_dir,
+                response,
+                skip_reason: Some(SkipReason::OfflineFallback),
+            });
+        }
         Err(e) => {
-            warn!(error = %e, "hKask unreachable; using offline fallback");
+            warn!(error = %e, "inference endpoint unreachable; using offline fallback");
             let response = fallback_summary(&gather_objective(writer).await);
             let ts = OffsetDateTime::now_utc();
             let input = HelpSessionInput {
@@ -191,17 +196,33 @@ pub async fn run_help_with_endpoint(
         }
     };
 
+    let infer_response: serde_json::Value = response
+        .json()
+        .await
+        .map_err(|e| DoctorError::Config(format!("failed to parse inference response: {e}")))?;
+
+    let text = infer_response
+        .get("response")
+        .and_then(|v| v.as_str())
+        .unwrap_or("No response from inference backend")
+        .to_string();
+
+    let model = infer_response
+        .get("model")
+        .and_then(|v| v.as_str())
+        .map(String::from);
+
     let ts = OffsetDateTime::now_utc();
     let input = HelpSessionInput {
         id: &session_id,
         ts_unix: ts.unix_timestamp(),
         ts: &ts.to_string(),
-        backend: "hkask",
-        model: Some(&response.model),
+        backend: "okapi",
+        model: model.as_deref(),
         note,
         prompt_chars: 0,
-        response_chars: response.response.len() as i64,
-        latency_ms: Some(response.latency_ms as i64),
+        response_chars: text.len() as i64,
+        latency_ms: None,
         status: HelpSessionStatus::Ok,
         error_kind: None,
         evidence_ref: &evidence_dir.to_string_lossy(),
@@ -209,16 +230,19 @@ pub async fn run_help_with_endpoint(
     writer.append_help_session(&input)?;
 
     let evidence_path = evidence_dir.join("response.json");
-    std::fs::write(&evidence_path, serde_json::to_string_pretty(&response)?)
-        .map_err(|e| DoctorError::io(&evidence_path, e))?;
+    std::fs::write(
+        &evidence_path,
+        serde_json::to_string_pretty(&infer_response)?,
+    )
+    .map_err(|e| DoctorError::io(&evidence_path, e))?;
 
-    info!(session_id, model = %response.model, "help session complete");
+    info!(session_id, "help session complete");
 
     Ok(HelpOutcome {
         session_id,
-        backend: "hkask",
+        backend: "okapi",
         evidence_dir,
-        response: response.response,
+        response: text,
         skip_reason: None,
     })
 }
@@ -348,223 +372,6 @@ fn verify_recent_evidence(evidence_base: &std::path::Path, _writer: &JournalWrit
                         }
                     }
                 }
-            }
-        }
-    }
-}
-
-async fn call_hkask(endpoint: &str, request: &HKaskInferRequest) -> Result<HKaskInferResponse> {
-    let client = reqwest::Client::builder()
-        .timeout(Duration::from_secs(30))
-        .build()
-        .map_err(|e| DoctorError::Config(format!("HTTP client: {e}")))?;
-
-    let response = client
-        .post(endpoint)
-        .header("Content-Type", "application/json")
-        .json(request)
-        .send()
-        .await
-        .map_err(|e| DoctorError::Config(format!("hKask request: {e}")))?;
-
-    if !response.status().is_success() {
-        return Err(DoctorError::Config(format!(
-            "hKask returned {}",
-            response.status()
-        )));
-    }
-
-    response
-        .json()
-        .await
-        .map_err(|e| DoctorError::Config(format!("hKask response: {e}")))
-}
-
-/// Load or generate a hKask-format capability token for SOAP inference.
-///
-/// The token is stored at `~/.local/state/harness/russell.capability_token`
-/// as base64-encoded JSON matching hKask's `CapabilityToken` schema.
-/// The token is encrypted at rest using age encryption (T10).
-///
-/// Returns `None` if the token cannot be loaded or generated.
-/// Token rotation interval in hours (Schneier: limit token lifetime).
-const TOKEN_ROTATION_HOURS: i64 = 24;
-
-/// Load or generate a hKask-format capability token for SOAP inference.
-///
-/// The token is stored at `~/.local/state/harness/russell.capability_token`
-/// as base64-encoded JSON matching hKask's `CapabilityToken` schema.
-/// The token is encrypted at rest using age encryption (T10).
-/// Tokens expire after [`TOKEN_ROTATION_HOURS`] and are automatically
-/// regenerated on load if expired (T2-1).
-///
-/// Returns `None` if the token cannot be loaded or generated.
-pub fn load_capability_token() -> Option<String> {
-    use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
-    use hmac::{Hmac, Mac};
-    use russell_core::encryption::EncryptionKey;
-    use serde_json::json;
-    use sha2::{Digest, Sha256};
-
-    type HmacSha256 = Hmac<Sha256>;
-
-    let paths = russell_core::paths::Paths::from_env().ok()?;
-    let token_path = paths.state.join("russell.capability_token");
-    let key_path = paths.state.join("russell.encryption_key");
-
-    // Load or generate encryption key
-    let encryption_key = if let Ok(key_str) = std::fs::read_to_string(&key_path) {
-        EncryptionKey::from_string(key_str.trim()).ok()?
-    } else {
-        let key = EncryptionKey::generate();
-        if let Some(parent) = key_path.parent() {
-            let _ = std::fs::create_dir_all(parent);
-        }
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::OpenOptionsExt;
-            let _ = std::fs::OpenOptions::new()
-                .write(true)
-                .create(true)
-                .truncate(true)
-                .mode(0o600)
-                .open(&key_path)
-                .and_then(|mut f| {
-                    std::io::Write::write_all(&mut f, key.to_encoded_string().as_bytes())
-                });
-        }
-        #[cfg(not(unix))]
-        {
-            let _ = std::fs::write(&key_path, key.to_encoded_string());
-        }
-        key
-    };
-
-    // Try to load and decrypt existing token, checking expiration
-    if let Ok(encrypted_token) = std::fs::read_to_string(&token_path) {
-        let trimmed = encrypted_token.trim();
-        if !trimmed.is_empty() {
-            let token_str = if let Ok(plaintext) = encryption_key.decrypt(trimmed) {
-                String::from_utf8(plaintext).ok()
-            } else {
-                // Fallback: token might be unencrypted (legacy format)
-                Some(trimmed.to_owned())
-            };
-
-            if let Some(ref token_str) = token_str {
-                // Check expiration — rotate if expired
-                if !is_token_expired(token_str) {
-                    return Some(token_str.clone());
-                }
-                tracing::info!("capability token expired, rotating");
-            }
-        }
-    }
-
-    // Generate new token matching hKask's CapabilityToken schema
-    let secret = std::env::var("HKASK_CAPABILITY_KEY").ok()?;
-    let russell_webid = "russell-agent";
-    let hkask_webid = "hkask-inference";
-
-    // Compute token ID: SHA-256(resource || resource_id || action || from || to)
-    // Aligned with hKask's CapabilityToken::generate_id() — no timestamp component.
-    let mut id_hasher = Sha256::new();
-    id_hasher.update(b"Tool");
-    id_hasher.update(b"inference");
-    id_hasher.update(b"Execute");
-    id_hasher.update(russell_webid.as_bytes());
-    id_hasher.update(hkask_webid.as_bytes());
-    let token_id = hex::encode(id_hasher.finalize());
-
-    // Compute signature: HMAC-SHA256(secret, id || resource || resource_id || action || from || to)
-    let mut mac =
-        HmacSha256::new_from_slice(secret.as_bytes()).expect("HMAC can take key of any size");
-    mac.update(token_id.as_bytes());
-    mac.update(b"Tool");
-    mac.update(b"inference");
-    mac.update(b"Execute");
-    mac.update(russell_webid.as_bytes());
-    mac.update(hkask_webid.as_bytes());
-    let signature = hex::encode(mac.finalize().into_bytes());
-
-    let now = chrono::Utc::now();
-    let expires_at_unix = (now + chrono::Duration::hours(TOKEN_ROTATION_HOURS)).timestamp();
-
-    let token_json = json!({
-        "id": token_id,
-        "resource": "Tool",
-        "resource_id": "inference",
-        "action": "Execute",
-        "delegated_from": russell_webid,
-        "delegated_to": hkask_webid,
-        "signature": signature,
-        "expires_at": expires_at_unix,
-        "attenuation_level": 0,
-        "max_attenuation": 7,
-        "context_nonce": format!("root-{}", russell_webid)
-    });
-
-    let token_b64 = BASE64.encode(serde_json::to_string(&token_json).ok()?.as_bytes());
-
-    // Encrypt and persist token
-    let encrypted_token = encryption_key.encrypt(token_b64.as_bytes()).ok()?;
-
-    if let Some(parent) = token_path.parent() {
-        let _ = std::fs::create_dir_all(parent);
-    }
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::OpenOptionsExt;
-        let _ = std::fs::OpenOptions::new()
-            .write(true)
-            .create(true)
-            .truncate(true)
-            .mode(0o600)
-            .open(&token_path)
-            .and_then(|mut f| std::io::Write::write_all(&mut f, encrypted_token.as_bytes()));
-    }
-    #[cfg(not(unix))]
-    {
-        let _ = std::fs::write(&token_path, &encrypted_token);
-    }
-
-    Some(token_b64)
-}
-
-/// Check if a base64-encoded capability token is expired.
-///
-/// Returns `true` if the token has an `expires_at` field that is in the past,
-/// or if the token cannot be parsed (treat unparseable tokens as expired).
-fn is_token_expired(token_b64: &str) -> bool {
-    use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
-
-    let decoded = match BASE64.decode(token_b64) {
-        Ok(d) => d,
-        Err(_) => return true,
-    };
-
-    let json_str = match String::from_utf8(decoded) {
-        Ok(s) => s,
-        Err(_) => return true,
-    };
-
-    let token_json: serde_json::Value = match serde_json::from_str(&json_str) {
-        Ok(v) => v,
-        Err(_) => return true,
-    };
-
-    match token_json.get("expires_at") {
-        None | Some(serde_json::Value::Null) => false,
-        Some(v) => {
-            if let Some(expires_unix) = v.as_i64() {
-                chrono::Utc::now().timestamp() > expires_unix
-            } else if let Some(expires_str) = v.as_str() {
-                match chrono::DateTime::parse_from_rfc3339(expires_str) {
-                    Ok(expires) => chrono::Utc::now() > expires,
-                    Err(_) => true,
-                }
-            } else {
-                true
             }
         }
     }
