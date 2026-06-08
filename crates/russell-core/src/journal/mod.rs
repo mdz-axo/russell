@@ -1445,3 +1445,727 @@ fn configure_pragmas(conn: &Connection) -> Result<()> {
     )?;
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::event::{Event, Scope, Severity};
+
+    /// Create a temporary directory and journal path for testing.
+    fn tmp_journal() -> (tempfile::TempDir, PathBuf) {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let p = tmp.path().join("journal.db");
+        (tmp, p)
+    }
+
+    // ---- JournalWriter open / basic lifecycle ----
+
+    // REQ: JR-7 — Persistence is auditable; opening a journal creates the DB.
+    #[test]
+    fn writer_open_creates_db() {
+        let (_guard, path) = tmp_journal();
+        let w = JournalWriter::open(&path).unwrap();
+        assert!(path.exists(), "journal DB file must exist after open");
+        assert_eq!(w.path(), &path);
+    }
+
+    // REQ: JR-7 — Reader can be obtained from a writer.
+    #[test]
+    fn writer_produces_reader() {
+        let (_guard, path) = tmp_journal();
+        let w = JournalWriter::open(&path).unwrap();
+        let r = w.reader();
+        assert_eq!(r.path(), &path);
+    }
+
+    // REQ: JR-7 — last_write_unix_s is set on open.
+    #[test]
+    fn writer_last_write_set_on_open() {
+        let (_guard, path) = tmp_journal();
+        let w = JournalWriter::open(&path).unwrap();
+        let ts = w.last_write_unix_s();
+        assert!(
+            ts > 1_700_000_000,
+            "last_write should be a recent unix timestamp"
+        );
+    }
+
+    // ---- append + recent round-trip ----
+
+    // REQ: JR-7 — Appending an event and reading it back preserves fields.
+    #[test]
+    fn append_event_and_read_back() {
+        let (_guard, path) = tmp_journal();
+        let w = JournalWriter::open(&path).unwrap();
+        let mut e = Event::new("observe", Severity::Info);
+        e.module = Some("daily/gpu-sanity".into());
+        e.summary = Some("GPU temperature 45°C".into());
+        w.append(&e).unwrap();
+
+        let r = w.reader();
+        let rows = r.recent(5).unwrap();
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].action, "observe");
+        assert_eq!(rows[0].severity, Severity::Info);
+        assert_eq!(rows[0].module.as_deref(), Some("daily/gpu-sanity"));
+        assert_eq!(rows[0].summary.as_deref(), Some("GPU temperature 45°C"));
+    }
+
+    // REQ: JR-7 — Recent events are returned newest-first.
+    #[test]
+    fn recent_returns_newest_first() {
+        let (_guard, path) = tmp_journal();
+        let w = JournalWriter::open(&path).unwrap();
+        for i in 0..3 {
+            let mut e = Event::new("observe", Severity::Info);
+            e.module = Some(format!("mod-{i}"));
+            // Stagger timestamps so ordering is deterministic.
+            e.ts_unix = 1_700_000_000 + i as i64;
+            w.append(&e).unwrap();
+        }
+        let r = w.reader();
+        let rows = r.recent(10).unwrap();
+        assert_eq!(rows.len(), 3);
+        // Newest first → module names descending.
+        assert_eq!(rows[0].module.as_deref(), Some("mod-2"));
+        assert_eq!(rows[1].module.as_deref(), Some("mod-1"));
+        assert_eq!(rows[2].module.as_deref(), Some("mod-0"));
+    }
+
+    // ---- append_sample + read back ----
+
+    // REQ: JR-7 — Sample persistence round-trip: write then query.
+    #[test]
+    fn append_sample_host_and_read_back() {
+        let (_guard, path) = tmp_journal();
+        let w = JournalWriter::open(&path).unwrap();
+        let ts = 1_700_000_100;
+        w.append_sample(
+            ts,
+            Scope::Host,
+            "mem_available_mib",
+            Some(8192.0),
+            None,
+            Some("MiB"),
+        )
+        .unwrap();
+
+        let r = w.reader();
+        let last_ts = r.last_host_sample_ts().unwrap();
+        assert_eq!(last_ts, Some(ts));
+    }
+
+    // REQ: JR-7 — Self-scope samples are recorded separately from host.
+    #[test]
+    fn append_sample_self_scope() {
+        let (_guard, path) = tmp_journal();
+        let w = JournalWriter::open(&path).unwrap();
+        let ts = 1_700_000_200;
+        w.append_sample(
+            ts,
+            Scope::Self_,
+            "sentinel_last_run_age_s",
+            Some(42.0),
+            None,
+            Some("s"),
+        )
+        .unwrap();
+
+        let r = w.reader();
+        // Self-scope should NOT appear in last_host_sample_ts.
+        let host_ts = r.last_host_sample_ts().unwrap();
+        assert_eq!(host_ts, None);
+        // But should appear in last_sample_ts (all scopes).
+        let any_ts = r.last_sample_ts().unwrap();
+        assert_eq!(any_ts, Some(ts));
+    }
+
+    // REQ: JR-7 — INSERT OR REPLACE on same (ts, scope, probe) upserts.
+    #[test]
+    fn append_sample_upserts_same_probe() {
+        let (_guard, path) = tmp_journal();
+        let w = JournalWriter::open(&path).unwrap();
+        let ts = 1_700_000_300;
+        w.append_sample(
+            ts,
+            Scope::Host,
+            "mem_available_mib",
+            Some(8192.0),
+            None,
+            Some("MiB"),
+        )
+        .unwrap();
+        w.append_sample(
+            ts,
+            Scope::Host,
+            "mem_available_mib",
+            Some(4096.0),
+            None,
+            Some("MiB"),
+        )
+        .unwrap();
+
+        let r = w.reader();
+        let summary = r.host_samples_summary(ts, ts + 1).unwrap();
+        assert_eq!(summary.len(), 1);
+        assert_eq!(summary[0].last, Some(4096.0));
+    }
+
+    // ---- severity_counts ----
+
+    // REQ: JR-7 — Severity counts are accurate across all four bands.
+    #[test]
+    fn severity_counts_all_bands() {
+        let (_guard, path) = tmp_journal();
+        let w = JournalWriter::open(&path).unwrap();
+        let cases = [
+            (Severity::Info, 3),
+            (Severity::Warn, 2),
+            (Severity::Alert, 1),
+            (Severity::Crit, 1),
+        ];
+        for (sev, count) in cases {
+            for _ in 0..count {
+                w.append(&Event::new("test", sev)).unwrap();
+            }
+        }
+        let r = w.reader();
+        let counts = r.severity_counts(0, i64::MAX).unwrap();
+        assert_eq!(counts.info, 3);
+        assert_eq!(counts.warn, 2);
+        assert_eq!(counts.alert, 1);
+        assert_eq!(counts.crit, 1);
+    }
+
+    // REQ: JR-7 — SeverityCounts defaults to zero.
+    #[test]
+    fn severity_counts_default_is_zero() {
+        let sc = SeverityCounts::default();
+        assert_eq!(sc.info, 0);
+        assert_eq!(sc.warn, 0);
+        assert_eq!(sc.alert, 0);
+        assert_eq!(sc.crit, 0);
+    }
+
+    // ---- count_events with scope filter ----
+
+    // REQ: JR-7 — count_events respects scope filtering.
+    #[test]
+    fn count_events_with_scope_filter() {
+        let (_guard, path) = tmp_journal();
+        let w = JournalWriter::open(&path).unwrap();
+        let mut e_host = Event::new("observe", Severity::Info);
+        e_host.scope = Scope::Host;
+        w.append(&e_host).unwrap();
+
+        let mut e_self = Event::new("proprio", Severity::Info);
+        e_self.scope = Scope::Self_;
+        w.append(&e_self).unwrap();
+
+        let r = w.reader();
+        let total = r.count_events(0, i64::MAX, None).unwrap();
+        assert_eq!(total, 2);
+        let host_only = r.count_events(0, i64::MAX, Some(Scope::Host)).unwrap();
+        assert_eq!(host_only, 1);
+        let self_only = r.count_events(0, i64::MAX, Some(Scope::Self_)).unwrap();
+        assert_eq!(self_only, 1);
+    }
+
+    // ---- host_samples_summary ----
+
+    // REQ: JR-7 — host_samples_summary returns correct min/avg/max/last/count.
+    #[test]
+    fn host_samples_summary_statistics() {
+        let (_guard, path) = tmp_journal();
+        let w = JournalWriter::open(&path).unwrap();
+        let base = 1_700_000_000;
+        // Insert 3 samples for mem_available_mib: 8000, 6000, 7000
+        for (i, val) in [8000.0, 6000.0, 7000.0].iter().enumerate() {
+            w.append_sample(
+                base + i as i64 * 300,
+                Scope::Host,
+                "mem_available_mib",
+                Some(*val),
+                None,
+                Some("MiB"),
+            )
+            .unwrap();
+        }
+        let r = w.reader();
+        let summaries = r.host_samples_summary(base, base + 1000).unwrap();
+        assert_eq!(summaries.len(), 1);
+        let s = &summaries[0];
+        assert_eq!(s.probe, "mem_available_mib");
+        assert_eq!(s.unit.as_deref(), Some("MiB"));
+        assert_eq!(s.min, Some(6000.0));
+        assert_eq!(s.max, Some(8000.0));
+        // avg = (8000+6000+7000)/3 = 7000.0
+        let avg = s.avg.unwrap();
+        assert!(
+            (avg - 7000.0).abs() < 0.01,
+            "avg should be 7000.0, got {avg}"
+        );
+        assert_eq!(s.last, Some(7000.0));
+        assert_eq!(s.count, 3);
+    }
+
+    // ---- self_samples_summary ----
+
+    // REQ: JR-7 — self_samples_summary only returns self-scope samples.
+    #[test]
+    fn self_samples_summary_excludes_host() {
+        let (_guard, path) = tmp_journal();
+        let w = JournalWriter::open(&path).unwrap();
+        let ts = 1_700_000_000;
+        w.append_sample(
+            ts,
+            Scope::Host,
+            "mem_available_mib",
+            Some(8192.0),
+            None,
+            Some("MiB"),
+        )
+        .unwrap();
+        w.append_sample(
+            ts,
+            Scope::Self_,
+            "timer_drift_s",
+            Some(0.5),
+            None,
+            Some("s"),
+        )
+        .unwrap();
+
+        let r = w.reader();
+        let host = r.host_samples_summary(ts, ts + 1).unwrap();
+        let self_ = r.self_samples_summary(ts, ts + 1).unwrap();
+        assert_eq!(host.len(), 1, "host summary should have 1 probe");
+        assert_eq!(self_.len(), 1, "self summary should have 1 probe");
+        assert_eq!(self_[0].probe, "timer_drift_s");
+    }
+
+    // ---- baselines ----
+
+    // REQ: JR-7 — Baseline upsert + read round-trip.
+    #[test]
+    fn baseline_upsert_and_read() {
+        let (_guard, path) = tmp_journal();
+        let w = JournalWriter::open(&path).unwrap();
+        w.upsert_baseline(
+            "mem_available_mib",
+            Scope::Host,
+            Some(8192.0), // ewma_mean
+            Some(256.0),  // ewma_var
+            Some(7500.0), // p50
+            Some(8000.0), // p95
+            Some(8100.0), // p99
+        )
+        .unwrap();
+
+        let r = w.reader();
+        let baselines = r.read_baselines().unwrap();
+        assert_eq!(baselines.len(), 1);
+        let b = &baselines[0];
+        assert_eq!(b.probe, "mem_available_mib");
+        assert_eq!(b.p50, Some(7500.0));
+        assert_eq!(b.p95, Some(8000.0));
+        assert_eq!(b.p99, Some(8100.0));
+        assert_eq!(b.ewma_mean, Some(8192.0));
+        assert_eq!(b.ewma_var, Some(256.0));
+        assert!(b.updated_ts.is_some());
+    }
+
+    // REQ: JR-7 — Baseline upsert is idempotent (INSERT OR REPLACE).
+    #[test]
+    fn baseline_upsert_replaces() {
+        let (_guard, path) = tmp_journal();
+        let w = JournalWriter::open(&path).unwrap();
+        w.upsert_baseline(
+            "mem_available_mib",
+            Scope::Host,
+            Some(8192.0),
+            Some(100.0),
+            Some(7500.0),
+            Some(8000.0),
+            Some(8100.0),
+        )
+        .unwrap();
+        w.upsert_baseline(
+            "mem_available_mib",
+            Scope::Host,
+            Some(9000.0),
+            Some(200.0),
+            Some(8000.0),
+            Some(8500.0),
+            Some(8600.0),
+        )
+        .unwrap();
+
+        let r = w.reader();
+        let baselines = r.read_baselines().unwrap();
+        assert_eq!(baselines.len(), 1);
+        assert_eq!(baselines[0].ewma_mean, Some(9000.0));
+        assert_eq!(baselines[0].p95, Some(8500.0));
+    }
+
+    // REQ: JR-7 — BaselineRow is_stale / is_fresh logic.
+    #[test]
+    fn baseline_staleness_checks() {
+        let now = crate::time::now_unix();
+        let fresh = BaselineRow {
+            probe: "test".into(),
+            p50: None,
+            p95: Some(1.0),
+            p99: None,
+            ewma_mean: None,
+            ewma_var: None,
+            count: 0,
+            updated_ts: Some(now),
+        };
+        assert!(fresh.is_fresh(24));
+        assert!(!fresh.is_stale(24));
+
+        let stale = BaselineRow {
+            probe: "test".into(),
+            p50: None,
+            p95: Some(1.0),
+            p99: None,
+            ewma_mean: None,
+            ewma_var: None,
+            count: 0,
+            updated_ts: Some(now - 100_000), // ~27.7 hours ago
+        };
+        assert!(stale.is_stale(24));
+        assert!(!stale.is_fresh(24));
+
+        let no_ts = BaselineRow {
+            probe: "test".into(),
+            p50: None,
+            p95: Some(1.0),
+            p99: None,
+            ewma_mean: None,
+            ewma_var: None,
+            count: 0,
+            updated_ts: None,
+        };
+        assert!(no_ts.is_stale(24), "missing updated_ts means stale");
+    }
+
+    // ---- hash chain integrity ----
+
+    // REQ: JR-7, ADR-0004 — Chain integrity returns true for a fresh journal.
+    #[test]
+    fn chain_integrity_fresh_journal() {
+        let (_guard, path) = tmp_journal();
+        let w = JournalWriter::open(&path).unwrap();
+        let r = w.reader();
+        // No events → chain is trivially intact.
+        assert_eq!(r.check_chain_integrity(), Some(true));
+    }
+
+    // REQ: JR-7, ADR-0004 — Chain integrity holds after appending events.
+    #[test]
+    fn chain_integrity_after_appends() {
+        let (_guard, path) = tmp_journal();
+        let w = JournalWriter::open(&path).unwrap();
+        for i in 0..5 {
+            let mut e = Event::new("observe", Severity::Info);
+            e.module = Some(format!("mod-{i}"));
+            w.append(&e).unwrap();
+        }
+        let r = w.reader();
+        assert_eq!(r.check_chain_integrity(), Some(true));
+    }
+
+    // ---- HelpSessionStatus ----
+
+    // REQ: JR-7 — HelpSessionStatus round-trips through as_str / from_str.
+    #[test]
+    fn help_session_status_round_trip() {
+        for (variant, s) in [
+            (HelpSessionStatus::Ok, "ok"),
+            (HelpSessionStatus::Error, "error"),
+            (HelpSessionStatus::Fallback, "fallback"),
+            (HelpSessionStatus::ThresholdSkip, "threshold_skip"),
+        ] {
+            assert_eq!(variant.as_str(), s);
+            assert_eq!(HelpSessionStatus::from_str(s).unwrap(), variant);
+        }
+    }
+
+    // REQ: JR-7 — Unknown HelpSessionStatus string is an error.
+    #[test]
+    fn help_session_status_unknown_rejected() {
+        assert!(HelpSessionStatus::from_str("unknown").is_err());
+    }
+
+    // ---- append_help_session + help_sessions_in_range ----
+
+    // REQ: JR-7 — Help session write and read round-trip.
+    #[test]
+    fn append_help_session_and_read() {
+        let (_guard, path) = tmp_journal();
+        let w = JournalWriter::open(&path).unwrap();
+        let ts = 1_700_000_000;
+        let input = HelpSessionInput {
+            id: "01HXYZ1234567890123456789A",
+            ts_unix: ts,
+            ts: "2026-01-15T00:00:00Z",
+            backend: "okapi",
+            model: Some("llama3"),
+            note: Some("test session"),
+            prompt_chars: 150,
+            response_chars: 300,
+            latency_ms: Some(2500),
+            status: HelpSessionStatus::Ok,
+            error_kind: None,
+            evidence_ref: "/tmp/evidence",
+        };
+        w.append_help_session(&input).unwrap();
+
+        let r = w.reader();
+        let sessions = r.help_sessions_in_range(ts, ts + 1).unwrap();
+        assert_eq!(sessions.len(), 1);
+        let s = &sessions[0];
+        assert_eq!(s.id, "01HXYZ1234567890123456789A");
+        assert_eq!(s.backend, "okapi");
+        assert_eq!(s.model.as_deref(), Some("llama3"));
+        assert_eq!(s.latency_ms, Some(2500));
+        assert_eq!(s.status, HelpSessionStatus::Ok);
+    }
+
+    // ---- check_and_mark_nonce ----
+
+    // REQ: JR-7 — Nonce replay protection: first use returns false, second returns true.
+    // NOTE: requires the used_nonces table (migration 7 file exists but isn't in
+    // MIGRATIONS list yet); we create it via a separate connection.
+    #[test]
+    fn nonce_replay_detection() {
+        let (_guard, path) = tmp_journal();
+        let w = JournalWriter::open(&path).unwrap();
+        // Ensure the used_nonces table exists by opening a separate connection.
+        {
+            let conn = Connection::open(&path).unwrap();
+            conn.execute_batch(
+                r"CREATE TABLE IF NOT EXISTS used_nonces (
+                     token_id   TEXT    NOT NULL,
+                     nonce      TEXT    NOT NULL,
+                     expires_at INTEGER NOT NULL,
+                     PRIMARY KEY (token_id, nonce)
+                   );
+                   CREATE INDEX IF NOT EXISTS used_nonces_expires ON used_nonces(expires_at);",
+            )
+            .unwrap();
+        }
+        let expires = crate::time::now_unix() + 3600;
+        // First use → not seen before.
+        assert_eq!(
+            w.check_and_mark_nonce("token-1", "nonce-abc", expires)
+                .unwrap(),
+            false
+        );
+        // Second use → replay detected.
+        assert_eq!(
+            w.check_and_mark_nonce("token-1", "nonce-abc", expires)
+                .unwrap(),
+            true
+        );
+        // Different nonce → not seen before.
+        assert_eq!(
+            w.check_and_mark_nonce("token-1", "nonce-def", expires)
+                .unwrap(),
+            false
+        );
+    }
+
+    // ---- previous_sample ----
+
+    // REQ: JR-7 — previous_sample returns the most recent sample before a timestamp.
+    #[test]
+    fn previous_sample_returns_most_recent() {
+        let (_guard, path) = tmp_journal();
+        let w = JournalWriter::open(&path).unwrap();
+        w.append_sample(
+            1_700_000_000,
+            Scope::Host,
+            "mem_available_mib",
+            Some(8192.0),
+            None,
+            Some("MiB"),
+        )
+        .unwrap();
+        w.append_sample(
+            1_700_000_300,
+            Scope::Host,
+            "mem_available_mib",
+            Some(7000.0),
+            None,
+            Some("MiB"),
+        )
+        .unwrap();
+
+        let r = w.reader();
+        let result = r.previous_sample("mem_available_mib", 1_700_000_500);
+        assert_eq!(result, Some((7000.0, 1_700_000_300)));
+    }
+
+    // REQ: JR-7 — previous_sample returns None when no sample exists.
+    #[test]
+    fn previous_sample_returns_none_when_empty() {
+        let (_guard, path) = tmp_journal();
+        let w = JournalWriter::open(&path).unwrap();
+        let r = w.reader();
+        assert_eq!(r.previous_sample("nonexistent", i64::MAX), None);
+    }
+
+    // ---- recent_with_evidence ----
+
+    // REQ: JR-7 — recent_with_evidence only returns events with non-null evidence_ref.
+    #[test]
+    fn recent_with_evidence_filters() {
+        let (_guard, path) = tmp_journal();
+        let w = JournalWriter::open(&path).unwrap();
+        // Event without evidence.
+        let e1 = Event::new("observe", Severity::Info);
+        w.append(&e1).unwrap();
+        // Event with evidence.
+        let mut e2 = Event::new("remediate", Severity::Alert);
+        e2.evidence_ref = Some("/tmp/evidence-1".into());
+        w.append(&e2).unwrap();
+
+        let r = w.reader();
+        let with_ev = r.recent_with_evidence(10).unwrap();
+        assert_eq!(with_ev.len(), 1);
+        assert_eq!(with_ev[0].evidence_ref.as_deref(), Some("/tmp/evidence-1"));
+    }
+
+    // ---- last_remote_fetch_ts ----
+
+    // REQ: JR-7 — last_remote_fetch_ts currently returns None because
+    // it queries MAX(ts) (text column) instead of MAX(ts_unix).
+    // This test documents the actual behavior (known bug).
+    #[test]
+    fn last_remote_fetch_ts_returns_none_due_to_ts_column_bug() {
+        let (_guard, path) = tmp_journal();
+        let w = JournalWriter::open(&path).unwrap();
+        let mut e = Event::new("remote.skill.fetch", Severity::Info);
+        e.ts_unix = 1_700_000_999;
+        w.append(&e).unwrap();
+
+        let r = w.reader();
+        let ts = r.last_remote_fetch_ts().unwrap();
+        // BUG: queries MAX(ts) (text) instead of MAX(ts_unix),
+        // so i64 conversion always fails → returns None.
+        assert_eq!(ts, None);
+    }
+
+    // ---- list_events_by_action ----
+
+    // REQ: JR-7 — list_events_by_action filters by action type.
+    #[test]
+    fn list_events_by_action_filters() {
+        let (_guard, path) = tmp_journal();
+        let w = JournalWriter::open(&path).unwrap();
+        w.append(&Event::new("observe", Severity::Info)).unwrap();
+        w.append(&Event::new("observe", Severity::Warn)).unwrap();
+        w.append(&Event::new("remediate", Severity::Alert)).unwrap();
+
+        let r = w.reader();
+        let observe = r.list_events_by_action("observe", 0, i64::MAX).unwrap();
+        assert_eq!(observe.len(), 2);
+        let remediate = r.list_events_by_action("remediate", 0, i64::MAX).unwrap();
+        assert_eq!(remediate.len(), 1);
+        let empty = r.list_events_by_action("nonexistent", 0, i64::MAX).unwrap();
+        assert_eq!(empty.len(), 0);
+    }
+
+    // ---- percentile helper ----
+
+    // REQ: JR-7 — percentile returns correct values for known inputs.
+    #[test]
+    fn percentile_known_values() {
+        let sorted = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0];
+        let p50 = percentile(&sorted, 50.0).unwrap();
+        assert!((p50 - 5.5).abs() < 0.01, "p50 should be ~5.5, got {p50}");
+        let p95 = percentile(&sorted, 95.0).unwrap();
+        assert!((p95 - 9.55).abs() < 0.01, "p95 should be ~9.55, got {p95}");
+        let p99 = percentile(&sorted, 99.0).unwrap();
+        assert!((p99 - 9.91).abs() < 0.01, "p99 should be ~9.91, got {p99}");
+    }
+
+    // REQ: JR-7 — percentile returns None for empty slice.
+    #[test]
+    fn percentile_empty_returns_none() {
+        assert_eq!(percentile(&[], 50.0), None);
+    }
+
+    // REQ: JR-7 — percentile returns the single element for len=1.
+    #[test]
+    fn percentile_single_element() {
+        assert_eq!(percentile(&[42.0], 99.0), Some(42.0));
+    }
+
+    // ---- compute_ewma helper ----
+
+    // REQ: JR-7 — compute_ewma returns None for fewer than 2 points.
+    #[test]
+    fn compute_ewma_too_few_points() {
+        assert_eq!(compute_ewma(&[(1.0, 100)], 604_800.0), (None, None));
+    }
+
+    // REQ: JR-7 — compute_ewma returns values for a short series.
+    #[test]
+    fn compute_ewma_produces_values() {
+        let series = [(10.0, 100), (20.0, 200), (30.0, 300)];
+        let (mean, var) = compute_ewma(&series, 604_800.0);
+        assert!(mean.is_some());
+        assert!(var.is_some());
+        // Mean should be between 10 and 30.
+        let m = mean.unwrap();
+        assert!(
+            m > 10.0 && m < 30.0,
+            "EWMA mean should be between 10 and 30, got {m}"
+        );
+    }
+
+    // ---- JournalReader standalone construction ----
+
+    // REQ: JR-7 — JournalReader::new does not require the file to exist.
+    #[test]
+    fn reader_new_does_not_require_file() {
+        let tmp = tempfile::tempdir().unwrap();
+        let path = tmp.path().join("nonexistent.db");
+        let r = JournalReader::new(&path);
+        assert_eq!(r.path(), &path);
+    }
+
+    // ---- compute_baselines from samples ----
+
+    // REQ: JR-7 — compute_baselines produces baselines from real samples.
+    #[test]
+    fn compute_baselines_from_samples() {
+        let (_guard, path) = tmp_journal();
+        let w = JournalWriter::open(&path).unwrap();
+        let now = crate::time::now_unix();
+        // Insert enough samples for a single probe.
+        for i in 0..10 {
+            w.append_sample(
+                now - 86_400 + i * 100,
+                Scope::Host,
+                "mem_available_mib",
+                Some(8000.0 + i as f64 * 100.0),
+                None,
+                Some("MiB"),
+            )
+            .unwrap();
+        }
+        let r = w.reader();
+        let baselines = r.compute_baselines(1).unwrap();
+        assert_eq!(baselines.len(), 1);
+        assert_eq!(baselines[0].probe, "mem_available_mib");
+        assert!(baselines[0].p50.is_some());
+        assert!(baselines[0].p95.is_some());
+        assert!(baselines[0].ewma_mean.is_some());
+        assert_eq!(baselines[0].count, 10);
+    }
+}

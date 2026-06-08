@@ -380,6 +380,12 @@ impl ConsentScope {
     }
 }
 
+impl Default for OperatorConsent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl OperatorConsent {
     /// Create a new empty consent store (all access denied by default).
     pub fn new() -> Self {
@@ -405,25 +411,24 @@ impl OperatorConsent {
             None => ConsentStatus::Denied,
             Some(grant) => {
                 // Check expiration
-                if let Some(expires_at) = grant.expires_at {
-                    if chrono::Utc::now() > expires_at {
-                        return ConsentStatus::Expired {
-                            expired_at: expires_at,
-                        };
-                    }
+                if let Some(expires_at) = grant.expires_at
+                    && chrono::Utc::now() > expires_at
+                {
+                    return ConsentStatus::Expired {
+                        expired_at: expires_at,
+                    };
                 }
 
                 // Check version mismatch — re-consent required when resource
                 // version changes (P2: version-bound consent).
                 if let (Some(granted_version), Some(current_ver)) =
                     (&grant.resource_version, current_version)
+                    && granted_version != current_ver
                 {
-                    if granted_version != current_ver {
-                        return ConsentStatus::VersionMismatch {
-                            granted_version: granted_version.clone(),
-                            current_version: current_ver.to_string(),
-                        };
-                    }
+                    return ConsentStatus::VersionMismatch {
+                        granted_version: granted_version.clone(),
+                        current_version: current_ver.to_string(),
+                    };
                 }
 
                 ConsentStatus::Granted {

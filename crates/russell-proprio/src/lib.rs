@@ -19,6 +19,11 @@
 
 pub mod reflex;
 
+pub use reflex::{
+    ACTION_DISABLE_LLM_HELP, ACTION_FLUSH_JOURNAL, ACTION_LLM_FALLBACK, ACTION_RESTART_SENTINEL,
+    ACTION_RESTART_TIMER, ProprioReflex, ReflexAction,
+};
+
 use russell_core::error::Result;
 use russell_core::event::{Event, Scope, Severity};
 use russell_core::journal::{JournalWriter, SelfTelemetryPort};
@@ -46,7 +51,7 @@ pub struct SystemdTimerSource;
 
 impl TimerSource for SystemdTimerSource {
     fn read_last_trigger_us(&self) -> Result<Option<u64>> {
-        read_timer_last_trigger().map_err(|e| russell_core::error::CoreError::Config(e))
+        read_timer_last_trigger().map_err(russell_core::error::CoreError::Config)
     }
 }
 
@@ -59,9 +64,7 @@ impl FixedTimerSource {
     /// Create a fixed timer source that returns the given trigger time.
     #[must_use]
     pub fn new(trigger_us: Option<u64>) -> Self {
-        Self {
-            trigger_us: trigger_us,
-        }
+        Self { trigger_us }
     }
 }
 

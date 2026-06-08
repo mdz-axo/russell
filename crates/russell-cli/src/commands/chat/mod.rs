@@ -18,7 +18,7 @@ use rustyline::error::ReadlineError;
 use serde::{Deserialize, Serialize};
 use std::io::Write;
 use std::time::Instant;
-use tracing::{debug, info, warn};
+use tracing::{info, warn};
 
 use execute::journal_chat_turn;
 
@@ -154,6 +154,7 @@ fn is_action_result_in_history(history: &ChatHistory) -> bool {
                 && (t.content.starts_with("[probe result:")
                     || t.content.starts_with("[probe error:")
                     || t.content.starts_with("[intervention result:")
+                    || t.content.starts_with("[remote tool result:")
                     || t.content.starts_with("[shell result:")
                     || t.content.starts_with("[action error:"))
         })

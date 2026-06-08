@@ -58,6 +58,10 @@ pub enum CoreError {
     /// These are bugs, not environmental failures.
     #[error("invariant violation: {0}")]
     Invariant(String),
+
+    /// A configuration or external system error.
+    #[error("config error: {0}")]
+    Config(String),
 }
 
 impl CoreError {
