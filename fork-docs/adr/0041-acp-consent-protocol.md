@@ -157,7 +157,7 @@ pub enum ConsentDecision {
 | Principle | Compliance |
 |---|---|
 | **JR-2** (Observe > Recommend > Act) | Interventions require explicit consent before execution |
-| **JR-3** (LLM never emits shell) | Consent is operator-driven, not LLM-generated |
+| **JR-3** (Consent gate) | Shell commands and interventions go through the consent gate; destructive commands blocked; operator's consent is sovereign |
 | **Schneier** (Defense in depth) | Session ownership + action ID matching + state validation |
 | **Miller** (Capability discipline) | Consent is scoped to specific action_id, not blanket approval |
 

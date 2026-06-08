@@ -134,7 +134,7 @@ Jack's voice lives in `crates/russell-meta/prompts/jack.md`. Changing his voice 
 flowchart TB
     JR1[JR-1 The Jack Russell Principle<br/><small>small but mighty</small>]
     JR2[JR-2 Observe &gt; Recommend &gt; Act]
-    JR3[JR-3 LLM never emits shell]
+    JR3[JR-3 Shell commands go through the consent gate]
     JR4[JR-4 Nurse present from day one]
     JR5[JR-5 Proprioception: Jack watches Jack]
     JR6[JR-6 Reuse, don't depend]

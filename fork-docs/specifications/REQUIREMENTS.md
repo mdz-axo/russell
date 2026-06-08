@@ -85,38 +85,43 @@ ddmvss_categories: [domain, capability]
 
 ### FR-5: Cry for Help (Jack)
 
-**Goal:** Russell cries for help via a local LLM when asked.
+**Goal:** Russell cries for help via a local LLM when asked, through the primary interface (`russell chat`).
 
 **Criteria:**
-- [x] Implements `russell jack` command
+- [x] Implements `russell chat` command (interactive REPL)
 - [x] Assembles SOAP bundle (Subjective, Objective, Assessment, Plan)
 - [x] Sends to LLM backend (Okapi default, OpenRouter opt-in)
 - [x] Writes round-trip to journal
 - [x] Prints response to operator
 - [x] Supports natural-language consent ("ok", "yes", "do it", `/approve`)
+- [x] Consent is sovereign: once operator approves, action executes regardless of risk band
+- [x] Jack can advise on any aspect of Russell or the host, including configuration changes
+- [x] Shell commands proposed via `SHELL:` syntax with safety classification and consent gate
 
-**Bounded context:** `jack`  
-**Capability:** `cry-for-help`  
+**Bounded context:** `jack`
+**Capability:** `cry-for-help`
 **DDMVSS categories:** Domain, Capability, Interface
 
 ---
 
-### FR-6: Act Through Skills
+### FR-6: Act Through Skills and Shell Commands
 
-**Goal:** Russell acts through IDRS-compliant skills.
+**Goal:** Russell acts through IDRS-compliant skills and consented shell commands.
 
 **Criteria:**
 - [x] Loads skills from YAML manifests
 - [x] Validates manifests against schema
 - [x] Enforces IDRS contract (Idempotent, Dry-run, Rollback, Structured-log)
 - [x] Enforces risk bands (none, low, medium, high, critical)
-- [x] Requires consent for high-risk interventions
+- [x] Requires consent for interventions when risk exceeds `max_auto_risk`
 - [x] Executes probes (risk: none) without consent
-- [x] Executes interventions (risk: low+) with consent
+- [x] Operator's consent overrides risk band — consented actions always execute
+- [x] Shell commands proposed via `SHELL:` syntax with safety classification
 - [x] Captures evidence bundles for all executions
+- [x] Journals all executions for audit
 
-**Bounded context:** `skill`  
-**Capability:** `act`  
+**Bounded context:** `skill`, `jack`
+**Capability:** `act`
 **DDMVSS categories:** Domain, Capability, Composition, Trust
 
 ---
@@ -182,26 +187,48 @@ ddmvss_categories: [domain, capability]
 **Criteria:**
 - [x] Probes are read-only (risk: none)
 - [x] Interventions require IDRS compliance
-- [x] High-risk interventions require consent
+- [x] Interventions require operator consent when risk exceeds `max_auto_risk`
+- [x] Shell commands always require operator consent
+- [x] Operator's consent overrides risk band — consented actions always execute
 - [x] Kill switches disable all mutations
 
-**Principle:** JR-2  
+**Principle:** JR-2
 **DDMVSS categories:** Trust
 
 ---
 
-### NFR-3: LLM Never Emits Shell (JR-3)
+### NFR-3: Shell Commands Go Through the Consent Gate (JR-3)
 
-**Goal:** The LLM never emits shell commands.
+**Goal:** The LLM proposes shell commands; the operator consents; the dispatcher executes.
 
 **Criteria:**
-- [x] LLM selects from known IDs in manifests
-- [x] Dispatcher rejects unknown IDs
-- [x] No ad-hoc shell execution
-- [x] No code generation from LLM
+- [x] LLM proposes shell commands via `SHELL:` prefix
+- [x] Safety classifier assigns risk bands (none, low, medium) and blocks destructive commands
+- [x] Every shell command requires operator consent before execution
+- [x] Skill interventions require consent when risk exceeds skill's `max_auto_risk`
+- [x] Operator's consent is sovereign — once given, the action executes regardless of risk band
+- [x] Destructive commands are blocked by the safety classifier
+- [x] No code path bypasses the manifest or consent gate
 
-**Principle:** JR-3  
+**Principle:** JR-3
 **DDMVSS categories:** Trust
+
+---
+
+### NFR-3a: Chat REPL is the Primary Interface
+
+**Goal:** `russell chat` is the operator's primary control surface for interacting with Russell.
+
+**Criteria:**
+- [x] Operator can observe, recommend, and act through the chat REPL
+- [x] Operator can change settings through the chat REPL (via shell commands with consent)
+- [x] Operator can manage skills through the chat REPL
+- [x] Jack can advise on any aspect of Russell's configuration or the host's state
+- [x] All three surfaces (CLI, API, ACP) support the consent flow
+- [x] The consent gate works correctly: consented actions execute regardless of risk band
+
+**Principle:** JR-2, JR-3, S-1 (operator sovereignty)
+**DDMVSS categories:** Domain, Capability, Interface, Trust
 
 ---
 
@@ -270,15 +297,17 @@ ddmvss_categories: [domain, capability]
 
 ### OSR-1: The Operator Controls Russell
 
-**Goal:** The operator can stop, delete, modify, and uninstall Russell at any time.
+**Goal:** The operator can stop, delete, modify, and configure Russell at any time.
 
 **Criteria:**
 - [x] `systemctl --user stop russell-*` stops Russell
 - [x] `rm -rf ~/.local/state/harness/` deletes state
 - [x] `~/.config/harness/` is user-editable
 - [x] `./packaging/bin/uninstall.sh` uninstalls Russell
+- [x] Operator can change any setting through `russell chat` (Jack proposes; operator consents)
+- [x] Operator's consent is sovereign — once given, actions execute regardless of risk band
 
-**Magna Carta:** S-1  
+**Magna Carta:** S-1
 **DDMVSS categories:** Trust, Lifecycle
 
 ---
@@ -370,12 +399,13 @@ ddmvss_categories: [domain, capability]
 | FR-3 | acp | report | — | Domain, Capability, Interface |
 | FR-4 | proprioception | self-watch | JR-5 | Domain, Capability, Observability |
 | FR-5 | jack | cry-for-help | JR-4 | Domain, Capability, Interface |
-| FR-6 | skill | act | JR-2, JR-3 | Domain, Capability, Composition, Trust |
+| FR-6 | skill, jack | act | JR-2, JR-3 | Domain, Capability, Composition, Trust |
 | FR-7 | skill | install, prune, retire | — | Domain, Capability, Lifecycle |
 | FR-8 | profile | — | JR-7 | Domain, Persistence |
 | NFR-1 | — | — | JR-1 | Trust, Lifecycle |
 | NFR-2 | — | — | JR-2 | Trust |
 | NFR-3 | — | — | JR-3 | Trust |
+| NFR-3a | — | — | JR-2, JR-3, S-1 | Domain, Capability, Interface, Trust |
 | NFR-4 | — | — | JR-4 | Domain, Capability |
 | NFR-5 | — | — | JR-5 | Domain, Capability, Observability |
 | NFR-6 | — | — | JR-6 | Lifecycle |
@@ -391,8 +421,8 @@ ddmvss_categories: [domain, capability]
 
 ## Completeness
 
-**Total requirements:** 21  
-**Satisfied:** 21 (100%)  
+**Total requirements:** 22
+**Satisfied:** 22 (100%)
 **Unsatisfied:** 0 (0%)
 
 **Status:** MVP complete

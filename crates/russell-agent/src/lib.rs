@@ -6,7 +6,7 @@
 //! - **Lifecycle states** — Populated → Registered → Activated → Deactivated
 //! - **CNS integration** — Span emission for observability
 //! - **Memory artifacts** — Semantic/episodic storage
-//! - **ACP interface** — Bidirectional communication with hKask
+//! - **ACP interface** — Bidirectional communication with agents
 //!
 //! # Architecture
 //!
@@ -32,7 +32,7 @@
 //!                            │
 //!                            │ ACP (stdio)
 //!                            ▼
-//!                    hKask Platform
+//!                    Agent Platform
 //! ```
 //!
 //! # Usage
@@ -49,7 +49,7 @@
 //!     // Create pod (Populated state)
 //!     let mut pod = RussellPod::new(&template_crate_path)?;
 //!
-//!     // Register with hKask ACP runtime (Registered state)
+//!     // Register with ACP runtime (Registered state)
 //!     // let runtime = AcpRuntime::connect("stdio").await?;
 //!     // pod.register(&runtime).await?;
 //!
@@ -88,7 +88,7 @@
 //!
 //! # Feature Flags
 //!
-//! - `cns` — Enable CNS span emission (requires hKask crates)
+//! - `cns` — Enable CNS span emission
 
 #![deny(unsafe_code)]
 #![deny(rust_2018_idioms)]

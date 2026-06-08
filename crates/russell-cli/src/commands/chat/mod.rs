@@ -3,19 +3,14 @@
 //!
 //! This module is split into focused submodules:
 //! - [`execute`] — local skill execution (probes & interventions)
-//! - [`hkask`] — hKask MCP tool execution (ADR-0025)
 //! - [`objective`] — SOAP objective builder
 
 pub mod execute;
-pub mod hkask;
 pub mod objective;
 
 use anyhow::{Context, Result};
 use russell_core::journal::{JournalReader, JournalWriter};
 use russell_core::paths::Paths;
-use russell_mcp::client::HKaskMcpClient;
-use russell_mcp::config::HKaskMcpConfig;
-use russell_mcp::registry::ToolRegistry;
 use russell_meta::action::{self, ResolvedAction};
 use russell_meta::client::LlmClient;
 use russell_skills::RiskBand;
@@ -424,42 +419,6 @@ pub async fn run(paths: &Paths) -> Result<()> {
     let mut skipped = load_result.skipped;
     let profile = russell_core::Profile::load(&paths.profile()).ok();
 
-    // Initialize hKask MCP client (ADR-0025). Non-blocking — graceful
-    // degradation if hKask is unreachable.
-    let hkask_config = HKaskMcpConfig::from_env();
-    let mut hkask_client: Option<HKaskMcpClient> = None;
-    let mut hkask_registry = ToolRegistry::new(hkask_config.tool_ttl);
-    let hkask_cache_path = paths.memory_dir().join("hkask-tools.cache.json");
-
-    // Load stale-but-useful tool info from disk (ADR-0025 §5, first-boot resilience).
-    let _ = hkask_registry.load_from_disk(&hkask_cache_path);
-
-    if hkask_config.validate().is_ok() {
-        match HKaskMcpClient::new(hkask_config.clone()) {
-            Ok(mut client) => {
-                if let Ok(_init) = client.connect().await {
-                    debug!(
-                        server = ?client.server_name(),
-                        "hKask MCP connected"
-                    );
-                    // Populate tool registry.
-                    if let Err(e) = hkask_registry.refresh(&client).await {
-                        debug!(error = %e, "hKask tool registry initial refresh failed");
-                    } else {
-                        // Persist fresh tools to disk for next boot.
-                        let _ = hkask_registry.save_to_disk(&hkask_cache_path);
-                    }
-                    hkask_client = Some(client);
-                } else {
-                    debug!("hKask MCP connect failed — tools unavailable this session");
-                }
-            }
-            Err(e) => {
-                debug!(error = %e, "hKask MCP client construction failed");
-            }
-        }
-    }
-
     let mut history = ChatHistory::new(session_id.clone());
     let mut editor = DefaultEditor::new().context("initialising readline")?;
     let mut pending_action: Option<PendingAction> = None;
@@ -549,7 +508,6 @@ pub async fn run(paths: &Paths) -> Result<()> {
                             );
                         let action_result = execute_action(
                             &journal,
-                            &hkask_client,
                             &pa.action,
                             &session_id,
                             &current_model,
@@ -603,11 +561,9 @@ pub async fn run(paths: &Paths) -> Result<()> {
                                     &skills,
                                     &skipped,
                                     profile.as_ref(),
-                                    &hkask_registry,
                                     &registry,
                                     paths,
                                     &mut pending_action,
-                                    &hkask_client,
                                     &client_cfg,
                                 )
                                 .await?;
@@ -639,7 +595,6 @@ pub async fn run(paths: &Paths) -> Result<()> {
                             );
                         let action_result = execute_action(
                             &journal,
-                            &hkask_client,
                             &pa.action,
                             &session_id,
                             &current_model,
@@ -692,11 +647,9 @@ pub async fn run(paths: &Paths) -> Result<()> {
                                     &skills,
                                     &skipped,
                                     profile.as_ref(),
-                                    &hkask_registry,
                                     &registry,
                                     paths,
                                     &mut pending_action,
-                                    &hkask_client,
                                     &client_cfg,
                                 )
                                 .await?;
@@ -750,11 +703,9 @@ pub async fn run(paths: &Paths) -> Result<()> {
                             &skills,
                             &skipped,
                             profile.as_ref(),
-                            &hkask_registry,
                             &registry,
                             paths,
                             &mut pending_action,
-                            &hkask_client,
                             &client_cfg,
                         )
                         .await
@@ -817,11 +768,9 @@ pub async fn run(paths: &Paths) -> Result<()> {
                         &skills,
                         &skipped,
                         profile.as_ref(),
-                        &hkask_registry,
                         &registry,
                         paths,
                         &mut pending_action,
-                        &hkask_client,
                         &client_cfg,
                     )
                     .await?;
@@ -884,21 +833,16 @@ pub async fn run(paths: &Paths) -> Result<()> {
     Ok(())
 }
 
-/// Unified action executor — dispatches to kask or local skill execution.
+/// Unified action executor — dispatches to local skill execution.
 async fn execute_action(
     journal: &JournalWriter,
-    hkask_client: &Option<HKaskMcpClient>,
     action: &ResolvedAction,
     session_id: &str,
     model: &str,
     paths: &Paths,
 ) -> Option<String> {
-    if action.is_hkask_tool() {
-        hkask::execute_hkask_tool(journal, hkask_client, action, session_id, model, paths).await
-    } else {
-        let pa = PendingAction::new(action.clone(), None);
-        execute::execute_pending_action(journal, paths, &pa, session_id, model).await
-    }
+    let pa = PendingAction::new(action.clone(), None);
+    execute::execute_pending_action(journal, paths, &pa, session_id, model).await
 }
 
 /// Handle a resolved ACTION: proposal from the LLM response.
@@ -906,7 +850,6 @@ async fn execute_action(
 async fn handle_action_proposal(
     action: ResolvedAction,
     journal: &JournalWriter,
-    hkask_client: &Option<HKaskMcpClient>,
     session_id: &str,
     current_model: &str,
     paths: &Paths,
@@ -915,39 +858,7 @@ async fn handle_action_proposal(
     pending_action: &mut Option<PendingAction>,
     stdin_content: Option<String>,
 ) -> Result<()> {
-    if action.is_hkask_tool() {
-        // hKask MCP tool — determine consent based on risk.
-        let risk = action.risk_band();
-        if risk == RiskBand::None {
-            // Auto-execute (probe-equivalent).
-            println!("  → Calling hKask tool: {}…", action.action_id());
-            let result = hkask::execute_hkask_tool(
-                journal,
-                hkask_client,
-                &action,
-                session_id,
-                current_model,
-                paths,
-            )
-            .await;
-            if let Some(result_text) = result {
-                history.turns.push(Turn {
-                    role: "user".into(),
-                    content: result_text,
-                });
-                save_history(chat_path, history);
-            }
-        } else {
-            // Requires consent.
-            println!(
-                "  → Jack proposes kask tool: {} (risk: {}).",
-                action.action_id(),
-                risk.as_str()
-            );
-            println!("  → Say 'ok' to approve, or 'no' to refuse.");
-            *pending_action = Some(PendingAction::new(action, None));
-        }
-    } else if action.is_probe() {
+    if action.is_probe() {
         // Probes are read-only — auto-execute immediately.
         println!(
             "  → Running probe: {}/{}…",
@@ -1204,15 +1115,13 @@ async fn call_jack(
     skills: &[russell_skills::Skill],
     skipped: &[russell_skills::SkippedSkill],
     profile: Option<&russell_core::Profile>,
-    hkask_registry: &ToolRegistry,
     registry: &russell_skills::registry::RegistryCache,
     paths: &Paths,
     pending_action: &mut Option<PendingAction>,
-    hkask_client: &Option<HKaskMcpClient>,
     _client_cfg: &russell_meta::client::ClientConfig,
 ) -> Result<()> {
     // Build the fresh SOAP objective.
-    let objective = objective::build_objective(reader, skills, profile, hkask_registry, registry);
+    let objective = objective::build_objective(reader, skills, profile, registry);
 
     // Build system prompt: persona + relevance-scored KNOWLEDGE.md injection.
     // All applicable skill knowledge is injected (within token budget),
@@ -1379,23 +1288,19 @@ async fn call_jack(
             journal_chat_turn(journal, session_id, current_model, "(chat turn)", &content);
 
             // Check for ACTION: proposal.
-            let hkask_tool_infos = hkask::build_hkask_tool_infos(hkask_registry);
-            match action::resolve_with_hkask(&content, skills, &hkask_tool_infos) {
+            match action::resolve(&content, skills) {
                 Some(Ok(mut action)) => {
                     // Append inline CLI arguments from the LLM response to
                     // the subprocess cmd (e.g. `Arguments --name swap-watcher`
                     // → appends `--name swap-watcher` to the manifest's cmd).
-                    if !action.is_hkask_tool() {
-                        let inline_args = extract_inline_args(&content);
-                        if !inline_args.is_empty() {
-                            action.append_cmd_args(&inline_args);
-                        }
+                    let inline_args = extract_inline_args(&content);
+                    if !inline_args.is_empty() {
+                        action.append_cmd_args(&inline_args);
                     }
                     let manifest = extract_manifest_block(&content);
                     handle_action_proposal(
                         action,
                         journal,
-                        hkask_client,
                         session_id,
                         current_model,
                         paths,

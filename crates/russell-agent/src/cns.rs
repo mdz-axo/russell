@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 //! CNS span emission for Russell agent.
 //!
-//! Spans are sent to hKask's CNS endpoint at `POST /api/v1/cns/span`.
-//! The span is mapped to hKask's NuEvent schema for compatibility.
+//! Spans are sent to a CNS endpoint at `POST /api/v1/cns/span`.
+//! The span is mapped to a NuEvent-compatible schema for compatibility.
 //! When no endpoint is configured, spans are logged locally (graceful degradation).
 
 use crate::persona::AgentPersona;
@@ -10,11 +10,11 @@ use crate::pod::PodID;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
-/// Default hKask CNS endpoint.
+/// Default CNS endpoint.
 pub const DEFAULT_CNS_ENDPOINT: &str = "http://127.0.0.1:8080/api/v1/cns/span";
 
 /// Environment variable for overriding the CNS endpoint.
-const ENV_CNS_ENDPOINT: &str = "HKASK_CNS_ENDPOINT";
+const ENV_CNS_ENDPOINT: &str = "RUSSELL_CNS_ENDPOINT";
 
 /// CNS port — hexagonal trait for observability span emission.
 ///
@@ -75,9 +75,9 @@ impl CnsSpan {
         }
     }
 
-    /// Convert to hKask NuEvent-compatible JSON for the CNS bridge.
+    /// Convert to NuEvent-compatible JSON for the CNS bridge.
     ///
-    /// Maps Russell's flat span to hKask's tagged schema:
+    /// Maps Russell's flat span to a tagged schema:
     /// - `span` → `{ category, path }` extracted from the span name
     /// - `observer_webid` → pod_id
     /// - `phase` → "Observe" (Russell is always observing)
@@ -124,7 +124,7 @@ fn capitalize_first(s: &str) -> String {
     }
 }
 
-/// CNS span emitter — sends spans to hKask CNS.
+/// CNS span emitter — sends spans to the configured CNS endpoint.
 #[derive(Clone)]
 pub struct CnsEmitter {
     /// Pod ID
@@ -195,7 +195,7 @@ impl CnsEmitter {
             &self.agent_name,
             serde_json::json!({
                 "state": "registered",
-                "hcp_runtime": "hKask"
+                "hcp_runtime": "russell"
             }),
         );
         self.emit(span);
@@ -360,7 +360,7 @@ impl CnsPort for CnsEmitter {
     }
 }
 
-/// Send CNS span to hKask endpoint.
+/// Send CNS span to the configured endpoint.
 async fn send_to_cns(
     client: &reqwest::Client,
     endpoint: &str,

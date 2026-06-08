@@ -171,6 +171,15 @@ requires human review.
 - Shell execution uses `bash -c` (or `sudo -S -- bash -c` for
   sudo commands) with timeout and output capture.
 - All shell executions are journaled as help-session events.
+- **Consent sovereignty:** After operator consent ("ok", "yes",
+  `/approve`), the dispatcher's risk cap is set to `Critical`,
+  ensuring consented actions always execute. The `max_auto_risk`
+  cap in skill manifests controls *whether consent is needed*, not
+  *whether a consented action may proceed*. The operator's consent
+  is sovereign. (Bug fix: 2026-06-07 — previously, `ShellCommand`
+  set `max_auto_risk = None`, blocking all shell commands after
+  consent; `Intervention` propagated the manifest cap, blocking
+  consented actions above the skill's auto threshold.)
 
 ## References
 

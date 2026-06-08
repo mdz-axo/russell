@@ -119,6 +119,7 @@ These are explicitly rejected features. If observed during testing, they are bug
 - Multi-operator mode (single-operator threat model)
 - Async streaming from LLM (request-response only)
 - Plugin marketplace or reputation systems
+- Risk caps that override operator consent (consent is sovereign)
 
 ## 8. Commands
 

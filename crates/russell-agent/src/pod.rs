@@ -122,7 +122,7 @@ pub struct RussellPod {
     /// Sentinel handle (if activated).
     sentinel: Option<SentinelHandle>,
 
-    /// Capability tokens from hKask ACP runtime.
+    /// Capability tokens from ACP runtime.
     capability_tokens: Vec<russell_acp_server::CapabilityToken>,
 
     /// Journal writer for sample persistence (sentinel-owned).
@@ -237,7 +237,7 @@ impl RussellPod {
         &self.persona
     }
 
-    /// Register the pod with hKask ACP runtime (Registered state).
+    /// Register the pod with ACP runtime (Registered state).
     ///
     /// This method:
     /// 1. Validates state transition (Populated → Registered)
@@ -254,7 +254,7 @@ impl RussellPod {
         // Validate state transition
         validate_transition(&self.state, &PodLifecycleState::Registered)?;
 
-        // Register with hKask ACP runtime
+        // Register with ACP runtime
         // 1. Send registration request with persona capabilities
         // 2. Receive capability token
         // 3. Store token for future requests
@@ -265,11 +265,11 @@ impl RussellPod {
             "Registering with ACP runtime"
         );
 
-        // In production, this would connect to hKask ACP runtime and receive a token
+        // In production, this would connect to an ACP runtime and receive a token
         // For now, we accept the AcpServer as proof of registration and create a stub token
         let _ = runtime; // Suppress unused warning
 
-        // Create a capability token (stub - in production would receive from hKask)
+        // Create a capability token (stub — in production would receive from ACP runtime)
         let token = russell_acp_server::CapabilityToken {
             token_id: format!("russell-pod-{}", self.id),
             token: "russell-pod-token".to_string(),
@@ -354,12 +354,12 @@ impl RussellPod {
         }
 
         // Revoke capabilities
-        // 1. Notify hKask ACP runtime of deactivation
+        // 1. Notify ACP runtime of deactivation
         // 2. Invalidate capability tokens
         // 3. Clean up any pending operations
         tracing::info!(pod_id = %self.id, "Revoking {} capability tokens", self.capability_tokens.len());
 
-        // Clear capability tokens (in production, would notify hKask first)
+        // Clear capability tokens (in production, would notify ACP runtime first)
         self.capability_tokens.clear();
 
         // Transition to Deactivated state
@@ -648,7 +648,7 @@ impl RussellPod {
         // In production deployment, the ACP server runs as a separate process:
         // - systemd service: russell-acp-server.service
         // - Binary: russell-acp-server
-        // - Communicates with hKask via stdio JSON-RPC
+        // - Communicates via stdio JSON-RPC
         //
         // For now, create a stub handle that tracks the "running" state.
         let handle = tokio::spawn(async move {
@@ -716,15 +716,15 @@ agent:
   name: "test-russell"
   type: "bot"
   version: "0.1.0"
-  
+
 charter:
   description: "Test agent"
   editor: "test"
-  
+
 capabilities:
   items:
     - "tool:test"
-    
+
 responsibilities:
   items:
     - "test: responsibility"
