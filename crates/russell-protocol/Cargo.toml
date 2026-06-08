@@ -7,7 +7,7 @@ rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
 authors.workspace = true
-description = "Shared ACP/JSON-RPC protocol types for Russell and hKask integration"
+description = "Shared ACP/JSON-RPC protocol types for Russell ACP integration"
 
 [lib]
 path = "src/lib.rs"

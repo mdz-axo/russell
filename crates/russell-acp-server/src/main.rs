@@ -68,21 +68,14 @@ async fn main() -> anyhow::Result<()> {
         auth = auth.with_journal(std::sync::Arc::clone(journal));
     }
 
-    // Initialize inference backends with fallback (hKask → Okapi).
-    let hkask_endpoint =
-        std::env::var("HKASK_ENDPOINT").unwrap_or_else(|_| "http://localhost:8080".to_string());
-    let hkask = russell_meta::HkaskInferenceAdapter::new(&hkask_endpoint)
-        .with_token_from_file()
-        .unwrap_or_else(|| russell_meta::HkaskInferenceAdapter::new(&hkask_endpoint));
-    let hkask = std::sync::Arc::new(hkask);
-
+    // Initialize inference backend (Okapi local inference).
     let okapi_endpoint =
         std::env::var("OKAPI_ENDPOINT").unwrap_or_else(|_| "http://localhost:11434".to_string());
     let okapi_model = std::env::var("OKAPI_MODEL").unwrap_or_else(|_| "llama3".to_string());
     let okapi = russell_meta::OkapiInferenceAdapter::new(&okapi_endpoint).with_model(&okapi_model);
     let okapi = std::sync::Arc::new(okapi);
 
-    let inference = std::sync::Arc::new(russell_meta::FallbackInferenceAdapter::new(hkask, okapi));
+    let inference = okapi;
 
     // Initialize rate limiter.
     let rate_limiter = RateLimiter::default();

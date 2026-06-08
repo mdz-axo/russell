@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
-//! Russell ACP Server — session-oriented interface for hKask integration.
+//! Russell ACP Server — session-oriented interface for ACP integration.
 //!
 //! This crate implements the Agent Client Protocol (ACP) server for Russell,
-//! exposing public skills and host probes to hKask agents while maintaining
+//! exposing public skills and host probes to agents while maintaining
 //! a security boundary around private skills and proprioception data.
 //!
 //! ## Architecture
 //!
 //! ```text
-//! hKask Agent
+//! Agent
 //!   │  (JSON-RPC over stdio)
 //!   ▼
 //! AcpServer

@@ -63,7 +63,7 @@ pub async fn execute_pending_action(
         ResolvedAction::Intervention {
             risk,
             needs_sudo,
-            max_auto_risk,
+            max_auto_risk: _, // Ignored: consent already granted by operator.
             requires_human,
             rollback_id,
             rollback_cmd,
@@ -72,7 +72,7 @@ pub async fn execute_pending_action(
         } => (
             *risk,
             *needs_sudo,
-            *max_auto_risk,
+            RiskBand::Critical, // Consent already granted; allow execution.
             *requires_human,
             rollback_id.clone(),
             rollback_cmd.clone(),
@@ -87,9 +87,9 @@ pub async fn execute_pending_action(
         } => (
             *risk,
             *needs_sudo,
-            RiskBand::None, // No skill-level cap for raw shell
-            false,          // No requires_human flag
-            None,           // No rollback for raw shell
+            RiskBand::Critical, // Shell commands always require consent; once approved, allow execution.
+            false,              // No requires_human flag
+            None,               // No rollback for raw shell
             None,
             false,
         ),

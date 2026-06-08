@@ -2,7 +2,7 @@
 //! CNS span emission for ACP server (T2-3).
 //!
 //! Defines the `CnsPort` trait (hexagonal port) and provides adapters:
-//! - `AcpCnsEmitter` — HTTP adapter (sends spans to hKask CNS)
+//! - `AcpCnsEmitter` — HTTP adapter (sends spans to a CNS endpoint)
 //! - `LoggingCnsAdapter` — logs spans locally, no network
 //! - `NoopCnsAdapter` — discards all spans (for testing/benchmarking)
 //!
@@ -42,7 +42,7 @@ pub struct AcpCnsSpan {
     pub attributes: serde_json::Value,
 }
 
-/// HTTP adapter — sends spans to hKask CNS endpoint.
+/// HTTP adapter — sends spans to a CNS observability endpoint.
 #[derive(Clone)]
 pub struct AcpCnsEmitter {
     /// Source identifier (e.g., "russell-acp-server")
@@ -56,7 +56,7 @@ pub struct AcpCnsEmitter {
 impl AcpCnsEmitter {
     /// Create a new ACP CNS emitter.
     pub fn new(source: impl Into<String>) -> Self {
-        let cns_endpoint = std::env::var("HKASK_CNS_ENDPOINT").ok();
+        let cns_endpoint = std::env::var("RUSSELL_CNS_ENDPOINT").ok();
         let http_client = cns_endpoint
             .as_ref()
             .and_then(|_| reqwest::Client::builder().build().ok());
@@ -190,7 +190,7 @@ impl CnsPort for NoopCnsAdapter {
     fn emit_consent_decision(&self, _action_id: &str, _decision: &str) {}
 }
 
-/// Send CNS span to hKask endpoint.
+/// Send CNS span to the configured endpoint.
 async fn send_to_cns(
     client: &reqwest::Client,
     endpoint: &str,
@@ -220,7 +220,7 @@ mod tests {
     fn noop_adapter_satisfies_port() {
         let port: Box<dyn CnsPort> = Box::new(NoopCnsAdapter);
         port.emit_skill_dispatched("test", "run");
-        port.emit_llm_escalation("hkask", None, 100);
+        port.emit_llm_escalation("okapi", None, 100);
         port.emit_session_created("s1", "jack");
         port.emit_consent_decision("a1", "approved");
     }
@@ -229,7 +229,7 @@ mod tests {
     fn logging_adapter_satisfies_port() {
         let port: Box<dyn CnsPort> = Box::new(LoggingCnsAdapter::new("test"));
         port.emit_skill_dispatched("test", "run");
-        port.emit_llm_escalation("hkask", Some("llama3"), 50);
+        port.emit_llm_escalation("okapi", Some("llama3"), 50);
         port.emit_session_created("s1", "jack");
         port.emit_consent_decision("a1", "denied");
     }

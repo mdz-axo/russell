@@ -138,7 +138,7 @@ impl Turn {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum TurnRole {
-    /// Operator or hKask agent.
+    /// Operator or agent.
     User,
     /// Jack persona.
     Assistant,

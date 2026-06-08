@@ -219,7 +219,7 @@ impl Default for SkillKind {
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Visibility {
-    /// Exposed via ACP to hKask agents.
+    /// Exposed via ACP to agents.
     Public,
     /// Russell-only (never exposed).
     #[default]

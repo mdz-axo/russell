@@ -117,31 +117,39 @@ No state is synchronized to external services.
 
 ---
 
-### T-2: The LLM is a Consultant, Not an Executor
+### T-2: The LLM Proposes; the Operator Consents; the Dispatcher Executes
 
 **Statement:** The LLM (Okapi or OpenRouter) may:
 - Rank differentials
 - Compose summaries
 - Explain symptoms
+- Propose shell commands via `SHELL:` syntax
 
-The LLM may **not**:
-- Generate shell commands
-- Execute mutations
-- Bypass the skill manifest
+Shell commands and skill interventions both flow through the consent gate.
+The LLM proposes; the operator reviews and consents; the dispatcher executes.
+Destructive commands (`rm -rf /`, `mkfs`, `shutdown`, `reboot`, fork bombs) are
+blocked by the safety classifier regardless of consent.
 
-**Rationale:** A hallucinating LLM with shell access is a disaster. The manifest is the boundary.
+**Rationale:** A hallucinating LLM with unsupervised shell access is a disaster.
+But an LLM that can never propose commands is a lobotomized assistant.
+The consent gate is the right boundary: execution, not suggestion.
 
-**Consequence:** Cost: Russell cannot improvise fixes. Buy: Russell cannot hallucinate mutations.
+**Consequence:** Cost: the safety classifier is heuristic and may misclassify edge cases. Buy: Jack can help with any task the operator would do at a shell, while destructive commands remain blocked and all mutations require consent.
 
 ---
 
-### T-3: Skills are the Only Mutators
+### T-3: Mutations Flow Through the Consent Gate
 
-**Statement:** All mutations flow through the skill dispatcher. No code path bypasses the manifest. No ad-hoc shell execution. No "just run this command."
+**Statement:** All mutations flow through the consent gate. Skill interventions
+provide IDRS guarantees (idempotent, dry-runnable, rollback-able, structured-logged).
+Shell commands provide operator review — the operator sees the exact command
+before it runs. There is no bypass: no code path executes a mutation without
+either IDRS compliance (skills) or operator consent (shell commands).
 
-**Rationale:** A skill manifest is a contract. Ad-hoc execution is a liability.
+**Rationale:** A skill manifest is a contract; the consent gate is a backstop.
+Both paths enforce human review before mutation.
 
-**Consequence:** Cost: Russell cannot run arbitrary commands. Buy: Russell only runs audited, IDRS-compliant commands.
+**Consequence:** Cost: no IDRS guarantees for ad-hoc shell commands. Buy: the operator can do anything through `russell chat` that they could do at a terminal, with safety classification and consent as guardrails.
 
 ---
 

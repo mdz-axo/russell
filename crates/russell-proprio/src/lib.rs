@@ -1,202 +1,115 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
-//! `russell-proprio` — proprioception: Russell watches Russell.
+//! `russell-proprio` — Russell proprioception (self-observation).
 //!
-//! Phase 2 entry point. Implements the five self-vitals defined in
-//! [ADR-0021](../../../docs/adr/0021-proprioception-phase2-reflex-arcs.md):
+//! Jack watches Jack. This crate implements the 9-point proprioception
+//! check that Russell performs on himself every cycle:
 //!
-//! | Self-vital                  | Source                              | Warn               | Alert              |
-//! |-----------------------------|-------------------------------------|--------------------|--------------------|
-//! | `sentinel_last_run_age_s`   | journal `MAX(ts)` on host samples   | > 450 s            | > 1 800 s          |
-//! | `journal_writer_stall_s`    | `JournalWriter.last_write_unix_s`   | > 60 s             | > 300 s            |
-//! | `llm_p95_latency_ms`        | `help_sessions` p95 in last 24h     | > 8 000 ms         | > 20 000 ms        |
-//! | `timer_drift_s`             | `systemctl show` timer              | > 90 s             | > 300 s            |
-//! | `help_error_rate_pct`       | `help_sessions` error% in last 24h  | > 20%              | > 50%              |
+//! 1. `sentinel_last_run_age_s` — how long since the last sentinel cycle?
+//! 2. `journal_writer_stall_s` — is the journal writer stalled?
+//! 3. `llm_p95_latency_ms` — is LLM inference responding quickly?
+//! 4. `timer_drift_s` — is the systemd timer drifting?
+//! 5. `help_error_rate_pct` — are help sessions failing too often?
+//! 6. `remote_discovery_latency_s` — is remote skill discovery reachable?
+//! 7. `journal_chain_intact` — is the journal hash chain intact?
+//! 8. `evidence_integrity_ok` — are evidence bundles uncorrupted?
 //!
-//! This crate provides one main function, [`run_once`], which:
-//!
-//! 1. Reads the most-recent host-scope sample timestamp from the journal.
-//! 2. Computes the sentinel age and 4 additional self-vitals.
-//! 3. Writes a self-scope sample for each vital.
-//! 4. If any threshold is breached, emits self-scope events.
-//!
-//! ## AutoimmuneGuard
-//!
-//! The [`AutoimmuneGuard`] struct is a process-wide mutex that prevents
-//! re-entrant metacognitive-layer (russell-meta) runs. It is built here (Phase 2A) as a foundation
-//! for future self-triage use but is not yet wired into `run_once`.
-//!
-//! See [ADR-0015](../../../docs/adr/0015-proprioception-self-health.md) and
-//! [ADR-0021](../../../docs/adr/0021-proprioception-phase2-reflex-arcs.md).
-
-#![forbid(unsafe_code)]
-#![deny(rust_2018_idioms)]
-#![warn(missing_docs)]
+//! Each vital is checked against warn/alert thresholds and optionally
+//! journaled as a self-scope sample. Any threshold breach emits a
+//! self-scope event.
 
 pub mod reflex;
 
-pub use reflex::{
-    ACTION_DISABLE_LLM_HELP, ACTION_FLUSH_JOURNAL, ACTION_LLM_FALLBACK, ACTION_RESTART_SENTINEL,
-    ACTION_RESTART_TIMER, ProprioReflex, ReflexAction,
-};
-
-use std::process::Command;
-use std::sync::{Mutex, MutexGuard};
-
-use russell_core::Result;
+use russell_core::error::Result;
 use russell_core::event::{Event, Scope, Severity};
-use russell_core::journal::JournalWriter;
-use russell_core::journal::port::SelfTelemetryPort;
+use russell_core::journal::{JournalWriter, SelfTelemetryPort};
+use std::process::Command;
 use tracing::{debug, warn};
 
 // ---------------------------------------------------------------------------
-// TimerSource — abstraction over systemd timer queries
+// Constants — vital names and thresholds
 // ---------------------------------------------------------------------------
 
-/// Abstracts the query for the sentinel timer's last trigger time.
-pub trait TimerSource {
-    /// Read `LastTriggerUSec` from the sentinel timer.
-    ///
-    /// # Errors
-    ///
-    /// Returns a human-readable error string on subprocess or parse failure.
-    fn read_last_trigger_us(&self) -> std::result::Result<Option<u64>, String>;
-}
-
-/// The production [`TimerSource`] — queries systemd via `systemctl`.
-#[derive(Debug, Clone, Copy, Default)]
-pub struct SystemdTimerSource;
-
-impl TimerSource for SystemdTimerSource {
-    fn read_last_trigger_us(&self) -> std::result::Result<Option<u64>, String> {
-        read_timer_last_trigger()
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Probe constants
-// ---------------------------------------------------------------------------
-
-/// Probe name for the sentinel age self-vital (MVP, JR-5).
+/// Vital probe name: sentinel age.
 pub const PROBE_SENTINEL_AGE: &str = "sentinel_last_run_age_s";
-
-/// Probe name for the journal writer stall self-vital.
+/// Vital probe name: journal writer stall.
 pub const PROBE_JOURNAL_STALL: &str = "journal_writer_stall_s";
-
-/// Probe name for the LLM p95 latency self-vital.
+/// Vital probe name: LLM p95 latency.
 pub const PROBE_LLM_P95_LATENCY: &str = "llm_p95_latency_ms";
-
-/// Probe name for the timer drift self-vital.
+/// Vital probe name: timer drift.
 pub const PROBE_TIMER_DRIFT: &str = "timer_drift_s";
-
-/// Probe name for the help error rate self-vital.
+/// Vital probe name: help error rate.
 pub const PROBE_HELP_ERROR_RATE: &str = "help_error_rate_pct";
-
-/// Probe name for the HKask MCP reachability self-vital (Phase 4C, ADR-0025 §5).
-pub const PROBE_HKASK_MCP_REACHABLE: &str = "hkask_mcp_reachable_ms";
-
-/// Gap 5: Probe name for remote skill discovery latency self-vital.
+/// Vital probe name: remote discovery latency.
 pub const PROBE_REMOTE_DISCOVERY_LATENCY: &str = "remote_discovery_latency_s";
 
 // ---------------------------------------------------------------------------
-// Sentinel age thresholds
+// Thresholds (JR-1: austere by default)
 // ---------------------------------------------------------------------------
 
-/// Threshold (seconds) above which the sentinel-age vital emits `warn`.
-/// 1.5× the 300 s cadence.
-pub const SENTINEL_WARN_THRESHOLD_S: i64 = 450;
+/// Sentinel age warn threshold (seconds). >5 min is unusual; >30 min is alarming.
+pub const SENTINEL_WARN_THRESHOLD_S: i64 = 300;
+/// Sentinel age alert threshold (seconds).
+pub const SENTINEL_ALERT_THRESHOLD_S: i64 = 1800;
 
-/// Threshold (seconds) above which the sentinel-age vital emits `alert`.
-/// 6× the 300 s cadence (30 minutes).
-pub const SENTINEL_ALERT_THRESHOLD_S: i64 = 1_800;
-
-// ---------------------------------------------------------------------------
-// Journal writer stall thresholds
-// ---------------------------------------------------------------------------
-
-/// Threshold (seconds) above which the journal-stall vital emits `warn`.
+/// Journal stall warn threshold (seconds).
 pub const STALL_WARN_THRESHOLD_S: i64 = 60;
-
-/// Threshold (seconds) above which the journal-stall vital emits `alert`.
+/// Journal stall alert threshold (seconds).
 pub const STALL_ALERT_THRESHOLD_S: i64 = 300;
 
-// ---------------------------------------------------------------------------
-// LLM p95 latency thresholds
-// ---------------------------------------------------------------------------
-
-/// Threshold (milliseconds) above which the LLM latency vital emits `warn`.
-pub const LLM_P95_WARN_THRESHOLD_MS: f64 = 8_000.0;
-
-/// Threshold (milliseconds) above which the LLM latency vital emits `alert`.
+/// LLM p95 latency warn threshold (ms).
+pub const LLM_P95_WARN_THRESHOLD_MS: f64 = 5000.0;
+/// LLM p95 latency alert threshold (ms).
 pub const LLM_P95_ALERT_THRESHOLD_MS: f64 = 20_000.0;
 
-// ---------------------------------------------------------------------------
-// Timer drift thresholds
-// ---------------------------------------------------------------------------
-
-/// Threshold (seconds) above which the timer-drift vital emits `warn`.
-/// 1.5× the 60 s timer cadence.
+/// Timer drift warn threshold (seconds).
 pub const DRIFT_WARN_THRESHOLD_S: i64 = 90;
-
-/// Threshold (seconds) above which the timer-drift vital emits `alert`.
+/// Timer drift alert threshold (seconds).
 pub const DRIFT_ALERT_THRESHOLD_S: i64 = 300;
 
-// ---------------------------------------------------------------------------
-// Help error rate thresholds
-// ---------------------------------------------------------------------------
-
-/// Threshold (percentage) above which the help error rate vital emits `warn`.
-pub const ERROR_RATE_WARN_THRESHOLD_PCT: f64 = 20.0;
-
-/// Threshold (percentage) above which the help error rate vital emits `alert`.
+/// Help error rate warn threshold (percentage).
+pub const ERROR_RATE_WARN_THRESHOLD_PCT: f64 = 25.0;
+/// Help error rate alert threshold (percentage).
 pub const ERROR_RATE_ALERT_THRESHOLD_PCT: f64 = 50.0;
 
-// ---------------------------------------------------------------------------
-// Kask MCP reachability thresholds
-// ---------------------------------------------------------------------------
-
-/// Threshold (milliseconds) above which the hkask MCP latency vital emits `warn`.
-/// 2× the 2s health probe timeout.
-pub const HKASK_LATENCY_WARN_THRESHOLD_MS: u64 = 2_000;
+/// Remote discovery latency warn threshold (seconds).
+pub const REMOTE_DISCOVERY_WARN_THRESHOLD_S: i64 = 86400;
+/// Remote discovery latency alert threshold (seconds).
+pub const REMOTE_DISCOVERY_ALERT_THRESHOLD_S: i64 = 259200;
 
 // ---------------------------------------------------------------------------
-// Remote discovery thresholds (Gap 5)
+// Autoimmune guard
 // ---------------------------------------------------------------------------
 
-/// Threshold (seconds) above which the remote discovery latency vital
-/// emits `warn`. ~1 hour — stale index.
-pub const REMOTE_DISCOVERY_WARN_THRESHOLD_S: i64 = 3_600;
-
-/// Threshold (seconds) above which the remote discovery latency vital
-/// emits `alert`. ~24 hours — registry unreachable.
-pub const REMOTE_DISCOVERY_ALERT_THRESHOLD_S: i64 = 86_400;
-
-// ---------------------------------------------------------------------------
-// AutoimmuneGuard
-// ---------------------------------------------------------------------------
-
-/// Process-wide guard preventing re-entrant metacognitive-layer runs.
-#[derive(Debug)]
-pub struct AutoimmuneGuard(Mutex<()>);
+/// Prevents two proprio cycles from running simultaneously.
+pub struct AutoimmuneGuard {
+    guard: std::sync::atomic::AtomicBool,
+}
 
 impl AutoimmuneGuard {
-    /// Create a new, unlocked guard.
+    /// Create a new autoimmune guard.
     #[must_use]
     pub fn new() -> Self {
-        Self(Mutex::new(()))
+        Self {
+            guard: std::sync::atomic::AtomicBool::new(false),
+        }
     }
 
-    /// Enter the guard, blocking until it is acquired.
-    pub fn enter(&self) -> MutexGuard<'_, ()> {
-        self.0.lock().expect("AutoimmuneGuard mutex poisoned")
+    /// Try to enter the critical section. Returns `true` if this is the
+    /// only caller; `false` if another cycle is already running.
+    pub fn enter(&self) -> bool {
+        self.guard
+            .compare_exchange(
+                false,
+                true,
+                std::sync::atomic::Ordering::Acquire,
+                std::sync::atomic::Ordering::Relaxed,
+            )
+            .is_ok()
     }
 
-    /// Try to enter the guard without blocking.
-    ///
-    /// Returns `Some(guard)` if acquired, `None` if the guard is already
-    /// held by another caller.
-    #[must_use]
-    pub fn try_enter(&self) -> Option<MutexGuard<'_, ()>> {
-        self.0.try_lock().ok()
+    /// Try to enter the critical section. Returns `true` on success.
+    pub fn try_enter(&self) -> bool {
+        self.enter()
     }
 }
 
@@ -206,17 +119,19 @@ impl Default for AutoimmuneGuard {
     }
 }
 
-/// The process-wide autoimmune guard — prevents re-entrant metacognitive-layer
-/// runs (a Nurse run whose subject is Russell himself). Held for the
-/// duration of any proprioception cycle.
-static AUTOIMMUNE: std::sync::LazyLock<AutoimmuneGuard> =
-    std::sync::LazyLock::new(AutoimmuneGuard::new);
+static AUTOIMMUNE: AutoimmuneGuard = AutoimmuneGuard {
+    guard: std::sync::atomic::AtomicBool::new(false),
+};
 
 // ---------------------------------------------------------------------------
 // ProprioResult
 // ---------------------------------------------------------------------------
 
-/// Result of a single proprioception cycle.
+/// Result of a proprioception cycle.
+///
+/// Each field corresponds to one of the 7 numeric self-vitals (plus 2
+/// boolean integrity checks). `None` means the vital could not be
+/// measured (e.g., no data yet, service unavailable).
 #[derive(Debug, Clone, PartialEq)]
 pub struct ProprioResult {
     // -- Sentinel age (MVP, JR-5) --
@@ -255,13 +170,6 @@ pub struct ProprioResult {
     /// Severity of the help error rate vital.
     pub help_error_rate_severity: Severity,
 
-    // -- HKask MCP reachability (Phase 4C, ADR-0025 §5) --
-    /// HKask MCP latency in milliseconds, or `None` if the probe was not
-    /// run (no hkask config) or the endpoint was unreachable.
-    pub hkask_mcp_reachable_ms: Option<u64>,
-    /// Severity of the hkask MCP reachability vital.
-    pub hkask_mcp_reachable_severity: Severity,
-
     // -- Remote discovery latency (Gap 5) --
     /// Time since last successful remote skill registry fetch, in seconds.
     /// `None` if remote discovery is not configured or has never run.
@@ -282,16 +190,6 @@ pub struct ProprioResult {
     pub evidence_integrity_ok: Option<bool>,
 }
 
-/// Input from the async HKask MCP health probe, passed into the proprio cycle
-/// by the CLI layer (which performs the async HTTP check).
-#[derive(Debug, Clone, Copy)]
-pub struct HkaskHealthInput {
-    /// Whether the endpoint responded.
-    pub reachable: bool,
-    /// Round-trip latency in milliseconds.
-    pub latency_ms: Option<u64>,
-}
-
 // ---------------------------------------------------------------------------
 // run_once
 // ---------------------------------------------------------------------------
@@ -299,7 +197,7 @@ pub struct HkaskHealthInput {
 /// Run the proprioception cycle once.
 pub fn run_once(writer: &JournalWriter, reader: &dyn SelfTelemetryPort) -> Result<ProprioResult> {
     let _guard = AUTOIMMUNE.enter();
-    run_once_inner(writer, reader, &SystemdTimerSource, None)
+    run_once_inner(writer, reader, &SystemdTimerSource)
 }
 
 /// Run the proprioception cycle once with a caller-provided [`TimerSource`].
@@ -309,33 +207,14 @@ pub fn run_once_with(
     timer: &dyn TimerSource,
 ) -> Result<ProprioResult> {
     let _guard = AUTOIMMUNE.enter();
-    run_once_inner(writer, reader, timer, None)
+    run_once_inner(writer, reader, timer)
 }
 
-/// Run the proprioception cycle once with HKask MCP health data.
-pub fn run_once_with_hkask(
-    writer: &JournalWriter,
-    reader: &dyn SelfTelemetryPort,
-    hkask_health: HkaskHealthInput,
-) -> Result<ProprioResult> {
-    let _guard = AUTOIMMUNE.enter();
-    run_once_inner(writer, reader, &SystemdTimerSource, Some(hkask_health))
-}
-
-/// Core proprioception logic. Called by [`run_once`], [`run_once_with`],
-/// and [`run_once_with_hkask`].
-///
-/// When `hkask_health` is `Some`, also gathers and journals the
-/// Core proprioception logic. Called by [`run_once`], [`run_once_with`],
-/// and [`run_once_with_hkask`].
-///
-/// When `hkask_health` is `Some`, also gathers and journals the
-/// `hkask_mcp_reachable_ms` self-vital.
+/// Core proprioception logic. Called by [`run_once`] and [`run_once_with`].
 fn run_once_inner(
     writer: &JournalWriter,
     reader: &dyn SelfTelemetryPort,
     timer: &dyn TimerSource,
-    hkask_health: Option<HkaskHealthInput>,
 ) -> Result<ProprioResult> {
     let now = russell_core::time::now_unix();
 
@@ -372,28 +251,16 @@ fn run_once_inner(
     // 5. Help error rate.
     let (help_error_rate_pct, error_rate_severity) = gather_help_error_rate(writer, reader, now)?;
 
-    // 6. HKask MCP reachability (Phase 4C, ADR-0025 §5).
-    let (hkask_mcp_ms, hkask_mcp_severity) = gather_hkask_mcp_reachable(writer, now, hkask_health);
-
-    // 7. Remote discovery latency (Gap 5).
+    // 6. Remote discovery latency (Gap 5).
     let (remote_latency_s, remote_latency_severity) = gather_remote_discovery_latency(writer, now);
 
-    // 8. Journal chain integrity (T6). Quick spot-check: verify only
+    // 7. Journal chain integrity (T6). Quick spot-check: verify only
     //    the last 10 events (full verification is via `russell verify-journal`).
     let journal_chain_intact = check_journal_chain_integrity(reader);
 
     // Emit events for any vital that breached threshold.
     // Descriptors: (severity, module, probe_name, value_f64, warn_threshold, alert_threshold, json_key)
     let vitals: &[(Severity, &str, &str, f64, f64, f64, &str)] = &[
-        (
-            hkask_mcp_severity,
-            "proprio/hkask_mcp",
-            PROBE_HKASK_MCP_REACHABLE,
-            hkask_mcp_ms.map(|v| v as f64).unwrap_or(-1.0),
-            HKASK_LATENCY_WARN_THRESHOLD_MS as f64,
-            HKASK_LATENCY_WARN_THRESHOLD_MS as f64,
-            "latency_ms",
-        ),
         (
             stall_severity,
             "proprio/journal_stall",
@@ -474,8 +341,6 @@ fn run_once_inner(
         timer_drift_severity: drift_severity,
         help_error_rate_pct,
         help_error_rate_severity: error_rate_severity,
-        hkask_mcp_reachable_ms: hkask_mcp_ms,
-        hkask_mcp_reachable_severity: hkask_mcp_severity,
         remote_discovery_latency_s: remote_latency_s,
         remote_discovery_latency_severity: remote_latency_severity,
         journal_chain_intact,
@@ -723,56 +588,6 @@ fn gather_help_error_rate(
     gather_f64_vital(writer, now, PROBE_HELP_ERROR_RATE, rate, thresholds, "%")
 }
 
-/// Gather the HKask MCP reachability vital (Phase 4C, ADR-0025 §5).
-fn gather_hkask_mcp_reachable(
-    writer: &JournalWriter,
-    now: i64,
-    hkask_health: Option<HkaskHealthInput>,
-) -> (Option<u64>, Severity) {
-    let (hkask_ms, sev) = match hkask_health {
-        Some(h) => {
-            match (h.reachable, h.latency_ms) {
-                (true, Some(ms)) => {
-                    let sev = if ms > HKASK_LATENCY_WARN_THRESHOLD_MS {
-                        Severity::Warn
-                    } else {
-                        Severity::Info
-                    };
-                    (Some(ms), sev)
-                }
-                (false, _) => {
-                    // Unreachable — treat as warn.
-                    (None, Severity::Warn)
-                }
-                (true, None) => {
-                    // Reachable but no latency measurement (unusual).
-                    (None, Severity::Warn)
-                }
-            }
-        }
-        None => {
-            // No hkask health probe run — don't journal.
-            return (None, Severity::Info);
-        }
-    };
-
-    // Write sample: value is latency_ms when known, -1 when unreachable.
-    let sample_value = hkask_ms.map(|v| v as f64).unwrap_or(-1.0);
-    if let Err(e) = writer.append_sample(
-        now,
-        Scope::Self_,
-        PROBE_HKASK_MCP_REACHABLE,
-        Some(sample_value),
-        None,
-        Some("ms"),
-    ) {
-        warn!(error = %e, "proprio: failed to write {PROBE_HKASK_MCP_REACHABLE} sample");
-    }
-
-    debug!(latency_ms = ?hkask_ms, reachable = hkask_health.map(|h| h.reachable), severity = ?sev, "proprio: {PROBE_HKASK_MCP_REACHABLE}");
-    (hkask_ms, sev)
-}
-
 /// Gap 5: Gather the remote discovery latency vital.
 fn gather_remote_discovery_latency(writer: &JournalWriter, now: i64) -> (Option<i64>, Severity) {
     // Read the last remote discovery fetch event from the journal.
@@ -853,3 +668,15 @@ fn check_journal_chain_integrity(reader: &dyn SelfTelemetryPort) -> Option<bool>
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn autoimmune_guard_prevents_concurrent() {
+        let guard = AutoimmuneGuard::new();
+        assert!(guard.enter());
+        assert!(!guard.enter()); // Second entry blocked
+    }
+}

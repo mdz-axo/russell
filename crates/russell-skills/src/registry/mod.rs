@@ -104,17 +104,17 @@ pub struct RegistryEntry {
     /// Whether this is a bundled skill (resistant to pruning).
     #[serde(default)]
     pub bundled: bool,
-    /// Documentary mapping to hKask pod lifecycle state.
+    /// Documentary mapping to external pod lifecycle state.
     ///
     /// Russell's skill lifecycle is a content management lifecycle
     /// (discover → evaluate → install → use → deprecate → retire).
-    /// hKask's pod lifecycle is a runtime activation sequence
+    /// An external pod lifecycle is a runtime activation sequence
     /// (populated → registered → activated → deactivated).
     ///
     /// Mapping: installed ≈ populated, active ≈ activated,
     /// retired ≈ deactivated. `None` if not yet mapped.
     #[serde(default)]
-    pub hkask_lifecycle_hint: Option<String>,
+    pub external_lifecycle_hint: Option<String>,
 }
 
 impl RegistryEntry {
@@ -156,7 +156,7 @@ impl RegistryEntry {
             avg_probe_duration_ms: None,
             ewma_success_rate: None,
             bundled,
-            hkask_lifecycle_hint: None,
+            external_lifecycle_hint: None,
         }
     }
 }

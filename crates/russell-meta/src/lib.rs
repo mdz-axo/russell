@@ -30,7 +30,6 @@ pub use client::{Backend, ClientConfig, EscalateMin, LlmClient, LlmResponse, Soa
 pub use error::{DoctorError, Result};
 pub use fallback_adapter::FallbackInferenceAdapter;
 pub use help::{HelpOutcome, run_help, run_help_with_endpoint};
-
 pub use okapi_adapter::OkapiInferenceAdapter;
 
 /// Jack's nurse persona prompt (loaded from `prompts/jack.md`).

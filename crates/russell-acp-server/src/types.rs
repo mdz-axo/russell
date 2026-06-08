@@ -14,7 +14,7 @@ use russell_core::risk::RiskBand;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Visibility {
-    /// Exposed via ACP to hKask agents.
+    /// Exposed via ACP to agents.
     Public,
     /// Russell-only (never exposed).
     Private,
@@ -103,13 +103,13 @@ pub struct SkillInfo {
     pub safety: SafetyInfo,
 }
 
-/// Proprioception notification — pushed to hKask agents when Russell detects
+/// Proprioception notification — pushed to agents when Russell detects
 /// degradation in its own health (T2-2).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProprioNotification {
     /// Notification ID (UUID v4).
     pub id: String,
-    /// Vital that breached threshold (e.g., "hkask_mcp_reachable_ms").
+    /// Vital that breached threshold (e.g., "journal_stall_s").
     pub vital: String,
     /// Severity ("warn", "alert", "critical").
     pub severity: String,
@@ -156,7 +156,7 @@ pub struct JsonRpcRequest {
     /// Authentication (macaroon token).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub auth: Option<AuthInfo>,
-    /// ACP protocol version (for hKask interop).
+    /// ACP protocol version (for ACP interop).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub acp_version: Option<String>,
 }

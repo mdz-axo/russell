@@ -7,7 +7,7 @@ rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
 authors.workspace = true
-description = "ACP (Agent Client Protocol) server for Russell — session-oriented interface exposing public skills and host probes to hKask agents"
+description = "ACP (Agent Client Protocol) server for Russell — session-oriented interface exposing public skills and host probes to agents"
 
 [lib]
 path = "src/lib.rs"

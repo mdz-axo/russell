@@ -2,8 +2,8 @@
 //! `russell-protocol` — shared ACP/JSON-RPC protocol types.
 //!
 //! This crate contains the wire types for the Agent Client Protocol (ACP)
-//! used between Russell and hKask. Both projects depend on this crate to
-//! ensure protocol-level type alignment.
+//! used by Russell. Projects integrating with Russell via ACP depend on this
+//! crate to ensure protocol-level type alignment.
 //!
 //! ## ACP Protocol Version
 //!

@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Visibility {
-    /// Exposed via ACP to hKask agents.
+    /// Exposed via ACP to agents.
     Public,
     /// Russell-only (never exposed).
     Private,

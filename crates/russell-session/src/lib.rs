@@ -6,7 +6,7 @@
 //!
 //! - **CLI** — `russell chat` interactive REPL
 //! - **API** — HTTP REST endpoints
-//! - **ACP** — JSON-RPC over stdio (hKask integration)
+//! - **ACP** — JSON-RPC over stdio
 //!
 //! All three surfaces are functionally equivalent. They exercise the same
 //! `SessionEngine` and share the same `Session`, `SessionManager`, and

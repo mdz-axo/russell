@@ -24,11 +24,13 @@ Russell is a single-host, single-operator harness that:
 - and when asked, **cries for help** via a local LLM
   (Okapi by default; OpenRouter opt-in).
 
-He does *not* mutate host state (outside his own skill sandbox)
-or act on LLM output as shell commands.
+Through the Chat REPL, the operator can do everything:
+observe, recommend, act, change settings, manage skills.
+Jack advises and proposes actions; the operator consents.
 
-**Primary interface:** ACP server for hKask integration
-**Secondary interface:** CLI for local operator actions
+**Primary interface:** `russell chat` (CLI REPL) — the operator's control surface
+**Secondary interface:** ACP server for hKask integration
+**Tertiary interface:** CLI subcommands (`sentinel-once`, `skill list`, etc.)
 **Deployment:** Hybrid (ACP server + systemd sentinel timer)
 
 ## 2. Key References
@@ -66,7 +68,7 @@ When two principles conflict, the lower number wins.
 | **Skill module** | YAML manifest + scripts encoding one playbook. `russell skill list` / `russell skill run`. |
 | **IDRS** | Idempotent / Dry-run / Rollback / Structured-log — the contract every mutation must satisfy. |
 | **SOAP bundle** | Evidence folder: Subjective / Objective / Assessment / Plan. |
-| **Risk band** | `none` / `low` / `medium` / `high` / `critical`. Enforced by dispatcher's `max_auto_risk` cap. |
+| **Risk band** | `none` / `low` / `medium` / `high` / `critical`. Determines consent requirement and auto-execution eligibility. The operator's consent overrides the band — once the operator approves, the action executes regardless of risk level. |
 | **EWMA baseline** | Per-probe mean + variance, 30-day rolling p50/p95/p99. |
 | **Poka-yoke** | The dispatcher refusing any ID not in the loaded manifest. |
 | **Proprioception** | Russell's self-observation. 9 self-observation points: 7 numeric vitals (`sentinel_last_run_age_s`, `journal_writer_stall_s`, `llm_p95_latency_ms`, `timer_drift_s`, `help_error_rate_pct`, `hkask_mcp_reachable_ms`, `remote_discovery_latency_s`) + 2 boolean integrity checks (`journal_chain_intact`, `evidence_integrity_ok`). |
@@ -79,7 +81,7 @@ When two principles conflict, the lower number wins.
 | **Rule engine** | Per-probe TOML rules with operator-overridable thresholds. `rules.d/*.toml`. |
 | **Memory layer** | Markdown exports from journal. `memory/REVIEW.md`, `memory/daily/YYYY-MM-DD.md`, `russell digest --format daily-log`. |
 | **Chat REPL** | Interactive multi-turn Jack session on three surfaces: CLI (`russell chat`), API (`POST /sessions`), ACP (`acp/session.create`). See ADR-0049. |
-| **Consent gate** | Probes auto-execute. Interventions require operator consent (`/approve`, "ok", "yes", "do it"). `/deny` or "no" refuses. |
+| **Consent gate** | Probes auto-execute. Interventions and shell commands require operator consent (`/approve`, "ok", "yes", "do it"). `/deny` or "no" refuses. **The operator's consent is sovereign** — once given, the action executes regardless of risk band. The risk band determines whether consent is needed, not whether a consented action may proceed. |
 | **ACTION syntax** | `ACTION: <skill>/<probe-or-intervention>` — probes fire immediately; interventions await consent. |
 | **Process probes** | 5 probes: total count, zombie/stuck/running counts, top memory % of system. |
 | **GPU probes** | 5 probes: VRAM usage %, VRAM MiB, temperature °C, GPU utilization %. |
@@ -112,7 +114,7 @@ When interacting through `russell chat` or the ACP server:
 These are explicitly rejected features. If observed during testing, they are bugs:
 
 - Cross-machine sync (single-host by design)
-- Unconsented shell execution (JR-3: consent gate required)
+- Shell execution without consent (JR-3: all shell commands go through the consent gate)
 - Bot swarms / consensus mechanisms
 - Multi-operator mode (single-operator threat model)
 - Async streaming from LLM (request-response only)

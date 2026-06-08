@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
-//! Proprioception notification types for hKask integration.
+//! Proprioception notification types for ACP integration.
 
 use serde::{Deserialize, Serialize};
 
-/// Proprioception notification — pushed to hKask agents when Russell detects
+/// Proprioception notification — pushed to agents when Russell detects
 /// degradation in its own health.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProprioNotification {
     /// Notification ID (UUID v4).
     pub id: String,
-    /// Vital that breached threshold (e.g., "hkask_mcp_reachable_ms").
+    /// Vital that breached threshold (e.g., "journal_stall_s").
     pub vital: String,
     /// Severity ("warn", "alert", "critical").
     pub severity: String,
