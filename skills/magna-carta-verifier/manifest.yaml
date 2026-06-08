@@ -14,7 +14,7 @@ authored: 2026-06-07
 min_harness_version: 0.20.0
 
 symptoms:
-  - magna-carta-violation
+  - magna_carta_violation
 
 applies_when:
   - os_family: linux

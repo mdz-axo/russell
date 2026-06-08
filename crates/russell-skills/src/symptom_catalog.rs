@@ -786,6 +786,12 @@ const SYMPTOM_DEFS: &[SymptomDef] = &[
         category: SymptomCategory::ScenarioTesting,
         severity_hint: SeverityHint::Critical,
     },
+    // Magna Carta / governance
+    SymptomDef {
+        name: "magna_carta_violation",
+        category: SymptomCategory::Semantic,
+        severity_hint: SeverityHint::High,
+    },
 ];
 
 /// Look up a symptom by name. Returns `None` if not in the catalog.
@@ -935,6 +941,8 @@ pub static SYMPTOMS: &[&str] = &[
     // Scenario testing — security and capability probes
     "capability_attenuation_failure",
     "prompt_sanitization_failure",
+    // Magna Carta / governance (magna-carta-verifier skill)
+    "magna_carta_violation",
 ];
 
 /// Load symptoms from a YAML file on disk.
