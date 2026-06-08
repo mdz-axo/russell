@@ -112,6 +112,24 @@ impl SessionEngine {
         }
     }
 
+    /// Check whether an action is pre-approved via hierarchical consent resolution.
+    ///
+    /// Returns `true` if `resolve_consent` returns `Granted`, meaning the
+    /// action can be auto-executed without presenting a consent prompt.
+    /// ACP/API surfaces should call this before presenting an intervention
+    /// for approval.
+    pub fn execute_if_pre_approved(
+        &self,
+        skill_id: &str,
+        action_type: &str,
+        current_version: Option<&str>,
+    ) -> bool {
+        matches!(
+            self.resolve_consent(skill_id, action_type, current_version),
+            russell_core::sovereignty::ConsentStatus::Granted { .. }
+        )
+    }
+
     /// Create a new session.
     pub fn create_session(
         &mut self,
@@ -579,5 +597,34 @@ mod tests {
                 scope: ConsentScope::Master
             }
         ));
+    }
+
+    #[test]
+    fn engine_execute_if_pre_approved() {
+        use russell_core::sovereignty::{ConsentGrant, ConsentScope};
+        use std::collections::HashSet;
+
+        let mut engine = SessionEngine::new("You are Jack.");
+
+        // No consent granted — not pre-approved
+        assert!(!engine.execute_if_pre_approved("sysadmin", "intervention", None));
+
+        // Grant PerSkill consent for sysadmin
+        let grant = ConsentGrant {
+            categories: HashSet::new(),
+            resource_version: None,
+            expires_at: Some(chrono::Utc::now() + chrono::Duration::hours(1)),
+            scope: ConsentScope::PerSkill {
+                skill_id: "sysadmin".to_string(),
+            },
+            granted_at: chrono::Utc::now(),
+        };
+        engine.grant_consent("sysadmin/restart".to_string(), grant);
+
+        // Same skill → pre-approved
+        assert!(engine.execute_if_pre_approved("sysadmin", "intervention", None));
+
+        // Different skill → not pre-approved
+        assert!(!engine.execute_if_pre_approved("other-skill", "intervention", None));
     }
 }

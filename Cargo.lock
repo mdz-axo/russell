@@ -2274,6 +2274,7 @@ name = "russell-cli"
 version = "0.23.0"
 dependencies = [
  "anyhow",
+ "chrono",
  "clap",
  "governor",
  "rand 0.8.6",

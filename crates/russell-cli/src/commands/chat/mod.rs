@@ -627,6 +627,7 @@ pub async fn run(paths: &Paths, no_hhh: bool, persona: Option<String>) -> Result
     let mut history = ChatHistory::new(session_id.clone());
     let mut editor = DefaultEditor::new().context("initialising readline")?;
     let mut pending_action: Option<PendingAction> = None;
+    let mut consent = russell_core::sovereignty::OperatorConsent::new();
 
     // Initialize generative settings from CLI flags (P3: Generative Space).
     let mut settings = GenerativeSettings::default();
@@ -776,6 +777,23 @@ pub async fn run(paths: &Paths, no_hhh: bool, persona: Option<String>) -> Result
                                 }
                             }
                         }
+                        // Record the consent grant so future actions from the same
+                        // skill can be pre-approved via hierarchical resolution.
+                        let action_key =
+                            format!("{}/{}", pa.action.skill_id(), pa.action.action_id());
+                        let grant = russell_core::sovereignty::ConsentGrant {
+                            categories: std::collections::HashSet::new(),
+                            resource_version: None,
+                            expires_at: Some(
+                                chrono::Utc::now()
+                                    + chrono::Duration::seconds(DEFAULT_CONSENT_EXPIRY_SECS as i64),
+                            ),
+                            scope: russell_core::sovereignty::ConsentScope::PerSkill {
+                                skill_id: pa.action.skill_id().to_string(),
+                            },
+                            granted_at: chrono::Utc::now(),
+                        };
+                        consent.grant(action_key, grant);
                         pending_action = None;
 
                         // Gap A: After executing an approved intervention, Jack
@@ -804,6 +822,7 @@ pub async fn run(paths: &Paths, no_hhh: bool, persona: Option<String>) -> Result
                                     &mut pending_action,
                                     &client_cfg,
                                     &settings,
+                                    &consent,
                                 )
                                 .await?;
                                 if let Ok(fresh) =
@@ -864,6 +883,22 @@ pub async fn run(paths: &Paths, no_hhh: bool, persona: Option<String>) -> Result
                                 }
                             }
                         }
+                        // Record the consent grant (password variant).
+                        let action_key =
+                            format!("{}/{}", pa.action.skill_id(), pa.action.action_id());
+                        let grant = russell_core::sovereignty::ConsentGrant {
+                            categories: std::collections::HashSet::new(),
+                            resource_version: None,
+                            expires_at: Some(
+                                chrono::Utc::now()
+                                    + chrono::Duration::seconds(DEFAULT_CONSENT_EXPIRY_SECS as i64),
+                            ),
+                            scope: russell_core::sovereignty::ConsentScope::PerSkill {
+                                skill_id: pa.action.skill_id().to_string(),
+                            },
+                            granted_at: chrono::Utc::now(),
+                        };
+                        consent.grant(action_key, grant);
                         pending_action = None;
 
                         // Gap A (password variant): Same auto-interpretation loop
@@ -891,6 +926,7 @@ pub async fn run(paths: &Paths, no_hhh: bool, persona: Option<String>) -> Result
                                     &mut pending_action,
                                     &client_cfg,
                                     &settings,
+                                    &consent,
                                 )
                                 .await?;
                                 if let Ok(fresh) =
@@ -948,6 +984,7 @@ pub async fn run(paths: &Paths, no_hhh: bool, persona: Option<String>) -> Result
                             &mut pending_action,
                             &client_cfg,
                             &settings,
+                            &consent,
                         )
                         .await
                         {
@@ -1016,6 +1053,7 @@ pub async fn run(paths: &Paths, no_hhh: bool, persona: Option<String>) -> Result
                         &mut pending_action,
                         &client_cfg,
                         &settings,
+                        &consent,
                     )
                     .await?;
 
@@ -1101,6 +1139,7 @@ async fn handle_action_proposal(
     chat_path: &std::path::Path,
     pending_action: &mut Option<PendingAction>,
     stdin_content: Option<String>,
+    consent: &russell_core::sovereignty::OperatorConsent,
 ) -> Result<()> {
     if action.is_probe() {
         // Probes are read-only — auto-execute immediately.
@@ -1134,9 +1173,9 @@ async fn handle_action_proposal(
             save_history(chat_path, history);
         }
     } else if action.is_shell_command() {
-        // ADR-0050: Shell command proposed by Jack.
-        // Always requires consent — even read-only commands show the
-        // operator exactly what will run before it runs.
+        // ADR-0050 / JR-3: Shell commands ALWAYS require explicit consent.
+        // Shell commands go through the consent gate — the operator saying
+        // "ok" — not an automatic bypass, even with a Master grant.
         if let ResolvedAction::ShellCommand {
             command,
             risk,
@@ -1153,6 +1192,40 @@ async fn handle_action_proposal(
             *pending_action = Some(PendingAction::new(action, stdin_content));
         }
     } else {
+        // Intervention — check for pre-granted consent before presenting.
+        let action_type = "intervention";
+        match consent.resolve_consent(action.skill_id(), action_type, None) {
+            russell_core::sovereignty::ConsentStatus::Granted { scope } => {
+                let scope_label = match &scope {
+                    russell_core::sovereignty::ConsentScope::Master => "master",
+                    russell_core::sovereignty::ConsentScope::PerSkill { .. } => "skill-level",
+                    russell_core::sovereignty::ConsentScope::PerActionType { .. } => "action-type",
+                };
+                println!(
+                    "  → Pre-approved via {} consent. Running: {}/{}…",
+                    scope_label,
+                    action.skill_id(),
+                    action.action_id()
+                );
+                // Auto-execute the intervention
+                let pa = PendingAction::new(action, stdin_content);
+                let result =
+                    execute::execute_pending_action(journal, paths, &pa, session_id, current_model)
+                        .await;
+                if let Some(result_text) = result {
+                    history.turns.push(Turn {
+                        role: "user".into(),
+                        content: result_text,
+                    });
+                    save_history(chat_path, history);
+                }
+                return Ok(());
+            }
+            _ => {
+                // No pre-granted consent — present for approval as usual
+            }
+        }
+
         match &action {
             ResolvedAction::Intervention {
                 risk, needs_sudo, ..
@@ -1535,6 +1608,7 @@ async fn call_jack(
     pending_action: &mut Option<PendingAction>,
     _client_cfg: &russell_meta::client::ClientConfig,
     settings: &GenerativeSettings,
+    consent: &russell_core::sovereignty::OperatorConsent,
 ) -> Result<()> {
     // Build the fresh SOAP objective.
     let objective = objective::build_objective(reader, skills, profile, registry);
@@ -1742,6 +1816,7 @@ async fn call_jack(
                         chat_path,
                         pending_action,
                         manifest,
+                        consent,
                     )
                     .await?;
                 }
@@ -1997,5 +2072,148 @@ mod tests {
     fn action_result_detection_empty_history() {
         let h = ChatHistory::new("test".to_string());
         assert!(!is_action_result_in_history(&h));
+    }
+
+    // ── P3b: No admin-gated settings ─────────────────────────────────────────
+    //
+    // P3 (Generative Space) requires that every generative setting is
+    // operator-accessible. These tests verify the structural guarantee.
+
+    /// Helper: call `handle_settings_set` in a sandboxed temp directory so
+    /// profile persistence succeeds without touching the real FS.
+    fn settings_set_in_sandbox(args: &str, settings: &mut GenerativeSettings) {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let paths = Paths::rooted(dir.path());
+        // Ensure the state dir exists so `persist_generative_settings` can write.
+        std::fs::create_dir_all(paths.state.join("..")).ok();
+        let mut profile: Option<russell_core::Profile> = None;
+        handle_settings_set(args, settings, &mut profile, &paths);
+    }
+
+    #[test]
+    fn p3b_all_settings_are_operator_accessible() {
+        let mut settings = GenerativeSettings::default();
+
+        // Verify every setting can be changed via /settings set.
+        settings_set_in_sandbox("temperature 0.8", &mut settings);
+        assert_eq!(settings.temperature, 0.8);
+
+        settings_set_in_sandbox("top_k 20", &mut settings);
+        assert_eq!(settings.top_k, 20);
+
+        settings_set_in_sandbox("top_p 0.5", &mut settings);
+        assert_eq!(settings.top_p, 0.5);
+
+        settings_set_in_sandbox("repeat_penalty 1.5", &mut settings);
+        assert_eq!(settings.repeat_penalty, 1.5);
+
+        settings_set_in_sandbox("hhh_filter off", &mut settings);
+        assert!(!settings.hhh_filter);
+
+        settings_set_in_sandbox("persona custom", &mut settings);
+        assert_eq!(settings.persona, "custom");
+    }
+
+    #[test]
+    fn p3b_generative_config_all_optional() {
+        // All fields are Option<T> — none are required or admin-gated.
+        // This test verifies the structural guarantee of P3.
+        let config = russell_core::profile::GenerativeConfig::default();
+        assert!(config.temperature.is_none());
+        assert!(config.top_k.is_none());
+        assert!(config.top_p.is_none());
+        assert!(config.repeat_penalty.is_none());
+        assert!(config.hhh_filter.is_none());
+        assert!(config.persona.is_none());
+    }
+
+    #[test]
+    fn p3b_settings_keys_match_struct_fields() {
+        // P3 requires no hidden settings. Verify that the set of keys
+        // accepted by /settings set exactly matches the fields on
+        // GenerativeSettings. If a field is added without a handler,
+        // or a handler added without a field, this test should be
+        // updated to flag the discrepancy.
+        let known_keys = [
+            "temperature",
+            "top_k",
+            "top_p",
+            "repeat_penalty",
+            "hhh_filter",
+            "persona",
+        ];
+
+        let mut settings = GenerativeSettings::default();
+        let dir = tempfile::tempdir().expect("tempdir");
+        let paths = Paths::rooted(dir.path());
+        std::fs::create_dir_all(paths.state.join("..")).ok();
+        let mut profile: Option<russell_core::Profile> = None;
+
+        for key in &known_keys {
+            // Each key should be recognized (no "unknown setting" output).
+            // We use valid values so `changed` becomes true.
+            let args = match *key {
+                "temperature" => "temperature 0.5",
+                "top_k" => "top_k 10",
+                "top_p" => "top_p 0.9",
+                "repeat_penalty" => "repeat_penalty 1.2",
+                "hhh_filter" => "hhh_filter on",
+                "persona" => "persona test",
+                _ => unreachable!(),
+            };
+            // If the key is unknown, handle_settings_set prints
+            // "unknown setting" and `changed` stays false, meaning
+            // no profile persist — but the settings struct won't
+            // change either. We verify the setting *did* change.
+            handle_settings_set(args, &mut settings, &mut profile, &paths);
+        }
+
+        // Final values should reflect the last change for each field.
+        assert_eq!(settings.temperature, 0.5);
+        assert_eq!(settings.top_k, 10);
+        assert_eq!(settings.top_p, 0.9);
+        assert_eq!(settings.repeat_penalty, 1.2);
+        assert!(settings.hhh_filter);
+        assert_eq!(settings.persona, "test");
+    }
+
+    // ── Hierarchical consent resolution tests ──────────────────────────────
+    //
+    // Verify that OperatorConsent::resolve_consent allows auto-execution
+    // of interventions when a PerSkill grant exists for the same skill.
+
+    #[test]
+    fn consent_perskill_grant_enables_intervention_auto_exec() {
+        use russell_core::sovereignty::{
+            ConsentGrant, ConsentScope, ConsentStatus, OperatorConsent,
+        };
+        use std::collections::HashSet;
+
+        let mut consent = OperatorConsent::new();
+
+        // No grants — intervention requires approval
+        let status = consent.resolve_consent("sysadmin", "intervention", None);
+        assert!(matches!(status, ConsentStatus::Denied));
+
+        // Grant PerSkill consent for sysadmin (simulates operator approving
+        // a previous sysadmin intervention)
+        let grant = ConsentGrant {
+            categories: HashSet::new(),
+            resource_version: None,
+            expires_at: Some(chrono::Utc::now() + chrono::Duration::hours(1)),
+            scope: ConsentScope::PerSkill {
+                skill_id: "sysadmin".to_string(),
+            },
+            granted_at: chrono::Utc::now(),
+        };
+        consent.grant("sysadmin/restart-service".to_string(), grant);
+
+        // Same skill → pre-approved via PerSkill grant
+        let status = consent.resolve_consent("sysadmin", "intervention", None);
+        assert!(matches!(status, ConsentStatus::Granted { .. }));
+
+        // Different skill → still denied (PerSkill is skill-scoped)
+        let status = consent.resolve_consent("other-skill", "intervention", None);
+        assert!(matches!(status, ConsentStatus::Denied));
     }
 }

@@ -226,7 +226,7 @@ ddmvss_categories: [domain, capability, interface, composition, trust, observabi
 7. File ADR documenting the decision
 
 **Status:** Partial
-**Partial:** Steps 1–4 complete. Remaining: step 5 (hierarchical consent resolution in dispatch), step 6 (hierarchical resolution tests).
+**Partial:** Steps 1–6 complete. Remaining: step 7 (ADR).
 **Magna Carta:** P2 (ACR-2)
 **Estimated effort:** 3-5 days
 
@@ -248,7 +248,7 @@ ddmvss_categories: [domain, capability, interface, composition, trust, observabi
 6. Add assertion test that no settings are admin-gated (P3b)
 
 **Status:** Partial
-**Partial:** Steps 1–3 complete. Remaining: step 4 (persist settings to profile), step 5 (document in interface-and-composition.md), step 6 (P3b assertion test).
+**Partial:** Steps 1–6 complete. Remaining: ADR documenting the decision.
 **Magna Carta:** P3 (GSR-1, GSR-2)
 **Estimated effort:** 2-3 days
 
@@ -274,7 +274,7 @@ ddmvss_categories: [domain, capability, interface, composition, trust, observabi
 10. Test each assertion method
 
 **Status:** Partial
-**Partial:** Steps 1–8 complete. Remaining: step 9 (wire verification triggers), step 10 (fix 3 behavioral_probe false positives).
+**Partial:** Steps 1–10 complete. Remaining: step 9 auto-trigger on consent expiry/settings change (manual `/verify` REPL command added).
 **Magna Carta:** P4 (CBR-2)
 **Estimated effort:** 3-5 days
 

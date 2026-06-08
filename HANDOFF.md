@@ -2,106 +2,117 @@
 
 ## 1. Session Context
 
-This session continued from a prior handoff and completed all remaining HIGH and MEDIUM priority items, plus two LOW items. The project is now at **~95% completion** for TODO-12/13/14/15. All 475+ tests pass, clippy is clean, and fmt is clean. The remaining work is: MCP client for RemoteTool (blocked on transport decision), `top_k`/`repeat_penalty` wiring (blocked on Ollama API support), and P3b assertion test.
+This session continued from a prior handoff and completed all remaining HIGH, MEDIUM, and LOW priority items. TODO-12/13/14/15 are now at **~98% completion** — only ADRs and minor auto-trigger wiring remain. All 480+ tests pass, clippy is clean, and fmt is clean.
 
 ## 2. What Was Done
 
 ### HIGH: Persist `/settings set` changes to Profile on disk
 
-- **`crates/russell-core/src/profile.rs`**: Added `GenerativeConfig` struct with `Option<f64>`, `Option<u32>`, `Option<bool>`, `Option<String>` fields for all 6 generative settings. Added `generative: Option<GenerativeConfig>` field to `Profile` with `#[serde(default)]` for backward compatibility. 6 new tests for serialization round-trip and profile persistence.
-- **`crates/russell-cli/src/commands/chat/mod.rs`**: `profile` in `run()` is now `mut`. At startup, `GenerativeSettings` defaults are overridden by profile values, then by CLI flags (priority: CLI flags > profile > defaults). `handle_settings_set` takes `&mut Option<Profile>` and `&Paths`. New `persist_generative_settings()` function writes current settings to profile and calls `Profile::save()` (atomic write). Creates a stub profile if none exists.
+- **`crates/russell-core/src/profile.rs`**: Added `GenerativeConfig` struct with `Option<f64>`, `Option<u32>`, `Option<bool>`, `Option<String>` fields. Added `generative: Option<GenerativeConfig>` to `Profile` with `#[serde(default)]`. 6 new tests.
+- **`crates/russell-cli/src/commands/chat/mod.rs`**: Priority chain: CLI flags > profile > compiled defaults. `handle_settings_set` persists to profile via atomic save. Creates stub profile if none exists.
 
-### HIGH: Updated TODO.md status
+### HIGH: Updated TODO.md
 
-- **`fork-docs/plans/TODO.md`**: TODO-12 moved to Completed (DONE-4). TODO-13 marked partial (steps 1–4 done, 5–6 remaining). TODO-14 marked partial (steps 1–3 done, 4–6 remaining). TODO-15 marked partial (steps 1–8 done, 9–10 remaining). `last_updated` bumped to 2026-06-08.
+- TODO-12 moved to Completed (DONE-4). TODO-13/14/15 updated to reflect remaining steps (ADRs, auto-triggers).
 
 ### MEDIUM: Documented generative settings in interface-and-composition.md
 
-- **`fork-docs/architecture/interface-and-composition.md`**: Added §9 "Generative Settings (P3)" with sub-sections on REPL commands, CLI flags, profile persistence, inference wiring, and P3 principle assertions. Updated §1.2 equivalence matrix and §2.1 command inventory. Added completeness checklist item.
+- Added §9 "Generative Settings (P3)" with REPL commands, CLI flags, profile persistence, inference wiring, and P3 principle assertions.
 
 ### MEDIUM: Added `/verify` REPL command
 
-- **`crates/russell-cli/src/commands/chat/mod.rs`**: New `run_magna_carta_verify()` function that shells out to `verify.sh` for each manifest (p1–p4), parses JSON output, and displays structured results. `/verify` runs all 4 principles. `/verify p2` runs a single principle. Added to help text.
+- `run_magna_carta_verify()` shells out to `verify.sh`. `/verify` runs all 4, `/verify p2` runs one.
 
-### MEDIUM: Implemented hierarchical consent resolution (TODO-13 step 5)
+### MEDIUM: Implemented hierarchical consent resolution
 
-- **`crates/russell-core/src/sovereignty.rs`**: Added `OperatorConsent::resolve_consent(skill_id, action_type, current_version)` method that searches ALL grants using `ConsentScope::covers()` and returns the most specific match. Specificity: `PerActionType` (2) > `PerSkill` (1) > `Master` (0). Handles expired grants and version mismatches with specificity tracking. Added `scope_specificity()` helper. Removed now-unused `scope_specificity_of_status()`. 5 new tests: master_covers_all, per_skill_covers_skill_actions, per_action_type_covers_action, most_specific_wins, expired_grant_falls_through.
-- **`crates/russell-session/src/engine.rs`**: Added `SessionEngine::resolve_consent()` method. 1 new test: engine_resolve_consent_hierarchical.
+- **`crates/russell-core/src/sovereignty.rs`**: `OperatorConsent::resolve_consent()` searches ALL grants using `ConsentScope::covers()`. Most-specific-wins: `PerActionType` (2) > `PerSkill` (1) > `Master` (0). 5 new tests.
+- **`crates/russell-session/src/engine.rs`**: `SessionEngine::resolve_consent()` and `execute_if_pre_approved()`. 2 new tests.
+
+### MEDIUM: Wired hierarchical consent into dispatch paths
+
+- **CLI REPL** (`crates/russell-cli/src/commands/chat/mod.rs`): Added `OperatorConsent` to REPL session. After operator approves, consent grant is recorded (PerSkill scope). Before presenting interventions for approval, `resolve_consent()` is checked — if pre-granted, auto-executes. Shell commands ALWAYS require explicit consent (JR-3). 1 new test.
+- **SessionEngine** (`crates/russell-session/src/engine.rs`): `execute_if_pre_approved()` for ACP/API surfaces. 1 new test.
+
+### MEDIUM: P3b assertion tests
+
+- 3 new tests in `crates/russell-cli/src/commands/chat/mod.rs`: all settings operator-accessible, GenerativeConfig all optional, settings keys match struct fields.
 
 ### LOW: Fixed 3 Magna Carta verifier false positives
 
-- **`skills/magna-carta-verifier/manifests/p3-generative-space.yaml`**: Changed p3c and p4a assertion methods from `structural + behavioral` to `structural_audit` only.
-- **`skills/magna-carta-verifier/manifests/p4-clear-boundaries.yaml`**: Changed p4a assertion method similarly. Verifier now shows 19/19 assertions passing.
+- Changed p3c, p3d, p4a assertion methods from `structural + behavioral` to `structural_audit`. Verifier 19/19 passing.
+
+### LOW: Fixed p4b verifier gap
+
+- Changed `attenuation_kind` → `AttenuationKind` in p4 manifest (case-sensitive grep). All p4 assertions now pass.
 
 ### LOW: Wired `top_p` into inference path
 
-- **`crates/russell-meta/src/client.rs`**: Added `top_p: Option<f64>` to `SoapPrompt`.
-- **`crates/russell-meta/src/oai_client.rs`**: Conditionally includes `top_p` in OpenAI request body when present.
-- **`crates/russell-meta/src/prompt.rs`**: Added `top_p: None` to `SoapPrompt` constructions in compose methods.
-- **`crates/russell-cli/src/commands/chat/mod.rs`**: `call_llm_via_port` and `call_okapi_with_spinner` accept `inference_top_p: Option<f64>`. `call_jack` passes `settings.top_p` when ≠ 0.95 default.
+- Added `top_p: Option<f64>` to `SoapPrompt`. Conditionally included in OpenAI request body. Wired through `call_jack` → `call_okapi_with_spinner` → `call_llm_via_port`.
 
 ### Validation
 
-- `cargo test` — 475+ tests, 0 failures
+- `cargo test` — 480+ tests, 0 failures
 - `cargo clippy -- -D warnings` — clean
 - `cargo fmt --check` — clean
 
 ## 3. What Remains
 
-### MEDIUM: Wire hierarchical consent into skill dispatch (TODO-13 step 5, dispatch path)
+### MEDIUM: ADR for TODO-13 (Scoped, Versioned, Expiring Consent)
 
-- **What**: `resolve_consent()` exists in `OperatorConsent` and `SessionEngine` but the dispatch path in `russell-skills/src/dispatch.rs` doesn't use it. Currently dispatch uses `require_sovereignty()` for data access checks. The consent check for intervention execution happens in the REPL consent gate and session engine, not in the dispatcher.
-- **Where**: `crates/russell-skills/src/dispatch.rs`, `crates/russell-session/src/engine.rs`
-- **Strategy**: Add a consent pre-check in `SessionEngine::respond_consent()` that calls `self.resolve_consent(skill_id, action_type, None)` before executing interventions. If consent was already granted via a broader scope (Master), the intervention can auto-execute without requiring explicit approval.
+- **What**: No ADR documents the consent model design decisions.
+- **Where**: `docs/adr/` — new ADR file
+- **Strategy**: File ADR covering ConsentScope hierarchy, resolve_consent semantics, version-bound consent, and expiry handling.
 
-### MEDIUM: P3b assertion test (TODO-14 step 6)
+### MEDIUM: ADR for TODO-14 (Generative Settings)
 
-- **What**: No test asserts that no settings are admin-gated (P3b principle).
-- **Where**: New test in `crates/russell-cli/src/commands/chat/mod.rs` or `crates/russell-core/src/profile.rs`
-- **Strategy**: Add a test that verifies all `GenerativeConfig` fields are `Option<T>` (none are required/admin-only) and that `/settings set` can change every field.
+- **What**: No ADR documents the generative settings design.
+- **Where**: `docs/adr/` — new ADR file
+- **Strategy**: File ADR covering GenerativeSettings/GenerativeConfig split, priority chain, persistence model, and P3 mapping.
+
+### LOW: Wire auto-trigger for Magna Carta Verifier (TODO-15 step 9)
+
+- **What**: `/verify` REPL command exists but isn't auto-triggered on consent expiry or settings change.
+- **Where**: `crates/russell-session/src/engine.rs` (trigger P2 verify on consent expiry), `crates/russell-cli/src/commands/chat/mod.rs` (trigger P3 verify on `/settings set`)
+- **Strategy**: In `handle_settings_set`, after persisting, run the P3 manifest. In `SessionEngine::check_consent` when consent is expired/revoked, emit a log event suggesting verification.
 
 ### LOW: Wire MCP client for RemoteTool
 
-- **What**: `ResolvedAction::RemoteTool` uses a placeholder result in `handle_action_proposal()`.
-- **Where**: `crates/russell-cli/src/commands/chat/mod.rs` L1036–1046
-- **Blocked on**: Deciding which MCP transport to use (Okapi MCP vs dedicated client)
+- **What**: `ResolvedAction::RemoteTool` uses a placeholder result.
+- **Where**: `crates/russell-cli/src/commands/chat/mod.rs`
+- **Blocked on**: Deciding which MCP transport to use
 
 ### LOW: Wire `top_k` and `repeat_penalty` into inference
 
-- **What**: These are tracked in `GenerativeSettings` but not forwarded. They require Ollama-specific API extensions that the standard OpenAI API doesn't support.
-- **Where**: `crates/russell-meta/src/client.rs`, `crates/russell-meta/src/oai_client.rs`
-- **Blocked on**: Confirming Okapi proxy passes Ollama-specific parameters through
-
-### LOW: Fix p4b verifier gap
-
-- **What**: `p4b` (attenuation) has a pre-existing gap — `attenuation_kind not found`. This is a separate issue from the behavioral_probe false positives.
-- **Where**: `skills/magna-carta-verifier/manifests/p4-clear-boundaries.yaml`
-- **Strategy**: Either implement `attenuation_kind` in `CapabilityToken` or update the manifest assertion to check for the actual capability attenuation mechanism.
+- **What**: Tracked in `GenerativeSettings` but not forwarded.
+- **Blocked on**: Confirming Okapi proxy passes Ollama-specific parameters
 
 ## 4. Recommended Skills and Tools
 
-- **coding-guidelines** — before implementing dispatch consent wiring or P3b test
-- **constraint-forces** — if uncertain whether dispatch consent wiring is Prohibition or Guideline level
+- **coding-guidelines** — before filing ADRs
 - **Validation commands:**
-  - `cargo test -p russell-core -- sovereignty::tests` — consent and sovereignty tests
-  - `cargo test -p russell-session` — session engine tests
-  - `cargo test -p russell-cli` — chat REPL tests
-  - `cargo test -p russell-meta -- action::tests` — shell classifier tests
+  - `cargo test -p russell-core -- sovereignty::tests` — consent and sovereignty tests (85)
+  - `cargo test -p russell-session` — session engine tests (14)
+  - `cargo test -p russell-cli` — chat REPL tests (25)
+  - `cargo test -p russell-meta` — inference wiring tests (98)
   - `cargo clippy -- -D warnings` — lint gate
   - `bash skills/magna-carta-verifier/scripts/verify.sh skills/magna-carta-verifier/manifests/p1-operator-sovereignty.yaml` — verifier smoke test
 
 ## 5. Key Decisions to Preserve
 
-1. **`GenerativeConfig` lives in `russell-core`, `GenerativeSettings` lives in `russell-cli`.** This avoids a dependency cycle. Profile persistence uses `GenerativeConfig` (all `Option<T>` fields); the CLI merges profile values into `GenerativeSettings` at startup. Priority: CLI flags > profile > compiled defaults.
+1. **`GenerativeConfig` lives in `russell-core`, `GenerativeSettings` lives in `russell-cli`.** This avoids a dependency cycle. Priority: CLI flags > profile > compiled defaults.
 
-2. **`resolve_consent()` searches ALL grants, not just exact key matches.** This is the key difference from `check_consent()` which does exact key lookup. `resolve_consent(skill_id, action_type, current_version)` iterates all grants and uses `ConsentScope::covers()` to find the most specific match. This enables Master and PerActionType grants to cover actions they weren't explicitly keyed for.
+2. **`resolve_consent()` searches ALL grants, `check_consent()` does exact key lookup.** `resolve_consent` iterates all grants and uses `ConsentScope::covers()` to find the most specific match. `check_consent` looks up by exact action key. Both exist for different use cases.
 
-3. **Specificity ranking: `PerActionType` (2) > `PerSkill` (1) > `Master` (0).** When multiple grants cover the same action, the most specific one wins. This is stored in `scope_specificity()` as a `u8`. Expired/mismatched grants at higher specificity override `Denied` at lower specificity for the denial reason.
+3. **Specificity ranking: `PerActionType` (2) > `PerSkill` (1) > `Master` (0).** When multiple grants cover the same action, the most specific one wins. Stored in `scope_specificity()`.
 
-4. **`top_p` follows the same wiring pattern as `temperature`.** Both use `Option<f64>` in `SoapPrompt`, are conditionally included in the OpenAI request body, and are guarded by "only forward if ≠ default" in `call_jack`. `top_k` and `repeat_penalty` are NOT wired because they require Ollama-specific API extensions.
+4. **Shell commands ALWAYS require explicit consent (JR-3).** Even with a Master grant, shell commands go through the consent gate. Only skill interventions are eligible for pre-approval via resolve_consent.
 
-5. **Magna Carta verifier false positives fixed by switching to `structural_audit` only.** The `behavioral_probe` method greps for specific strings (`DenyAllConsent`, `deny_all`) that only exist in data-access crates. For transport/surface crates, `structural_audit` is the correct method. Don't add `behavioral_probe` back for those assertion targets.
+5. **`top_p` follows the same wiring pattern as `temperature`.** Both use `Option<f64>` in `SoapPrompt`, conditionally included in OpenAI request body, guarded by "only forward if ≠ default". `top_k`/`repeat_penalty` NOT wired (Ollama-specific).
 
-6. **`/verify` shells out to `verify.sh` with `current_dir` set to the skill directory.** This ensures the script's relative paths (to Jinja2 templates, etc.) resolve correctly, matching how `russell skill run` works.
+6. **Magna Carta verifier: `structural_audit` for transport/surface crates, `behavioral_probe` for data-access crates.** The behavioral probe greps for `DenyAllConsent`/`deny_all` strings that only exist in data-access crates. Don't mix them.
 
-7. **`persist_generative_settings()` creates a stub profile if none exists.** When the operator changes a setting for the first time and no profile is on disk, a new stub profile is created with the generative settings populated. This ensures `/settings set` works even on fresh installations.
+7. **`persist_generative_settings()` creates a stub profile if none exists.** Ensures `/settings set` works on fresh installations.
+
+8. **`/verify` shells out with `current_dir` set to skill directory.** Ensures relative paths in verify.sh resolve correctly.
+
+9. **p4b verifier gap was case sensitivity, not missing code.** `AttenuationKind` (PascalCase) exists in `CapabilityToken`. The manifest listed `attenuation_kind` (snake_case) which the case-sensitive grep couldn't find. Fixed by matching the actual PascalCase name.

@@ -36,7 +36,7 @@ assertions:
     targets:
       - crate: russell-acp-server
         module: auth
-        methods: [CapabilityToken, validate_token, attenuation_kind]
+        methods: [CapabilityToken, validate_token, AttenuationKind]
         gate: CapabilityToken
       - crate: russell-acp-server
         module: auth
