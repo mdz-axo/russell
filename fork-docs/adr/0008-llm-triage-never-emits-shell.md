@@ -1,11 +1,11 @@
 ---
 title: "ADR-0008: LLM Never Emits Shell"
 audience: [developers, architects, agents]
-last_updated: 2026-04-18
+last_updated: 2026-06-07
 ddmvss_context: "jack"
 ddmvss_artifact: "adr"
 version: "1.0.0"
-status: "Active"
+status: "Superseded by ADR-0050"
 ---
 
 

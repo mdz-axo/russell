@@ -9,7 +9,6 @@
 //! his own capabilities regardless of interface mode.
 
 use russell_core::journal::JournalReader;
-use russell_mcp::registry::ToolRegistry;
 use russell_skills::Skill;
 use russell_skills::registry::RegistryCache;
 use std::fmt::Write as _;
@@ -22,7 +21,6 @@ pub fn build_objective(
     reader: &JournalReader,
     skills: &[Skill],
     profile: Option<&russell_core::Profile>,
-    hkask_registry: &ToolRegistry,
     registry: &RegistryCache,
 ) -> String {
     let now = russell_core::time::now_unix();
@@ -228,31 +226,6 @@ pub fn build_objective(
                     s.id, iv.id, iv.risk
                 );
             }
-        }
-    }
-
-    // ── hKask MCP tools (ADR-0025) ───────────────────────────────────
-    if !hkask_registry.is_empty() {
-        let _ = writeln!(obj, "\n### hKask MCP tools");
-        for tool in hkask_registry.tools() {
-            let risk = hkask_registry
-                .tool_risk_band(&tool.name)
-                .unwrap_or_else(|| "medium".into());
-            let desc = tool
-                .description
-                .as_deref()
-                .and_then(|d| d.lines().next())
-                .unwrap_or("");
-            let desc_short = if desc.len() > 60 {
-                format!("{}…", &desc[..57])
-            } else {
-                desc.to_owned()
-            };
-            let _ = writeln!(
-                obj,
-                "- `hkask`/`{}` (tool, risk: {}) — {}",
-                tool.name, risk, desc_short
-            );
         }
     }
 

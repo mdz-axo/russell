@@ -1,8 +1,8 @@
 ---
 title: "Russell Documentation Standards"
 audience: [contributors, maintainers]
-last_updated: 2026-05-25
-version: "1.0.0"
+last_updated: 2026-06-07
+version: "1.1.0"
 status: "Active"
 domain: "Cross-cutting"
 ddmvss_categories: [curation]
@@ -26,7 +26,7 @@ Russell's documentation follows hKask's DDMVSS framework:
 - `architecture/russell-architecture-master.md` — Index
 - `architecture/DDMVSS.md` — Framework taxonomy
 - `architecture/PRINCIPLES.md` — JR-1 through JR-7
-- `architecture/magna-carta.md` — Operator sovereignty
+- `architecture/magna-carta.md` — Operator sovereignty, affirmative consent, generative space, clear boundaries (OCAP)
 
 **Spec documents (4):**
 - `architecture/domain-and-capability.md` — Bounded contexts, verbs

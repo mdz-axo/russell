@@ -78,10 +78,6 @@ pub async fn execute_pending_action(
             rollback_cmd.clone(),
             *rollback_is_reboot,
         ),
-        ResolvedAction::HKaskTool { .. } => {
-            println!("  \u{2192} Internal error: HKaskTool routed to local dispatcher.");
-            return None;
-        }
         ResolvedAction::ShellCommand {
             risk, needs_sudo, ..
         } => (

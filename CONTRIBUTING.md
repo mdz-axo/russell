@@ -16,7 +16,7 @@ status: "Active"
 
 This document covers **mechanics**: dev environment, tests, local MCP
 wiring. For content-of-contributions rules (medical metaphor, IDRS,
-adding a skill, adding an MCP tool, commits, LLM-never-emits-shell),
+adding a skill, adding an MCP tool, commits, consent-gate),
 see [`AGENTS.md`](AGENTS.md).
 
 ## 1. Prerequisites

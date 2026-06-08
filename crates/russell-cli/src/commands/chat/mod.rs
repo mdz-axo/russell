@@ -13,7 +13,6 @@ use russell_core::journal::{JournalReader, JournalWriter};
 use russell_core::paths::Paths;
 use russell_meta::action::{self, ResolvedAction};
 use russell_meta::client::LlmClient;
-use russell_skills::RiskBand;
 use rustyline::DefaultEditor;
 use rustyline::error::ReadlineError;
 use serde::{Deserialize, Serialize};
@@ -144,7 +143,7 @@ fn is_refusal(input: &str) -> bool {
 }
 
 /// Check if the most recent history turn is an action result that Jack
-/// should interpret — probe result, intervention result, kask tool result,
+/// should interpret — probe result, intervention result, shell result,
 /// or action parse error.
 fn is_action_result_in_history(history: &ChatHistory) -> bool {
     history
@@ -155,7 +154,7 @@ fn is_action_result_in_history(history: &ChatHistory) -> bool {
                 && (t.content.starts_with("[probe result:")
                     || t.content.starts_with("[probe error:")
                     || t.content.starts_with("[intervention result:")
-                    || t.content.starts_with("[kask tool result:")
+                    || t.content.starts_with("[shell result:")
                     || t.content.starts_with("[action error:"))
         })
         .unwrap_or(false)

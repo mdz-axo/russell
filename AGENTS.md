@@ -88,6 +88,12 @@ When two principles conflict, the lower number wins.
 | **Disk probes** | 3 probes: I/O pressure "some"/"full" avg10, root filesystem usage %. |
 | **Systemd probes** | 3 probes: degraded state, failed user units, failed system units. |
 | **Baseline deviation** | p95 (30d) column in SOAP. 1.5× = mild anomaly, 3× = significant, 10× = crisis. |
+| **Magna Carta** | Russell's charter of operator liberties. Four principles: P1 (Operator Sovereignty), P2 (Affirmative Consent), P3 (Generative Space), P4 (Clear Boundaries / OCAP), plus invariant H-1–H-3 (single-host) and L-1–L-3 (lifecycle). See `fork-docs/architecture/magna-carta.md`. |
+| **Data Sovereignty Boundary** | Per-category classification of data as sovereign, shared, or public. Enforced by `SovereigntyChecker`. See P1. |
+| **Affirmative consent** | Default deny. Consent is scoped, versioned, and expiring — not a blanket permission. See P2. |
+| **Generative Space** | P3 principle: all generative settings exposed to operators, no privileged engineer access, open-source commitment, operator curation over system imposition, non-normativity. |
+| **OCAP** | Object Capability. Principles 1–3 enforced through unforgeable, attenuating capability tokens. No admin override. See P4. |
+| **Magna Carta Verifier** | Skill that verifies each principle (P1–P4) using YAML manifests and Jinja2 templates. Invoked via `russell skill run magna-carta-verifier`. |
 
 ## 5. IDRS Contract
 

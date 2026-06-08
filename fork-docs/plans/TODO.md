@@ -1,8 +1,8 @@
 ---
 title: "Russell TODO"
 audience: [developers, maintainers]
-last_updated: 2026-05-25
-version: "1.0.0"
+last_updated: 2026-06-07
+version: "1.1.0"
 status: "Active"
 domain: "Cross-cutting"
 ddmvss_categories: [domain, capability, interface, composition, trust, observability, persistence, lifecycle, curation]
@@ -232,7 +232,7 @@ ddmvss_categories: [domain, capability, interface, composition, trust, observabi
 **Category:** Interface  
 **Description:** Create mobile app for remote monitoring
 
-**Status:** Deferred (not in MVP scope, violates magna-carta.md single-host constraint)
+**Status:** Deferred (not in MVP scope, violates magna-carta.md H-1 single-host constraint)
 
 ---
 

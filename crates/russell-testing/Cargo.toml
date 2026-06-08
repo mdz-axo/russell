@@ -17,7 +17,6 @@ russell-sentinel = { workspace = true }
 russell-skills   = { workspace = true }
 russell-meta     = { workspace = true }
 russell-proprio  = { workspace = true }
-russell-mcp      = { workspace = true }
 
 thiserror = { workspace = true }
 anyhow    = { workspace = true }

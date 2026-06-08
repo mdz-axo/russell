@@ -1,8 +1,8 @@
 ---
 title: "Russell Architecture Master Index"
 audience: [architects, developers, agents]
-last_updated: 2026-05-25
-version: "1.0.0"
+last_updated: 2026-06-07
+version: "1.1.0"
 status: "Active"
 domain: "Cross-cutting"
 ddmvss_categories: [domain, capability, interface, composition, trust, observability, persistence, lifecycle, curation]
@@ -22,7 +22,7 @@ ddmvss_categories: [domain, capability, interface, composition, trust, observabi
 |----------|------|-------------------|---------|
 | [`DDMVSS.md`](DDMVSS.md) | FRAMEWORK | All 9 | DDMVSS taxonomy and methodology |
 | [`PRINCIPLES.md`](PRINCIPLES.md) | FRAMEWORK | All 9 | JR-1 through JR-7, C1-C4 |
-| [`magna-carta.md`](magna-carta.md) | FRAMEWORK | Trust, Lifecycle | Operator sovereignty and single-host constraint |
+| [`magna-carta.md`](magna-carta.md) | FRAMEWORK | Trust, Lifecycle, Capability, Composition | Operator sovereignty, affirmative consent, generative space, clear boundaries (OCAP), single-host and lifecycle constraints |
 | [`domain-and-capability.md`](domain-and-capability.md) | SPEC | Domain, Capability | Bounded contexts, verbs, capabilities |
 | [`interface-and-composition.md`](interface-and-composition.md) | SPEC | Interface, Composition | CLI/ACP/systemd surfaces, skill composition |
 | [`trust-security-observability.md`](trust-security-observability.md) | SPEC | Trust, Observability | IDRS contract, risk bands, proprioception |

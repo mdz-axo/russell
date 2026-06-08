@@ -1,8 +1,8 @@
 ---
 title: "Russell Requirements"
 audience: [architects, developers, operators]
-last_updated: 2026-05-25
-version: "1.0.0"
+last_updated: 2026-06-07
+version: "1.1.0"
 status: "Active"
 domain: "Cross-cutting"
 ddmvss_categories: [domain, capability]
@@ -227,7 +227,7 @@ ddmvss_categories: [domain, capability]
 - [x] All three surfaces (CLI, API, ACP) support the consent flow
 - [x] The consent gate works correctly: consented actions execute regardless of risk band
 
-**Principle:** JR-2, JR-3, S-1 (operator sovereignty)
+**Principle:** JR-2, JR-3, P1 (Operator Sovereignty)
 **DDMVSS categories:** Domain, Capability, Interface, Trust
 
 ---
@@ -293,7 +293,7 @@ ddmvss_categories: [domain, capability]
 
 ---
 
-## Operator Sovereignty Requirements
+## Operator Sovereignty Requirements (P1)
 
 ### OSR-1: The Operator Controls Russell
 
@@ -306,8 +306,10 @@ ddmvss_categories: [domain, capability]
 - [x] `./packaging/bin/uninstall.sh` uninstalls Russell
 - [x] Operator can change any setting through `russell chat` (Jack proposes; operator consents)
 - [x] Operator's consent is sovereign — once given, actions execute regardless of risk band
+- [x] Data is owned by the operator, correctly categorized (sovereign/shared/public), and portable
+- [x] Consent terms are atomic — unbundled, specific, no more than 5 sentences per term
 
-**Magna Carta:** S-1
+**Magna Carta:** P1 (Operator Sovereignty)
 **DDMVSS categories:** Trust, Lifecycle
 
 ---
@@ -323,7 +325,7 @@ ddmvss_categories: [domain, capability]
 - [x] No analytics by default
 - [x] Network access is opt-in
 
-**Magna Carta:** S-2  
+**Magna Carta:** P1 (Operator Sovereignty — data sovereignty)
 **DDMVSS categories:** Trust
 
 ---
@@ -338,8 +340,124 @@ ddmvss_categories: [domain, capability]
 - [x] No system configuration modification
 - [x] No system service creation
 
-**Magna Carta:** S-3  
+**Magna Carta:** P1 (Operator Sovereignty)
 **DDMVSS categories:** Trust
+
+---
+
+## Affirmative Consent Requirements (P2)
+
+### ACR-1: Default is Deny
+
+**Goal:** No access or mutation occurs without explicit operator consent.
+
+**Criteria:**
+- [x] Probes (risk: none) execute without consent
+- [x] Interventions require operator consent when risk exceeds `max_auto_risk`
+- [x] Shell commands always require operator consent
+- [x] Operator's consent is sovereign — once given, the action executes regardless of risk band
+- [x] Destructive commands are blocked by the safety classifier regardless of consent
+- [x] No code path bypasses the manifest or consent gate
+- [x] Fail-closed: misconfiguration or missing wiring defaults to deny
+
+**Magna Carta:** P2 (Affirmative Consent)
+**DDMVSS categories:** Trust
+
+---
+
+### ACR-2: Consent is Scoped, Versioned, and Expiring
+
+**Goal:** Consent grants are not indefinite blanket permissions.
+
+**Criteria:**
+- [ ] Consent is scoped to specific categories and resource versions
+- [ ] Consent is version-bound — re-affirm when resources are upgraded
+- [ ] Consent is time-bound — grants can expire and must be re-affirmed
+- [ ] Hierarchical consent: master → per-skill → per-action-type
+
+**Magna Carta:** P2 (Affirmative Consent)
+**DDMVSS categories:** Trust
+
+---
+
+### ACR-3: LLM Proposes; Operator Consents; Dispatcher Executes
+
+**Goal:** The LLM proposes shell commands and interventions; the operator reviews and consents; the dispatcher executes.
+
+**Criteria:**
+- [x] LLM proposes shell commands via `SHELL:` prefix
+- [x] LLM proposes skill interventions via `ACTION:` syntax
+- [x] Safety classifier assigns risk bands and blocks destructive commands
+- [x] Every mutation requires either IDRS compliance (skills) or operator consent (shell commands)
+- [x] Destructive commands (`rm -rf /`, `mkfs`, `shutdown`, `reboot`, fork bombs) are blocked regardless of consent
+
+**Magna Carta:** P2 (Affirmative Consent)
+**DDMVSS categories:** Trust
+
+---
+
+## Generative Space Requirements (P3)
+
+### GSR-1: Settings Exposure
+
+**Goal:** Inference and tooling expose all probabilistic/generative settings to operators.
+
+**Criteria:**
+- [x] Temperature, top-k, top-p, repeat penalty are configurable via Okapi
+- [x] No settings are hidden or admin-gated
+- [ ] All generative settings accessible through `russell chat`
+- [ ] Persona and HHH filters are operator-selectable, not system-imposed
+
+**Magna Carta:** P3 (Generative Space)
+**DDMVSS categories:** Capability
+
+---
+
+### GSR-2: Open-Source Commitment
+
+**Goal:** Russell only partners with open-source projects that expose their weights and settings.
+
+**Criteria:**
+- [x] Okapi (llama.cpp) is open-source with exposed settings
+- [x] No privileged engineer access to settings
+- [ ] Verification that connected inference providers expose settings
+
+**Magna Carta:** P3 (Generative Space)
+**DDMVSS categories:** Trust
+
+---
+
+## Clear Boundaries Requirements (P4)
+
+### CBR-1: Dual Enforcement Gate
+
+**Goal:** Every resource access passes through both `require_capability` and `require_sovereignty` gates.
+
+**Criteria:**
+- [ ] ACP macaroon-based OCAP tokens verify capability (`require_capability`)
+- [ ] Data sovereignty boundary enforces category-based access (`require_sovereignty`)
+- [ ] No code path bypasses both gates
+- [ ] Capability tokens are unforgeable and attenuating
+- [ ] No admin override or god token exists
+
+**Magna Carta:** P4 (Clear Boundaries / OCAP)
+**DDMVSS categories:** Trust, Composition
+
+---
+
+### CBR-2: Magna Carta Verifier
+
+**Goal:** A skill verifies each principle using YAML manifests and Jinja2 templates.
+
+**Criteria:**
+- [ ] Verifier skill installed at `~/.local/share/harness/skills/magna-carta-verifier/`
+- [ ] Manifests for P1–P4 with assertions and verification methods
+- [ ] Structural audit, behavioral probe, resource verification, and absence check methods
+- [ ] Triggered on start-up, consent expiration, operator change, and resource change
+- [ ] Failed assertions escalated to Jack for resolution with the operator
+
+**Magna Carta:** P4 (Clear Boundaries / OCAP)
+**DDMVSS categories:** Trust, Lifecycle
 
 ---
 
@@ -355,7 +473,7 @@ ddmvss_categories: [domain, capability]
 - [x] No cross-machine correlation
 - [x] No central aggregator
 
-**Magna Carta:** H-1  
+**Magna Carta:** H-1
 **DDMVSS categories:** Domain
 
 ---
@@ -405,25 +523,34 @@ ddmvss_categories: [domain, capability]
 | NFR-1 | — | — | JR-1 | Trust, Lifecycle |
 | NFR-2 | — | — | JR-2 | Trust |
 | NFR-3 | — | — | JR-3 | Trust |
-| NFR-3a | — | — | JR-2, JR-3, S-1 | Domain, Capability, Interface, Trust |
+| NFR-3a | — | — | JR-2, JR-3, P1 | Domain, Capability, Interface, Trust |
 | NFR-4 | — | — | JR-4 | Domain, Capability |
 | NFR-5 | — | — | JR-5 | Domain, Capability, Observability |
 | NFR-6 | — | — | JR-6 | Lifecycle |
 | NFR-7 | — | — | JR-7 | Persistence |
-| OSR-1 | — | — | — | Trust, Lifecycle |
-| OSR-2 | — | — | — | Trust |
-| OSR-3 | — | — | — | Trust |
-| SHR-1 | — | — | — | Domain |
-| SHR-2 | — | — | — | Persistence |
-| SHR-3 | — | — | — | Trust |
+| OSR-1 | — | — | P1 | Trust, Lifecycle |
+| OSR-2 | — | — | P1 | Trust |
+| OSR-3 | — | — | P1 | Trust |
+| ACR-1 | — | — | P2 | Trust |
+| ACR-2 | — | — | P2 | Trust |
+| ACR-3 | — | — | P2 | Trust |
+| GSR-1 | — | — | P3 | Capability |
+| GSR-2 | — | — | P3 | Trust |
+| CBR-1 | — | — | P4 | Trust, Composition |
+| CBR-2 | — | — | P4 | Trust, Lifecycle |
+| SHR-1 | — | — | H-1 | Domain |
+| SHR-2 | — | — | H-2 | Persistence |
+| SHR-3 | — | — | H-3 | Trust |
 
 ---
 
 ## Completeness
 
-**Total requirements:** 22
-**Satisfied:** 22 (100%)
-**Unsatisfied:** 0 (0%)
+**Total requirements:** 30
+**Satisfied:** 22 (73%)
+**Unsatisfied:** 8 (27%)
+
+**New from Magna Carta v2.0:** ACR-2, GSR-1 (partial), GSR-2 (partial), CBR-1, CBR-2
 
 **Status:** MVP complete
 
@@ -433,5 +560,5 @@ ddmvss_categories: [domain, capability]
 
 - DDMVSS: `architecture/DDMVSS.md`
 - Principles: `architecture/PRINCIPLES.md`
-- Magna Carta: `architecture/magna-carta.md`
+- Magna Carta: `architecture/magna-carta.md` (P1–P4, H-1–H-3, L-1–L-3)
 - Domain and Capability: `architecture/domain-and-capability.md`

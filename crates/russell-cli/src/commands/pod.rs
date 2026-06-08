@@ -14,7 +14,7 @@ pub fn status(paths: &Paths) -> Result<()> {
     println!("ACP Server: Running (external service)");
     println!(
         "CNS Emitter: {}",
-        if std::env::var("HKASK_CNS_ENDPOINT").is_ok() {
+        if std::env::var("RUSSELL_CNS_ENDPOINT").is_ok() {
             "Connected"
         } else {
             "Local only"

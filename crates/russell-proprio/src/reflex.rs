@@ -181,8 +181,6 @@ mod tests {
             timer_drift_severity: Severity::Info,
             help_error_rate_pct: None,
             help_error_rate_severity: Severity::Info,
-            hkask_mcp_reachable_ms: None,
-            hkask_mcp_reachable_severity: Severity::Info,
             remote_discovery_latency_s: None,
             remote_discovery_latency_severity: Severity::Info,
             journal_chain_intact: None,

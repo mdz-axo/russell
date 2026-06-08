@@ -1,8 +1,8 @@
 ---
 title: "Russell DDMVSS Scaffold"
 audience: [architects, maintainers]
-last_updated: 2026-05-25
-version: "1.0.0"
+last_updated: 2026-06-07
+version: "1.1.0"
 status: "Active"
 domain: "Cross-cutting"
 ddmvss_categories: [curation]
@@ -25,7 +25,7 @@ ddmvss_categories: [curation]
 | [`architecture/russell-architecture-master.md`](architecture/russell-architecture-master.md) | Master index | All |
 | [`architecture/DDMVSS.md`](architecture/DDMVSS.md) | Framework taxonomy | All |
 | [`architecture/PRINCIPLES.md`](architecture/PRINCIPLES.md) | JR-1 through JR-7 | All |
-| [`architecture/magna-carta.md`](architecture/magna-carta.md) | Operator sovereignty | Trust, Lifecycle |
+| [`architecture/magna-carta.md`](architecture/magna-carta.md) | Operator sovereignty, affirmative consent, generative space, clear boundaries (OCAP) | Trust, Lifecycle, Capability, Composition |
 
 ### Specification Documents (4)
 
@@ -96,10 +96,12 @@ Russell's documentation is organized by 9 DDMVSS categories:
 | **Capability** | Verbs, grants | domain-and-capability.md |
 | **Interface** | CLI, ACP, systemd | interface-and-composition.md |
 | **Composition** | Skills, manifests | interface-and-composition.md |
-| **Trust** | IDRS, risk bands, security | trust-security-observability.md, magna-carta.md |
+| **Trust** | IDRS, risk bands, security, affirmative consent | trust-security-observability.md, magna-carta.md |
 | **Observability** | Journal, proprioception, CNS spans | trust-security-observability.md |
 | **Persistence** | Storage, schemas | persistence-and-lifecycle.md |
 | **Lifecycle** | Bootstrap, evolution, deprecation | persistence-and-lifecycle.md, magna-carta.md |
+| **Capability** | Verbs, grants, generative settings | magna-carta.md |
+| **Composition** | Skills, OCAP boundaries | magna-carta.md |
 | **Curation** | Documentation standards | DOCUMENTATION_STANDARDS.md, WRITING_EXCELLENCE.md |
 
 ---
@@ -129,7 +131,7 @@ Russell is governed by 7 principles (JR-1 through JR-7):
 |-----------|-----------|
 | **JR-1** | Austere by default |
 | **JR-2** | Observe > Recommend > Act |
-| **JR-3** | The LLM never emits shell |
+| **JR-3** | Shell commands go through the consent gate |
 | **JR-4** | Small but present — the Nurse |
 | **JR-5** | Proprioception — Jack watches Jack |
 | **JR-6** | Reuse, don't depend |

@@ -22,8 +22,6 @@ russell-skills.workspace = true
 russell-meta.workspace = true
 russell-proprio.workspace = true
 russell-session.workspace = true
-# MCP client for hKask tool access (client feature only, server is deprecated)
-russell-mcp = { workspace = true, features = ["client"] }
 anyhow.workspace = true
 clap.workspace = true
 tokio.workspace = true
