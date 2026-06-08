@@ -1,7 +1,7 @@
 ---
 title: "Russell TODO"
 audience: [developers, maintainers]
-last_updated: 2026-06-07
+last_updated: 2026-06-08
 version: "1.1.0"
 status: "Active"
 domain: "Cross-cutting"
@@ -207,27 +207,7 @@ ddmvss_categories: [domain, capability, interface, composition, trust, observabi
 
 ---
 
-### TODO-12: Implement Data Sovereignty Boundary (P1, P4)
 
-**Category:** Trust, Composition
-**Context:** Magna Carta v2.0 — P1 (Operator Sovereignty), P4 (Clear Boundaries)
-**Depends on:** None (foundational)
-**Description:** Implement `DataCategory` enum, `DataSovereigntyBoundary` struct, and `SovereigntyChecker` in `russell-core`
-
-**Steps:**
-1. Create `crates/russell-core/src/sovereignty.rs` with `DataCategory`, `DataSovereigntyBoundary`, `SovereigntyChecker`
-2. Implement `DataSovereigntyBoundary::russell_default()` with sovereign/shared/public categories
-3. Implement `SovereigntyChecker::can_access(category, requester)` — deny by default
-4. Implement `DenyAllConsent` as default `ConsentGate` — denies everything until explicitly granted
-5. Wire `require_sovereignty` into skill dispatch path (`russell-skills`)
-6. Wire `require_capability` + `require_sovereignty` dual gate into ACP session path
-7. Add unit tests for fail-closed behavior
-8. File ADR documenting the decision
-
-**Magna Carta:** P1, P4 (CBR-1)
-**Estimated effort:** 3-5 days
-
----
 
 ### TODO-13: Implement Scoped, Versioned, Expiring Consent (P2)
 
@@ -245,6 +225,8 @@ ddmvss_categories: [domain, capability, interface, composition, trust, observabi
 6. Add unit tests for scope resolution, expiry, and version mismatch
 7. File ADR documenting the decision
 
+**Status:** Partial
+**Partial:** Steps 1–4 complete. Remaining: step 5 (hierarchical consent resolution in dispatch), step 6 (hierarchical resolution tests).
 **Magna Carta:** P2 (ACR-2)
 **Estimated effort:** 3-5 days
 
@@ -265,6 +247,8 @@ ddmvss_categories: [domain, capability, interface, composition, trust, observabi
 5. Document settings exposure in `interface-and-composition.md`
 6. Add assertion test that no settings are admin-gated (P3b)
 
+**Status:** Partial
+**Partial:** Steps 1–3 complete. Remaining: step 4 (persist settings to profile), step 5 (document in interface-and-composition.md), step 6 (P3b assertion test).
 **Magna Carta:** P3 (GSR-1, GSR-2)
 **Estimated effort:** 2-3 days
 
@@ -289,6 +273,8 @@ ddmvss_categories: [domain, capability, interface, composition, trust, observabi
 9. Wire verification triggers (start-up, consent expiry, operator change)
 10. Test each assertion method
 
+**Status:** Partial
+**Partial:** Steps 1–8 complete. Remaining: step 9 (wire verification triggers), step 10 (fix 3 behavioral_probe false positives).
 **Magna Carta:** P4 (CBR-2)
 **Estimated effort:** 3-5 days
 
@@ -349,6 +335,15 @@ ddmvss_categories: [domain, capability, interface, composition, trust, observabi
 **Description:** Documented JR-1 through JR-7 principles
 
 **Result:** See `architecture/PRINCIPLES.md`
+
+---
+
+### DONE-4: Implement Data Sovereignty Boundary (P1, P4)
+
+**Completed:** 2026-06-08
+**Description:** Implemented DataCategory, DataSovereigntyBoundary, SovereigntyChecker, DenyAllConsent, OperatorConsent, ConsentGrant, ConsentScope, and ConsentStatus
+
+**Result:** All 8 steps complete. See `crates/russell-core/src/sovereignty.rs`. ADR filed.
 
 ---
 

@@ -306,8 +306,7 @@ impl Default for GenerativeSettings {
 }
 
 /// Display current generative settings.
-fn handle_settings_display() {
-    let settings = GenerativeSettings::default();
+fn handle_settings_display(settings: &GenerativeSettings) {
     println!("  Generative settings (P3: all exposed to operator):");
     println!("    temperature:      {}", settings.temperature);
     println!("    top_k:            {}", settings.top_k);
@@ -324,8 +323,13 @@ fn handle_settings_display() {
     println!();
 }
 
-/// Change a generative setting in-session.
-fn handle_settings_set(args: &str, _profile: Option<&russell_core::Profile>) {
+/// Change a generative setting in-session and persist to profile.
+fn handle_settings_set(
+    args: &str,
+    settings: &mut GenerativeSettings,
+    profile: &mut Option<russell_core::Profile>,
+    paths: &russell_core::paths::Paths,
+) {
     let parts: Vec<&str> = args.splitn(2, ' ').collect();
     if parts.len() < 2 {
         println!("  Usage: /settings set <key> <value>");
@@ -336,63 +340,124 @@ fn handle_settings_set(args: &str, _profile: Option<&russell_core::Profile>) {
     let key = parts[0];
     let value = parts[1];
 
+    // Track whether a valid change was made so we can persist.
+    let mut changed = false;
+
     match key {
         "temperature" => {
             if let Ok(v) = value.parse::<f64>() {
                 if (0.0..=2.0).contains(&v) {
-                    println!("  → temperature set to {v}");
+                    settings.temperature = v;
+                    println!("  \u{2192} temperature set to {v}");
+                    changed = true;
                 } else {
-                    println!("  → temperature must be between 0.0 and 2.0");
+                    println!("  \u{2192} temperature must be between 0.0 and 2.0");
                 }
             } else {
-                println!("  → invalid value for temperature: {value}");
+                println!("  \u{2192} invalid value for temperature: {value}");
             }
         }
         "top_k" => {
             if let Ok(v) = value.parse::<u32>() {
-                println!("  → top_k set to {v}");
+                settings.top_k = v;
+                println!("  \u{2192} top_k set to {v}");
+                changed = true;
             } else {
-                println!("  → invalid value for top_k: {value}");
+                println!("  \u{2192} invalid value for top_k: {value}");
             }
         }
         "top_p" => {
             if let Ok(v) = value.parse::<f64>() {
                 if (0.0..=1.0).contains(&v) {
-                    println!("  → top_p set to {v}");
+                    settings.top_p = v;
+                    println!("  \u{2192} top_p set to {v}");
+                    changed = true;
                 } else {
-                    println!("  → top_p must be between 0.0 and 1.0");
+                    println!("  \u{2192} top_p must be between 0.0 and 1.0");
                 }
             } else {
-                println!("  → invalid value for top_p: {value}");
+                println!("  \u{2192} invalid value for top_p: {value}");
             }
         }
         "repeat_penalty" => {
             if let Ok(v) = value.parse::<f64>() {
                 if v >= 1.0 {
-                    println!("  → repeat_penalty set to {v}");
+                    settings.repeat_penalty = v;
+                    println!("  \u{2192} repeat_penalty set to {v}");
+                    changed = true;
                 } else {
-                    println!("  → repeat_penalty must be >= 1.0");
+                    println!("  \u{2192} repeat_penalty must be >= 1.0");
                 }
             } else {
-                println!("  → invalid value for repeat_penalty: {value}");
+                println!("  \u{2192} invalid value for repeat_penalty: {value}");
             }
         }
         "hhh_filter" => match value {
-            "on" | "true" | "yes" => println!("  → hhh_filter enabled"),
-            "off" | "false" | "no" => println!("  → hhh_filter disabled"),
-            _ => println!("  → hhh_filter must be on/off (got: {value})"),
+            "on" | "true" | "yes" => {
+                settings.hhh_filter = true;
+                println!("  \u{2192} hhh_filter enabled");
+                changed = true;
+            }
+            "off" | "false" | "no" => {
+                settings.hhh_filter = false;
+                println!("  \u{2192} hhh_filter disabled");
+                changed = true;
+            }
+            _ => println!("  \u{2192} hhh_filter must be on/off (got: {value})"),
         },
         "persona" => {
-            println!("  → persona set to {value}");
+            settings.persona = value.to_string();
+            println!("  \u{2192} persona set to {value}");
+            changed = true;
         }
         _ => {
-            println!("  → unknown setting: {key}");
+            println!("  \u{2192} unknown setting: {key}");
             println!(
                 "    Available: temperature, top_k, top_p, repeat_penalty, hhh_filter, persona"
             );
         }
     }
+
+    // Persist the change to profile on disk.
+    if changed {
+        persist_generative_settings(settings, profile, paths);
+    }
     println!();
+}
+
+/// Write the current `GenerativeSettings` into the profile's `generative` field
+/// and save the profile to disk. Creates a stub profile if none exists.
+fn persist_generative_settings(
+    settings: &GenerativeSettings,
+    profile: &mut Option<russell_core::Profile>,
+    paths: &russell_core::paths::Paths,
+) {
+    use russell_core::profile::GenerativeConfig;
+
+    let gen = GenerativeConfig {
+        temperature: Some(settings.temperature),
+        top_k: Some(settings.top_k),
+        top_p: Some(settings.top_p),
+        repeat_penalty: Some(settings.repeat_penalty),
+        hhh_filter: Some(settings.hhh_filter),
+        persona: Some(settings.persona.clone()),
+    };
+
+    if let Some(ref mut p) = profile {
+        p.generative = Some(gen);
+        if let Err(e) = p.save(&paths.profile()) {
+            warn!(error = %e, "failed to save profile after settings change");
+        }
+    } else {
+        // No profile on disk yet — create a stub and persist.
+        let mut p = russell_core::Profile::stub();
+        p.generative = Some(gen);
+        if let Err(e) = p.save(&paths.profile()) {
+            warn!(error = %e, "failed to save stub profile after settings change");
+        } else {
+            *profile = Some(p);
+        }
+    }
 }
 
 // ─── LLM spinner (from spinner.rs) ──────────────────────────────────────────
@@ -414,6 +479,7 @@ async fn call_okapi_with_spinner(
     cfg: &russell_meta::client::ClientConfig,
     model: &str,
     messages: &[serde_json::Value],
+    inference_temperature: Option<f64>,
 ) -> std::result::Result<String, String> {
     use rand::seq::SliceRandom;
     use tokio::sync::oneshot;
@@ -427,7 +493,7 @@ async fn call_okapi_with_spinner(
     let model = model.to_string();
     let messages = messages.to_vec();
     tokio::spawn(async move {
-        let result = call_llm_via_port(&cfg, &model, &messages).await;
+        let result = call_llm_via_port(&cfg, &model, &messages, inference_temperature).await;
         let _ = tx.send(result);
     });
 
@@ -463,6 +529,7 @@ async fn call_llm_via_port(
     cfg: &russell_meta::client::ClientConfig,
     model: &str,
     messages: &[serde_json::Value],
+    inference_temperature: Option<f64>,
 ) -> std::result::Result<String, String> {
     use russell_meta::client::SoapPrompt;
     use russell_meta::oai_client::OkapiClient;
@@ -487,7 +554,7 @@ async fn call_llm_via_port(
         subjective: String::new(),
         objective: String::new(),
         rendered: rendered.trim_end().to_string(),
-        temperature: None,
+        temperature: inference_temperature,
         max_tokens: None,
     };
 
@@ -548,6 +615,39 @@ pub async fn run(paths: &Paths, no_hhh: bool, persona: Option<String>) -> Result
     let mut history = ChatHistory::new(session_id.clone());
     let mut editor = DefaultEditor::new().context("initialising readline")?;
     let mut pending_action: Option<PendingAction> = None;
+
+    // Initialize generative settings from CLI flags (P3: Generative Space).
+    let mut settings = GenerativeSettings::default();
+    // Apply persisted overrides from profile (non-None fields override defaults).
+    if let Some(ref gen) = profile.as_ref().and_then(|p| p.generative.as_ref()) {
+        if let Some(v) = gen.temperature {
+            settings.temperature = v;
+        }
+        if let Some(v) = gen.top_k {
+            settings.top_k = v;
+        }
+        if let Some(v) = gen.top_p {
+            settings.top_p = v;
+        }
+        if let Some(v) = gen.repeat_penalty {
+            settings.repeat_penalty = v;
+        }
+        if let Some(v) = gen.hhh_filter {
+            settings.hhh_filter = v;
+        }
+        if let Some(ref v) = gen.persona {
+            settings.persona = v.clone();
+        }
+    }
+    if no_hhh {
+        settings.hhh_filter = false;
+    }
+    if let Some(ref p) = persona {
+        settings.persona = p.clone();
+    }
+    if !no_hhh && persona.is_none() {
+        // Default: no changes
+    }
 
     // Load skill registry cache for telemetry display and lifecycle management.
     let registry_path = paths.state.join("registry").join("local-cache.yaml");
@@ -691,6 +791,7 @@ pub async fn run(paths: &Paths, no_hhh: bool, persona: Option<String>) -> Result
                                     paths,
                                     &mut pending_action,
                                     &client_cfg,
+                                    &settings,
                                 )
                                 .await?;
                                 if let Ok(fresh) =
@@ -777,6 +878,7 @@ pub async fn run(paths: &Paths, no_hhh: bool, persona: Option<String>) -> Result
                                     paths,
                                     &mut pending_action,
                                     &client_cfg,
+                                    &settings,
                                 )
                                 .await?;
                                 if let Ok(fresh) =
@@ -789,7 +891,7 @@ pub async fn run(paths: &Paths, no_hhh: bool, persona: Option<String>) -> Result
                                 }
                                 history.turns.push(Turn {
                                     role: "user".into(),
-                                    content: "(Continue — interpret the result above and respond.)"
+                                    content: "(Continue \u{2014} interpret the result above and respond.)"
                                         .to_string(),
                                 });
                                 save_history(&chat_path, &history);
@@ -833,6 +935,7 @@ pub async fn run(paths: &Paths, no_hhh: bool, persona: Option<String>) -> Result
                             paths,
                             &mut pending_action,
                             &client_cfg,
+                            &settings,
                         )
                         .await
                         {
@@ -862,7 +965,8 @@ pub async fn run(paths: &Paths, no_hhh: bool, persona: Option<String>) -> Result
                         &session_id,
                         &history,
                         paths,
-                        profile.as_ref(),
+                        &mut profile,
+                        &mut settings,
                     )
                     .await
                 {
@@ -899,6 +1003,7 @@ pub async fn run(paths: &Paths, no_hhh: bool, persona: Option<String>) -> Result
                         paths,
                         &mut pending_action,
                         &client_cfg,
+                        &settings,
                     )
                     .await?;
 
@@ -1073,7 +1178,8 @@ async fn handle_slash_command(
     session_id: &str,
     history: &ChatHistory,
     paths: &Paths,
-    profile: Option<&russell_core::Profile>,
+    profile: &mut Option<russell_core::Profile>,
+    settings: &mut GenerativeSettings,
 ) -> bool {
     match trimmed {
         "/refresh" | "/reload" => {
@@ -1121,16 +1227,16 @@ async fn handle_slash_command(
             true
         }
         "/settings" => {
-            handle_settings_display();
+            handle_settings_display(settings);
             true
         }
         other => {
             if let Some(set_args) = other.strip_prefix("/settings set ") {
-                handle_settings_set(set_args.trim(), profile);
+                handle_settings_set(set_args.trim(), settings, profile, paths);
                 return true;
             }
             if other == "/settings" {
-                handle_settings_display();
+                handle_settings_display(settings);
                 return true;
             }
             if other == "/model" {
@@ -1273,6 +1379,7 @@ async fn call_jack(
     paths: &Paths,
     pending_action: &mut Option<PendingAction>,
     _client_cfg: &russell_meta::client::ClientConfig,
+    settings: &GenerativeSettings,
 ) -> Result<()> {
     // Build the fresh SOAP objective.
     let objective = objective::build_objective(reader, skills, profile, registry);
@@ -1423,8 +1530,14 @@ async fn call_jack(
     save_history(chat_path, history);
 
     // Call the LLM with an animated thinking spinner.
+    // P3: Generative Space — operator settings flow to inference.
+    let inference_temp = if settings.temperature != 0.2 {
+        Some(settings.temperature)
+    } else {
+        None // let the prompt template default take over
+    };
     let cfg = russell_meta::client::ClientConfig::from_env();
-    let response = call_okapi_with_spinner(&cfg, current_model, &messages).await;
+    let response = call_okapi_with_spinner(&cfg, current_model, &messages, inference_temp).await;
 
     match response {
         Ok(content) => {

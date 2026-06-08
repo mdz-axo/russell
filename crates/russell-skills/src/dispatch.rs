@@ -280,8 +280,14 @@ pub fn validate_command_path(cmd: &str) -> std::result::Result<(), CommandPathEr
         return Ok(());
     }
 
-    // Absolute paths are acceptable (operator controls the manifest).
+    // Absolute paths are acceptable (operator controls the manifest),
+    // but path traversal inside them is not.
     if cmd.starts_with('/') {
+        if cmd.contains("/../") || cmd.ends_with("/..") {
+            return Err(CommandPathError::PathTraversal {
+                path: cmd.to_string(),
+            });
+        }
         return Ok(());
     }
 
@@ -995,6 +1001,7 @@ pub fn verify_evidence_bundle(dir: &Path) -> Result<bool> {
 
 #[cfg(test)]
 mod tests {
+    #![allow(unsafe_code)]
     use super::*;
 
     #[tokio::test]
@@ -1675,7 +1682,10 @@ mod tests {
     #[tokio::test]
     async fn secrets_not_leaked_to_subprocess() {
         // Set a secret env var that should NOT leak into the subprocess.
-        std::env::set_var("RUSSELL_ACP_SECRET", "super-secret-value");
+        // SAFETY: test-only, single-threaded test context.
+        unsafe {
+            std::env::set_var("RUSSELL_ACP_SECRET", "super-secret-value");
+        }
         let tmp = tempfile::tempdir().unwrap();
         let dispatcher = Dispatcher {
             skill_dir: tmp.path().to_path_buf(),
@@ -1693,7 +1703,10 @@ mod tests {
             .run(&["/usr/bin/env".into()], None)
             .await
             .unwrap();
-        std::env::remove_var("RUSSELL_ACP_SECRET");
+        // SAFETY: test-only, single-threaded test context.
+        unsafe {
+            std::env::remove_var("RUSSELL_ACP_SECRET");
+        }
         assert_eq!(outcome.exit_code, Some(0));
         assert!(
             !outcome.stdout.contains("RUSSELL_ACP_SECRET"),
@@ -1708,7 +1721,9 @@ mod tests {
     // REQ: ADR-0031 — allowed_env_keys grants access to specific env vars.
     #[tokio::test]
     async fn allowed_env_keys_grants_access() {
-        std::env::set_var("MY_TOOL_API_KEY", "test-key-123");
+        unsafe {
+            std::env::set_var("MY_TOOL_API_KEY", "test-key-123");
+        }
         let tmp = tempfile::tempdir().unwrap();
         let dispatcher = Dispatcher {
             skill_dir: tmp.path().to_path_buf(),
@@ -1726,7 +1741,9 @@ mod tests {
             .run(&["/usr/bin/env".into()], None)
             .await
             .unwrap();
-        std::env::remove_var("MY_TOOL_API_KEY");
+        unsafe {
+            std::env::remove_var("MY_TOOL_API_KEY");
+        }
         assert_eq!(outcome.exit_code, Some(0));
         assert!(
             outcome.stdout.contains("MY_TOOL_API_KEY=test-key-123"),
@@ -1737,8 +1754,12 @@ mod tests {
     // REQ: ADR-0031 — Non-allowed env vars are not leaked even when other vars are allowed.
     #[tokio::test]
     async fn non_allowed_env_vars_not_leaked() {
-        std::env::set_var("MY_ALLOWED_KEY", "allowed");
-        std::env::set_var("MY_BLOCKED_KEY", "blocked");
+        unsafe {
+            std::env::set_var("MY_ALLOWED_KEY", "allowed");
+        }
+        unsafe {
+            std::env::set_var("MY_BLOCKED_KEY", "blocked");
+        }
         let tmp = tempfile::tempdir().unwrap();
         let dispatcher = Dispatcher {
             skill_dir: tmp.path().to_path_buf(),
@@ -1756,8 +1777,12 @@ mod tests {
             .run(&["/usr/bin/env".into()], None)
             .await
             .unwrap();
-        std::env::remove_var("MY_ALLOWED_KEY");
-        std::env::remove_var("MY_BLOCKED_KEY");
+        unsafe {
+            std::env::remove_var("MY_ALLOWED_KEY");
+        }
+        unsafe {
+            std::env::remove_var("MY_BLOCKED_KEY");
+        }
         assert_eq!(outcome.exit_code, Some(0));
         assert!(
             outcome.stdout.contains("MY_ALLOWED_KEY=allowed"),

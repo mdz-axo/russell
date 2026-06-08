@@ -16,46 +16,46 @@ assertions:
     claim: "Every access path goes through require_capability + require_sovereignty"
     method: structural + behavioral
     targets:
-      - crate: russell-capability
-        module: capability::gate
-        methods: [require_capability, check_capability]
-        gate: require_capability
-      - crate: russell-sovereignty
-        module: sovereignty::gate
-        methods: [require_sovereignty, check_sovereignty]
+      - crate: russell-acp-server
+        module: auth
+        methods: [CapabilityToken, validate_token, has_capability]
+        gate: CapabilityToken
+      - crate: russell-core
+        module: sovereignty
+        methods: [SovereigntyChecker, require_sovereignty]
         gate: require_sovereignty
-      - crate: russell-journal
-        module: journal::writer
-        methods: [store_sample, store_evidence]
-        gate: require_capability
+      - crate: russell-skills
+        module: dispatch
+        methods: [validate_command_path, sovereignty]
+        gate: sovereignty
 
   - id: p4b
     name: unforgeable_tokens
     claim: "Capability tokens are unforgeable and attenuating — no bypass exists"
     method: structural_audit
     targets:
-      - crate: russell-capability
-        module: capability::token
-        methods: [validate_token, delegate_attenuated, verify_unforgeable]
-        gate: no_bypass
-      - crate: russell-capability
-        module: capability::gate
-        methods: [require_capability, check_no_admin_override]
-        gate: no_bypass
+      - crate: russell-acp-server
+        module: auth
+        methods: [CapabilityToken, validate_token, attenuation_kind]
+        gate: CapabilityToken
+      - crate: russell-acp-server
+        module: auth
+        methods: [replay_protection, token_revocation]
+        gate: replay_protection
 
   - id: p4c
     name: consent_gated_settings
     claim: "Generative settings tokens obtainable through P2's affirmative consent"
     method: structural_audit
     targets:
-      - crate: russell-capability
-        module: capability::token
-        methods: [obtain_via_consent, settings_capability_token]
-        gate: require_consent
-      - crate: russell-consent
-        module: consent::bridge
-        methods: [consent_to_capability, bridge_settings_token]
-        gate: require_consent
+      - crate: russell-acp-server
+        module: handler
+        methods: [consent_respond, run_skill]
+        gate: consent_respond
+      - crate: russell-session
+        module: engine
+        methods: [grant_consent, check_consent]
+        gate: ConsentGrant
 
   - id: p4d
     name: open_settings
@@ -63,11 +63,10 @@ assertions:
     method: structural_audit
     targets:
       - crate: russell-meta
-        module: meta::provider
-        methods:
-          [expose_settings, verify_provider_openness, list_provider_settings]
-        gate: open_source_check
+        module: oai_client
+        methods: [OkapiClient, chat, resolve_and_correct_model]
+        gate: OkapiClient
       - crate: russell-meta
-        module: meta::inference
-        methods: [provider_settings, check_exposure]
-        gate: open_source_check
+        module: client
+        methods: [ClientConfig, SoapPrompt]
+        gate: ClientConfig

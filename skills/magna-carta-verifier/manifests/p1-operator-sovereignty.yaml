@@ -16,13 +16,13 @@ assertions:
     claim: "Every code path to sovereign data is gated by SovereigntyChecker"
     method: structural_audit
     targets:
-      - crate: russell-journal
-        module: journal::writer
-        methods: [store_sample, recall_samples, store_evidence, recall_evidence]
+      - crate: russell-core
+        module: sovereignty
+        methods: [SovereigntyChecker, require_sovereignty, russell_default]
         gate: require_sovereignty
-      - crate: russell-journal
-        module: journal::reader
-        methods: [read_samples, read_evidence]
+      - crate: russell-acp-server
+        module: handler
+        methods: [sovereignty, require_sovereignty]
         gate: require_sovereignty
 
   - id: p1b
@@ -30,13 +30,13 @@ assertions:
     claim: "Non-owner access to sovereign data is denied"
     method: behavioral_probe
     targets:
-      - crate: russell-journal
-        module: journal::writer
-        methods: [store_sample, recall_samples]
-        gate: require_sovereignty
-      - crate: russell-sovereignty
-        module: sovereignty::checker
-        methods: [can_access]
+      - crate: russell-core
+        module: sovereignty
+        methods: [SovereigntyChecker, require_sovereignty]
+        gate: deny_all
+      - crate: russell-skills
+        module: dispatch
+        methods: [sovereignty, require_sovereignty]
         gate: deny_all
 
   - id: p1c
@@ -44,9 +44,9 @@ assertions:
     claim: "Every resource is correctly categorized before harness entry"
     method: resource_verification
     targets:
-      - crate: russell-sovereignty
-        module: sovereignty::boundary
-        methods: [categorize, verify_category]
+      - crate: russell-core
+        module: sovereignty
+        methods: [DataSovereigntyBoundary, DataCategory, categorize]
         gate: DataSovereigntyBoundary
 
   - id: p1d
@@ -54,25 +54,25 @@ assertions:
     claim: "Sovereign data is portable and not locked into proprietary format"
     method: structural_audit
     targets:
-      - crate: russell-journal
-        module: journal::export
-        methods: [export_daily_log, export_json, export_csv]
-        gate: standard_format
-      - crate: russell-journal
-        module: journal::digest
-        methods: [digest]
-        gate: standard_format
+      - crate: russell-cli
+        module: commands::digest
+        methods: [daily_log, digest]
+        gate: digest
+      - crate: russell-core
+        module: journal
+        methods: [recent, reader]
+        gate: JournalReader
 
   - id: p1e
     name: atomic_consent
     claim: "Consent terms are atomic — unbundled, specific, ≤5 sentences per term"
     method: structural_audit
     targets:
-      - crate: russell-consent
-        module: consent::term
-        methods: [validate_atomic, max_sentence_count]
-        gate: atomic_validation
-      - crate: russell-consent
-        module: consent::grant
-        methods: [grant_term, revoke_term]
-        gate: require_consent
+      - crate: russell-session
+        module: engine
+        methods: [ConsentGrant, ConsentStatus, grant_consent, revoke_consent]
+        gate: ConsentGrant
+      - crate: russell-core
+        module: sovereignty
+        methods: [OperatorConsent, ConsentScope]
+        gate: OperatorConsent

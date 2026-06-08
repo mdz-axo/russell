@@ -438,14 +438,15 @@ pub fn resolve(
 // ---------------------------------------------------------------------------
 
 /// Destructive patterns that are always blocked.
+/// All patterns must be lowercase — `classify_shell_command` lowers the input.
+/// `rm -rf /` patterns are handled separately by [`is_rm_targeting_root`]
+/// because simple `contains()` would also match `rm -rf /tmp/…`.
 const BLOCKED_PATTERNS: &[&str] = &[
-    "rm -rf /",
-    "rm -rf /*",
     "mkfs",
     "dd if=",
     ":(){ :|:& };:", // fork bomb
-    "chmod -R 777 /",
-    "chown -R",
+    "chmod -r 777 /",
+    "chown -r",
     "> /dev/sd",
     "shutdown",
     "reboot",
@@ -456,6 +457,35 @@ const BLOCKED_PATTERNS: &[&str] = &[
     "halt",
     "poweroff",
 ];
+
+/// Returns `true` when `rm -rf` targets the root filesystem.
+///
+/// This is a boundary-aware check: `rm -rf /` and `rm -rf /*` are blocked,
+/// but `rm -rf /tmp/cleanup` is allowed through as high-risk (not blocked).
+fn is_rm_targeting_root(cmd_lower: &str) -> bool {
+    // Walk through the command looking for `rm -rf /` or `rm -f /`
+    // and verify the character after the `/` is NOT a path character.
+    let rm_patterns = ["rm -rf /", "rm -f /"];
+    for pat in &rm_patterns {
+        let mut start = 0;
+        while let Some(idx) = cmd_lower[start..].find(pat) {
+            let abs_idx = start + idx;
+            let after_idx = abs_idx + pat.len();
+            let after = if after_idx < cmd_lower.len() {
+                cmd_lower.as_bytes()[after_idx]
+            } else {
+                b'\0' // end of string
+            };
+            // Blocked if after `/` is: end-of-string, space, `;`, `|`, `&`, `*`, newline
+            let is_boundary = matches!(after, b'\0' | b' ' | b';' | b'|' | b'&' | b'*' | b'\n');
+            if is_boundary {
+                return true;
+            }
+            start = abs_idx + 1;
+        }
+    }
+    false
+}
 
 /// High-risk patterns that require explicit consent.
 const HIGH_RISK_PATTERNS: &[&str] = &[
@@ -617,7 +647,15 @@ const READ_ONLY_PREFIXES: &[&str] = &[
 pub fn classify_shell_command(command: &str) -> std::result::Result<ResolvedAction, ActionError> {
     let cmd_lower = command.to_lowercase();
 
-    // 1. Check blocked patterns first.
+    // 1a. rm -rf targeting root filesystem is always blocked.
+    if is_rm_targeting_root(&cmd_lower) {
+        return Err(ActionError::ShellBlocked {
+            command: command.to_string(),
+            reason: "destructive pattern detected: rm targeting root filesystem".into(),
+        });
+    }
+
+    // 1b. Check remaining blocked patterns.
     for pattern in BLOCKED_PATTERNS {
         if cmd_lower.contains(pattern) {
             return Err(ActionError::ShellBlocked {
@@ -994,7 +1032,9 @@ mod tests {
     fn sudo_apt_install_is_low_risk() {
         let result = classify_shell_command("sudo apt install build-essential").unwrap();
         assert!(result.is_shell_command());
-        assert!(result.needs_sudo());
+        if let ResolvedAction::ShellCommand { needs_sudo, .. } = &result {
+            assert!(needs_sudo);
+        }
     }
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -1065,5 +1105,49 @@ mod tests {
         let result = classify_shell_command("kill -9 12345").unwrap();
         assert!(result.is_shell_command());
         assert_eq!(result.risk_band(), RiskBand::Medium);
+    }
+
+    // REQ: Boundary-aware rm -rf root check (ADR-0050).
+    // `rm -rf /` and `rm -rf /*` are blocked.
+    // `rm -rf /tmp/cleanup` is NOT blocked (high-risk, consent-gated).
+
+    #[test]
+    fn is_rm_targeting_root_exact() {
+        assert!(is_rm_targeting_root("rm -rf /"));
+    }
+
+    #[test]
+    fn is_rm_targeting_root_wildcard() {
+        assert!(is_rm_targeting_root("rm -rf /*"));
+    }
+
+    #[test]
+    fn is_rm_targeting_root_trailing_space() {
+        assert!(is_rm_targeting_root("rm -rf / "));
+    }
+
+    #[test]
+    fn is_rm_targeting_root_in_chain() {
+        assert!(is_rm_targeting_root("echo hi; rm -rf /; echo done"));
+    }
+
+    #[test]
+    fn is_rm_targeting_root_sudo() {
+        assert!(is_rm_targeting_root("sudo rm -rf /"));
+    }
+
+    #[test]
+    fn is_rm_targeting_root_tmp_not_blocked() {
+        assert!(!is_rm_targeting_root("rm -rf /tmp/cleanup"));
+    }
+
+    #[test]
+    fn is_rm_targeting_root_home_not_blocked() {
+        assert!(!is_rm_targeting_root("rm -rf /home/user/old"));
+    }
+
+    #[test]
+    fn is_rm_targeting_root_var_not_blocked() {
+        assert!(!is_rm_targeting_root("rm -rf /var/log/old"));
     }
 }

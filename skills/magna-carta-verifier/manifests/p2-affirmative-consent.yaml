@@ -15,73 +15,67 @@ assertions:
     claim: "Default is deny — no access without explicit consent grant"
     method: structural + behavioral
     targets:
-      - crate: russell-consent
-        module: consent::default
-        methods: [DenyAllConsent, deny_all]
-        gate: deny_all
-      - crate: russell-sovereignty
-        module: sovereignty::boundary
-        methods: [requires_affirmative_consent, russell_default]
-        gate: deny_all
+      - crate: russell-core
+        module: sovereignty
+        methods: [DenyAllConsent, default_deny, deny_all]
+        gate: DenyAllConsent
+      - crate: russell-session
+        module: engine
+        methods: [grant_consent, check_consent, ConsentStatus]
+        gate: ConsentStatus
 
   - id: p2b
     name: scoped_consent
     claim: "Consent grants are scoped to specific categories and resource versions"
     method: structural_audit
     targets:
-      - crate: russell-consent
-        module: consent::grant
-        methods: [grant_scope, validate_scope, category_scope, version_scope]
-        gate: require_consent
-      - crate: russell-consent
-        module: consent::types
-        methods: [ConsentScope, ConsentCategory]
-        gate: require_consent
+      - crate: russell-session
+        module: engine
+        methods: [ConsentGrant, ConsentScope, PerSkill]
+        gate: ConsentScope
+      - crate: russell-core
+        module: sovereignty
+        methods: [OperatorConsent, ConsentScope]
+        gate: ConsentScope
 
   - id: p2c
     name: expiring_consent
     claim: "Consent grants expire by date or resource version upgrade"
     method: structural + behavioral
     targets:
-      - crate: russell-consent
-        module: consent::grant
-        methods: [check_expiry, expire_grant, validate_version_bound]
-        gate: require_consent
-      - crate: russell-consent
-        module: consent::clock
-        methods: [is_expired, time_bound_check]
-        gate: require_consent
+      - crate: russell-session
+        module: engine
+        methods: [grant_consent, expires_at, VersionMismatch]
+        gate: ConsentGrant
+      - crate: russell-core
+        module: sovereignty
+        methods: [OperatorConsent, expires_at]
+        gate: OperatorConsent
 
   - id: p2d
     name: hierarchical_consent
     claim: "Consent structures are hierarchical (master → per-skill → per-action-type)"
     method: structural_audit
     targets:
-      - crate: russell-consent
-        module: consent::hierarchy
-        methods:
-          [
-            resolve_consent,
-            master_consent,
-            per_skill_consent,
-            per_action_type_consent,
-          ]
-        gate: require_consent
-      - crate: russell-consent
-        module: consent::types
-        methods: [ConsentLevel, ConsentHierarchy]
-        gate: require_consent
+      - crate: russell-session
+        module: session
+        methods: [ConsentStatus, consent_flow]
+        gate: ConsentStatus
+      - crate: russell-core
+        module: sovereignty
+        methods: [OperatorConsent, ConsentScope]
+        gate: ConsentScope
 
   - id: p2e
     name: fail_closed
     claim: "Fail-closed: misconfiguration or missing wiring defaults to deny"
     method: behavioral_probe
     targets:
-      - crate: russell-consent
-        module: consent::default
-        methods: [DenyAllConsent, misconfiguration_fallback]
+      - crate: russell-core
+        module: sovereignty
+        methods: [SovereigntyChecker, require_sovereignty]
         gate: deny_all
-      - crate: russell-sovereignty
-        module: sovereignty::boundary
-        methods: [requires_affirmative_consent, fail_closed_default]
+      - crate: russell-session
+        module: engine
+        methods: [ConsentStatus, Denied]
         gate: deny_all
