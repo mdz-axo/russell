@@ -7,6 +7,12 @@ targets = [{ triple = "x86_64-unknown-linux-gnu" }]
 [advisories]
 db-path = "~/.cargo/advisory-db"
 db-urls = ["https://github.com/rustsec/advisory-db"]
+ignore = [
+    # proc-macro-error2 — unmaintained fork; transitive via age → i18n-embed-fl
+    "RUSTSEC-2026-0173",
+    # sodiumoxide — deprecated; transitive via macaroon → russell-acp-server
+    "RUSTSEC-2021-0137",
+]
 
 [licenses]
 allow = [
