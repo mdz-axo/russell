@@ -294,29 +294,6 @@ ddmvss_categories: [domain, capability, interface, composition, trust, observabi
 
 ---
 
-### TODO-16: Align Russell Docs with hKask DDMVSS MCP Spec
-
-**Category:** Curation
-**Context:** Cross-project alignment
-****Description:** Use the updated hKask DDMVSS MCP spec server implementation to guide an aggressive update and consolidation of Russell's document base
-
-**Steps:**
-1. Run `kask` MCP server and query the DDMVSS spec for current taxonomy and structure
-2. Compare Russell's 19-document corpus against hKask's spec-driven DDMVSS
-3. Identify documents that should be archived (merged into others or deprecated)
-4. Identify spec gaps where Russell lacks coverage hKask has
-5. Identify redundancies where multiple Russell documents cover the same ground
-6. Archive deprecated documents (move to `docs/archive/` with superseded-by pointers)
-7. Merge redundant documents (e.g., consolidate overlapping specs)
-8. Rewrite remaining documents to align with hKask's spec structure and vocabulary
-9. Update DDMVSS_SCAFFOLD.md to reflect new document count and structure
-10. Update all cross-references
-11. Verify coherence score ≥ 0.7
-
-**Estimated effort:** 5-7 days
-
----
-
 ## Backlog
 
 ### BACKLOG-1: Add GUI Dashboard

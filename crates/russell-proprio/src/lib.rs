@@ -26,6 +26,52 @@ use std::process::Command;
 use tracing::{debug, warn};
 
 // ---------------------------------------------------------------------------
+// TimerSource trait and SystemdTimerSource
+// ---------------------------------------------------------------------------
+
+/// Abstraction over timer state queries for proprioception.
+///
+/// Production code uses [`SystemdTimerSource`] (reads from systemd).
+/// Tests can inject a mock via [`FixedTimerSource`] or any implementation.
+pub trait TimerSource: Send + Sync {
+    /// Read the last trigger time in microseconds since epoch.
+    /// Returns `Ok(None)` if the timer was found but hasn't triggered yet.
+    /// Returns `Err` if the timer couldn't be read at all.
+    fn read_last_trigger_us(&self) -> Result<Option<u64>>;
+}
+
+/// Production timer source — reads the Russell sentinel systemd timer's
+/// `LastTriggerUSec` property via `systemctl --user show`.
+pub struct SystemdTimerSource;
+
+impl TimerSource for SystemdTimerSource {
+    fn read_last_trigger_us(&self) -> Result<Option<u64>> {
+        read_timer_last_trigger().map_err(|e| russell_core::error::CoreError::Config(e))
+    }
+}
+
+/// Fixed timer source for testing — always returns the given trigger time.
+pub struct FixedTimerSource {
+    trigger_us: Option<u64>,
+}
+
+impl FixedTimerSource {
+    /// Create a fixed timer source that returns the given trigger time.
+    #[must_use]
+    pub fn new(trigger_us: Option<u64>) -> Self {
+        Self {
+            trigger_us: trigger_us,
+        }
+    }
+}
+
+impl TimerSource for FixedTimerSource {
+    fn read_last_trigger_us(&self) -> Result<Option<u64>> {
+        Ok(self.trigger_us)
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Constants — vital names and thresholds
 // ---------------------------------------------------------------------------
 

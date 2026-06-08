@@ -686,22 +686,22 @@ mod tests {
     #[test]
     fn operator_consent_expiry() {
         let mut consent = OperatorConsent::new();
+        let expired_time = chrono::Utc::now() - chrono::Duration::hours(1);
         let grant = ConsentGrant {
             categories: [DataCategory::JournalEntry].into_iter().collect(),
             resource_version: None,
-            expires_at: Some(chrono::Utc::now() - chrono::Duration::hours(1)), // expired
+            expires_at: Some(expired_time),
             scope: ConsentScope::Master,
             granted_at: chrono::Utc::now() - chrono::Duration::hours(2),
         };
 
         consent.grant("action".to_string(), grant);
 
-        assert_eq!(
-            consent.check_consent("action", None),
-            ConsentStatus::Expired {
-                expired_at: chrono::Utc::now() - chrono::Duration::hours(1)
-            }
-        );
+        // Verify consent is expired (don't compare exact nanoseconds)
+        match consent.check_consent("action", None) {
+            ConsentStatus::Expired { .. } => {} // pass
+            other => panic!("Expected Expired, got {:?}", other),
+        }
     }
 
     #[test]

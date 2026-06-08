@@ -70,10 +70,10 @@ JS-rendered pages; Browserbase is for when I need to click through a flow.
 
 ---
 
-## 2. How Search Connects Through Kask
+## 2. How Search Connects Through the Agent Layer
 
-Kask is the broader agent-native container platform the operator runs. It
-manages MCP registries, tool discovery, and capability exposure.
+The operator's agent environment manages MCP tool registries and tool
+discovery.
 
 ### Direct MCP (Kilo IDE agent)
 
@@ -90,15 +90,14 @@ kilo.json / kilo.jsonc → mcpServers:
 These are available in the current agent session. The operator's Kilo config
 at `~/.config/kilo/` defines which MCP servers are loaded.
 
-### Through Kask (arsenal MCP registry)
+### Through ACP (Russell's own MCP registry)
 
-Kask's `arsenal-mcp-russell` reads Russell's journal and exposes 6 tools.
-The MCP registry at `~/.config/stack/mcp-registry.json` could also register
-web search tools. If the operator has web search MCPs registered through
-Kask, they're available to any Kask curator (like Duncan) and can be bridged
-to Russell's agent layer.
+Russell's ACP server exposes its own journal-reading MCP tools. If the
+operator has registered additional MCP tools through the ACP server,
+they're available to Russell through the `ACTION: remote/<tool-name>`
+syntax.
 
-The boundary (JR-6): Russell never imports Kask crates. They communicate
+The boundary (JR-6): Russell never imports external crates. They communicate
 through journal reads and MCP tools. Web search tools flow through the same
 boundary — the Kilo agent layer has them, not Russell's Rust binary.
 

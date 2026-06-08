@@ -1533,7 +1533,7 @@ mod tests {
         let mut h = ChatHistory::new("test".to_string());
         h.turns.push(Turn {
             role: "user".into(),
-            content: "[action error: 'kask' is not a loaded skill.]".to_string(),
+            content: "[action error: 'remote' is not a loaded skill.]".to_string(),
         });
         assert!(is_action_result_in_history(&h));
     }

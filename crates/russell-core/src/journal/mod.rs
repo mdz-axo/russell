@@ -20,6 +20,12 @@
 pub mod migrations;
 pub mod port;
 
+// Re-export port traits for convenient access.
+pub use port::{
+    EventDetailPort, EventQueryPort, HostTelemetryPort, JournalReadPort, JournalWritePort,
+    SelfTelemetryPort,
+};
+
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::sync::atomic::{AtomicI64, Ordering};

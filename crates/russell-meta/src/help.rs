@@ -7,7 +7,7 @@
 use std::path::PathBuf;
 use std::time::Duration;
 
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use time::OffsetDateTime;
 use tracing::{info, warn};
 
@@ -41,11 +41,13 @@ pub enum SkipReason {
     ThresholdSkip,
 }
 
+#[derive(Debug, Clone, serde::Serialize)]
 struct ObjectiveData {
     severity_counts: SeverityCounts,
     recent_events: Vec<EventRecord>,
 }
 
+#[derive(Debug, Clone, serde::Serialize)]
 struct SeverityCounts {
     crit: u64,
     alert: u64,
@@ -53,6 +55,7 @@ struct SeverityCounts {
     info: u64,
 }
 
+#[derive(Debug, Clone, serde::Serialize)]
 struct EventRecord {
     probe: String,
     severity: String,
