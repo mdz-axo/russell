@@ -560,7 +560,7 @@ impl JournalReader {
         let conn = self.open_ro()?;
         let row: Option<Option<i64>> = conn
             .query_row(
-                "SELECT MAX(ts) FROM events WHERE action = 'remote.skill.fetch'",
+                "SELECT MAX(ts_unix) FROM events WHERE action = 'remote.skill.fetch'",
                 [],
                 |r| r.get::<_, Option<i64>>(0),
             )
@@ -2041,11 +2041,11 @@ mod tests {
 
     // ---- last_remote_fetch_ts ----
 
-    // REQ: JR-7 — last_remote_fetch_ts currently returns None because
-    // it queries MAX(ts) (text column) instead of MAX(ts_unix).
-    // This test documents the actual behavior (known bug).
+    // REQ: JR-7 — last_remote_fetch_ts returns the most recent unix timestamp
+    // for remote.skill.fetch events. Previously queried MAX(ts) (text column)
+    // instead of MAX(ts_unix) (integer) — fixed 2026-06-07.
     #[test]
-    fn last_remote_fetch_ts_returns_none_due_to_ts_column_bug() {
+    fn last_remote_fetch_ts_returns_unix_timestamp() {
         let (_guard, path) = tmp_journal();
         let w = JournalWriter::open(&path).unwrap();
         let mut e = Event::new("remote.skill.fetch", Severity::Info);
@@ -2054,9 +2054,7 @@ mod tests {
 
         let r = w.reader();
         let ts = r.last_remote_fetch_ts().unwrap();
-        // BUG: queries MAX(ts) (text) instead of MAX(ts_unix),
-        // so i64 conversion always fails → returns None.
-        assert_eq!(ts, None);
+        assert_eq!(ts, Some(1_700_000_999));
     }
 
     // ---- list_events_by_action ----

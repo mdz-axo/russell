@@ -16,6 +16,7 @@ use crate::persona::JackPersonaProjection;
 use crate::port::SkillDispatchPort;
 use crate::rate_limit::RateLimiter;
 use crate::types::*;
+use russell_core::sovereignty::{DataCategory, SovereigntyChecker};
 use russell_session::{
     ConsentDecision, ConsentRequest, CreateSessionRequest, SessionEngine, SessionMessageRequest,
 };
@@ -53,6 +54,8 @@ pub struct AcpHandler {
     dispatch: std::sync::Arc<dyn SkillDispatchPort>,
     /// Macaroon auth.
     auth: MacaroonAuth,
+    /// Sovereignty checker (P4 dual gate).
+    sovereignty: SovereigntyChecker,
     /// Rate limiter.
     rate_limiter: RateLimiter,
     /// Whether authentication is required for all requests.
@@ -85,6 +88,7 @@ impl AcpHandler {
             persona,
             dispatch: dispatch_arc,
             auth,
+            sovereignty: SovereigntyChecker::russell_default(),
             rate_limiter,
             require_auth: true,
             journal_reader: None,
@@ -116,6 +120,12 @@ impl AcpHandler {
     /// Set whether authentication is required for all requests.
     pub fn with_require_auth(mut self, require: bool) -> Self {
         self.require_auth = require;
+        self
+    }
+
+    /// Set a custom sovereignty checker (for testing or configuration overrides).
+    pub fn with_sovereignty(mut self, checker: SovereigntyChecker) -> Self {
+        self.sovereignty = checker;
         self
     }
 
@@ -364,6 +374,12 @@ impl AcpHandler {
         params: Option<serde_json::Value>,
         token: Option<&CapabilityToken>,
     ) -> Result<serde_json::Value> {
+        // P4 dual gate: consent records are sovereign data.
+        // Accessing or modifying consent requires sovereignty check.
+        self.sovereignty
+            .require_sovereignty(&DataCategory::ConsentRecord, "acp/consent.respond", false)
+            .map_err(|e| AcpError::SovereigntyDenied(e.to_string()))?;
+
         let raw_req: ConsentRequest = params
             .ok_or_else(|| AcpError::InvalidRequest("missing params".to_string()))
             .and_then(|p| {
@@ -456,6 +472,13 @@ impl AcpHandler {
                 let args = p.get("args").cloned().unwrap_or(json!({}));
                 Ok((skill_id, args))
             })?;
+
+        // P4 dual gate: check sovereignty before skill dispatch.
+        // Skill results may access journal entries, SOAP bundles, or other
+        // sovereign data categories.
+        self.sovereignty
+            .require_sovereignty(&DataCategory::SkillResult, "acp/skill.run", false)
+            .map_err(|e| AcpError::SovereigntyDenied(e.to_string()))?;
 
         let result = self.dispatch.dispatch_skill(&skill_id, &args).await?;
 
@@ -561,6 +584,7 @@ impl From<crate::error::AcpError> for JsonRpcError {
             AcpError::AuthFailed(_) => (401, None),
             AcpError::TokenExpired(_) => (401, Some(json!({"expired": true}))),
             AcpError::CapabilityNotGranted(_) => (403, Some(json!({"capability": "not_granted"}))),
+            AcpError::SovereigntyDenied(_) => (403, Some(json!({"sovereignty": "denied"}))),
             AcpError::RateLimitExceeded(_) => (429, Some(json!({"retry_after": 60}))),
             AcpError::InvalidRequest(_) => (400, None),
             _ => (500, None),

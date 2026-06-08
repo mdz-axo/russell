@@ -60,6 +60,11 @@ pub const MIGRATIONS: &[Migration] = &[
         slug: "hash_chain",
         sql: include_str!("migrations/0006_hash_chain.sql"),
     },
+    Migration {
+        version: 7,
+        slug: "used_nonces",
+        sql: include_str!("migrations/0007_used_nonces.sql"),
+    },
 ];
 
 /// Apply any migrations newer than the DB's current version.

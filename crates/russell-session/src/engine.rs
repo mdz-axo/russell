@@ -28,6 +28,8 @@ pub struct SessionEngine {
     inference: Option<std::sync::Arc<dyn InferencePort>>,
     /// Intervention execution port.
     intervention_port: Option<Box<dyn InterventionPort>>,
+    /// Operator consent grants (TODO-13: scoped, versioned, expiring).
+    consent: Option<russell_core::sovereignty::OperatorConsent>,
 }
 
 impl SessionEngine {
@@ -38,6 +40,7 @@ impl SessionEngine {
             system_prompt: system_prompt.into(),
             inference: None,
             intervention_port: None,
+            consent: None,
         }
     }
 
@@ -56,6 +59,41 @@ impl SessionEngine {
     /// Access the session manager (for GC, inspection).
     pub fn sessions_mut(&mut self) -> &mut SessionManager {
         &mut self.sessions
+    }
+
+    /// Grant operator consent for a specific action.
+    /// Records the grant with scope, version, and expiry per P2 (Affirmative Consent).
+    pub fn grant_consent(
+        &mut self,
+        action: String,
+        grant: russell_core::sovereignty::ConsentGrant,
+    ) {
+        if self.consent.is_none() {
+            self.consent = Some(russell_core::sovereignty::OperatorConsent::new());
+        }
+        if let Some(ref mut consent) = self.consent {
+            consent.grant(action, grant);
+        }
+    }
+
+    /// Revoke operator consent for a specific action.
+    pub fn revoke_consent(&mut self, action: &str) {
+        if let Some(ref mut consent) = self.consent {
+            consent.revoke(action);
+        }
+    }
+
+    /// Check whether consent exists for a given action, considering
+    /// scope, version, and expiry per P2 (Affirmative Consent).
+    pub fn check_consent(
+        &self,
+        action: &str,
+        current_version: Option<&str>,
+    ) -> russell_core::sovereignty::ConsentStatus {
+        match &self.consent {
+            Some(consent) => consent.check_consent(action, current_version),
+            None => russell_core::sovereignty::ConsentStatus::Denied,
+        }
     }
 
     /// Create a new session.
@@ -184,6 +222,20 @@ impl SessionEngine {
                     intervention_id = %intervention_id,
                     "Consent approved, executing intervention"
                 );
+
+                // Record the consent grant with scope, version, and expiry (P2).
+                let action_key = format!("{}/{}", skill_id, intervention_id);
+                let grant = russell_core::sovereignty::ConsentGrant {
+                    categories: std::collections::HashSet::new(),
+                    resource_version: None,
+                    expires_at: Some(chrono::Utc::now() + chrono::Duration::seconds(300)),
+                    scope: russell_core::sovereignty::ConsentScope::PerSkill {
+                        skill_id: skill_id.clone(),
+                    },
+                    granted_at: chrono::Utc::now(),
+                };
+                self.grant_consent(action_key, grant);
+
                 match self.execute_intervention(&skill_id, &intervention_id, &args) {
                     Ok(res) => (Some(res), None),
                     Err(e) => {
@@ -375,5 +427,93 @@ mod tests {
         let engine = SessionEngine::new("You are Jack.");
         let result = engine.get_session("nonexistent");
         assert!(result.is_err());
+    }
+
+    // ── Consent tests (TODO-13) ──────────────────────────────────────
+
+    #[test]
+    fn engine_consent_default_is_deny() {
+        let engine = SessionEngine::new("You are Jack.");
+        let status = engine.check_consent("test/action", None);
+        assert!(
+            matches!(status, russell_core::sovereignty::ConsentStatus::Denied),
+            "consent should be denied by default (P2: fail-closed)"
+        );
+    }
+
+    #[test]
+    fn engine_grant_and_check_consent() {
+        use russell_core::sovereignty::{ConsentGrant, ConsentScope};
+        use std::collections::HashSet;
+
+        let mut engine = SessionEngine::new("You are Jack.");
+        let grant = ConsentGrant {
+            categories: HashSet::new(),
+            resource_version: Some("v1".to_string()),
+            expires_at: Some(chrono::Utc::now() + chrono::Duration::hours(1)),
+            scope: ConsentScope::PerSkill {
+                skill_id: "test-skill".to_string(),
+            },
+            granted_at: chrono::Utc::now(),
+        };
+        engine.grant_consent("test-skill/action".to_string(), grant);
+
+        let status = engine.check_consent("test-skill/action", None);
+        assert!(
+            matches!(
+                status,
+                russell_core::sovereignty::ConsentStatus::Granted { .. }
+            ),
+            "consent should be granted after explicit grant"
+        );
+    }
+
+    #[test]
+    fn engine_consent_version_mismatch() {
+        use russell_core::sovereignty::{ConsentGrant, ConsentScope, ConsentStatus};
+        use std::collections::HashSet;
+
+        let mut engine = SessionEngine::new("You are Jack.");
+        let grant = ConsentGrant {
+            categories: HashSet::new(),
+            resource_version: Some("v1".to_string()),
+            expires_at: None,
+            scope: ConsentScope::Master,
+            granted_at: chrono::Utc::now(),
+        };
+        engine.grant_consent("test/action".to_string(), grant);
+
+        // Same version → Granted
+        let status = engine.check_consent("test/action", Some("v1"));
+        assert!(matches!(status, ConsentStatus::Granted { .. }));
+
+        // Different version → VersionMismatch
+        let status = engine.check_consent("test/action", Some("v2"));
+        assert!(matches!(status, ConsentStatus::VersionMismatch { .. }));
+    }
+
+    #[test]
+    fn engine_revoke_consent() {
+        use russell_core::sovereignty::{ConsentGrant, ConsentScope, ConsentStatus};
+        use std::collections::HashSet;
+
+        let mut engine = SessionEngine::new("You are Jack.");
+        let grant = ConsentGrant {
+            categories: HashSet::new(),
+            resource_version: None,
+            expires_at: None,
+            scope: ConsentScope::Master,
+            granted_at: chrono::Utc::now(),
+        };
+        engine.grant_consent("test/action".to_string(), grant);
+
+        // Granted
+        let status = engine.check_consent("test/action", None);
+        assert!(matches!(status, ConsentStatus::Granted { .. }));
+
+        // Revoke
+        engine.revoke_consent("test/action");
+        let status = engine.check_consent("test/action", None);
+        assert!(matches!(status, ConsentStatus::Denied));
     }
 }

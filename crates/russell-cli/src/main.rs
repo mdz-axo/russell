@@ -53,7 +53,14 @@ enum Command {
     /// Run Sentinel once.
     SentinelOnce,
     /// Interactive chat with Jack.
-    Chat,
+    Chat {
+        /// Disable HHH (Helpful, Honest, Harmless) filter.
+        #[arg(long)]
+        no_hhh: bool,
+        /// Use a specific persona instead of Jack.
+        #[arg(long)]
+        persona: Option<String>,
+    },
     /// List skills.
     SkillList,
     /// Run a skill.
@@ -93,7 +100,7 @@ async fn main() -> Result<()> {
         Command::List { limit } => commands::list::run(&paths, limit),
         Command::Digest { since_hours } => commands::digest::run(&paths, since_hours, "stdout"),
         Command::SentinelOnce => commands::sentinel_once::run(&paths),
-        Command::Chat => commands::chat::run(&paths).await,
+        Command::Chat { no_hhh, persona } => commands::chat::run(&paths, no_hhh, persona).await,
         Command::SkillList => commands::skill::list(&paths),
         Command::SkillRun { id } => commands::skill::run(&paths, &id, false).await,
         Command::SkillInstall { name } => {

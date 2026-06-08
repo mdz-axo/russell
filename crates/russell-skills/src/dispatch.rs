@@ -31,6 +31,7 @@ use russell_core::Result;
 use russell_core::event::{Event, Severity};
 use russell_core::journal::JournalWriter;
 use russell_core::journal::port::JournalWritePort;
+use russell_core::sovereignty::{DataCategory, SovereigntyChecker};
 use tracing::{debug, warn};
 use zeroize::Zeroize;
 
@@ -225,6 +226,9 @@ pub struct Dispatcher {
     /// If `None`, no sandbox is applied (default for backward compatibility).
     /// Set to `Some(SandboxConfig::for_skill(&skill_dir))` for production use.
     pub sandbox: Option<SandboxConfig>,
+    /// Sovereignty checker for P1/P4 data access gating.
+    /// Defaults to `SovereigntyChecker::russell_default()`.
+    pub sovereignty: SovereigntyChecker,
 }
 
 impl std::fmt::Debug for Dispatcher {
@@ -316,7 +320,24 @@ impl Dispatcher {
             stdin_content: None,
             allowed_env_keys: Vec::new(),
             sandbox: Some(SandboxConfig::for_skill(&skill_dir)),
+            sovereignty: SovereigntyChecker::russell_default(),
         }
+    }
+
+    /// Check whether a skill may access the given data category.
+    /// Returns `Ok(())` if access is allowed, `Err` with the sovereignty error if denied.
+    ///
+    /// This is the P1/P4 gate for skill dispatch — every skill that accesses
+    /// sovereign data categories (journal entries, SOAP bundles, proprioceptive
+    /// readings, consent records, operator profile) must pass through this gate.
+    pub fn require_sovereignty(
+        &self,
+        category: &DataCategory,
+        requester: &str,
+        has_consent: bool,
+    ) -> std::result::Result<(), russell_core::sovereignty::SovereigntyError> {
+        self.sovereignty
+            .require_sovereignty(category, requester, has_consent)
     }
 
     /// Check whether an intervention at the given risk band may auto-execute.
@@ -988,6 +1009,7 @@ mod tests {
             stdin_content: None,
             allowed_env_keys: Vec::new(),
             sandbox: None,
+            sovereignty: SovereigntyChecker::russell_default(),
         };
         // Dry-run skips validation — any command shape accepted.
         let outcome = d
@@ -1011,6 +1033,7 @@ mod tests {
             stdin_content: None,
             allowed_env_keys: Vec::new(),
             sandbox: None,
+            sovereignty: SovereigntyChecker::russell_default(),
         };
         let outcome = d
             .run(&["/bin/echo".into(), "hello".into()], None)
@@ -1033,6 +1056,7 @@ mod tests {
             stdin_content: None,
             allowed_env_keys: Vec::new(),
             sandbox: None,
+            sovereignty: SovereigntyChecker::russell_default(),
         };
         let outcome = d.run(&[], None).await.unwrap();
         assert_eq!(outcome.exit_code, Some(-1));
@@ -1051,6 +1075,7 @@ mod tests {
             stdin_content: None,
             allowed_env_keys: Vec::new(),
             sandbox: None,
+            sovereignty: SovereigntyChecker::russell_default(),
         };
         let outcome = d
             .run(&["curl".into(), "http://evil.com".into()], None)
@@ -1072,6 +1097,7 @@ mod tests {
             stdin_content: None,
             allowed_env_keys: Vec::new(),
             sandbox: None,
+            sovereignty: SovereigntyChecker::russell_default(),
         };
         let outcome = d
             .run(&["./scripts/../../../etc/passwd".into()], None)
@@ -1093,6 +1119,7 @@ mod tests {
             stdin_content: None,
             allowed_env_keys: Vec::new(),
             sandbox: None,
+            sovereignty: SovereigntyChecker::russell_default(),
         };
         // Sleep longer than the timeout — uses allowed interpreter `sh`.
         let outcome = d
@@ -1125,6 +1152,7 @@ mod tests {
             stdin_content: None,
             allowed_env_keys: Vec::new(),
             sandbox: None,
+            sovereignty: SovereigntyChecker::russell_default(),
         };
         let outcome = d
             .run_and_journal(
@@ -1183,6 +1211,7 @@ mod tests {
             stdin_content: None,
             allowed_env_keys: Vec::new(),
             sandbox: None,
+            sovereignty: SovereigntyChecker::russell_default(),
         };
         let outcome = d
             .run_and_journal(
@@ -1219,6 +1248,7 @@ mod tests {
             stdin_content: None,
             allowed_env_keys: Vec::new(),
             sandbox: None,
+            sovereignty: SovereigntyChecker::russell_default(),
         };
         assert!(d.check_risk(RiskBand::None, false).is_ok());
         assert!(d.check_risk(RiskBand::Low, false).is_ok());
@@ -1239,6 +1269,7 @@ mod tests {
             stdin_content: None,
             allowed_env_keys: Vec::new(),
             sandbox: None,
+            sovereignty: SovereigntyChecker::russell_default(),
         };
         // High risk in dry-run mode should still pass — no mutation occurs.
         assert!(d.check_risk(RiskBand::Critical, true).is_ok());
@@ -1256,6 +1287,7 @@ mod tests {
             stdin_content: None,
             allowed_env_keys: Vec::new(),
             sandbox: None,
+            sovereignty: SovereigntyChecker::russell_default(),
         };
         assert!(d.check_risk(RiskBand::Medium, false).is_ok());
         assert!(d.check_risk(RiskBand::High, false).is_err());
@@ -1273,6 +1305,7 @@ mod tests {
             stdin_content: None,
             allowed_env_keys: Vec::new(),
             sandbox: None,
+            sovereignty: SovereigntyChecker::russell_default(),
         };
         let err = d.check_risk(RiskBand::High, false).unwrap_err();
         let msg = err.to_string();
@@ -1299,6 +1332,7 @@ mod tests {
             stdin_content: None,
             allowed_env_keys: Vec::new(),
             sandbox: None,
+            sovereignty: SovereigntyChecker::russell_default(),
         };
 
         // Forward: a command that exits non-zero.
@@ -1346,6 +1380,7 @@ mod tests {
             stdin_content: None,
             allowed_env_keys: Vec::new(),
             sandbox: None,
+            sovereignty: SovereigntyChecker::russell_default(),
         };
 
         let outcome = d
@@ -1386,6 +1421,7 @@ mod tests {
             stdin_content: None,
             allowed_env_keys: Vec::new(),
             sandbox: None,
+            sovereignty: SovereigntyChecker::russell_default(),
         };
 
         let outcome = d
@@ -1426,6 +1462,7 @@ mod tests {
             stdin_content: None,
             allowed_env_keys: Vec::new(),
             sandbox: None,
+            sovereignty: SovereigntyChecker::russell_default(),
         };
 
         let outcome = d
@@ -1543,5 +1580,440 @@ mod tests {
         std::fs::write(bundle.join("stdout.txt"), b"tampered content\n").unwrap();
 
         assert!(!verify_evidence_bundle(&bundle).unwrap());
+    }
+
+    // ── Sovereignty gate tests (TODO-12) ─────────────────────────────────
+
+    #[test]
+    fn sovereignty_deny_without_consent() {
+        use russell_core::sovereignty::DataCategory;
+        let tmp = tempfile::tempdir().unwrap();
+        let dispatcher = Dispatcher::new(tmp.path());
+        // Accessing sovereign data without consent should be denied.
+        let result = dispatcher.require_sovereignty(
+            &DataCategory::JournalEntry,
+            "test-skill",
+            false, // no consent
+        );
+        assert!(
+            result.is_err(),
+            "sovereign data access without consent should be denied"
+        );
+    }
+
+    #[test]
+    fn sovereignty_allow_with_consent() {
+        use russell_core::sovereignty::DataCategory;
+        let tmp = tempfile::tempdir().unwrap();
+        let dispatcher = Dispatcher::new(tmp.path());
+        // Accessing sovereign data with consent should be allowed.
+        let result = dispatcher.require_sovereignty(
+            &DataCategory::JournalEntry,
+            "test-skill",
+            true, // has consent
+        );
+        assert!(
+            result.is_ok(),
+            "sovereign data access with consent should be allowed"
+        );
+    }
+
+    #[test]
+    fn sovereignty_public_always_accessible() {
+        use russell_core::sovereignty::DataCategory;
+        let tmp = tempfile::tempdir().unwrap();
+        let dispatcher = Dispatcher::new(tmp.path());
+        // Public data should be accessible even without consent.
+        let result =
+            dispatcher.require_sovereignty(&DataCategory::HlexiconTerm, "test-skill", false);
+        assert!(result.is_ok(), "public data should always be accessible");
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // P0 SECURITY: Capability attenuation at dispatch (ADR-0031)
+    // ═══════════════════════════════════════════════════════════════════════
+
+    // REQ: ADR-0031 — Default-deny: skill without allowed_env_keys gets zero env vars.
+    #[tokio::test]
+    async fn default_deny_no_extra_env_keys() {
+        let tmp = tempfile::tempdir().unwrap();
+        let dispatcher = Dispatcher {
+            skill_dir: tmp.path().to_path_buf(),
+            dry_run: DryRun::Disabled,
+            probe_timeout: Duration::from_secs(30),
+            intervention_timeout: Duration::from_secs(120),
+            max_auto_risk: RiskBand::Low,
+            sudo_password: None,
+            stdin_content: None,
+            allowed_env_keys: vec![], // no extra env keys
+            sandbox: None,
+            sovereignty: SovereigntyChecker::russell_default(),
+        };
+        // Run a command that prints env vars — only the default allowlist should be present.
+        let outcome = dispatcher
+            .run(&["/usr/bin/env".into()], None)
+            .await
+            .unwrap();
+        assert_eq!(outcome.exit_code, Some(0));
+        // PATH should be the restrictive one we set
+        for line in outcome.stdout.lines() {
+            if line.starts_with("PATH=") {
+                assert_eq!(
+                    line, "PATH=/usr/local/bin:/usr/bin:/bin",
+                    "PATH should be restrictive"
+                );
+            }
+        }
+        // RUSSELL_* vars should NOT be present (they're not in the allowlist)
+        assert!(
+            !outcome.stdout.contains("RUSSELL_"),
+            "no RUSSELL_ env vars should leak"
+        );
+    }
+
+    // REQ: ADR-0031 — Secrets are not leaked to skill subprocesses.
+    #[tokio::test]
+    async fn secrets_not_leaked_to_subprocess() {
+        // Set a secret env var that should NOT leak into the subprocess.
+        std::env::set_var("RUSSELL_ACP_SECRET", "super-secret-value");
+        let tmp = tempfile::tempdir().unwrap();
+        let dispatcher = Dispatcher {
+            skill_dir: tmp.path().to_path_buf(),
+            dry_run: DryRun::Disabled,
+            probe_timeout: Duration::from_secs(30),
+            intervention_timeout: Duration::from_secs(120),
+            max_auto_risk: RiskBand::Low,
+            sudo_password: None,
+            stdin_content: None,
+            allowed_env_keys: vec![],
+            sandbox: None,
+            sovereignty: SovereigntyChecker::russell_default(),
+        };
+        let outcome = dispatcher
+            .run(&["/usr/bin/env".into()], None)
+            .await
+            .unwrap();
+        std::env::remove_var("RUSSELL_ACP_SECRET");
+        assert_eq!(outcome.exit_code, Some(0));
+        assert!(
+            !outcome.stdout.contains("RUSSELL_ACP_SECRET"),
+            "RUSSELL_ACP_SECRET should not leak to subprocess"
+        );
+        assert!(
+            !outcome.stdout.contains("super-secret-value"),
+            "secret value should not appear in subprocess env"
+        );
+    }
+
+    // REQ: ADR-0031 — allowed_env_keys grants access to specific env vars.
+    #[tokio::test]
+    async fn allowed_env_keys_grants_access() {
+        std::env::set_var("MY_TOOL_API_KEY", "test-key-123");
+        let tmp = tempfile::tempdir().unwrap();
+        let dispatcher = Dispatcher {
+            skill_dir: tmp.path().to_path_buf(),
+            dry_run: DryRun::Disabled,
+            probe_timeout: Duration::from_secs(30),
+            intervention_timeout: Duration::from_secs(120),
+            max_auto_risk: RiskBand::Low,
+            sudo_password: None,
+            stdin_content: None,
+            allowed_env_keys: vec!["MY_TOOL_API_KEY".into()],
+            sandbox: None,
+            sovereignty: SovereigntyChecker::russell_default(),
+        };
+        let outcome = dispatcher
+            .run(&["/usr/bin/env".into()], None)
+            .await
+            .unwrap();
+        std::env::remove_var("MY_TOOL_API_KEY");
+        assert_eq!(outcome.exit_code, Some(0));
+        assert!(
+            outcome.stdout.contains("MY_TOOL_API_KEY=test-key-123"),
+            "allowed env key should be present"
+        );
+    }
+
+    // REQ: ADR-0031 — Non-allowed env vars are not leaked even when other vars are allowed.
+    #[tokio::test]
+    async fn non_allowed_env_vars_not_leaked() {
+        std::env::set_var("MY_ALLOWED_KEY", "allowed");
+        std::env::set_var("MY_BLOCKED_KEY", "blocked");
+        let tmp = tempfile::tempdir().unwrap();
+        let dispatcher = Dispatcher {
+            skill_dir: tmp.path().to_path_buf(),
+            dry_run: DryRun::Disabled,
+            probe_timeout: Duration::from_secs(30),
+            intervention_timeout: Duration::from_secs(120),
+            max_auto_risk: RiskBand::Low,
+            sudo_password: None,
+            stdin_content: None,
+            allowed_env_keys: vec!["MY_ALLOWED_KEY".into()],
+            sandbox: None,
+            sovereignty: SovereigntyChecker::russell_default(),
+        };
+        let outcome = dispatcher
+            .run(&["/usr/bin/env".into()], None)
+            .await
+            .unwrap();
+        std::env::remove_var("MY_ALLOWED_KEY");
+        std::env::remove_var("MY_BLOCKED_KEY");
+        assert_eq!(outcome.exit_code, Some(0));
+        assert!(
+            outcome.stdout.contains("MY_ALLOWED_KEY=allowed"),
+            "allowed key should be present"
+        );
+        assert!(
+            !outcome.stdout.contains("MY_BLOCKED_KEY"),
+            "non-allowed key should not leak"
+        );
+    }
+
+    // REQ: ADR-0031 — Bare command names are rejected (poka-yoke).
+    #[test]
+    fn bare_command_rejected_for_capability_safety() {
+        let err = validate_command_path("russell");
+        assert!(matches!(err, Err(CommandPathError::BareCommand { .. })));
+    }
+
+    // REQ: ADR-0031 — Path traversal in command is rejected.
+    #[test]
+    fn path_traversal_rejected_for_capability_safety() {
+        let err = validate_command_path("/tmp/../etc/passwd");
+        assert!(matches!(err, Err(CommandPathError::PathTraversal { .. })));
+    }
+
+    // REQ: ADR-0031 — Allowed interpreters are accepted.
+    #[test]
+    fn allowed_interpreter_accepted() {
+        assert!(validate_command_path("/bin/bash").is_ok());
+        assert!(validate_command_path("/usr/bin/python3").is_ok());
+    }
+
+    // REQ: ADR-0031 — Full path is accepted.
+    #[test]
+    fn full_path_accepted() {
+        assert!(validate_command_path("/usr/bin/echo").is_ok());
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // P0 SECURITY: Evidence bundle SHA-256 sealing (ADR-0032)
+    // ═══════════════════════════════════════════════════════════════════════
+
+    // REQ: ADR-0032 — write_evidence produces manifest.json with correct hashes.
+    #[test]
+    fn write_evidence_produces_manifest_with_hashes() {
+        use sha2::{Digest, Sha256};
+        let dir = tempfile::tempdir().unwrap();
+        let evidence_dir = dir.path().join("evidence-test");
+
+        let outcome = RunOutcome {
+            cmd: vec!["/bin/echo".into(), "hello".into()],
+            dry_run: false,
+            exit_code: Some(0),
+            stdout: "hello\n".into(),
+            stderr: String::new(),
+            timed_out: false,
+            duration: std::time::Duration::from_millis(10),
+            rollback: None,
+        };
+
+        let event =
+            russell_core::event::Event::new("skill_probe", russell_core::event::Severity::Info);
+
+        write_evidence(&evidence_dir, &outcome, &event).unwrap();
+
+        // manifest.json must exist
+        let manifest_path = evidence_dir.join("manifest.json");
+        assert!(manifest_path.exists(), "manifest.json must be created");
+
+        // Parse manifest and verify structure
+        let manifest: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(manifest_path).unwrap()).unwrap();
+        assert_eq!(manifest["version"], "1.0");
+        assert!(manifest["created_at"].is_string());
+        assert!(manifest["files"].is_object());
+
+        // stdout.txt must have a sha256 entry
+        let stdout_entry = &manifest["files"]["stdout.txt"];
+        assert!(stdout_entry["sha256"].is_string());
+        assert!(stdout_entry["size_bytes"].is_number());
+
+        // Verify the hash is correct
+        let stdout_content = std::fs::read(evidence_dir.join("stdout.txt")).unwrap();
+        let mut hasher = Sha256::new();
+        hasher.update(&stdout_content);
+        let expected_hash = hex::encode(hasher.finalize());
+        assert_eq!(stdout_entry["sha256"].as_str().unwrap(), expected_hash);
+    }
+
+    // REQ: ADR-0032 — verify_evidence_bundle returns true for intact bundle.
+    #[test]
+    fn evidence_sealing_intact_bundle() {
+        use sha2::{Digest, Sha256};
+        let dir = tempfile::tempdir().unwrap();
+        let bundle = dir.path().join("sealed-bundle");
+        std::fs::create_dir_all(&bundle).unwrap();
+
+        let stdout = b"test output\n";
+        std::fs::write(bundle.join("stdout.txt"), stdout).unwrap();
+        let mut hasher = Sha256::new();
+        hasher.update(stdout);
+        let stdout_hash = hex::encode(hasher.finalize());
+
+        let event_json = r#"{"action":"skill_probe","severity":"info"}"#;
+        std::fs::write(bundle.join("event.json"), event_json).unwrap();
+        let mut event_hasher = Sha256::new();
+        event_hasher.update(event_json.as_bytes());
+        let event_hash = hex::encode(event_hasher.finalize());
+
+        let manifest = serde_json::json!({
+            "version": "1.0",
+            "created_at": "2026-06-07T00:00:00Z",
+            "files": {
+                "stdout.txt": { "sha256": stdout_hash, "size_bytes": stdout.len() },
+                "event.json": { "sha256": event_hash, "size_bytes": event_json.len() }
+            }
+        });
+        std::fs::write(
+            bundle.join("manifest.json"),
+            serde_json::to_string_pretty(&manifest).unwrap(),
+        )
+        .unwrap();
+
+        assert!(verify_evidence_bundle(&bundle).unwrap());
+    }
+
+    // REQ: ADR-0032 — Tampered stdout is detected.
+    #[test]
+    fn evidence_sealing_detects_tampered_stdout() {
+        use sha2::{Digest, Sha256};
+        let dir = tempfile::tempdir().unwrap();
+        let bundle = dir.path().join("tampered-stdout");
+        std::fs::create_dir_all(&bundle).unwrap();
+
+        let stdout = b"original\n";
+        std::fs::write(bundle.join("stdout.txt"), stdout).unwrap();
+        let mut hasher = Sha256::new();
+        hasher.update(stdout);
+        let stdout_hash = hex::encode(hasher.finalize());
+
+        let manifest = serde_json::json!({
+            "version": "1.0",
+            "created_at": "2026-06-07T00:00:00Z",
+            "files": {
+                "stdout.txt": { "sha256": stdout_hash, "size_bytes": stdout.len() }
+            }
+        });
+        std::fs::write(
+            bundle.join("manifest.json"),
+            serde_json::to_string_pretty(&manifest).unwrap(),
+        )
+        .unwrap();
+
+        // Tamper with stdout after writing manifest
+        std::fs::write(bundle.join("stdout.txt"), b"tampered\n").unwrap();
+
+        assert!(!verify_evidence_bundle(&bundle).unwrap());
+    }
+
+    // REQ: ADR-0032 — Tampered event.json is detected.
+    #[test]
+    fn evidence_sealing_detects_tampered_event() {
+        use sha2::{Digest, Sha256};
+        let dir = tempfile::tempdir().unwrap();
+        let bundle = dir.path().join("tampered-event");
+        std::fs::create_dir_all(&bundle).unwrap();
+
+        let event_json = r#"{"action":"skill_probe"}"#;
+        std::fs::write(bundle.join("event.json"), event_json).unwrap();
+        let mut hasher = Sha256::new();
+        hasher.update(event_json.as_bytes());
+        let event_hash = hex::encode(hasher.finalize());
+
+        let manifest = serde_json::json!({
+            "version": "1.0",
+            "created_at": "2026-06-07T00:00:00Z",
+            "files": {
+                "event.json": { "sha256": event_hash, "size_bytes": event_json.len() }
+            }
+        });
+        std::fs::write(
+            bundle.join("manifest.json"),
+            serde_json::to_string_pretty(&manifest).unwrap(),
+        )
+        .unwrap();
+
+        // Tamper with event.json after writing manifest
+        std::fs::write(bundle.join("event.json"), b"{\"action\":\"tampered\"}").unwrap();
+
+        assert!(!verify_evidence_bundle(&bundle).unwrap());
+    }
+
+    // REQ: ADR-0032 — Missing manifest.json returns error.
+    #[test]
+    fn evidence_sealing_missing_manifest() {
+        let dir = tempfile::tempdir().unwrap();
+        let bundle = dir.path().join("no-manifest");
+        std::fs::create_dir_all(&bundle).unwrap();
+        std::fs::write(bundle.join("stdout.txt"), b"data").unwrap();
+
+        assert!(verify_evidence_bundle(&bundle).is_err());
+    }
+
+    // REQ: ADR-0032 — Missing file referenced in manifest returns error.
+    #[test]
+    fn evidence_sealing_missing_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let bundle = dir.path().join("missing-file");
+        std::fs::create_dir_all(&bundle).unwrap();
+
+        let manifest = serde_json::json!({
+            "version": "1.0",
+            "created_at": "2026-06-07T00:00:00Z",
+            "files": {
+                "nonexistent.txt": { "sha256": "abc123", "size_bytes": 10 }
+            }
+        });
+        std::fs::write(
+            bundle.join("manifest.json"),
+            serde_json::to_string_pretty(&manifest).unwrap(),
+        )
+        .unwrap();
+
+        assert!(verify_evidence_bundle(&bundle).is_err());
+    }
+
+    // REQ: ADR-0032 — write_evidence includes event.json hash in manifest.
+    #[test]
+    fn write_evidence_includes_event_hash() {
+        let dir = tempfile::tempdir().unwrap();
+        let evidence_dir = dir.path().join("event-hash-test");
+
+        let outcome = RunOutcome {
+            cmd: vec!["/bin/echo".into()],
+            dry_run: false,
+            exit_code: Some(0),
+            stdout: "output\n".into(),
+            stderr: String::new(),
+            timed_out: false,
+            duration: std::time::Duration::from_millis(5),
+            rollback: None,
+        };
+
+        let event =
+            russell_core::event::Event::new("skill_probe", russell_core::event::Severity::Info);
+
+        write_evidence(&evidence_dir, &outcome, &event).unwrap();
+
+        let manifest: serde_json::Value = serde_json::from_str(
+            &std::fs::read_to_string(evidence_dir.join("manifest.json")).unwrap(),
+        )
+        .unwrap();
+
+        // event.json must be in the files map with a hash
+        let event_entry = &manifest["files"]["event.json"];
+        assert!(event_entry["sha256"].is_string());
+        assert!(!event_entry["sha256"].as_str().unwrap().is_empty());
     }
 }

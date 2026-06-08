@@ -69,6 +69,10 @@ pub enum AcpError {
     /// Invalid capability token (malformed or tampered).
     #[error("invalid token: {0}")]
     InvalidToken(String),
+
+    /// Sovereignty check denied access (P4 dual gate).
+    #[error("sovereignty denied: {0}")]
+    SovereigntyDenied(String),
 }
 
 /// Result type alias.

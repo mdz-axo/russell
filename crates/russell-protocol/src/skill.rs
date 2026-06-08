@@ -14,6 +14,13 @@ pub enum Visibility {
 }
 
 /// hLexicon domain (from skill manifests).
+///
+// DELIBERATE CHOICE: serde(rename_all = "lowercase") produces concatenated
+// lowercase ("wordact", "flowdef", "knowact") rather than snake_case
+// ("word_act", "flow_def", "know_act"). This is the wire format used by
+// the ACP capabilities endpoint. Changing to snake_case would break the
+// ACP wire protocol. If snake_case is desired, file an ADR and version
+// the ACP protocol. See OPEN_QUESTIONS.md OQ-16.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum LexiconDomain {

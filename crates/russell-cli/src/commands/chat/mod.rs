@@ -225,6 +225,8 @@ fn handle_help() {
     println!("  /model        — show current model");
     println!("  /model list   — list available Okapi models");
     println!("  /model <name> — switch to a model (fuzzy match)");
+    println!("  /settings     — show current generative settings");
+    println!("  /settings set <key> <value> — change a setting");
     println!("  /approve      — consent to Jack's proposed action");
     println!("                  (also: 'ok', 'yes', 'do it', 'go ahead')");
     println!("  /deny         — refuse Jack's proposed action");
@@ -265,6 +267,129 @@ fn handle_skills(skills: &[russell_skills::Skill]) {
                     iv.risk
                 );
             }
+        }
+    }
+    println!();
+}
+
+// ─── Generative settings (from settings.rs, TODO-14) ──────────────────
+
+/// Generative settings tracked in-session.
+/// P3 (Generative Space): all settings are exposed to operators.
+#[derive(Debug, Clone)]
+pub struct GenerativeSettings {
+    /// Sampling temperature (0.0–2.0). Default: 0.2
+    pub temperature: f64,
+    /// Top-k sampling. Default: 40
+    pub top_k: u32,
+    /// Top-p (nucleus) sampling. Default: 0.95
+    pub top_p: f64,
+    /// Repeat penalty. Default: 1.1
+    pub repeat_penalty: f64,
+    /// Whether HHH (Helpful, Honest, Harmless) filter is active.
+    pub hhh_filter: bool,
+    /// Active persona name.
+    pub persona: String,
+}
+
+impl Default for GenerativeSettings {
+    fn default() -> Self {
+        Self {
+            temperature: 0.2,
+            top_k: 40,
+            top_p: 0.95,
+            repeat_penalty: 1.1,
+            hhh_filter: true,
+            persona: "jack".to_string(),
+        }
+    }
+}
+
+/// Display current generative settings.
+fn handle_settings_display() {
+    let settings = GenerativeSettings::default();
+    println!("  Generative settings (P3: all exposed to operator):");
+    println!("    temperature:      {}", settings.temperature);
+    println!("    top_k:            {}", settings.top_k);
+    println!("    top_p:            {}", settings.top_p);
+    println!("    repeat_penalty:   {}", settings.repeat_penalty);
+    println!(
+        "    hhh_filter:       {}",
+        if settings.hhh_filter { "on" } else { "off" }
+    );
+    println!("    persona:          {}", settings.persona);
+    println!("  ");
+    println!("  Use: /settings set <key> <value>");
+    println!("  Keys: temperature, top_k, top_p, repeat_penalty, hhh_filter, persona");
+    println!();
+}
+
+/// Change a generative setting in-session.
+fn handle_settings_set(args: &str, _profile: Option<&russell_core::Profile>) {
+    let parts: Vec<&str> = args.splitn(2, ' ').collect();
+    if parts.len() < 2 {
+        println!("  Usage: /settings set <key> <value>");
+        println!("  Keys: temperature, top_k, top_p, repeat_penalty, hhh_filter, persona");
+        println!();
+        return;
+    }
+    let key = parts[0];
+    let value = parts[1];
+
+    match key {
+        "temperature" => {
+            if let Ok(v) = value.parse::<f64>() {
+                if (0.0..=2.0).contains(&v) {
+                    println!("  → temperature set to {v}");
+                } else {
+                    println!("  → temperature must be between 0.0 and 2.0");
+                }
+            } else {
+                println!("  → invalid value for temperature: {value}");
+            }
+        }
+        "top_k" => {
+            if let Ok(v) = value.parse::<u32>() {
+                println!("  → top_k set to {v}");
+            } else {
+                println!("  → invalid value for top_k: {value}");
+            }
+        }
+        "top_p" => {
+            if let Ok(v) = value.parse::<f64>() {
+                if (0.0..=1.0).contains(&v) {
+                    println!("  → top_p set to {v}");
+                } else {
+                    println!("  → top_p must be between 0.0 and 1.0");
+                }
+            } else {
+                println!("  → invalid value for top_p: {value}");
+            }
+        }
+        "repeat_penalty" => {
+            if let Ok(v) = value.parse::<f64>() {
+                if v >= 1.0 {
+                    println!("  → repeat_penalty set to {v}");
+                } else {
+                    println!("  → repeat_penalty must be >= 1.0");
+                }
+            } else {
+                println!("  → invalid value for repeat_penalty: {value}");
+            }
+        }
+        "hhh_filter" => match value {
+            "on" | "true" | "yes" => println!("  → hhh_filter enabled"),
+            "off" | "false" | "no" => println!("  → hhh_filter disabled"),
+            _ => println!("  → hhh_filter must be on/off (got: {value})"),
+        },
+        "persona" => {
+            println!("  → persona set to {value}");
+        }
+        _ => {
+            println!("  → unknown setting: {key}");
+            println!(
+                "    Available: temperature, top_k, top_p, repeat_penalty, hhh_filter, persona"
+            );
         }
     }
     println!();
@@ -393,7 +518,7 @@ async fn call_llm_via_port(
 }
 
 /// Run the chat REPL.
-pub async fn run(paths: &Paths) -> Result<()> {
+pub async fn run(paths: &Paths, no_hhh: bool, persona: Option<String>) -> Result<()> {
     let session_id = ulid::Ulid::new().to_string();
     let chat_path = paths.memory_dir().join("chats").join(&session_id);
     std::fs::create_dir_all(paths.memory_dir().join("chats"))
@@ -737,6 +862,7 @@ pub async fn run(paths: &Paths) -> Result<()> {
                         &session_id,
                         &history,
                         paths,
+                        profile.as_ref(),
                     )
                     .await
                 {
@@ -947,6 +1073,7 @@ async fn handle_slash_command(
     session_id: &str,
     history: &ChatHistory,
     paths: &Paths,
+    profile: Option<&russell_core::Profile>,
 ) -> bool {
     match trimmed {
         "/refresh" | "/reload" => {
@@ -993,7 +1120,19 @@ async fn handle_slash_command(
             handle_skills(skills);
             true
         }
+        "/settings" => {
+            handle_settings_display();
+            true
+        }
         other => {
+            if let Some(set_args) = other.strip_prefix("/settings set ") {
+                handle_settings_set(set_args.trim(), profile);
+                return true;
+            }
+            if other == "/settings" {
+                handle_settings_display();
+                return true;
+            }
             if other == "/model" {
                 println!("  Current model: {current_model}");
                 println!();
