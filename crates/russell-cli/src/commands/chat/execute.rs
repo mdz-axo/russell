@@ -136,7 +136,21 @@ pub async fn execute_pending_action(
     }
 
     // Prompt for sudo password if needed (secure terminal prompt, not CLI).
-    if needs_sudo {
+    // First check if sudo's credential cache is still valid (avoids re-prompting
+    // the operator within the sudo timestamp_timeout window).
+    let sudo_already_cached = if needs_sudo {
+        tokio::process::Command::new("sudo")
+            .args(["-n", "--", "true"])
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status()
+            .await
+            .is_ok_and(|s| s.success())
+    } else {
+        false
+    };
+
+    if needs_sudo && !sudo_already_cached {
         eprint!("  → Sudo password for this action: ");
         let _ = std::io::stderr().flush();
         let password = rpassword::read_password().unwrap_or_default();
@@ -166,12 +180,25 @@ pub async fn execute_pending_action(
             Ok(s) if s.success() => {
                 dispatcher.sudo_password =
                     Some(russell_skills::dispatch::SudoCredential::new(password));
+                // Refresh the sudo timestamp so subsequent commands don't re-prompt
+                // for at least the sudoers timestamp_timeout (typically 5-15 min).
+                let _ = tokio::process::Command::new("sudo")
+                    .args(["-v"])
+                    .stdout(std::process::Stdio::null())
+                    .stderr(std::process::Stdio::null())
+                    .status()
+                    .await;
             }
             _ => {
                 println!("  → Wrong sudo password. Aborting action.");
                 return None;
             }
         }
+    } else if needs_sudo {
+        // Sudo timestamp is already cached — use an empty credential as a marker
+        // so the dispatcher still wraps commands with sudo (but doesn't pipe a password).
+        dispatcher.sudo_password =
+            Some(russell_skills::dispatch::SudoCredential::new(String::new()));
     }
 
     let step_type = if is_probe {
@@ -483,15 +510,31 @@ pub async fn execute_shell_command(
         .stderr(std::process::Stdio::piped())
         .stdin(std::process::Stdio::piped());
 
-    // If sudo, prompt for password.
+    // If sudo, prompt for password — but only if the credential cache has expired.
     if needs_sudo {
-        eprint!("  \u{2192} Sudo password for shell command: ");
-        let _ = std::io::stderr().flush();
-        let password = rpassword::read_password().unwrap_or_default();
-        if password.is_empty() {
-            println!("  \u{2192} Empty password. Aborting.");
-            return None;
-        }
+        // Check if sudo timestamp is still valid (set by execute_pending_action
+        // via sudo -v, or from a prior shell command).
+        let cached = tokio::process::Command::new("sudo")
+            .args(["-n", "--", "true"])
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status()
+            .await
+            .is_ok_and(|s| s.success());
+
+        let password = if cached {
+            // Timestamp is valid — sudo -S will accept an empty/newline stdin.
+            String::new()
+        } else {
+            eprint!("  \u{2192} Sudo password for shell command: ");
+            let _ = std::io::stderr().flush();
+            let pw = rpassword::read_password().unwrap_or_default();
+            if pw.is_empty() {
+                println!("  \u{2192} Empty password. Aborting.");
+                return None;
+            }
+            pw
+        };
         // Spawn and pipe password.
         let mut child = match cmd.spawn() {
             Ok(c) => c,
